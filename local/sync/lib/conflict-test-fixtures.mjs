@@ -27,12 +27,16 @@ export const proveWithIndex = (
   stages = stagesOf(merged)
 ) => proveFile({ path, merged, moduleExists, stages })
 
-/** `history` over in-memory sides: `{ base: { path: text }, ours, theirs }`, renames base path -> side path. */
-export const historyOf = (sides, renames = {}) =>
+/**
+ * `history` over in-memory sides: `{ base: { path: text }, ours, theirs }`, renames base path -> side
+ * path, and the moved paths whose merged copy the merge is taken to have carried.
+ */
+export const historyOf = (sides, renames = {}, carried = []) =>
   providerHistory({
     files: Object.fromEntries(
       Object.entries(sides).map(([side, blobs]) => [side, new Set(Object.keys(blobs))])
     ),
     read: (side, path) => sides[side][path] ?? null,
-    renames: { ours: new Map(renames.ours ?? []), theirs: new Map(renames.theirs ?? []) }
+    renames: { ours: new Map(renames.ours ?? []), theirs: new Map(renames.theirs ?? []) },
+    carries: ({ now }) => carried.includes(now)
   })

@@ -35,28 +35,34 @@ export function readState(gitDir) {
   return { kind: 'none' }
 }
 
+// The ref that holds the replayed (or reverted) commit for each operation `readState` names.
+const OPERATION_HEAD = {
+  merge: 'MERGE_HEAD',
+  'cherry-pick': 'CHERRY_PICK_HEAD',
+  rebase: 'REBASE_HEAD',
+  revert: 'REVERT_HEAD'
+}
+
 /**
- * The stage-1/2/3 commits of the live operation, or null; a revert's sides are its target and its
- * parent. `rev(ref)` is a verified oid or null; `gitText(args, options)` is the caller's git runner.
+ * The stage-1/2/3 commits of the operation `state` (readState's) names, or null. Derived from its kind,
+ * not from whichever *_HEAD ref a finished operation left behind. A merge with more than one merge base
+ * has a virtual base no commit holds, and a revert's sides are its target and its target's parent.
+ * `rev(ref)` is a verified oid or null; `gitText(args, options)` is the caller's git runner.
  */
-export function liveSides(rev, gitText) {
-  const [merge, pick, rebase, revert] = [
-    'MERGE_HEAD',
-    'CHERRY_PICK_HEAD',
-    'REBASE_HEAD',
-    'REVERT_HEAD'
-  ].map(rev)
+export function liveSides(state, rev, gitText) {
   const head = rev('HEAD')
-  if (merge) {
-    return {
-      base: gitText(['merge-base', head, merge], { allowFailure: true }),
-      ours: head,
-      theirs: merge
-    }
+  const operation = OPERATION_HEAD[state?.kind] ? rev(OPERATION_HEAD[state.kind]) : null
+  if (!head || !operation) {
+    return null
   }
-  const replayed = pick ?? rebase
-  if (replayed) {
-    return { base: rev(`${replayed}^`), ours: head, theirs: replayed }
+  if (state.kind === 'merge') {
+    const bases = (gitText(['merge-base', '--all', head, operation], { allowFailure: true }) ?? '')
+      .split('\n')
+      .filter(Boolean)
+    return bases.length === 1 ? { base: bases[0], ours: head, theirs: operation } : null
   }
-  return revert ? { base: revert, ours: head, theirs: rev(`${revert}^`) } : null
+  if (state.kind === 'revert') {
+    return { base: operation, ours: head, theirs: rev(`${operation}^`) }
+  }
+  return { base: rev(`${operation}^`), ours: head, theirs: operation }
 }

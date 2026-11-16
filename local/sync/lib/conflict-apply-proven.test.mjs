@@ -94,17 +94,15 @@ test('apply-proven writes only a path git lists as unmerged, and never through a
     worktree(() => proven, ['src/link.ts'], ['src/link.ts'])
   )
   assert.equal(plan.writes.length, 0)
+  assert.deepEqual(plan.staged, [{ path: 'src/p.ts' }])
   assert.deepEqual(
     plan.refused.map((item) => [item.path, item.reason]),
-    [
-      ['src/p.ts', 'git does not list it as unmerged'],
-      ['src/link.ts', 'it is a symlink; writing would follow it']
-    ]
+    [['src/link.ts', 'it is a symlink; writing would follow it']]
   )
   assert.throws(() => planApplyProven(decision, { readText: () => proven }), /unmerged/)
 })
 
-test('apply-proven run again re-checks what it already wrote and refuses what it cannot', () => {
+test('apply-proven run again re-checks what it wrote, and leaves a staged path alone without failing', () => {
   const resolved = file('const a = 1')
   const original = { 'src/p.ts': proven, 'src/staged.ts': proven }
   const plan = planApplyProven(
@@ -116,13 +114,15 @@ test('apply-proven run again re-checks what it already wrote and refuses what it
   )
   assert.equal(plan.writes.length, 0)
   assert.deepEqual(plan.already, [{ path: 'src/p.ts' }])
-  // Its stages are gone once it is staged, so there is nothing to re-check it against.
-  assert.deepEqual(
-    plan.refused.map((item) => [item.path, item.reason.split(':')[0]]),
-    [['src/staged.ts', 'no longer unmerged']]
-  )
+  // Its stages are gone once it is staged: it is reported, not re-checked, and refuses nothing.
+  assert.deepEqual(plan.staged, [{ path: 'src/staged.ts' }])
+  assert.deepEqual(plan.refused, [])
   const rendered = renderApplyPlan(plan, [])
-  assert.match(rendered.split('\n').at(-1), /1 already written by an earlier run.*1 refused/)
+  assert.match(rendered, /staged {2}src\/staged\.ts — no longer unmerged: staged, not re-checked/)
+  assert.match(
+    rendered.split('\n').at(-1),
+    /1 already written by an earlier run, 1 staged.*0 refused/
+  )
 })
 
 test('a file the decision says is resolved is refused when the live index now refuses it', () => {

@@ -1,10 +1,10 @@
 // The whole-file gate a resolution passes after every hunk in it is proven: `conflict-prove.mjs` has the
 // tiers and the reasons this exists. Pure: the index facts (`moduleExists`, the three stages) are injected.
-import { ALIAS_PREFIXES, WORKSPACE_PREFIX, resolvesInIndex } from './conflict-module-resolve.mjs'
+import { modulePaths, resolvesInIndex } from './conflict-module-resolve.mjs'
 import { swappedProviders } from './conflict-provider-gate.mjs'
 import { parseSource, ts } from './ts-source.mjs'
 
-export { resolvesInIndex }
+export { modulePaths, resolvesInIndex }
 
 /** The module and bound names of one import declaration; `type ` prefixes a type-only module. */
 export function importFacts(node) {
@@ -21,60 +21,6 @@ export function importFacts(node) {
   }
   const typeOnly = Boolean(clause?.isTypeOnly)
   return { module: `${typeOnly ? 'type ' : ''}${node.moduleSpecifier.text}`, names }
-}
-
-// `vi.mock('../x')` and friends carry a module path exactly as an import does.
-const PATH_CALLEE =
-  /^(?:require|require\.resolve|(?:vi|vitest|jest)\.(?:mock|doMock|unmock|doUnmock|importActual|importMock|requireActual|requireMock))$/
-
-const isPathSpecifier = (text) =>
-  /^\.\.?(?:\/|$)/.test(text) ||
-  ALIAS_PREFIXES.some((alias) => text.startsWith(alias)) ||
-  text.startsWith(WORKSPACE_PREFIX)
-
-const isTypeOnly = (node) =>
-  Boolean(
-    (ts.isImportDeclaration(node) && node.importClause?.isTypeOnly) ||
-    (ts.isExportDeclaration(node) && node.isTypeOnly)
-  )
-
-/**
- * Relative, aliased and workspace module specifiers in a parsed file, each with how it is resolved:
- * `type` (may name a `.d.ts`), `value`, or `url` (a `new URL(…, import.meta.url)`: the exact path).
- */
-export function modulePaths(sf) {
-  const found = new Map()
-  const take = (node, kind) => {
-    if (node && (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node))) {
-      if (isPathSpecifier(node.text) && !found.has(`${kind}\u0000${node.text}`)) {
-        found.set(`${kind}\u0000${node.text}`, { specifier: node.text, kind })
-      }
-    }
-  }
-  const visit = (node) => {
-    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
-      take(node.moduleSpecifier, isTypeOnly(node) ? 'type' : 'value')
-    } else if (ts.isExternalModuleReference(node)) {
-      take(node.expression, 'value')
-    } else if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument)) {
-      take(node.argument.literal, 'type')
-    } else if (
-      ts.isCallExpression(node) &&
-      (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
-        PATH_CALLEE.test(node.expression.getText(sf)))
-    ) {
-      take(node.arguments[0], 'value')
-    } else if (
-      ts.isNewExpression(node) &&
-      node.expression.getText(sf) === 'URL' &&
-      node.arguments?.[1]?.getText(sf) === 'import.meta.url'
-    ) {
-      take(node.arguments[0], 'url')
-    }
-    ts.forEachChild(node, visit)
-  }
-  visit(sf)
-  return [...found.values()]
 }
 
 /**
@@ -150,6 +96,7 @@ const NOT_A_REFERENCE = new Set([
   ts.SyntaxKind.BreakStatement,
   ts.SyntaxKind.ContinueStatement
 ])
+// An identifier in these slots is the name being declared, not a use of anything.
 const DECLARES = new Set([
   ts.SyntaxKind.VariableDeclaration,
   ts.SyntaxKind.BindingElement,
@@ -165,23 +112,52 @@ const DECLARES = new Set([
   ts.SyntaxKind.TypeParameter
 ])
 
+const bindingNames = (name) =>
+  ts.isIdentifier(name)
+    ? [name.text]
+    : name.elements.flatMap((element) =>
+        ts.isOmittedExpression(element) ? [] : bindingNames(element.name)
+      )
+
 /**
- * Identifier texts used outside import declarations, and the names the file declares anywhere. A text
- * scan, not a binder: a shadowing declaration in some inner scope hides a use, and a false hit only
- * refuses.
+ * Names declared at module scope: top-level statements, top-level variable bindings, and the
+ * declarations inside `declare global`. Only these can stand in for a dropped import; an inner
+ * parameter, `<T>` or local const named like it binds nothing at module scope.
+ */
+function moduleScopeDeclarations(statements, declared = new Set()) {
+  for (const statement of statements) {
+    if (ts.isVariableStatement(statement)) {
+      for (const declaration of statement.declarationList.declarations) {
+        bindingNames(declaration.name).forEach((name) => declared.add(name))
+      }
+    } else if (
+      ts.isModuleDeclaration(statement) &&
+      (statement.flags & ts.NodeFlags.GlobalAugmentation) !== 0
+    ) {
+      if (statement.body && ts.isModuleBlock(statement.body)) {
+        moduleScopeDeclarations(statement.body.statements, declared)
+      }
+    } else if (statement.name && ts.isIdentifier(statement.name)) {
+      declared.add(statement.name.text)
+    }
+  }
+  return declared
+}
+
+/**
+ * Identifier texts used outside import declarations, and the module-scope names the file declares. A
+ * text scan, not a binder: a use an inner declaration shadows still counts, and a false hit only refuses.
  */
 function referencesAndDeclarations(sf) {
   const used = new Set()
-  const declared = new Set()
   const visit = (node) => {
     if (ts.isImportDeclaration(node) || ts.isImportEqualsDeclaration(node)) {
       return
     }
     if (ts.isIdentifier(node)) {
       const parent = node.parent
-      if (DECLARES.has(parent.kind) && parent.name === node) {
-        declared.add(node.text)
-      } else if (
+      if (
+        !(DECLARES.has(parent.kind) && parent.name === node) &&
         !(ts.isPropertyAccessExpression(parent) && parent.name === node) &&
         !(ts.isQualifiedName(parent) && parent.right === node) &&
         !(NOT_A_REFERENCE.has(parent.kind) && (parent.name === node || parent.label === node))
@@ -192,7 +168,7 @@ function referencesAndDeclarations(sf) {
     ts.forEachChild(node, visit)
   }
   visit(sf)
-  return { used, declared }
+  return { used, declared: moduleScopeDeclarations(sf.statements) }
 }
 
 /**

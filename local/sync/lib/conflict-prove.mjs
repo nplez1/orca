@@ -16,7 +16,7 @@
 // That gate exists because no tier above can see the tree, git's clean merge, or another file. In the
 // 2026-11-15 sync 88 of 189 "proven" files differed from the merge that shipped: stale paths after
 // upstream's reorganisation, orphaned imports, and one binding re-pointed at a module the fork's edit
-// never reached. The gate refuses all 88; the 100 files it still writes are byte-identical.
+// never reached. The gate refuses all 88; the 84 files it still writes are byte-identical.
 //
 // Comments are not always noise. A directive comment (`@vitest-environment`, `@ts-expect-error`,
 // `eslint-disable`, `/// <reference>`, a JSDoc type in a JS file) *is* code: dropping one changes a test

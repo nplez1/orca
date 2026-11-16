@@ -39,7 +39,7 @@ export function planApplyProven(
       `the decision was proposed for ${stateKey(decision.state)}, the worktree is at ${stateKey(state)}: re-run --propose`
     )
   }
-  const plan = { writes: [], already: [], removals: [], unproven: [], refused: [] }
+  const plan = { writes: [], already: [], staged: [], removals: [], unproven: [], refused: [] }
   for (const file of decision.files) {
     if (file.proposal?.action === 'delete') {
       plan.removals.push({
@@ -73,22 +73,24 @@ export function planApplyProven(
       plan.refused.push({ path: file.path, reason: 'it is a symlink; writing would follow it' })
       continue
     }
+    // Staged (or never conflicted): a person has taken the path over, so it is neither written nor, with
+    // its stages gone, re-checked. Not a failure: a partial `git add` then a rerun must not exit 1.
+    if (!unmerged.has(file.path)) {
+      plan.staged.push({ path: file.path })
+      continue
+    }
     const current = readText(file.path)
     // A second run over the same decision finds the files the first one wrote: on 2026-11-15 the rerun
     // called all 189 "changed since --propose" and exited 1. The recorded hash only nominates a file
     // (the decision is never the authority: an older tool's decision vouches for its own bad writes), so
     // each one is re-checked against the live index before it is reported as done.
     if (current !== null && proof.resolvedSha && sha256(current) === proof.resolvedSha) {
-      const recheck = recheckAlready(file.path, current, { unmerged, moduleExists, readStages })
+      const recheck = recheckAlready(file.path, current, { moduleExists, readStages })
       if (recheck === null) {
         plan.already.push({ path: file.path })
       } else {
         plan.refused.push({ path: file.path, reason: recheck })
       }
-      continue
-    }
-    if (!unmerged.has(file.path)) {
-      plan.refused.push({ path: file.path, reason: 'git does not list it as unmerged' })
       continue
     }
     if (current === null) {
@@ -124,10 +126,7 @@ export function planApplyProven(
 }
 
 /** Why a file holding the recorded resolution is not done after all, or null when it passes. */
-function recheckAlready(path, current, { unmerged, moduleExists, readStages }) {
-  if (!unmerged.has(path)) {
-    return 'no longer unmerged: its index stages are gone, so it cannot be re-checked; nothing written'
-  }
+function recheckAlready(path, current, { moduleExists, readStages }) {
   if (parseConflictHunks(current).length > 0) {
     return 'matches the recorded resolution but still has conflict markers; re-run --propose'
   }
@@ -160,13 +159,19 @@ export function attachProofs(files, { merged, stages, moduleExists }) {
 
 export function renderApplyPlan(plan, written) {
   const already = plan.already ?? []
-  const summary = `apply-proven: wrote ${written.length} fully proven file(s); ${already.length} already written by an earlier run, ${plan.unproven.length} not fully proven, ${plan.refused.length} refused, ${plan.removals.length} deletion(s) proposed`
+  const staged = plan.staged ?? []
+  const summary = `apply-proven: wrote ${written.length} fully proven file(s); ${already.length} already written by an earlier run, ${staged.length} staged, ${plan.unproven.length} not fully proven, ${plan.refused.length} refused, ${plan.removals.length} deletion(s) proposed`
   const rows = [summary]
   for (const write of plan.writes.filter((item) => written.includes(item.path))) {
     rows.push(`  wrote   ${write.path} — ${write.tiers.join(', ')}`)
   }
   for (const item of already) {
-    rows.push(`  already ${item.path} — holds the resolution this decision recorded, re-checked`)
+    rows.push(`  already ${item.path} — holds the recorded resolution; whole-file gate re-checked`)
+  }
+  for (const item of staged) {
+    rows.push(
+      `  staged  ${item.path} — no longer unmerged: staged, not re-checked, nothing written`
+    )
   }
   for (const item of plan.refused) {
     rows.push(`  REFUSED ${item.path} — ${item.reason}`)

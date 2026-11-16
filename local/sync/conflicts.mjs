@@ -79,8 +79,9 @@ the fork's identity literals re-applied; re-run identity-sweep.mjs), import-only
 no duplicate module or binding); the resolved file must also pass the whole-file gate (local/sync/
 README.md). --apply-proven reads \`--propose --json\` output for the live operation, re-proves each
 file from the bytes on disk, and writes only files where EVERY hunk is proven and nothing changed
-since; a rerun re-checks what an earlier run wrote (\`already\`) and refuses a path no longer
-unmerged. It stages nothing, and prints the \`git rm\` a ledger/manifest deletion needs instead.
+since; a rerun re-runs the whole-file gate on what an earlier run wrote (\`already\`) and reports a
+path no longer unmerged as \`staged\` without failing. It stages nothing, and prints the \`git rm\`
+a ledger/manifest deletion needs instead.
 
 --rename-forecast runs before the merge: upstream's renames and deletions in <old-base>..<new-base>,
 matched against the lines the fork added since <old-base> (default tip HEAD) — import specifiers,
@@ -152,13 +153,11 @@ const indexStages = (path) => ({
 
 const workspaceSource = () => workspaceSourceLookup(gitText(['rev-parse', '--show-toplevel']))
 const rev = (ref) => gitText(['rev-parse', '--verify', '-q', ref], { allowFailure: true })
-const historyFor = (sides) =>
-  sides && Object.values(sides).every(Boolean) ? gitProviderHistory(gitText, sides) : null
+const historyFor = (sides, stagesAt = null) =>
+  sides && Object.values(sides).every(Boolean) ? gitProviderHistory(gitText, sides, stagesAt) : null
 const indexOracle = () =>
-  indexModuleOracle(
-    gitText(['ls-files', '-s', '-z']) ?? '',
-    workspaceSource(),
-    historyFor(liveSides(rev, gitText))
+  indexModuleOracle(gitText(['ls-files', '-s', '-z']) ?? '', workspaceSource(), (stagesAt) =>
+    historyFor(liveSides(liveState(), rev, gitText), stagesAt)
   )
 
 const unmergedPaths = () =>

@@ -6,14 +6,7 @@ import test from 'node:test'
 import { modulePaths, resolvesInIndex } from './conflict-file-gate.mjs'
 import { indexModuleOracle, treeModuleOracle } from './conflict-index.mjs'
 import { proveFile } from './conflict-prove.mjs'
-import {
-  everyModule,
-  file,
-  historyOf,
-  hunk,
-  proveWithIndex,
-  stagesOf
-} from './conflict-test-fixtures.mjs'
+import { everyModule, file, historyOf, hunk, proveWithIndex } from './conflict-test-fixtures.mjs'
 import { parseSource } from './ts-source.mjs'
 
 test('a proven file is not written while a module path in it resolves to nothing the merge keeps', () => {
@@ -217,54 +210,31 @@ test('a proven file is not written while it uses a binding one side stopped impo
   assert.equal(local.fullyProven, true)
 })
 
-test('a binding re-pointed at another module is refused when the other side changed it in the old one', () => {
-  // The 2026-11-15 WorktreeCardStatusSlot.tsx shape: upstream took `WorktreeStatus` from a rollup module,
-  // while the fork added 'setup' to the renderer's own `WorktreeStatus`, which upstream merely moved.
-  const path = 'src/renderer/src/card.tsx'
+test('an inner parameter of the same name does not stand in for a dropped module-scope import', () => {
+  // Upstream dropped `import path`; the fork's clean-merged module-scope code still calls path.join, and
+  // an unrelated function takes a `path` parameter. Only a module-scope declaration binds the use.
   const merged = file(
     hunk({
-      ours: ["import { label, type Status } from './status'"],
-      base: ["import { label, type Status } from './status'"],
-      theirs: [
-        "import { label } from './activity/status'",
-        "import type { Status } from './rollup'"
-      ]
-    })
+      ours: ["import path from 'node:path'", "import { f } from './f'"],
+      base: ["import path from 'node:path'"],
+      theirs: ["import { g } from './g'"]
+    }),
+    "export const root = path.join('a', 'b')",
+    'export function g2(path: string) { return path }',
+    'export type Pick<T> = T extends infer K ? K : never'
   )
-  const stages = stagesOf(merged)
-  const before = "export type Status = 'a' | 'b'\nexport const label = 1\n"
-  const forked = "export type Status = 'a' | 'b' | 'setup'\nexport const label = 1\n"
-  const history = (oursStatus) =>
-    historyOf(
-      {
-        base: { 'src/renderer/src/status.ts': before },
-        ours: { 'src/renderer/src/status.ts': oursStatus },
-        theirs: {
-          'src/renderer/src/activity/status.ts': before,
-          'src/renderer/src/rollup.ts': "export type Status = 'a' | 'b'\n"
-        }
-      },
-      { theirs: [['src/renderer/src/status.ts', 'src/renderer/src/activity/status.ts']] }
-    )
-  const swapped = proveWithIndex(
-    path,
-    merged,
-    { exists: everyModule, history: history(forked) },
-    stages
-  )
-  assert.equal(swapped.provenHunks, 1)
-  assert.match(swapped.reason, /never reached: Status \(now from src\/renderer\/src\/rollup\.ts/)
-  // `label` followed its module's move, so the fork's edits travel with it; and with no fork edit to
-  // `Status`, upstream's choice of provider stands.
-  const untouched = proveWithIndex(
-    path,
-    merged,
-    { exists: everyModule, history: history(before) },
-    stages
-  )
-  assert.equal(untouched.fullyProven, true)
-  // No history to trace the old module through refuses the re-pointed names rather than passing them.
-  assert.equal(proveWithIndex(path, merged, everyModule, stages).fullyProven, false)
+  const stages = {
+    base: file("import path from 'node:path'", "export const root = path.join('a', 'b')"),
+    ours: file(
+      "import path from 'node:path'",
+      "import { f } from './f'",
+      "export const root = path.join('a', 'b')"
+    ),
+    theirs: file("import { g } from './g'", 'export function g2(path: string) { return path }')
+  }
+  const result = proveWithIndex('src/a.ts', merged, everyModule, stages)
+  assert.equal(result.provenHunks, 1)
+  assert.match(result.reason, /uses what it no longer imports: path$/)
 })
 
 test('a proven file is not written while it re-exports what one side removed', () => {
