@@ -151,8 +151,8 @@ describe('web session summary api', () => {
     mocks.environment.mockReturnValue({ id: 'env-1' })
     await api.open({ paneKey: PANE_KEY, sameViewer: true })
 
-    const refresh = callsTo('sessionSummary.openOnHost')[0]?.[2]
-    expect(refresh?.sameViewer).not.toBe(true)
+    // The fold client sends `sameViewer: sameViewer ?? null`, so null is exactly "not claimed".
+    expect(callsTo('sessionSummary.openOnHost')[0]?.[2]).toMatchObject({ sameViewer: null })
 
     api.close({ paneKey: PANE_KEY, seenTimelineCount: 0 })
 
