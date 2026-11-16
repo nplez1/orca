@@ -115,6 +115,13 @@ describe('the release dispatch is gated on test evidence', () => {
     }
   })
 
+  it('refuses an empty version in every job that reads it', () => {
+    for (const job of PUBLISHING.filter((name) => name !== 'publish')) {
+      const scripts = runScripts({ jobs: { job: RELEASE.jobs[job] } }).join('\n')
+      expect(scripts, job).toContain('if [ -z "$RELEASE_VERSION" ]; then')
+    }
+  })
+
   it('never runs two releases at once, and never cancels one mid-upload', () => {
     expect(RELEASE.concurrency).toEqual({ group: 'fork-release', 'cancel-in-progress': false })
   })
@@ -278,6 +285,17 @@ describe('a release does not go public without its change summary', () => {
     expect(RELEASE.on.workflow_dispatch.inputs.keep_draft.default).toBe(false)
     expect(skip).toBeGreaterThan(publish.indexOf('fork-release-notes-guard.mjs'))
     expect(skip).toBeLessThan(publish.indexOf('--draft=false'))
+  })
+
+  it('reads whether the release is a draft in a way a gh failure cannot pass', () => {
+    // `set -e` does not trip on a failure inside a `[` argument, so an inline read failed open.
+    const publish = runScripts(RELEASE).find((run) => run.includes('--draft=false')) ?? ''
+
+    expect(publish).toMatch(/^\s*draft="\$\(gh release view [^\n]*--json isDraft/m)
+    expect(publish).not.toMatch(/\[ "\$\(gh release view/)
+    expect(publish).toContain('if [ "$draft" = "false" ]; then')
+    expect(publish).toContain('if [ "$draft" != "true" ]; then')
+    expect(publish).toMatch(/^\s*set -euo pipefail$/m)
   })
 
   it('checks every platform manifest before the undraft', () => {

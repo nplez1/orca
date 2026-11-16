@@ -67,8 +67,9 @@ permissions:
 
 # Why one release run at a time: two dispatches running together can each create a draft, or the
 # lower version can finish last and its undraft make it `releases/latest`. Why not cancel: a release
-# run cancelled mid-upload leaves a half-filled draft. GitHub keeps one run pending behind the
-# running one, and a newer dispatch replaces an older pending one — which is the run to keep anyway.
+# run cancelled mid-upload leaves a half-filled draft. GitHub keeps at most ONE run pending per group:
+# whatever is queued next — a dispatch, a `keep_draft` validation, a `--failed` re-run — cancels the
+# run already pending, whichever of them mattered more. Queue nothing behind a pending release.
 concurrency:
   group: fork-release
   cancel-in-progress: false
@@ -259,6 +260,17 @@ jobs:
         with:
           node-version-file: package.json
 
+      # Why: an empty output would name the tag `v`, and every later step would act on that.
+      - name: Require the version release-ref approved
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$RELEASE_VERSION" ]; then
+            echo "::error::release-ref passed no version to this job"
+            exit 1
+          fi
+          echo "Releasing $RELEASE_VERSION"
+
       # Why generated: the notes must say what changed, and a hand-maintained list goes stale. The
       # script derives the summary from git and never exits non-zero, so the guard below — not the
       # generator — decides whether this release has a summary (see "Release notes" in
@@ -410,6 +422,15 @@ jobs:
           node -e "const fs=require('fs');const p=require('./package.json');p.version=process.argv[1];fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')" "$RELEASE_VERSION"
           echo "Releasing $RELEASE_VERSION"
 
+      # Why before the build as well as before the upload: the build is the leg's long part, and a leg
+      # re-run without its draft should fail in seconds rather than after it. The check before the
+      # upload stays, because the draft can change while the leg builds.
+      - name: Require this run's draft release before building
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash .github/scripts/fork-release-require-draft.sh "$PUBLISH_OWNER/orca" "v$RELEASE_VERSION"
+
       - name: Build app
         run: pnpm build:release
         env:
@@ -531,6 +552,15 @@ jobs:
           node -e "const fs=require('fs');const p=require('./package.json');p.version=process.argv[1];fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')" "$RELEASE_VERSION"
           echo "Releasing $RELEASE_VERSION"
 
+      # Why before the build as well as before the upload: the build is the leg's long part, and a leg
+      # re-run without its draft should fail in seconds rather than after it. The check before the
+      # upload stays, because the draft can change while the leg builds.
+      - name: Require this run's draft release before building
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash .github/scripts/fork-release-require-draft.sh "$PUBLISH_OWNER/orca" "v$RELEASE_VERSION"
+
       - name: Build app
         run: pnpm build:release
         env:
@@ -645,6 +675,15 @@ jobs:
           fi
           node -e "const fs=require('fs');const p=require('./package.json');p.version=process.argv[1];fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')" "$RELEASE_VERSION"
           echo "Releasing $RELEASE_VERSION"
+
+      # Why before the build as well as before the upload: the build is the leg's long part, and a leg
+      # re-run without its draft should fail in seconds rather than after it. The check before the
+      # upload stays, because the draft can change while the leg builds.
+      - name: Require this run's draft release before building
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash .github/scripts/fork-release-require-draft.sh "$PUBLISH_OWNER/orca" "v$RELEASE_VERSION"
 
       - name: Build app
         run: pnpm build:release
@@ -780,10 +819,18 @@ jobs:
           gh release view "$tag" --repo "$PUBLISH_OWNER/orca" --json body --jq .body \
             | node .github/scripts/fork-release-notes-guard.mjs - --site draft --label "the draft body of $tag"
           # Why: "Re-run job" on this job after its own undraft reaches here with a published release,
-          # and neither the validation notice nor the edit applies to it.
-          if [ "$(gh release view "$tag" --repo "$PUBLISH_OWNER/orca" --json isDraft --jq .isDraft)" != "true" ]; then
+          # and neither the validation notice nor the edit applies to it. Why an assignment: `set -e`
+          # does not see a failure inside a `[` argument, so a gh error there read as "published" and
+          # left the release a draft with a green run. Only a literal `false` skips; anything but
+          # `true` after that is an answer this step does not understand.
+          draft="$(gh release view "$tag" --repo "$PUBLISH_OWNER/orca" --json isDraft --jq .isDraft)"
+          if [ "$draft" = "false" ]; then
             echo "$tag is already published; nothing to do"
             exit 0
+          fi
+          if [ "$draft" != "true" ]; then
+            echo "::error::cannot tell whether $tag is a draft (isDraft=$draft)"
+            exit 1
           fi
           if [ "$KEEP_DRAFT" = "true" ]; then
             echo "::notice title=Validation run::keep_draft is set, so $tag stays a draft. Every check passed; delete it with: gh release delete $tag --repo $PUBLISH_OWNER/orca --yes"

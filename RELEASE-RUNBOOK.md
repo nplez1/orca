@@ -397,6 +397,11 @@ gh run rerun <run-id> --failed --repo nplez1/orca   # the failed leg(s) and `pub
 gh run rerun <run-id> --repo nplez1/orca            # everything, gates included — never needed for a leg
 ```
 
+Releases share one concurrency group (`fork-release`, never cancelled in progress), and GitHub keeps
+at most one run _pending_ in it: anything queued behind a pending run — a dispatch, a `keep_draft`
+validation, a `--failed` re-run — cancels that pending run. Queue nothing behind a release that is
+already waiting.
+
 It re-runs only the failed jobs and their dependents, so a failed `macos` re-runs `macos` and
 `publish`, and keeps the gates, the draft and the legs that passed. That used to be unsafe because
 `release-ref` — the version guard — is one of the jobs it keeps, and the published tags can move

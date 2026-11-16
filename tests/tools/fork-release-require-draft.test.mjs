@@ -89,13 +89,18 @@ describe('a leg uploads only into its own draft', () => {
   it('runs in every leg, immediately before electron-builder publishes', () => {
     for (const leg of ['macos', 'windows', 'linux']) {
       const steps = RELEASE.jobs[leg].steps
-      const check = steps.findIndex((step) =>
-        (step.run ?? '').includes('fork-release-require-draft.sh')
-      )
+      const checks = steps
+        .map((step, index) =>
+          (step.run ?? '').includes('fork-release-require-draft.sh') ? index : -1
+        )
+        .filter((index) => index > -1)
+      const build = steps.findIndex((step) => step.run === 'pnpm build:release')
       const upload = steps.findIndex((step) => (step.run ?? '').includes('--publish always'))
 
-      expect(check, leg).toBeGreaterThan(-1)
-      expect(upload - check, leg).toBe(1)
+      // Once to fail fast, before the build; once where it decides, right before the upload.
+      expect(checks, leg).toHaveLength(2)
+      expect(build - checks[0], leg).toBe(1)
+      expect(upload - checks[1], leg).toBe(1)
     }
   })
 

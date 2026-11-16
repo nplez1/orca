@@ -49,10 +49,8 @@ errors="$(mktemp "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/fork-release-guard.XXXXXX")"
 if ! found="$(gh release view "$tag" --repo "$repo" --json targetCommitish,isDraft \
   --jq '"\(.targetCommitish) \(.isDraft)"' 2>"$errors")"; then
   if grep -qiE 'not found|HTTP 404' "$errors"; then
-    # Why the monotonicity check here and on a draft below, but not on a published tag: a published
-    # tag cannot be above itself. That exemption no longer lets anything upload — `release-draft` and
-    # every leg refuse a published release — so in practice it only lets `publish` be re-run after
-    # its own undraft.
+    # Why the monotonicity check here: a tag that does not exist yet is the one this run creates, so
+    # it has to sort above every release already published.
     if ! node "$script_dir/fork-release-version-guard.mjs" "$tag" "$newest_tag"; then
       exit 1
     fi
@@ -87,11 +85,11 @@ if [ "$matched" != 1 ]; then
 fi
 
 # Why a draft is not exempt from the newest-tag check: a draft is this run's own release, not yet
-# published, so it can still be stepped below a release published since it was created — and making
-# it public then points `releases/latest` at the older build. Only an already-published tag is exempt,
-# because it cannot be above itself (see the not-found branch above for what that still allows). A draft carries no git tag, so this tag is excluded only in case
-# one was pushed by hand. Anything but a literal `false` is read as a draft: failing closed here costs
-# a retry, and failing open publishes below the line.
+# published, so it can still be stepped below a release published since it was created — and
+# making it public then points `releases/latest` at the older build. Only an already-published tag
+# is exempt (below). A draft carries no git tag, so this tag is excluded only in case one was
+# pushed by hand. Anything but a literal `false` is read as a draft: failing closed here costs a
+# retry, and failing open publishes below the line.
 if [ "$is_draft" != "false" ]; then
   newest_other="$(git tag -l 'v[0-9]*-np.*' --sort=-v:refname 2>/dev/null \
     | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+-np\.[0-9]+$' \
@@ -103,7 +101,10 @@ if [ "$is_draft" != "false" ]; then
   echo "$tag is a draft at $sha; uploading into it"
   exit 0
 fi
-# Why "nothing uploads": the ref and commit check out, but the release is already published, and
-# `release-draft` and every leg's `fork-release-require-draft.sh` refuse to upload into one.
+# Why a published tag is exempt from the newest-tag check: it cannot be above itself. The exemption
+# lets nothing upload — `release-draft` and every leg's `fork-release-require-draft.sh` refuse a
+# published release — but it does let two things through this guard: a re-dispatch into a published
+# tag, which then runs the gates before `release-draft` refuses it, and `publish` re-run after its
+# own undraft, which then finds nothing to do.
 echo "$tag is already published at $sha; nothing uploads into it"
 exit 0
