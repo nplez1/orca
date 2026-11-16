@@ -1,10 +1,11 @@
-// Fixture tests for the re-pointed-import check and the git plumbing under it. No git:
+// Fixture tests for the re-pointed-import check and the git plumbing under it. Only the catFileBatch
+// test runs git, read-only, against this repository's HEAD:
 //   node --test local/sync/lib/conflict-provider-gate.test.mjs
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { gitProviderHistory, parseRenames, parseTree } from './conflict-index.mjs'
-import { swappedProviders } from './conflict-provider-gate.mjs'
+import { catFileBatch, gitProviderHistory, parseRenames, parseTree } from './conflict-index.mjs'
+import { providerHistory, swappedProviders } from './conflict-provider-gate.mjs'
 import {
   everyModule,
   file,
@@ -69,13 +70,19 @@ const rePointed = ({
   newLine,
   oldModule,
   deps = {},
-  edited,
-  oldPath = 'status.ts'
+  edited = null,
+  oldPath = 'status.ts',
+  oursAdds = {},
+  historyFor = historyOf
 }) => {
   const sides = { base: file(importLine), ours: file(importLine), theirs: file(newLine) }
   const baseTree = { [at(oldPath)]: oldModule, ...deps }
-  const oursTree = { ...baseTree, [edited]: `${baseTree[edited]}// fork edit\n` }
-  const history = historyOf({
+  const oursTree = {
+    ...baseTree,
+    ...(edited ? { [edited]: `${String(baseTree[edited])}// fork edit\n` } : {}),
+    ...oursAdds
+  }
+  const history = historyFor({
     base: baseTree,
     ours: oursTree,
     theirs: { ...baseTree, [at('rollup.ts')]: 'export type Status = 1\n' }
@@ -183,6 +190,17 @@ test('git plumbing: -z renames and trees parse, and a move is carried only on th
     ),
     true
   )
+  // The other side's stage must be that side's copy of the old module, not just any blob.
+  assert.equal(
+    carriedWhen(
+      new Map([
+        ['1', oid('1')],
+        ['2', oid('6')],
+        ['3', oid('3')]
+      ])
+    ),
+    false
+  )
   // A conflict whose base stage is some other file is not this move.
   assert.equal(
     carriedWhen(
@@ -197,4 +215,106 @@ test('git plumbing: -z renames and trees parse, and a move is carried only on th
   assert.equal(carriedWhen(new Map([['0', oid('9')]])), true)
   assert.equal(carriedWhen(new Map([['0', oid('8')]])), false)
   assert.equal(carriedWhen(null), false)
+})
+
+const STATUS_RE_POINT = {
+  importLine: "import type { Status } from './status'",
+  newLine: "import type { Status } from './rollup'"
+}
+
+test('a re-point away from a workspace package refuses: its exports cannot be traced', () => {
+  const found = rePointed({
+    importLine: "import { X } from '@orca/foo'",
+    newLine: "import { X } from './rollup'",
+    oldModule: 'export const unused = 1\n'
+  })
+  assert.match(found.join(), /^X \(its old module @orca\/foo is a workspace package/)
+  // A bare npm package is not the fork's to edit, so it is still skipped.
+  assert.deepEqual(
+    rePointed({
+      importLine: "import { X } from 'react'",
+      newLine: "import { X } from './rollup'",
+      oldModule: ''
+    }),
+    []
+  )
+})
+
+test('an old module whose closure cannot be traced refuses: a workspace import, a missing path, a broken parse', () => {
+  for (const oldModule of [
+    "export { run } from '@orca/process-host'\nexport type Status = 'a'\n",
+    "export { gone } from './missing'\nexport type Status = 'a'\n",
+    'export type Status = \n'
+  ]) {
+    const found = rePointed({ ...STATUS_RE_POINT, oldModule })
+    assert.match(
+      found.join(),
+      /^Status \(what its old module .*status\.ts imports cannot be traced/,
+      oldModule
+    )
+  }
+})
+
+test('the other side resolving an edge to another file is a change, though no byte moved', () => {
+  // Base's `./types` is types/index.ts; the fork adds types.ts, which TypeScript probes first.
+  const found = rePointed({
+    ...STATUS_RE_POINT,
+    oldModule: "export type { Status } from './types'\n",
+    deps: { [at('types/index.ts')]: "export type Status = 'a'\n" },
+    oursAdds: { [at('types.ts')]: "export type Status = 'a' | 'b'\n" }
+  })
+  assert.match(found.join(), /status\.ts -> \.\/types/)
+  // The control: nothing edited and nothing shadowed passes.
+  assert.deepEqual(
+    rePointed({
+      ...STATUS_RE_POINT,
+      oldModule: "export type { Status } from './types'\n",
+      deps: { [at('types/index.ts')]: "export type Status = 'a'\n" }
+    }),
+    []
+  )
+})
+
+test('production compares blob oids, and a bulk read that returns nothing falls back to read', () => {
+  // The Map shape gitProviderHistory builds: path -> oid. Text is still read for parsing the closure.
+  const byOid = (oursOid) => ({ base: oldOid, ours: oursOid, theirs: oldOid })
+  const oldOid = 'a'.repeat(40)
+  const history =
+    (oids, prefetch, text = "export type Status = 'a'\n") =>
+    () =>
+      providerHistory({
+        files: {
+          base: new Map([[at('status.ts'), oids.base]]),
+          ours: new Map([[at('status.ts'), oids.ours]]),
+          theirs: new Map([
+            [at('status.ts'), oids.theirs],
+            [at('rollup.ts'), 'f'.repeat(40)]
+          ])
+        },
+        read: () => text,
+        renames: {},
+        prefetch
+      })
+  const run = (historyFor) =>
+    rePointed({ ...STATUS_RE_POINT, oldModule: "export type Status = 'a'\n", historyFor })
+  // Same text, different blob: an oid comparison sees the change a text one would not.
+  assert.match(run(history(byOid('b'.repeat(40)))).join(), /^Status .*ours changed .*status\.ts/)
+  assert.deepEqual(run(history(byOid(oldOid), () => new Map())), [])
+  // The bulk read returned nothing, so the text that makes the closure untraceable came from `read`.
+  const missing = "export { gone } from './missing'\n"
+  assert.match(
+    run(history(byOid('b'.repeat(40)), () => new Map(), missing)).join(),
+    /imports cannot be traced/
+  )
+})
+
+test('catFileBatch reads several blobs in one process and leaves out what it cannot frame', () => {
+  const texts = catFileBatch('HEAD', [
+    'package.json',
+    'no/such/file',
+    'a\nb',
+    'local/sync/README.md'
+  ])
+  assert.deepEqual([...texts.keys()], ['package.json', 'local/sync/README.md'])
+  assert.match(texts.get('package.json'), /"name"/)
 })

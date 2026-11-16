@@ -56,13 +56,19 @@ export function liveSides(state, rev, gitText) {
     return null
   }
   if (state.kind === 'merge') {
-    const bases = (gitText(['merge-base', '--all', head, operation], { allowFailure: true }) ?? '')
-      .split('\n')
-      .filter(Boolean)
-    return bases.length === 1 ? { base: bases[0], ours: head, theirs: operation } : null
+    const base = singleMergeBase(gitText, head, operation)
+    return base ? { base, ours: head, theirs: operation } : null
   }
   if (state.kind === 'revert') {
     return { base: operation, ours: head, theirs: rev(`${operation}^`) }
   }
   return { base: rev(`${operation}^`), ours: head, theirs: operation }
+}
+
+/** The one merge base of two commits, or null: a criss-cross merge's virtual base no commit holds. */
+export function singleMergeBase(gitText, left, right) {
+  const bases = (gitText(['merge-base', '--all', left, right], { allowFailure: true }) ?? '')
+    .split('\n')
+    .filter(Boolean)
+  return bases.length === 1 ? bases[0] : null
 }

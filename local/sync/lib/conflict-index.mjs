@@ -76,7 +76,9 @@ export function parseRenames(z) {
  * `git cat-file --batch` over `<commit>:<path>` requests -> Map of path -> text (a missing object is
  * left out). One process for a whole closure level instead of one `git show` per file.
  */
-export function catFileBatch(commit, paths) {
+export function catFileBatch(commit, allPaths) {
+  // The batch protocol is line-framed: a path with a newline would desync it, so it is left to `read`.
+  const paths = allPaths.filter((path) => !path.includes('\n'))
   const result = spawnSync('git', ['cat-file', '--batch'], {
     input: paths.map((path) => `${commit}:${path}\n`).join(''),
     maxBuffer: 1024 * 1024 * 1024
@@ -162,6 +164,7 @@ export function gitProviderHistory(gitText, { base, ours, theirs }, stagesAt = n
       if (held.has('1')) {
         return held.get('1') === baseOid && held.get(other === 'ours' ? '2' : '3') === otherOid
       }
+      // `--object-id` writes the result as a loose object: harmless, and what makes the oid comparable.
       const [first, second] = taker === 'ours' ? [takerOid, otherOid] : [otherOid, takerOid]
       const merged = gitText(['merge-file', '--object-id', first, baseOid, second], {
         allowFailure: true

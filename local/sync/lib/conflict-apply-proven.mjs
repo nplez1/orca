@@ -69,14 +69,14 @@ export function planApplyProven(
       })
       continue
     }
-    if (isSymlink(file.path)) {
-      plan.refused.push({ path: file.path, reason: 'it is a symlink; writing would follow it' })
-      continue
-    }
     // Staged (or never conflicted): a person has taken the path over, so it is neither written nor, with
     // its stages gone, re-checked. Not a failure: a partial `git add` then a rerun must not exit 1.
     if (!unmerged.has(file.path)) {
       plan.staged.push({ path: file.path })
+      continue
+    }
+    if (isSymlink(file.path)) {
+      plan.refused.push({ path: file.path, reason: 'it is a symlink; writing would follow it' })
       continue
     }
     const current = readText(file.path)

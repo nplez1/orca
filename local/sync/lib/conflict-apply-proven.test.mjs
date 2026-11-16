@@ -99,6 +99,15 @@ test('apply-proven writes only a path git lists as unmerged, and never through a
     plan.refused.map((item) => [item.path, item.reason]),
     [['src/link.ts', 'it is a symlink; writing would follow it']]
   )
+  // Once staged, a symlink is a path someone took over like any other: reported, not refused.
+  const staged = planApplyProven(
+    decision,
+    worktree(() => proven, [], ['src/link.ts'])
+  )
+  assert.deepEqual(
+    [staged.staged.map((item) => item.path), staged.refused],
+    [['src/p.ts', 'src/link.ts'], []]
+  )
   assert.throws(() => planApplyProven(decision, { readText: () => proven }), /unmerged/)
 })
 

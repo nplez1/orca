@@ -35,7 +35,7 @@ import { proposeAll } from './lib/conflict-propose.mjs'
 import { renameForecast } from './lib/fork-surface-git.mjs'
 import { renderForecast } from './lib/rename-forecast.mjs'
 import { classCounts, renderSummary, renderText } from './lib/conflict-report.mjs'
-import { liveSides, readState } from './lib/conflict-state.mjs'
+import { liveSides, readState, singleMergeBase } from './lib/conflict-state.mjs'
 
 const LEDGER_URL = new URL('./convergence-ledger.md', import.meta.url)
 const DELETIONS_URL = new URL('./expected-deletions.json', import.meta.url)
@@ -621,7 +621,7 @@ function main() {
               result.files,
               workspaceSource(),
               historyFor({
-                base: result.state.mergeBase,
+                base: singleMergeBase(gitText, result.state.base, result.state.other),
                 ours: result.state.base,
                 theirs: result.state.other
               })

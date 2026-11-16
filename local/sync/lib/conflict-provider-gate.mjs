@@ -75,7 +75,7 @@ export function providerHistory({ files, read, renames, prefetch = null, carries
     }
   }
   const closures = new Map()
-  /** `basePath` and every module it reaches through path imports in base; null if one is untraceable. */
+  /** `basePath`'s closure through path imports in base (`{ files, edges }`); null if untraceable. */
   const closure = (basePath) => {
     if (!closures.has(basePath)) {
       closures.set(basePath, traceClosure(basePath, { blob, resolve, warm }))
@@ -85,9 +85,14 @@ export function providerHistory({ files, read, renames, prefetch = null, carries
   return { blob, renamedTo, basePathOf, resolve, unchanged, closure, carries }
 }
 
-/** Breadth-first, one bulk read per level: a shared module's closure runs to thousands of files. */
+/**
+ * Breadth-first, one bulk read per level: a shared module's closure runs to thousands of files. Returns
+ * the files and every import edge (`[from, specifier, kind, to]`), so the other side's resolution of
+ * each edge can be checked as well as its bytes.
+ */
 function traceClosure(start, { blob, resolve, warm }) {
   const seen = new Set([start])
+  const edges = []
   let level = [start]
   while (level.length > 0) {
     warm(level)
@@ -105,6 +110,7 @@ function traceClosure(start, { blob, resolve, warm }) {
         if (found === null) {
           return null // an `@orca/` package or a path base cannot resolve: untraceable
         }
+        edges.push([at, specifier, kind, found])
         if (!seen.has(found)) {
           seen.add(found)
           next.push(found)
@@ -113,7 +119,7 @@ function traceClosure(start, { blob, resolve, warm }) {
     }
     level = next
   }
-  return [...seen]
+  return { files: [...seen], edges }
 }
 
 const importSources = (sf) => {
@@ -136,6 +142,9 @@ const importSources = (sf) => {
 }
 
 const isPath = (specifier) => /^(?:\.\.?(?:\/|$)|@\/|@renderer\/)/.test(specifier)
+// A workspace package is a module the fork can edit like any other, but this check has no way to trace
+// its `exports` through history, so a re-point away from one refuses. Bare npm packages are skipped.
+const isWorkspace = (specifier) => specifier.startsWith('@orca/')
 
 /**
  * Names the resolved file imports from another module than base did, where the side that did NOT pick
@@ -149,7 +158,11 @@ export function swappedProviders({ path, resolvedSf, sides, history }) {
   const found = []
   for (const [name, specifier] of resolved) {
     const was = base.get(name)
-    if (was === undefined || was === specifier || !isPath(was)) {
+    if (was === undefined || was === specifier || !(isPath(was) || isWorkspace(was))) {
+      continue
+    }
+    if (isWorkspace(was)) {
+      found.push(`${name} (its old module ${was} is a workspace package and cannot be traced)`)
       continue
     }
     if (history === null) {
@@ -184,7 +197,18 @@ export function swappedProviders({ path, resolvedSf, sides, history }) {
       found.push(`${name} (what its old module ${old} imports cannot be traced)`)
       continue
     }
-    const changed = reach.filter((at) => !history.unchanged(other, at))
+    // Same bytes are not enough: the other side may resolve an edge elsewhere (a new `types.ts` that
+    // TypeScript probes before base's `types/index.ts`), so each edge has to land on the same file.
+    const changed = [
+      ...reach.files.filter((at) => !history.unchanged(other, at)),
+      ...reach.edges
+        .filter(
+          ([from, edge, kind, to]) =>
+            history.resolve(other, history.renamedTo(other, from), edge, kind) !==
+            history.renamedTo(other, to)
+        )
+        .map(([from, edge]) => `${from} -> ${edge}`)
+    ]
     if (changed.length === 0) {
       continue
     }
