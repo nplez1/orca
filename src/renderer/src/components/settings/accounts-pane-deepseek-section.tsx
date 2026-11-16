@@ -71,10 +71,7 @@ export function renderDeepSeekAccountsSection(model: AccountsPaneSectionModel): 
               'DeepSeek API key'
             )}
           </Label>
-          <Badge
-            variant={deepSeekApiKeyConfigured ? 'secondary' : 'outline'}
-            className="h-5 gap-1 rounded-full px-2 text-[10px] font-medium text-muted-foreground"
-          >
+          <Badge variant={deepSeekApiKeyConfigured ? 'secondary' : 'outline'}>
             {deepSeekApiKeyConfigured ? (
               <Lock className="size-3" />
             ) : (
@@ -124,11 +121,11 @@ export function renderDeepSeekAccountsSection(model: AccountsPaneSectionModel): 
           </Button>
           {deepSeekApiKeyConfigured ? (
             <Button
-              variant="ghost"
+              variant="muted-field-icon"
               size="xs"
               onClick={() => void clearDeepSeekApiKey()}
               disabled={deepSeekCredentialBusy}
-              className="h-7 shrink-0 text-muted-foreground hover:text-foreground"
+              className="h-7 shrink-0"
             >
               {translate(
                 'auto.components.settings.accounts.pane.deepseek.section.bc10d6273f',

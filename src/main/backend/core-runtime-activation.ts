@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 3-code-line delta rides inside it, and splitting costs a permanent sync hunk. */
 import type { BackendCoreHost } from './core-runtime'
 import type { OrcadHandle } from '../orcad/serve-startup/orcad-start-contract'
 import type { BackendCoreProfileShutdown } from './core-profile-shutdown'

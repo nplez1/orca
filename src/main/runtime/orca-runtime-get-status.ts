@@ -73,6 +73,7 @@ export abstract class OrcaRuntimeWithGetStatus extends OrcaRuntimeWithPtyControl
   protected abstract pruneUnregisteredWorktreeScans(): void
 
   private asRuntimeStatusHost(): RuntimeStatusHost {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the concrete runtime mixes this member in from the terminal-stop surface, which is composed below this abstract base.
     return this as unknown as RuntimeStatusHost
   }
 

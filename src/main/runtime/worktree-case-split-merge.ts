@@ -116,9 +116,13 @@ export function planWorktreeCaseSplitMerge(
   return updates
 }
 
-const OWNER_KEYED_SESSION_FIELDS = (
-  Object.keys(WORKSPACE_SESSION_WORKTREE_REFERENCE_KIND) as (keyof WorkspaceSessionState)[]
-).filter((field) => WORKSPACE_SESSION_WORKTREE_REFERENCE_KIND[field].startsWith('owner-keyed'))
+function isSessionStateField(field: string): field is keyof WorkspaceSessionState {
+  return field in WORKSPACE_SESSION_WORKTREE_REFERENCE_KIND
+}
+
+const OWNER_KEYED_SESSION_FIELDS = Object.keys(WORKSPACE_SESSION_WORKTREE_REFERENCE_KIND)
+  .filter(isSessionStateField)
+  .filter((field) => WORKSPACE_SESSION_WORKTREE_REFERENCE_KIND[field].startsWith('owner-keyed'))
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)

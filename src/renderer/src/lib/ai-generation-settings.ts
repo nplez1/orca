@@ -12,6 +12,7 @@ import {
 } from '../../../shared/source-control/ai/generation/commit-message-agent-spec'
 import type { CommitMessageAiSettings } from '../../../shared/source-control/ai/generation/commit-message-ai-types'
 import type { TuiAgent } from '../../../shared/agent-launch/catalog/tui-agent'
+import { isTuiAgent } from '../../../shared/agent-launch/catalog/tui-agent-config'
 import { getAgentCatalog } from '@/lib/agent-catalog/agent-catalog'
 
 /** The fields a selection reads. Both stored blocks are a superset of this. */
@@ -149,7 +150,10 @@ export function aiGenerationAgentChangePatch(
   if (isCustomAgentId(newAgentId)) {
     return { agentId: CUSTOM_AGENT_ID }
   }
-  const capability = getCommitMessageAgentCapability(newAgentId as TuiAgent)
+  if (!isTuiAgent(newAgentId)) {
+    return {}
+  }
+  const capability = getCommitMessageAgentCapability(newAgentId)
   if (!capability) {
     return {}
   }

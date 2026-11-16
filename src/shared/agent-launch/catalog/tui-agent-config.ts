@@ -16,7 +16,7 @@ function resolveTuiAgentConfig(source: TuiAgentConfigSource): TuiAgentConfig {
   }
 }
 
-const TUI_AGENT_CONFIG_SOURCE: Record<TuiAgent, TuiAgentConfigSource> = {
+const TUI_AGENT_CONFIG_SOURCE: Record<TuiAgent, TuiAgentConfigSource> = withForkTuiAgentOverrides({
   claude: {
     detectCmd: 'claude',
     promptInjectionMode: 'argv',
@@ -333,10 +333,10 @@ const TUI_AGENT_CONFIG_SOURCE: Record<TuiAgent, TuiAgentConfigSource> = {
   devin: { detectCmd: 'devin', promptInjectionMode: 'argv', argvPromptSeparator: '--' },
   // prettier-ignore
   jcode: { detectCmd: 'jcode', launchCmd: 'jcode', expectedProcess: 'jcode', promptInjectionMode: 'stdin-after-start' }
-}
+})
 
 export const TUI_AGENT_CONFIG: Record<TuiAgent, TuiAgentConfig> = Object.fromEntries(
-  Object.entries(withForkTuiAgentOverrides(TUI_AGENT_CONFIG_SOURCE)).map(([agent, source]) => [
+  Object.entries(TUI_AGENT_CONFIG_SOURCE).map(([agent, source]) => [
     agent,
     resolveTuiAgentConfig(source)
   ])

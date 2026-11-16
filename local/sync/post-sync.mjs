@@ -122,7 +122,7 @@ function main() {
     try {
       report.addOutcome(id, title, look, run())
     } catch (error) {
-      report.add(id, STATUS.failed, title, `${id} crashed: ${error.message}`, {
+      report.add(id, STATUS.failed, title, `${String(id)} crashed: ${String(error?.message ?? error)}`, {
         look: 'this is a bug in local/sync/post-sync.mjs, not a finding about the repository',
         details: String(error.stack ?? '')
           .split('\n')

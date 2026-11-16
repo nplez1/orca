@@ -31,6 +31,11 @@ export { type RuntimeClientTarget } from '../../../shared/remote-runtime/host-ca
 export { RuntimeRpcCallError, unwrapRuntimeRpcResult } from './rpc/calls/runtime-rpc-result'
 export { hasRuntimeRpcErrorCode } from '../../../shared/remote-runtime/rpc/runtime-rpc-error-code'
 
+/** The bridge replies are typed `unknown`, so typing the envelope happens in one place. */
+function unwrapBridgeResult<TResult>(response: unknown): TResult {
+  return unwrapRuntimeRpcResult<TResult>(response as RuntimeRpcResponse<TResult>)
+}
+
 export async function callRuntimeRpc<TResult>(
   target: RuntimeClientTarget,
   method: string,
@@ -88,7 +93,7 @@ export async function callRuntimeRpc<TResult>(
           expectedEnvironmentPairingRevision,
           expectedEnvironmentRuntimeId: options.expectedEnvironmentRuntimeId
         })
-  return unwrapRuntimeRpcResult<TResult>(response as RuntimeRpcResponse<TResult>)
+  return unwrapBridgeResult<TResult>(response)
 }
 
 export async function ensureRuntimeEnvironmentCompatible(
@@ -113,9 +118,7 @@ export async function ensureRuntimeEnvironmentCompatible(
       timeoutMs: options.timeoutMs,
       expectedEnvironmentPairingRevision: options.expectedEnvironmentPairingRevision
     })
-    const status = unwrapRuntimeRpcResult<RuntimeStatus>(
-      response as RuntimeRpcResponse<RuntimeStatus>
-    )
+    const status = unwrapBridgeResult<RuntimeStatus>(response)
     assertRuntimeStatusCompatible(status)
     invalidateWorkspacePathSearchCapabilitiesForReplacement(previousStatus, status, environmentId)
     entry.status = status
@@ -152,9 +155,7 @@ export async function getRuntimeEnvironmentStatus(
       method: 'status.get',
       timeoutMs
     })
-    const status = unwrapRuntimeRpcResult<RuntimeStatus>(
-      response as RuntimeRpcResponse<RuntimeStatus>
-    )
+    const status = unwrapBridgeResult<RuntimeStatus>(response)
     assertRuntimeStatusCompatible(status)
     invalidateWorkspacePathSearchCapabilitiesForReplacement(previousStatus, status, trimmed)
     entry.status = status

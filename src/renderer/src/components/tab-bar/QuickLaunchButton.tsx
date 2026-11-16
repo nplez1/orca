@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 10-code-line delta rides inside it, and splitting costs a permanent sync hunk. */
 import { readAgentMenuTerminalPending } from './agent-menu-launch-facts'
 import { terminalPendingReason } from './new-tab-agent-menu-model'
 import { useAppStore } from '@/store/index'

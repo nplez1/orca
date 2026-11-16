@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork s delta rides inside it (+8 code lines), and splitting costs a permanent sync hunk. */
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { JsonStringifyByteLimitError } from '../../json-stream/node-bounded-json-stringify'

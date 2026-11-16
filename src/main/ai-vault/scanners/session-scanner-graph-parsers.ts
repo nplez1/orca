@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork s delta rides inside it (+2 code lines), and splitting costs a permanent sync hunk. */
 import { waitForAiVaultScan } from '../scan-lifecycle/ai-vault-scan-cancellation'
 import { rovoSessionCwd, rovoRoleFromKind } from './session-scanner-rovo-metadata'
 export { rovoSessionCwd, rovoRoleFromKind } from './session-scanner-rovo-metadata'

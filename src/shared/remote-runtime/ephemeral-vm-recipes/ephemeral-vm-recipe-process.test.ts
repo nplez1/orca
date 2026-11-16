@@ -50,6 +50,8 @@ describe('runRecipeCommand', () => {
       resultSchemaVersion: 1,
       context: { recipeId: 'cloud-sandbox', repoPath: makeRepo() },
       stdin: '{"kind":"destroy"}',
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the seam is typed `typeof spawn`; the fake only has to produce a child whose stdio the case drives.
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the double only needs the spawn seam the process under test calls.
       spawnCommand: vi.fn(() => child) as never
     })
 

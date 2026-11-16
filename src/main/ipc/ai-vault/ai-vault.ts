@@ -1,5 +1,3 @@
-/* eslint-disable max-lines -- Why: upstream's AI Vault IPC plus the fork's host-leg scan, leg-sync
-   request shaping and session-depth filtering, which ride upstream's handler bodies. */
 import { scanLocalAiVaultSessionsAsIssue } from './ai-vault-local-scan'
 import {
   captureRuntimeAiVaultProjectionDependency,

@@ -55,11 +55,21 @@
     // because the root lint scan does not load this plugin, so an inline directive always
     // reads back as an unused directive there.
     {
-      "files": ["**/src/renderer/src/components/status-bar/icons.tsx"],
+      "files": [
+        "**/src/renderer/src/components/status-bar/**/provider-icons.tsx",
+        "**/src/renderer/src/components/status-bar/fork-usage-providers.tsx"
+      ],
       "rules": {
         "shadcn/no-raw-colors": "off"
       }
     }
   ],
-  "ignorePatterns": ["**/node_modules", "**/dist", "**/out", "cloud/**", "mobile/**"]
+  "ignorePatterns": [
+    "**/node_modules",
+    "**/dist",
+    "**/out",
+    "cloud/**",
+    "mobile/**",
+    "**/*.generated.ts"
+  ]
 }

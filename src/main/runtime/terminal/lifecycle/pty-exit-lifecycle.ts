@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork s reapWorktreeSetupRunnerState hook rides inside it, and splitting costs a permanent sync hunk. */
 import { RuntimePtyExitSurfaceReads } from './pty-exit-surface-reads'
 import type { RuntimeTerminalResolvePane } from '../../../../shared/terminal/runtime/runtime-terminal-contracts'
 

@@ -6,6 +6,7 @@ import { RpcDispatcher } from '../dispatcher'
 import { WORKTREE_METHODS } from './workspaces/worktree'
 
 function makeRuntime(repoHostIds: (string | undefined)[] = ['local']): OrcaRuntimeService {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the dispatcher only reaches the four worktree.rm members this double supplies.
   return {
     getRuntimeId: () => 'test-runtime',
     listRepos: () =>
@@ -168,6 +169,7 @@ describe('worktree.rm host qualification', () => {
 
   it('fails closed when an old-client row has no host evidence', async () => {
     const runtime = makeRuntime()
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the case is an old-client row with no host evidence, so the row deliberately carries only its id.
     vi.mocked(runtime.showManagedWorktree).mockResolvedValue({ id: 'wt-1' } as never)
     const dispatcher = new RpcDispatcher({ runtime, methods: WORKTREE_METHODS })
 

@@ -17,6 +17,10 @@ import {
 
 const SOURCE_FILE_PATTERN = /\.(?:[cm]?[jt]sx?)$/
 const ROOT_CODE_QUALITY_IGNORED_PREFIXES = ['cloud/']
+// Generated bundles are build output committed for the mobile webview; they are not hand-written
+// code-quality surface, and the lint configs that exclude them are per-package while this gate
+// passes the root configs.
+const GENERATED_FILE_PATTERN = /\.generated\.[cm]?[jt]sx?$/
 const CASTING_RULE = 'typescript/consistent-type-assertions'
 const CASTING_DISABLE_PATTERN =
   /\/[/*]\s*(?:oxlint|eslint)-disable(?:-next-line|-line)?\s[^\n]*typescript\/consistent-type-assertions/
@@ -154,7 +158,10 @@ function splitNullDelimited(output) {
 }
 
 export function isRootCodeQualityPath(file) {
-  return !ROOT_CODE_QUALITY_IGNORED_PREFIXES.some((prefix) => file.startsWith(prefix))
+  return (
+    !ROOT_CODE_QUALITY_IGNORED_PREFIXES.some((prefix) => file.startsWith(prefix)) &&
+    !GENERATED_FILE_PATTERN.test(file)
+  )
 }
 
 function resolveBase(root, requestedBase) {

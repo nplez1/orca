@@ -172,6 +172,7 @@ function makeRemoteWorktree(): Worktree {
 }
 
 function seedRemoteWorktree(): void {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the store's settings state is a weaker shape than the slice intersection AppState declares, so the seed cannot be spelled field by field.
   useAppStore.setState({
     settings: { ...initialAppState.settings, activeRuntimeEnvironmentId: 'env-1' },
     repos: [],
@@ -394,7 +395,7 @@ describe('useRuntimeFileListForWorktree query lifecycle', () => {
       projectGroups: [makeProjectGroup()],
       repos: [],
       worktreesByRepo: {}
-    } as Partial<AppState>)
+    } satisfies Partial<AppState>)
     vi.useFakeTimers()
     const states: RuntimeFileListState[] = []
     searchFilePathsMock.mockImplementation((args) =>
@@ -434,7 +435,7 @@ describe('useRuntimeFileListForWorktree query lifecycle', () => {
       projectGroups: [makeProjectGroup()],
       repos: [],
       worktreesByRepo: {}
-    } as Partial<AppState>)
+    } satisfies Partial<AppState>)
     vi.useFakeTimers()
     const states: RuntimeFileListState[] = []
     searchFilePathsMock.mockImplementation((args) =>
@@ -469,7 +470,7 @@ describe('useRuntimeFileListForWorktree query lifecycle', () => {
       projectGroups: [makeProjectGroup()],
       repos: [],
       worktreesByRepo: {}
-    } as Partial<AppState>)
+    } satisfies Partial<AppState>)
     vi.useFakeTimers()
     const states: RuntimeFileListState[] = []
     searchFilePathsMock.mockImplementation((args) =>
@@ -538,7 +539,7 @@ describe('useRuntimeFileListForWorktree query lifecycle', () => {
       projectGroups: [makeProjectGroup()],
       repos: [],
       worktreesByRepo: {}
-    } as Partial<AppState>)
+    } satisfies Partial<AppState>)
     vi.useFakeTimers()
     const states: RuntimeFileListState[] = []
     searchFilePathsMock.mockResolvedValue({
@@ -587,7 +588,7 @@ describe('useRuntimeFileListForWorktree query lifecycle', () => {
       projectGroups: [makeProjectGroup()],
       repos: [],
       worktreesByRepo: {}
-    } as Partial<AppState>)
+    } satisfies Partial<AppState>)
     const states: RuntimeFileListState[] = []
 
     await renderProbe({
@@ -610,7 +611,7 @@ describe('useRuntimeFileListForWorktree query lifecycle', () => {
       projectGroups: [makeProjectGroup()],
       repos: [],
       worktreesByRepo: {}
-    } as Partial<AppState>)
+    } satisfies Partial<AppState>)
     vi.useFakeTimers()
 
     try {

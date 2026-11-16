@@ -32,5 +32,5 @@
       }
     }
   ],
-  "ignorePatterns": ["**/node_modules", "**/dist", "**/out"]
+  "ignorePatterns": ["**/node_modules", "**/dist", "**/out", "**/*.generated.ts"]
 }

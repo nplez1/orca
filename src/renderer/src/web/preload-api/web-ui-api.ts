@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork s web preload additions ride inside it, and splitting costs a permanent sync hunk. */
 import { subscribeWebWorkspaceSleep } from './web-workspace-sleep-notices'
 import { savePastedTextAsWebAgentSessionAttachment } from './web-pasted-text-upload'
 import { createWebExplorerRootSync } from './web-explorer-root-sync'

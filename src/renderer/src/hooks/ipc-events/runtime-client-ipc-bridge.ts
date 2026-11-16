@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork s delta rides inside it (+4 code lines), and splitting costs a permanent sync hunk. */
 import {
   registerLinearLinkedIssueRefresh,
   refreshDefaultLinkedLinearIssue

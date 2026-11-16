@@ -6,6 +6,7 @@ import type { OrcaRuntimeService } from '../../orca-runtime'
 import { WORKTREE_METHODS } from './workspaces/worktree'
 
 function makeRuntime(): OrcaRuntimeService {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the dispatcher only reaches the four worktree.rm members this double supplies.
   return {
     getRuntimeId: () => 'test-runtime',
     dedupeWorktreeCreate: <T>(_repo: string, _id: string | undefined, run: () => Promise<T>) =>

@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 1-code-line delta rides inside it, and splitting costs a permanent sync hunk. */
 import { getRepoIdFromWorktreeId } from '../../../../../../shared/worktree/id'
 import { parseExecutionHostId } from '../../../../../../shared/execution-host'
 import { ensureHooksConfirmed } from '@/runtime/repo-hooks/ensure-hooks-confirmed'

@@ -180,8 +180,10 @@ import {
   retireGeneratedWorktreeName
 } from '../workspaces/removal/retirement/worktree-name-retirement'
 import { createRetiredNameLookup } from '../../shared/worktree/naming/retired-name-registry'
-import { assertNoPendingWorktreeRemovalConflict } from '../workspaces/removal/worktree-removal-table'
-import { findPendingWorktreeRemovalConflict } from '../workspaces/removal/worktree-removal-table'
+import {
+  assertNoPendingWorktreeRemovalConflict,
+  findPendingWorktreeRemovalConflict
+} from '../workspaces/removal/worktree-removal-table'
 import {
   exactNameBranchConflict,
   exactNameLateCollision,

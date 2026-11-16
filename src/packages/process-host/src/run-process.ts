@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's deadline-overrun delta rides inside it, and splitting costs a permanent sync hunk. */
 import type { ChildProcess, ChildProcessWithoutNullStreams } from 'node:child_process'
 import { resolveSpawn, type ResolvedSpawn } from './spawn-resolution'
 import { forceTerminateProcessTree, signalProcessTree } from './process-tree-termination'

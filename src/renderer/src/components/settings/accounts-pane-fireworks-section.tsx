@@ -73,10 +73,7 @@ export function renderFireworksAccountsSection(model: AccountsPaneSectionModel):
               'Fireworks API key'
             )}
           </Label>
-          <Badge
-            variant={fireworksApiKeyConfigured ? 'secondary' : 'outline'}
-            className="h-5 gap-1 rounded-full px-2 text-[10px] font-medium text-muted-foreground"
-          >
+          <Badge variant={fireworksApiKeyConfigured ? 'secondary' : 'outline'}>
             {fireworksApiKeyConfigured ? (
               <Lock className="size-3" />
             ) : (
@@ -129,11 +126,11 @@ export function renderFireworksAccountsSection(model: AccountsPaneSectionModel):
           </Button>
           {fireworksApiKeyConfigured ? (
             <Button
-              variant="ghost"
+              variant="muted-field-icon"
               size="xs"
               onClick={() => void clearFireworksCredentials()}
               disabled={fireworksCredentialBusy}
-              className="h-7 shrink-0 text-muted-foreground hover:text-foreground"
+              className="h-7 shrink-0"
             >
               {translate(
                 'auto.components.settings.accounts.pane.fireworks.section.545da4ee6c',

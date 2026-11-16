@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork s delta rides inside it (+3 code lines), and splitting costs a permanent sync hunk. */
 import { collectLocalSavedStructuredAgentSessionIds } from '../agent-session/lifecycle/saved-structured-agent-session-restoration'
 import type {
   RuntimeConstructionBindings as Bindings,

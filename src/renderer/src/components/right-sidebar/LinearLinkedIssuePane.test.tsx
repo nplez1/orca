@@ -174,6 +174,13 @@ afterEach(() => {
  * The pane's own identifier read names the handed source and searches every workspace, and no
  * read anywhere in the pane names a different source — the Active Server is never consulted.
  */
+function readSourceContext(value: unknown): unknown {
+  if (typeof value !== 'object' || value === null || !('sourceContext' in value)) {
+    return undefined
+  }
+  return value.sourceContext
+}
+
 function expectEveryReadRoutedThrough(source: TaskSourceContext): void {
   const calls = mocks.fetchLinearIssue.mock.calls
   const paneReads = calls.filter((call) => call[1] === 'all')
@@ -182,7 +189,7 @@ function expectEveryReadRoutedThrough(source: TaskSourceContext): void {
     expect(call[2]).toMatchObject({ sourceContext: source })
   }
   for (const call of calls) {
-    const named = (call[2] as { sourceContext?: unknown } | undefined)?.sourceContext
+    const named = readSourceContext(call[2])
     if (named !== undefined) {
       expect(named).toEqual(source)
     }

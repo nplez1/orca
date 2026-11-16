@@ -1,5 +1,3 @@
-/* eslint-disable max-lines -- Why: upstream's creation flow plus the fork's `exactBranchName`
-   pass-through, one line at the call site that owns it. */
 import { prepareWorktreeCreationHooks, setupCreateArgs } from './worktree-creation-hook-preparation'
 import { useAppStore } from '@/store/index'
 import { activateAndRevealWorktree } from '@/lib/workspace/activation/worktree-activation'

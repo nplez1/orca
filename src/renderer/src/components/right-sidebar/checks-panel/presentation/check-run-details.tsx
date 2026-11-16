@@ -1,5 +1,3 @@
-/* eslint-disable max-lines -- Why: upstream's check-run details plus the fork's Jenkins rerun
-   action and build-metadata rows. */
 import React from 'react'
 import { LoaderCircle, PanelRight, RefreshCw, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'

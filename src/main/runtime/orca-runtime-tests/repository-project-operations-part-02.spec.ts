@@ -34,6 +34,7 @@ describe('OrcaRuntimeService', () => {
       },
       getRepo: (id: string) => added.find((repo) => repo.id === id) as never
     }
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the double overrides three store reads the create path uses; a full store would need a real database.
     const runtime = new OrcaRuntimeService(createStore as never)
     const tempRoot = await mkdtempReal(join(tmpdir(), 'orca-runtime-create-parent-'))
     const parentDir = join(tempRoot, 'orca', 'projects')

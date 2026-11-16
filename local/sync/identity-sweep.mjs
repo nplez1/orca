@@ -310,7 +310,7 @@ function printReport({ violations, allowed, files, skipped }, strict = false) {
   const line = (hit) =>
     `    [${hit.id}] ${hit.file}:${hit.line}  ${hit.text}${hit.fix ? ` -> ${hit.fix}` : ''}`
   const readme = (hits) => RULES.filter(([id]) => hits.some((hit) => hit.id === id))
-  const titles = (hits) => readme(hits).map(([id]) => `  ${id}${WHY[id] ? ` — ${WHY[id]}` : ''}`)
+  const titles = (hits) => readme(hits).map(([id]) => `  ${String(id)}${WHY[id] ? ` — ${WHY[id]}` : ''}`)
   const groups = buckets.filter(([, hits]) => hits.length > 0)
   const body = groups.flatMap(([label, hits]) => [`\n${label}`, ...titles(hits), ...hits.map(line)])
   process.stdout.write(`${head}\n${policy}\n${body.join('\n')}\n`)

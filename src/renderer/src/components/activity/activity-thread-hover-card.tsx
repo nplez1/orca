@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 2-code-line delta rides inside it, and splitting costs a permanent sync hunk. */
 import React, { useCallback, useEffect } from 'react'
 import { Pencil, StickyNote } from 'lucide-react'
 import { HoverCardContent } from '@/components/ui/hover-card'

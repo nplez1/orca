@@ -220,7 +220,7 @@ describe('useChecksPanelAiAcknowledgement', () => {
       ...mixedPayload(),
       provider: 'gitlab',
       githubTarget: undefined
-    } as NonNullable<typeof model.pendingCommentResolutionRef.current>
+    } satisfies NonNullable<typeof model.pendingCommentResolutionRef.current>
     model.pendingCommentResolutionRef.current = payload
     const { result } = renderHook(() => useChecksPanelAiAcknowledgement(model.input))
 
@@ -246,7 +246,7 @@ describe('useChecksPanelAiAcknowledgement', () => {
         { kind: 'thread', threadId: 'T1', root: reviewThreadComment(), replies: [] }
       ],
       githubTarget: undefined
-    } as NonNullable<typeof model.pendingCommentResolutionRef.current>
+    } satisfies NonNullable<typeof model.pendingCommentResolutionRef.current>
     model.pendingCommentResolutionRef.current = payload
     const { result } = renderHook(() => useChecksPanelAiAcknowledgement(model.input))
 
@@ -266,7 +266,7 @@ describe('useChecksPanelAiAcknowledgement', () => {
     const payload = {
       ...mixedPayload(),
       githubTarget: undefined
-    } as NonNullable<typeof model.pendingCommentResolutionRef.current>
+    } satisfies NonNullable<typeof model.pendingCommentResolutionRef.current>
     model.pendingCommentResolutionRef.current = payload
     const { result } = renderHook(() => useChecksPanelAiAcknowledgement(model.input))
 

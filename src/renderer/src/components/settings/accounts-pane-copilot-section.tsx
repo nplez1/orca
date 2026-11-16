@@ -137,10 +137,7 @@ export function renderCopilotAccountsSection(model: AccountsPaneSectionModel): R
               'GitHub token'
             )}
           </Label>
-          <Badge
-            variant={tokenStored ? 'secondary' : 'outline'}
-            className="h-5 gap-1 rounded-full px-2 text-[10px] font-medium text-muted-foreground"
-          >
+          <Badge variant={tokenStored ? 'secondary' : 'outline'}>
             {tokenStored ? <Lock className="size-3" /> : <LockOpen className="size-3" />}
             {tokenStored
               ? translate(
@@ -191,11 +188,11 @@ export function renderCopilotAccountsSection(model: AccountsPaneSectionModel): R
           </Button>
           {tokenStored ? (
             <Button
-              variant="ghost"
+              variant="muted-field-icon"
               size="xs"
               onClick={() => void clearCopilotCredentials()}
               disabled={copilotCredentialBusy}
-              className="h-7 shrink-0 text-muted-foreground hover:text-foreground"
+              className="h-7 shrink-0"
             >
               {translate(
                 'auto.components.settings.accounts.pane.copilot.section.4cf256a883',

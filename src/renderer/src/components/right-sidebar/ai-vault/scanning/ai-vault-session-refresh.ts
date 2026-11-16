@@ -1,5 +1,3 @@
-/* eslint-disable max-lines -- Why: upstream-owned, and this fork touches it only to clear React
-   Compiler bailouts; splitting it would put a fork hunk in the way of the next sync. */
 import { runAsyncTaskWithFailure } from '@/lib/async-task-with-cleanup'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 

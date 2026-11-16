@@ -15,11 +15,14 @@ vi.mock('@/runtime/source-control/references/runtime-repo-client.ts', () => ({
   getRuntimeRepoBaseRefDefault: mocks.getRuntimeRepoBaseRefDefault,
   // Why the inline watcher: the module factory replaces the whole module, so the real
   // `watchRuntimeRepoBaseRefDefault` wrapper is gone and the hook would call undefined.
-  watchRuntimeRepoBaseRefDefault: (hostId: string, repoId: string, handlers: unknown) => {
-    const typed = handlers as {
+  watchRuntimeRepoBaseRefDefault: (
+    hostId: string,
+    repoId: string,
+    typed: {
       onResult: (result: unknown) => void
       onError: (error: unknown) => void
     }
+  ) => {
     void Promise.resolve(mocks.getRuntimeRepoBaseRefDefault(hostId, repoId)).then(
       typed.onResult,
       typed.onError
