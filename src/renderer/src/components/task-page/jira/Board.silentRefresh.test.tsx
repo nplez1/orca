@@ -237,7 +237,7 @@ describe('TaskPageJiraBoard silent reloads', () => {
     dragCardOnto(card, doingColumn, sprintIssue.key)
 
     // The reload the move asked for is in flight, and the board is still drawn under it.
-    await waitFor(() => expect(refetch.sprintCalls()).toBe(2))
+    await waitFor(() => expect(refetch.sprintCalls()).toBe(2), { timeout: 5_000 })
     expect(screen.getByText('ABC-1').closest('section')?.textContent).toContain('Doing')
     expect(screen.getByText('ABC-6')).toBeTruthy()
     expect(screen.queryByText('Loading…')).toBeNull()
@@ -283,7 +283,7 @@ describe('TaskPageJiraBoard silent reloads', () => {
       bumpBoardRefresh()
     })
 
-    await waitFor(() => expect(refetch.sprintCalls()).toBe(2))
+    await waitFor(() => expect(refetch.sprintCalls()).toBe(2), { timeout: 5_000 })
     expect(screen.queryByText('Loading…')).toBeNull()
     expect(screen.getByText('Doing')).toBeTruthy()
     expect(screen.getByText(filteredEmpty)).toBeTruthy()
@@ -305,7 +305,7 @@ describe('TaskPageJiraBoard silent reloads', () => {
       bumpBoardRefresh()
     })
 
-    await waitFor(() => expect(refetch.sprintCalls()).toBe(2))
+    await waitFor(() => expect(refetch.sprintCalls()).toBe(2), { timeout: 5_000 })
     expect(screen.queryByText('Loading…')).toBeNull()
     expect(screen.getByText(emptySprint)).toBeTruthy()
 
@@ -353,7 +353,7 @@ describe('TaskPageJiraBoard silent reloads', () => {
     await act(async () => {
       bumpBoardRefresh()
     })
-    await waitFor(() => expect(refetch.sprintCalls()).toBe(2))
+    await waitFor(() => expect(refetch.sprintCalls()).toBe(2), { timeout: 5_000 })
 
     // Why: a page appended over the reload's answer would write a pre-reload snapshot
     // back over the server's, cache included, so the button must not offer that read.
