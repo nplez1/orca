@@ -160,6 +160,23 @@ export class PRRefreshVisibility {
     return undefined
   }
 
+  /** The first row any window shows whose request `matches`, with the key it is shown under: a
+   *  read whose own key names a scoped account still settles the row it belongs to. */
+  findShown(
+    matches: (shown: GitHubPRRefreshCandidate) => boolean
+  ): { key: string; shown: GitHubPRRefreshCandidate } | null {
+    for (const window of this.visibleByWindow.values()) {
+      for (const [key, aliases] of window.candidates) {
+        for (const candidate of aliases.rows.values()) {
+          if (matches(candidate)) {
+            return { key, shown: candidate }
+          }
+        }
+      }
+    }
+    return null
+  }
+
   candidate(key: string, fallback: GitHubPRRefreshCandidate): GitHubPRRefreshCandidate {
     let latest = fallback
     let selected = false

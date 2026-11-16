@@ -168,17 +168,19 @@ export class PRRefreshQueueScheduler {
     request: PRBranchReadRequest,
     producer: PRBranchReadProducer
   ): PRRefreshOutcome {
-    const key = refreshKey(request)
-    const representative = this.visibility.shown(key)
-    if (!representative || !producer.current?.()) {
-      return outcome
-    }
     const matchesCurrentRequest = (shown: GitHubPRRefreshCandidate) =>
       prepared.matchesRequest(candidateReadRequest(shown, 'visible'))
-    const shown = this.visibility.shown(key, matchesCurrentRequest)
-    if (!shown) {
+    // A read that names the account the project resolves itself is the row's own request, though
+    // its key carries that account's scope: it settles the row, under the key the row is shown as.
+    const readKey = refreshKey(request)
+    const exact = this.visibility.shown(readKey, matchesCurrentRequest)
+    const located = exact
+      ? { key: readKey, shown: exact }
+      : this.visibility.findShown(matchesCurrentRequest)
+    if (!located || !producer.current?.()) {
       return outcome
     }
+    const { key, shown } = located
     const pending = this.queue.get(key)
     const candidate = this.visibility.candidate(key, shown)
     // The row's failure is settled whatever is queued for it, so the last check before any read
