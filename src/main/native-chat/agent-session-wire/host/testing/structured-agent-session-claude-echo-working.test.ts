@@ -85,7 +85,6 @@ beforeEach(async () => {
     providerHandle: { kind: 'claude', sessionId: PROVIDER_SESSION_ID, leafUuid: null }
   })
   expect(await host.attach(CALLER, params)).toMatchObject({ ok: true })
-  // Same 1 s default the stop-contract fixture reddened shard 12/12 with (#439).
   await vi.waitFor(
     () => expect(host.readStatusSummary(SESSION)?.hostExecutionPhase).toBe('ready'),
     {
