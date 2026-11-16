@@ -8,8 +8,9 @@ findings by area so no two fixers share a file.
   {{PRE_SYNC_TIP}}   the merge's first parent (the fork before the sync), for recovering fork code
   {{FINDINGS}}       numbered: severity, file, the defect, and the fix the reviewer verified — verbatim
                      where possible
-  {{GATE}}           the checks that prove these fixes: the project typecheck (`pnpm tc:node` or
-                     `pnpm tc:web`) and the single test files that cover the touched code
+  {{GATE}}           the single test files that cover the touched code. Not a typecheck: several
+                     fixers run at once, so the orchestrator runs each project's typecheck once, after
+                     every fixer has reported
 -->
 
 The release review of `{{REVISION}}` (RELEASE-RUNBOOK.md Step 1.6) found defects in the merge
@@ -26,9 +27,11 @@ A finding that a fork-owned test was lost is fixed by restoring the fork's own c
 current home — not upstream's retired suite — and each restored case must fail if the behaviour it guards
 is reverted.
 
-Gate: {{GATE}}. Run single test files only (`pnpm test <one file>`; a directory queues). Do not use
+Gate: {{GATE}}. Run single test files only (`pnpm test <one file>`; a directory queues), and no
+typecheck — the orchestrator runs it once when every fixer has reported. Do not use
 `skip`, `any` or `@ts-expect-error`, do not commit, and do not touch `package.json`, lockfiles or
 `local/`.
 
 Report in under 15 lines: what you changed per finding and the verification you actually ran. The
-re-check of these fixes is the delta round Step 1.6 describes; do not run a review yourself.
+re-check of these fixes is the delta round in `~/Code/orca/AGENTS.md` § "PR gate 2 — one reviewer
+round, then one delta re-check"; do not run a review yourself.

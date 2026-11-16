@@ -2844,6 +2844,21 @@ rejected delivery, not an argument for changing the decision.
 `electron.vite.config.ts` keeps upstream's `popout` entry deleted along with `popout.html`: an entry
 that resolves nothing does not build, and the fork's comment there says why.
 
+### `local(sync)`: the sync's subagent prompts are checked in, and the Linux lane runs early
+
+`local/sync/templates/` holds the prompts the 2026-11-15 release agent wrote from scratch — the release
+brief (the documented way to start a sync and release), the conflict protocol, the per-batch resolver
+prompt and four repair prompts — with that run's lessons as rules: batches of at most 20 paths staged
+file by file (its 51-file batch staged nothing in 26 minutes), no repo-wide commands in a resolver, no
+`sleep` polling (23 polls, 162 minutes), and one runner per heavy gate.
+
+`local/sync/linux-lane.mjs` is UPSTREAM-SYNC-RUNBOOK.md Step 3.5: push HEAD to `sync-candidate/<sha12>`
+and dispatch `fork-main-tests.yml` there, because four of the six 2026-11-16 release dispatches failed
+in `fork-release.yml`'s Linux unit lane at 8–60 minutes a loop. It refuses a candidate whose tree has a
+`push`/`create` trigger that would fire for the ref, or an unprovisioned runner label the lane can
+reach; `--cleanup` deletes only candidate refs `origin/main` contains, each leased to its listed sha.
+Guarded by `tests/tools/linux-lane.test.mjs`.
+
 ### `local(test)`: two `orca-runtime` defects were test bugs, not environment reds
 
 `local/unit-known-red.json` carried three `orca-runtime` items as `macos-path-semantics`. Both causes

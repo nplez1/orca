@@ -24,16 +24,19 @@ Notes for this release: {{NOTES}}
 - Read `UPSTREAM-SYNC-RUNBOOK.md`, `RELEASE-RUNBOOK.md`, `BRANCHES.md`, `LOCAL-PATCHES.md`,
   `local/sync/convergence-ledger.md` and `local/sync/README.md` before touching anything. Follow the
   runbooks exactly; where this brief and a runbook disagree, the runbook wins.
-- `git status` must be clean; fast-forward `main` to `origin/main`; fetch `origin` and `upstream`.
+- `git status` must be clean; fetch `origin` and `upstream`, then fast-forward `main` to `origin/main`.
 - Record the upstream base you actually merge (`git rev-parse upstream/main`) and how far ahead it is.
 
 ## 2. Upstream sync — `UPSTREAM-SYNC-RUNBOOK.md`
 
 - Follow Steps 0 and 1.
 - Follow Step 2. Settle what the ledger and the manifest already answer, and what
-  `conflicts.mjs --propose` / `--apply-proven` can prove, yourself. Fan the rest out to resolver
+  `conflicts.mjs --propose` / `--apply-proven` can prove, yourself. Resolve `package.json` yourself
+  and regenerate each lockfile from its merged manifest (`pnpm install --lockfile-only` in its
+  directory); never hand-merge a lockfile and never batch either. Fan the rest out to resolver
   subagents using `local/sync/templates/conflict-protocol.md` (written once to
-  `.git/orca-sync/PROTOCOL.md`) and one `local/sync/templates/resolve-batch.md` prompt per batch. Stop
+  `$(git rev-parse --git-dir)/orca-sync/PROTOCOL.md`) and one `local/sync/templates/resolve-batch.md`
+  prompt per batch. Stop
   and report only for a substantial convergence question the ledger does not answer; otherwise decide,
   record the decision in the ledger, and continue.
 - Follow Step 3. Repair what it finds with the repair templates (`local/sync/templates/repair-*.md`).
@@ -46,9 +49,12 @@ Notes for this release: {{NOTES}}
 - Follow Step 0.5, then Step 1.5. Repair gate reds with `repair-tests.md` / `repair-lint.md`.
 - Follow Step 1.6, the review gate, exactly as written there. Fix its findings with
   `repair-review-findings.md`. Do not use `--waive-review`.
-- Re-run the early Linux lane on the final revision (UPSTREAM-SYNC-RUNBOOK.md Step 3.5), then follow
-  Step 2 to dispatch. Never `gh workflow run fork-release.yml` directly.
-- Watch the run once (`gh run watch <id> --compact --exit-status`), read the draft release body as the
+- Re-run the early Linux lane on the final revision (UPSTREAM-SYNC-RUNBOOK.md Step 3.5) and block on
+  `gh run watch <id> --repo nplez1/orca --exit-status` until it is green. Only then follow Step 2 to
+  dispatch. Never `gh workflow run fork-release.yml` directly.
+- Watch the release run once (`gh run watch <id> --repo nplez1/orca --compact --exit-status`). Pass
+  `--repo nplez1/orca` to every `gh` command: without it `gh` resolves to the `upstream` remote.
+- Read the draft release body as the
   runbook's "Release notes" section says, and publish only when it is right.
 - Verify the published release: its tag, that it is marked Latest, and that its asset list matches the
   previous release's (`gh release view <previous tag> --repo nplez1/orca --json assets`) leg for leg,
@@ -86,7 +92,8 @@ These come from the 2026-11-15 run, where they cost hours. They apply in Pi and 
 5. **One runner per heavy gate.** While a subagent is fixing a gate, do not run that gate yourself, and
    never give two concurrent subagents the same heavy command: split typecheck repair by project
    (`tc:node`, `tc:web`, `tc:cli`), never two agents on one project. Run the gate once when every fixer
-   has reported, save its output under `.git/orca-sync/`, and hand each fixer its own excerpt.
+   has reported, save its output under `$(git rev-parse --git-dir)/orca-sync/`, and hand each fixer its
+   own excerpt.
 6. **Bound every heavy command with an explicit timeout** in the harness's unit: Pi's bash takes
    seconds (`600`), Claude Code's takes milliseconds (`600000`).
 

@@ -5,7 +5,11 @@ its output, so the fixer starts from the list instead of a cold run.
 
   {{WORKTREE}}     the checkout
   {{PROJECT}}      node | web | cli  (the command is `pnpm tc:{{PROJECT}}`)
-  {{ERRORS_FILE}}  the saved output, e.g. .git/orca-sync/tc-{{PROJECT}}.txt, and its error count
+  {{ERRORS_FILE}}  the absolute path of the saved output, e.g.
+                   $(git rev-parse --absolute-git-dir)/orca-sync/tc-{{PROJECT}}.txt, and its error count
+  {{OUT_OF_SCOPE}} what this fixer must not edit. `src/shared/**` and `src/preload/**` are in more than
+                   one project, so they belong to the `node` fixer alone: give the web and cli fixers
+                   "src/main/**, src/shared/**, src/preload/**" (and the web fixer src/cli/**)
   {{OLD_BASE}}     the merge base; {{PRE_SYNC_TIP}} the merge's first parent (the fork before the sync)
   {{SETTLED}}      decisions settled in this sync a fixer could undo (moved modules, deleted features,
                    renamed settings fields), one bullet each
@@ -15,8 +19,9 @@ You are fixing the residual typecheck errors a large upstream-sync merge left in
 `{{PROJECT}}` TypeScript project, in the worktree `{{WORKTREE}}`. No conflicts remain; this is
 mechanical repair, not analysis.
 
-Start from the saved error list, `{{WORKTREE}}/{{ERRORS_FILE}}` (`<file>(line,col): error TSxxxx: …`).
-You are the only agent on this project. Re-run `pnpm tc:{{PROJECT}}` (several minutes; give it an
+Start from the saved error list, `{{ERRORS_FILE}}` (`<file>(line,col): error TSxxxx: …`).
+You are the only agent on this project. Do not edit {{OUT_OF_SCOPE}}: another fixer owns those
+paths, so report an error there to the orchestrator with its line instead of fixing it. Re-run `pnpm tc:{{PROJECT}}` (several minutes; give it an
 explicit timeout) only after fixing a whole batch of errors, not after each one.
 
 Typical shapes and their fixes:

@@ -7,7 +7,8 @@ per fixer, and never give two fixers the same file.
   {{FILES}}          the failing test files, one per line, in a fenced block
   {{FAILURES}}       the failure excerpt per file (assertion and first stack frame), or "run each file"
   {{ORIGIN}}         where the reds came from: "the Mac unit gate", or "the Linux lane, run <id>" — for
-                     a Linux-only red, also give the artifact path from `gh run download <id>`
+                     a Linux-only red, also give the artifact path from
+                     `gh run download <id> --repo nplez1/orca`
   {{KNOWN_SHAPES}}   causes already diagnosed for some of these files, one bullet each; "none" if none
   {{SETTLED}}        decisions settled in this sync a fixer could undo, one bullet each
   {{OUT_OF_SCOPE}}   trees another fixer owns right now (e.g. src/renderer/**)

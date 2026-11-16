@@ -1,13 +1,15 @@
 <!--
 Conflict-resolution protocol for resolver subagents. Write it once per sync, filled, to
-`.git/orca-sync/PROTOCOL.md`; every resolve-batch.md prompt points at that copy.
+`{{SYNC_DIR}}/PROTOCOL.md`; every resolve-batch.md prompt points at that copy.
 
   {{WORKTREE}}      the checkout the merge is in
   {{OLD_BASE}}      the merge base, `git merge-base HEAD MERGE_HEAD` (recorded by pre-sync.mjs)
   {{UPSTREAM_SHA}}  the upstream tip being merged (MERGE_HEAD)
-  {{RENAME_COUNT}}  how many paths upstream moved, from `.git/orca-sync/renames.txt`
+  {{SYNC_DIR}}      the absolute path of `$(git rev-parse --absolute-git-dir)/orca-sync` — not
+                    `.git/orca-sync`, which does not exist in a linked worktree
+  {{RENAME_COUNT}}  how many paths upstream moved, from `{{SYNC_DIR}}/renames.txt`
 
-`.git/orca-sync/renames.txt` (`old -> new`, one per line) is written before fan-out, e.g. from the
+`{{SYNC_DIR}}/renames.txt` (`old -> new`, one per line) is written before fan-out, e.g. from the
 `R` lines of `git status --porcelain -M`.
 -->
 
@@ -37,7 +39,7 @@ Worktree: `{{WORKTREE}}`, branch `main`. A **merge** of upstream into the releas
    fork-only behaviour upstream does not have.
 5. **Unions**: both sides added to the same list, import block, union type or map → keep both and drop
    duplicates (a member both sides already had appears once). Check commas and trailing members.
-6. **Renames**: upstream moved {{RENAME_COUNT}} paths. `.git/orca-sync/renames.txt` maps `old -> new`;
+6. **Renames**: upstream moved {{RENAME_COUNT}} paths. `{{SYNC_DIR}}/renames.txt` maps `old -> new`;
    use it to re-point imports, and prefer the new path.
 7. **Identity (fork invariant)**: this fork ships as **Orca NP** — `~/.orca-np` (not `~/.orca`), bundle
    `com.nplez1.orca`, packaged userData `appData/orca-np`, CLI `orca-np`/`orca-np-dev`, NSIS ProgIDs
@@ -51,7 +53,9 @@ Worktree: `{{WORKTREE}}`, branch `main`. A **merge** of upstream into the releas
    full-history `git log`, or repo-wide search-and-replace. Read single files and single diffs; the
    release engineer runs the gates centrally.
 10. **Do not change** `package.json`, lockfiles, `.github/workflows/fork-*` or anything under `local/`.
-    Do not commit and do not `git merge --continue`.
+    Those are never batched: the release engineer resolves `package.json` centrally and regenerates each
+    lockfile from its merged manifest. If one is in your list anyway, leave it unmerged and say so. Do not
+    commit and do not `git merge --continue`.
 11. Leave **no conflict markers** in a file you report done: `<<<<<<<`, `|||||||`, `=======`,
     `>>>>>>>`.
 12. **Ambiguous file?** Take upstream's shape plus the fork's delta, note it in your report, and move on

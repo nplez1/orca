@@ -97,7 +97,7 @@ the 2026-10-05 sync expensive to diagnose: a clean tree (nothing here is safe to
 stray conflict markers, **the tip typechecks before you start**, the derived localization catalog
 regenerating to no diff, `local(` commits confined to `main`, `rerere.enabled` +
 `merge.conflictStyle zdiff3`, and it records old base / old tip / new base plus the dry-run conflict
-set. Nothing on the remote changes until Step 4.
+set. Nothing on the remote changes until Step 4, except the `sync-candidate/*` ref Step 3.5 pushes.
 
 ## Step 1 — the sync
 
@@ -183,9 +183,11 @@ answer into the ledger** in the same commit. Decisions already taken are in
 
 A sync-sized conflict set is resolved by subagents, from checked-in prompts: write
 [`conflict-protocol.md`](./local/sync/templates/conflict-protocol.md) once to
-`.git/orca-sync/PROTOCOL.md`, then hand each batch a
+`$(git rev-parse --git-dir)/orca-sync/PROTOCOL.md`, then hand each batch a
 [`resolve-batch.md`](./local/sync/templates/resolve-batch.md). **A batch is at most 20 paths from one
-area, resolved and `git add`-ed file by file**, and a resolver never runs a repo-wide command — the
+area, resolved and `git add`-ed file by file**; `package.json` and the lockfiles are never batched
+(resolve `package.json` centrally and regenerate each lockfile); and a resolver never runs a repo-wide
+command — the
 2026-11-15 batch of 51 staged nothing in 26 minutes while re-splits of 22 and 19 finished in under
 ten. The `repair-*.md` templates beside them hand Step 3's and the release gates' reds to fixers.
 [release-brief.md](./local/sync/templates/release-brief.md) § Orchestration has the rest of the rules.
@@ -373,10 +375,12 @@ at no cost.
   shares the nightly's slot. One ref per revision means candidates never cancel each other; a
   re-dispatch of the same revision supersedes its earlier run.
 - The health checks do not read it as the nightly: `check-nightly-liveness.mjs` lists `--branch main`
-  only, `ci-health-report.mjs` sweeps only on `refs/heads/main`, and `check-actions-enablement.mjs`
-  judges per-workflow repository state, which no ref changes. A bare
-  `gh run list --workflow fork-main-tests.yml -L1` _does_ show a candidate run — add `--branch main`
-  when you mean the nightly.
+  only; `check-fork-lane-red.mjs` reads `branch=main` only and leaves `fork-main-tests.yml` to the
+  liveness check (`COVERED_ELSEWHERE`); `ci-health-report.mjs` sweeps only on `refs/heads/main`; and
+  `check-actions-enablement.mjs` judges per-workflow repository state, which no ref changes.
+  `check-queued-runs.mjs` is repository-wide by design, so a candidate job stuck waiting for a runner
+  is reported like any other. A bare `gh run list --workflow fork-main-tests.yml -L1` _does_ show a
+  candidate run — add `--branch main` when you mean the nightly.
 
 **Triage in parallel.** Start `gh run watch <id> --repo nplez1/orca --compact --exit-status` as one
 background command and let its exit notify you; meanwhile carry on with Step 3's review and the local
@@ -386,9 +390,10 @@ Step 1.5): `gh run download <id> --repo nplez1/orca`, then
 [`repair-tests.md`](./local/sync/templates/repair-tests.md). Commit the fixes and re-run the script on
 the new HEAD.
 
-**Run it again on the final revision**, before `node local/dispatch-release.mjs`: the revision whose
-code you dispatch. A later commit that touches only `local/sync/release-review/*.json` or `*.md` — what
-the review gate already treats as review-neutral — does not change what it tests.
+**Run it again on the final revision**, before `node local/dispatch-release.mjs`, and wait for it to
+pass. The one exemption: a later commit that touches only `local/sync/release-review/*.json` does not
+need a third run, because no test reads a review manifest. Markdown is not exempt — some suites read
+the repository's `*.md` files.
 
 **Clean up after the release ships:** `node local/sync/linux-lane.mjs --cleanup` (`--dry-run` lists)
 deletes the candidate refs `origin/main` already contains and keeps, by name, any whose commit it does
@@ -422,6 +427,6 @@ from the new line.
 
 ## Step 6 — release
 
-`gh workflow run fork-release.yml --repo nplez1/orca --ref main`, then follow
-[RELEASE-RUNBOOK.md](./RELEASE-RUNBOOK.md). The version stamps itself as
-`<package.json version>-np.<run number>`, so no number is chosen by hand.
+Follow [RELEASE-RUNBOOK.md](./RELEASE-RUNBOOK.md): its gates, then `node local/dispatch-release.mjs`,
+which refuses an unreviewed or unswept dispatch — not a bare `gh workflow run`. The version stamps
+itself as `<package.json version>-np.<run number>`, so no number is chosen by hand.

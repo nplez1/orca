@@ -51,15 +51,15 @@ A sync and release is run by one agent that fans work out to subagents. The prom
 checked in under [`templates/`](./templates/), parameterised with `{{PLACEHOLDERS}}` that each file's
 header comment lists. Fill them, and check nothing still reads `{{`, before sending.
 
-| Template                    | Who gets it                                                                    |
-| --------------------------- | ------------------------------------------------------------------------------ |
-| `release-brief.md`          | the release agent itself — **start a sync and release with this brief**        |
-| `conflict-protocol.md`      | written once per sync to `.git/orca-sync/PROTOCOL.md`; every resolver reads it |
-| `resolve-batch.md`          | one resolver per batch of at most 20 conflicted paths                          |
-| `repair-typecheck.md`       | one fixer per TypeScript project after the merge                               |
-| `repair-tests.md`           | unit-gate or Linux-lane reds, grouped by area                                  |
-| `repair-lint.md`            | lint-gate steps, disjoint sets per fixer                                       |
-| `repair-review-findings.md` | the findings of RELEASE-RUNBOOK.md Step 1.6, grouped by area                   |
+| Template                    | Who gets it                                                                         |
+| --------------------------- | ----------------------------------------------------------------------------------- |
+| `release-brief.md`          | the release agent itself — **start a sync and release with this brief**             |
+| `conflict-protocol.md`      | written once per sync to `<git-dir>/orca-sync/PROTOCOL.md`; every resolver reads it |
+| `resolve-batch.md`          | one resolver per batch of at most 20 conflicted paths                               |
+| `repair-typecheck.md`       | one fixer per TypeScript project after the merge                                    |
+| `repair-tests.md`           | unit-gate or Linux-lane reds, grouped by area                                       |
+| `repair-lint.md`            | lint-gate steps, disjoint sets per fixer                                            |
+| `repair-review-findings.md` | the findings of RELEASE-RUNBOOK.md Step 1.6, grouped by area                        |
 
 The brief names runbook steps rather than copying their commands, so a runbook change reaches it
 without an edit. Its "Orchestration" section holds the rules the 2026-11-15 run paid for: batch size,

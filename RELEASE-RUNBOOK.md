@@ -114,7 +114,9 @@ something to do silently.
 
 **Precondition: the early Linux lane is green on the revision being released**
 (UPSTREAM-SYNC-RUNBOOK.md Step 3.5, `node local/sync/linux-lane.mjs`) — the same suite this dispatch
-runs, on the same runner, without a dispatch loop per red.
+runs, on the same runner, without a dispatch loop per red. Only a later commit that touches nothing but
+`local/sync/release-review/*.json` keeps an earlier green; a markdown change does not, because some
+suites read the repository's `*.md`.
 
 Since 2026-10-29 the dispatch carries the same coverage itself: `fork-release.yml` runs the unit suite
 on the dispatched commit (`unit-plan` → `unit-tests`, the same reusable workflow, shard plan and fork

@@ -1,8 +1,11 @@
 <!--
 One resolver subagent per batch. A batch is at most 20 paths from one area (release-brief.md,
-"Orchestration" rule 1); write its list to `.git/orca-sync/batch-{{BATCH_ID}}.txt`, one path per line.
+"Orchestration" rule 1); write its list to `{{SYNC_DIR}}/batch-{{BATCH_ID}}.txt`, one path per line.
+`package.json` and the lockfiles are never in a batch: the release engineer resolves `package.json`
+and regenerates each lockfile centrally.
 
   {{WORKTREE}}        the checkout the merge is in
+  {{SYNC_DIR}}        the absolute path of `$(git rev-parse --absolute-git-dir)/orca-sync`
   {{BATCH_ID}}        a short unique id, e.g. c2
   {{FILE_COUNT}}      the number of paths in the list (<= 20)
   {{AREA}}            the area, e.g. "src/main/{ipc,window,persistence}"
@@ -16,11 +19,11 @@ One resolver subagent per batch. A batch is at most 20 paths from one area (rele
 You are resolving ONE batch of file conflicts from an in-progress `git merge` (upstream stablyai/orca
 into the Orca NP fork's release line) in the worktree `{{WORKTREE}}`.
 
-FIRST read `{{WORKTREE}}/.git/orca-sync/PROTOCOL.md`. It is binding: the index-stage convention (in this
+FIRST read `{{SYNC_DIR}}/PROTOCOL.md`. It is binding: the index-stage convention (in this
 merge `:2:` = ours = the fork, `:3:` = theirs = upstream, `:1:` = the merge base), the rules and the
 report format.
 
-YOUR FILES: exactly the {{FILE_COUNT}} paths in `{{WORKTREE}}/.git/orca-sync/batch-{{BATCH_ID}}.txt`
+YOUR FILES: exactly the {{FILE_COUNT}} paths in `{{SYNC_DIR}}/batch-{{BATCH_ID}}.txt`
 ({{AREA}}). Do not modify any other file — other resolvers are working {{OTHER_BATCHES}} in this
 worktree at the same time.
 
