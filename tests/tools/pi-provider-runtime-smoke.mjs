@@ -52,7 +52,7 @@ try {
   await build({
     stdin: {
       contents:
-        "export {planCommitMessageGeneration} from '../../src/shared/source-control/ai/generation/commit-message-plan';",
+        "export {planCommitMessageGeneration} from './src/shared/source-control/ai/generation/commit-message-plan';",
       resolveDir: process.cwd()
     },
     bundle: true,
