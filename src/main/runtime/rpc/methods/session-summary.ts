@@ -37,6 +37,10 @@ export const SESSION_SUMMARY_RPC_METHODS = [
         paneKey: params.paneKey,
         foldParams,
         ...(session ? { session } : {}),
+        // Why forwarded: a browser client can read a workspace owned by a third host, and this
+        // host holds no status row for that pane — its own rows would say "local" and fold
+        // where the session is not.
+        ...(params.executionHostId ? { executionHostId: params.executionHostId } : {}),
         ...(params.revalidateWithinMs ? { revalidateWithinMs: params.revalidateWithinMs } : {}),
         ...(params.sameViewer ? { sameViewer: true } : {})
       })

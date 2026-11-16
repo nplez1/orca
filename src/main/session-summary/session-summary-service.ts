@@ -8,14 +8,15 @@
 // would run if the user were working on that machine directly. A session on an SSH
 // target folds here, from a fetched copy, because an SSH host runs no Orca server.
 import type { ResolvedSourceControlAiGenerationParams } from '../../shared/source-control/ai/source-control-ai-operation-resolution'
-import type {
-  SessionSummaryCloseRequest,
-  SessionSummaryOpenRequest,
-  SessionSummarySessionRef,
-  SessionSummarySnapshot,
-  SessionSummaryStatus
+import {
+  failedSessionSummarySnapshot,
+  parseSessionSummarySessionRef,
+  type SessionSummaryCloseRequest,
+  type SessionSummaryOpenRequest,
+  type SessionSummarySessionRef,
+  type SessionSummarySnapshot,
+  type SessionSummaryStatus
 } from '../../shared/session-summary-types'
-import { parseSessionSummarySessionRef } from '../../shared/session-summary-types'
 import {
   mergeSessionRef,
   hasSessionRef,
@@ -24,9 +25,9 @@ import {
   sessionSummaryIdentityOf,
   type SessionSummaryFoldRunnerDeps
 } from './session-summary-fold-runner'
-import type { SessionSummaryHostFoldClient } from './session-summary-host-fold-client'
-import { SessionSummaryHostFoldSubscription } from './session-summary-host-subscription'
-import { SessionSummaryPaneLeases } from './session-summary-pane-leases'
+import type { SessionSummaryHostFoldClient } from '../../shared/session-summary-host-fold-client'
+import { SessionSummaryHostFoldSubscription } from '../../shared/session-summary-host-subscription'
+import { SessionSummaryPaneLeases } from '../../shared/session-summary-pane-leases'
 import {
   buildLocalSessionSummarySnapshot,
   IDLE_FOLD,
@@ -369,18 +370,7 @@ export class SessionSummaryService {
     runtime.status = 'failed'
     runtime.error = error.message
     // Keep the last good brief on screen; the header and body report the failure.
-    runtime.hostSnapshot = {
-      ...(snapshot ?? {
-        paneKey,
-        status: 'failed' as const,
-        facts: null,
-        ledger: null,
-        seenThrough: 0,
-        fold: IDLE_FOLD
-      }),
-      status: 'failed',
-      error: error.message
-    }
+    runtime.hostSnapshot = failedSessionSummarySnapshot(paneKey, error.message, snapshot)
     this.emit(paneKey)
   }
 }

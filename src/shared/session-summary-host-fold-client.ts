@@ -8,14 +8,14 @@ import {
   SessionSummaryCloseOnHostParams,
   SessionSummaryOpenOnHostParams,
   SessionSummarySnapshotOnHostParams
-} from '../../shared/rpc-contract/session-summary-params'
+} from './rpc-contract/session-summary-params'
 import {
   SESSION_SUMMARY_HOST_OUTDATED_MESSAGE,
   type SessionSummarySessionRef,
   type SessionSummarySnapshot
-} from '../../shared/session-summary-types'
-import type { ResolvedSourceControlAiGenerationParams } from '../../shared/source-control/ai/source-control-ai-operation-resolution'
-import { isUnknownSessionSearchMethod } from '../../shared/ai-vault/search/ai-vault-search-client'
+} from './session-summary-types'
+import type { ResolvedSourceControlAiGenerationParams } from './source-control/ai/source-control-ai-operation-resolution'
+import { isUnknownSessionSearchMethod } from './ai-vault/search/ai-vault-search-client'
 import { coerceRelayedLedger } from './session-summary-relayed-ledger'
 
 export type SessionSummaryHostFoldClient = {
@@ -25,6 +25,8 @@ export type SessionSummaryHostFoldClient = {
     foldParams: ResolvedSourceControlAiGenerationParams | null
     /** The viewer's own record of which session is on screen, when it knows one. */
     session?: SessionSummarySessionRef
+    /** The host the viewer believes owns the session, for a pane this host has no row for. */
+    executionHostId?: string
     /** The reader's freshness window; the host decides whether its brief is still current. */
     revalidateWithinMs?: number
     /** A refresh from a viewer that already holds the pane's lease there. */
@@ -61,7 +63,15 @@ export function createSessionSummaryHostFoldClient(deps: {
     }
   }
   return {
-    open: async ({ environmentId, paneKey, foldParams, session, revalidateWithinMs, sameViewer }) =>
+    open: async ({
+      environmentId,
+      paneKey,
+      foldParams,
+      session,
+      executionHostId,
+      revalidateWithinMs,
+      sameViewer
+    }) =>
       asSnapshot(
         await call(
           environmentId,
@@ -72,6 +82,9 @@ export function createSessionSummaryHostFoldClient(deps: {
             // Why sent: a host that cannot read its own row for this pane would otherwise
             // answer "no readable transcript" for a session it is running right now.
             session: session ?? null,
+            // Why omitted rather than null: a client that has no opinion about the host must
+            // not name one, which the host would read as a request for that host.
+            ...(executionHostId ? { executionHostId } : {}),
             revalidateWithinMs: revalidateWithinMs ?? null,
             sameViewer: sameViewer ?? null
           })

@@ -5,10 +5,15 @@ import {
   createDeepSeekCredentialsApi,
   createFireworksCredentialsApi
 } from './web-agent-accounts-api'
+import { createWebSessionSummaryApi } from './web-session-summary-api'
 
 export type WebForkPreloadApi = Pick<
   PreloadApi,
-  'deepseekCredentials' | 'deepinfraCredentials' | 'fireworksCredentials' | 'copilotCredentials'
+  | 'deepseekCredentials'
+  | 'deepinfraCredentials'
+  | 'fireworksCredentials'
+  | 'copilotCredentials'
+  | 'sessionSummary'
 >
 
 /** The web client's stubs for the fork's own preload namespaces, composed in one spread. */
@@ -17,6 +22,7 @@ export function createWebForkPreloadApi(): WebForkPreloadApi {
     deepseekCredentials: createDeepSeekCredentialsApi(),
     deepinfraCredentials: createDeepInfraCredentialsApi(),
     fireworksCredentials: createFireworksCredentialsApi(),
-    copilotCredentials: createCopilotCredentialsApi()
+    copilotCredentials: createCopilotCredentialsApi(),
+    sessionSummary: createWebSessionSummaryApi()
   }
 }

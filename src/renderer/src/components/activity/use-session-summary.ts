@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type {
-  SessionSummarySessionRef,
-  SessionSummarySnapshot
+import {
+  failedSessionSummarySnapshot,
+  type SessionSummarySessionRef,
+  type SessionSummarySnapshot
 } from '../../../../shared/session-summary-types'
 
 /**
@@ -59,7 +60,13 @@ export function useSessionSummary(
   }, [agentUpdatedAt, snapshot])
 
   const accept = useCallback(
-    (next: SessionSummarySnapshot): void => {
+    (next: SessionSummarySnapshot | null | undefined): void => {
+      // Why: a window whose preload has no summary bridge answers `undefined` (the web client's
+      // fallback proxy does exactly this), and reading `paneKey` off that threw inside a voided
+      // promise. There is nothing to show, so the pane keeps whatever it has.
+      if (!next || typeof next.paneKey !== 'string') {
+        return
+      }
       if (next.paneKey !== paneKey) {
         return
       }
@@ -79,6 +86,19 @@ export function useSessionSummary(
         seenCountRef.current = Math.max(seenCountRef.current, ledger.timeline.length)
       }
       setSnapshot(merged)
+    },
+    [paneKey]
+  )
+
+  const fail = useCallback(
+    (error: unknown): void => {
+      setSnapshot((current) =>
+        failedSessionSummarySnapshot(
+          paneKey,
+          error instanceof Error ? error.message : String(error),
+          current?.paneKey === paneKey ? current : null
+        )
+      )
     },
     [paneKey]
   )
@@ -115,9 +135,11 @@ export function useSessionSummary(
             : {})
         })
         .then(accept)
+        .catch(fail)
     },
     [
       accept,
+      fail,
       paneKey,
       executionHostId,
       sessionAgentType,

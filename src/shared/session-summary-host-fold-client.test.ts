@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   SESSION_SUMMARY_HOST_OUTDATED_MESSAGE,
   type SessionSummarySnapshot
-} from '../../shared/session-summary-types'
+} from './session-summary-types'
 import { createSessionSummaryHostFoldClient } from './session-summary-host-fold-client'
 
 function snapshot(paneKey = 'tab-1:leaf-1'): SessionSummarySnapshot {
