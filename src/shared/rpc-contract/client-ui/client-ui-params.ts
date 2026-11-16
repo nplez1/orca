@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's extra client-ui params ride upstream's schema, and splitting costs a permanent sync hunk. */
 import { GitHistoryRefName } from '../source-control/git-params'
 import { z } from 'zod'
 import { isFeatureTipSeenId } from '../../feature-education/feature-tips'

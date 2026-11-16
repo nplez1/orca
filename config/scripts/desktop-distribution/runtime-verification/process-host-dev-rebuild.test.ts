@@ -1,8 +1,6 @@
 import {
-  existsSync,
   mkdtempSync,
   mkdirSync,
-  readFileSync,
   realpathSync,
   rmSync,
   symlinkSync,

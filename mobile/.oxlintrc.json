@@ -3,9 +3,9 @@
   "extends": ["../.oxlintrc.json"],
   "ignorePatterns": [
     "src/components/markdown/mobile-markdown-mdast-nodes.d.ts",
-    "src/terminal/document/terminal-webview-engine.generated.ts",
-    "src/components/mermaid/mermaid-page-engine.generated.ts",
-    "src/components/markdown/math/katex-page-style.generated.ts"
+    "src/terminal/terminal-webview-engine.generated.ts",
+    "src/components/pr-sidebar/mermaid-page-engine.generated.ts",
+    "src/components/katex-page-style.generated.ts"
   ],
   "rules": {
     "react-hooks/exhaustive-deps": "off",

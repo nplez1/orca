@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's review actions ride upstream's checks tab, and splitting costs a permanent sync hunk. */
 import { PRCheckEmptyDetails } from '@/components/pr-check-empty-details'
 import { isCompletePRCheckOwner } from '../../../../../shared/github/checks/complete-pr-check-owner'
 import { usePRCheckRefreshOwner } from '@/hooks/use-pr-check-refresh-owner'

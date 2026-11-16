@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's extra providers ride upstream's usage panel, and splitting costs a permanent sync hunk. */
 import type {
   ProviderRateLimits,
   RateLimitWindow

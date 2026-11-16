@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's deleteRemoteBranch threading rides upstream's removal flow, and splitting costs a permanent sync hunk. */
 import type { LocalProjectWorktreeGitOptions } from '../../../workspaces/execution-host/project-runtime-git-options'
 import { isStaleLocalWorktreeRegistration } from '../catalog/stale-worktree-registration-preflight'
 import type { RuntimeStore } from '../../construction/runtime-store-contract'

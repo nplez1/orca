@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's project-folder relocation rows ride upstream's catalog resolution, and splitting costs a permanent sync hunk. */
 import { preserveFolderUpgradeWorktreePath } from '../../../workspaces/catalog/folder-upgrade-worktree-path'
 import {
   composeWorktreeId,

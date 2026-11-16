@@ -4,10 +4,8 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
-  readFileSync,
   realpathSync,
   rmSync,
-  statSync,
   writeFileSync
 } from 'node:fs'
 import { createRequire } from 'node:module'

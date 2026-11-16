@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's workspace-scope rules ride upstream's terminal launch scope, and splitting costs a permanent sync hunk. */
 import { OrcaRuntimeWithBrowserWorkspaceRouting } from '../../browser/client-pages/runtime-browser-workspace-routing'
 
 import {

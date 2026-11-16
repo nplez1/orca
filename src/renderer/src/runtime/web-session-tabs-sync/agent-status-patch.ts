@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's agent-status attention fields ride upstream's patch reducer, and splitting costs a permanent sync hunk. */
 import { recordDraft } from '@/store/keyed-record-transitions'
 import { conversationSessionStartedAt } from '../../store/slices/agent-status/agent-conversation-acceptance'
 import { toRuntimeExecutionHostId } from '../../../../shared/execution-host'

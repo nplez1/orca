@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's review-verdict fields ride upstream's reply schema, and splitting costs a permanent sync hunk. */
 import * as z from 'zod'
 import { salvagedOptional, salvagingArray } from '../../../../../src/shared/validation/zod-salvage'
 import {

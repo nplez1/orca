@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's palette ordering rides upstream's worktree hook, and splitting costs a permanent sync hunk. */
 import { useMemo } from 'react'
 import { applyWorkspaceKindFilters } from '@/components/sidebar/visible-worktree-kind-filters'
 import { useWorktreeIdsWithEmptySurface } from '../../sidebar/workspace-actions/sleep/use-worktree-sleep-state'
