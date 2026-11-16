@@ -96,6 +96,20 @@ describe('the candidate push starts nothing but the dispatch', () => {
     expect(broken.some((problem) => problem.includes('does not parse'))).toBe(true)
   })
 
+  it('refuses a callee the lane reaches that does not parse', () => {
+    const files = {
+      [LANE]: lane.replace('jobs: {}', 'jobs:\n  t:\n    uses: ./.github/workflows/x.yml'),
+      '.github/workflows/x.yml': 'on: [workflow_call\njobs: {}\n'
+    }
+    const problems = refusalsFor({ remotes: ['origin'], dirty: [], files, branch })
+
+    expect(problems.filter((problem) => !problem.startsWith('pushing '))).toEqual([
+      expect.stringMatching(
+        /^\.github\/workflows\/x\.yml is reachable from the lane and does not parse: /
+      )
+    ])
+  })
+
   it('refuses an origin that is not this fork', () => {
     const problems = refusalsFor({
       remotes: ['origin'],
@@ -109,6 +123,9 @@ describe('the candidate push starts nothing but the dispatch', () => {
       'origin is https://github.com/stablyai/orca.git, not nplez1/orca — the candidate goes to the fork only'
     ])
     expect(isForkUrl('ssh://git@ssh.github.com:443/nplez1/orca.git')).toBe(true)
+    expect(isForkUrl('git@github.com:nplez1/orca.git')).toBe(true)
+    expect(isForkUrl('https://github.com/nplez1/orca')).toBe(true)
+    expect(isForkUrl('https://evil.example/nplez1/orca.git')).toBe(false)
   })
 
   it('refuses a dirty tree, because the candidate is HEAD', () => {

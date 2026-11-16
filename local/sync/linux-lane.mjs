@@ -191,7 +191,10 @@ export function unservedLabels(files, entry = LANE) {
 }
 
 /** Whether a remote URL names this fork, in any of the URL shapes git accepts. */
-export const isForkUrl = (url) => /[/:]nplez1\/orca(?:\.git)?\/?$/.test(String(url ?? '').trim())
+export const isForkUrl = (url) =>
+  /^(?:(?:https|ssh):\/\/(?:[^@/]+@)?(?:ssh\.)?github\.com(?::\d+)?\/|[^@/:]+@github\.com:)nplez1\/orca(?:\.git)?\/?$/.test(
+    String(url ?? '').trim()
+  )
 
 /** Everything that makes pushing this candidate unsafe or pointless, as sentences. */
 export function refusalsFor({ toplevel, root, remotes, originUrl, dirty, files, branch }) {
@@ -211,6 +214,7 @@ export function refusalsFor({ toplevel, root, remotes, originUrl, dirty, files, 
     )
   }
   const lane = files[LANE]
+  let laneParses = true
   if (lane === undefined) {
     problems.push(`${LANE} is not in the candidate's tree`)
   } else {
@@ -219,6 +223,7 @@ export function refusalsFor({ toplevel, root, remotes, originUrl, dirty, files, 
       triggers = triggersOf(lane)
     } catch (error) {
       problems.push(`${LANE} in the candidate's tree does not parse: ${error.message}`)
+      laneParses = false
     }
     if (triggers && !triggers.includes('workflow_dispatch')) {
       problems.push(`${LANE} in the candidate's tree has no workflow_dispatch trigger`)
@@ -227,7 +232,8 @@ export function refusalsFor({ toplevel, root, remotes, originUrl, dirty, files, 
   for (const { path, why } of workflowsFiredBy(files, branch)) {
     problems.push(`pushing ${branch} would start ${path}: ${why}`)
   }
-  for (const { path, label, error } of unservedLabels(files)) {
+  // A lane that does not parse is already refused; walking it again would only say so twice.
+  for (const { path, label, error } of laneParses ? unservedLabels(files) : []) {
     if (error !== undefined) {
       problems.push(`${path} is reachable from the lane and does not parse: ${error}`)
       continue
@@ -285,14 +291,14 @@ function facts(cwd, sha, branch) {
   }
   const dirty = git('status', '--porcelain', '--untracked-files=no').split('\n').filter(Boolean)
   const originUrl = remotes.includes('origin')
-    ? git('remote', 'get-url', 'origin').trim()
+    ? git('remote', 'get-url', '--push', 'origin').trim()
     : undefined
   return { toplevel, root: ROOT, remotes, originUrl, dirty, files: treeWorkflows(sha), branch }
 }
 
 const pause = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
 
-/** The lane's dispatch runs on `branch`, newest first; [] when the list cannot be read. */
+/** The lane's dispatch runs on `branch`, newest first; null when the list cannot be read. */
 function dispatchRuns(branch) {
   const list = spawnSync(
     'gh',
@@ -314,10 +320,14 @@ function dispatchRuns(branch) {
     ],
     { encoding: 'utf8' }
   )
+  if (list.status !== 0) {
+    return null
+  }
   try {
-    return JSON.parse(list.stdout || '[]')
+    const runs = JSON.parse(list.stdout || '[]')
+    return Array.isArray(runs) ? runs : null
   } catch {
-    return []
+    return null
   }
 }
 
@@ -335,9 +345,14 @@ function findRun(dispatchOutput, branch, sha, before) {
   if (printed) {
     return printed
   }
+  // Without a snapshot from before the dispatch, any run of this sha could be an earlier one.
+  if (before === null) {
+    return null
+  }
   for (let attempt = 0; attempt < 10; attempt += 1) {
     pause(3000)
-    const found = newRunId(dispatchRuns(branch), sha, before)
+    const runs = dispatchRuns(branch)
+    const found = runs === null ? null : newRunId(runs, sha, before)
     if (found) {
       return found
     }
@@ -421,7 +436,8 @@ function main() {
     console.error('linux-lane: the push failed, so nothing was dispatched')
     process.exit(1)
   }
-  const before = new Set(dispatchRuns(branch).map((run) => String(run.databaseId)))
+  const snapshot = dispatchRuns(branch)
+  const before = snapshot === null ? null : new Set(snapshot.map((run) => String(run.databaseId)))
   const dispatched = spawnSync('gh', dispatch, { cwd: ROOT, encoding: 'utf8' })
   process.stdout.write(`${dispatched.stdout ?? ''}${dispatched.stderr ?? ''}`)
   if (dispatched.status !== 0) {

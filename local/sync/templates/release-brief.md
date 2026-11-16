@@ -32,12 +32,13 @@ Notes for this release: {{NOTES}}
 - Follow Steps 0 and 1.
 - Follow Step 2. Settle what the ledger and the manifest already answer, and what
   `conflicts.mjs --propose` / `--apply-proven` can prove, yourself. Resolve `package.json` yourself
-  and regenerate each lockfile from its merged manifest (`pnpm install --lockfile-only` in its
-  directory); never hand-merge a lockfile and never batch either. Fan the rest out to resolver
+  and regenerate each lockfile from its merged manifest — never hand-merge a lockfile, and never batch
+  either. A `pnpm-lock.yaml` is regenerated with `pnpm install --lockfile-only` in its directory; for
+  `native/*/Cargo.lock` and `mobile/Gemfile.lock`, take the side that matches the merged manifest and
+  regenerate with `cargo generate-lockfile` or `bundle lock` there. Fan the rest out to resolver
   subagents using `local/sync/templates/conflict-protocol.md` (written once to
   `$(git rev-parse --git-dir)/orca-sync/PROTOCOL.md`) and one `local/sync/templates/resolve-batch.md`
-  prompt per batch. Stop
-  and report only for a substantial convergence question the ledger does not answer; otherwise decide,
+  prompt per batch. Stop and report only for a substantial convergence question the ledger does not answer; otherwise decide,
   record the decision in the ledger, and continue.
 - Follow Step 3. Repair what it finds with the repair templates (`local/sync/templates/repair-*.md`).
 - Follow Step 3.5 (the early Linux lane) as soon as post-sync and `pnpm tc` pass, and triage its reds
@@ -49,10 +50,12 @@ Notes for this release: {{NOTES}}
 - Follow Step 0.5, then Step 1.5. Repair gate reds with `repair-tests.md` / `repair-lint.md`.
 - Follow Step 1.6, the review gate, exactly as written there. Fix its findings with
   `repair-review-findings.md`. Do not use `--waive-review`.
-- Re-run the early Linux lane on the final revision (UPSTREAM-SYNC-RUNBOOK.md Step 3.5) and block on
-  `gh run watch <id> --repo nplez1/orca --exit-status` until it is green. Only then follow Step 2 to
-  dispatch. Never `gh workflow run fork-release.yml` directly.
-- Watch the release run once (`gh run watch <id> --repo nplez1/orca --compact --exit-status`). Pass
+- Re-run the early Linux lane on the final revision (UPSTREAM-SYNC-RUNBOOK.md Step 3.5). Start
+  `gh run watch <id> --repo nplez1/orca --exit-status` as one background command, wait for its exit
+  notification, and follow Step 2 to dispatch only once it exits 0 — a foreground watch outlives the
+  harness's 600 s command limit (rule 6). Never `gh workflow run fork-release.yml` directly.
+- Watch the release run the same way: one background
+  `gh run watch <id> --repo nplez1/orca --compact --exit-status`, then its exit notification. Pass
   `--repo nplez1/orca` to every `gh` command: without it `gh` resolves to the `upstream` remote.
 - Read the draft release body as the
   runbook's "Release notes" section says, and publish only when it is right.
