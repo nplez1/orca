@@ -18,7 +18,8 @@
  *
  *   node local/sync/linux-lane.mjs                     push HEAD to sync-candidate/<sha12>, dispatch
  *   node local/sync/linux-lane.mjs --dry-run           print the plan and the safety verdict only
- *   node local/sync/linux-lane.mjs --cleanup           delete candidate refs main already contains
+ *   node local/sync/linux-lane.mjs --cleanup           delete candidate refs main already contains,
+ *                                                      each leased to the sha it was listed at
  *   node local/sync/linux-lane.mjs --cleanup --dry-run list what --cleanup would delete
  *
  * The ref is per revision, so a push only ever creates a ref (never a force-push), and two candidates
@@ -77,7 +78,18 @@ export function filterPatternRegex(pattern) {
   }
 }
 
-const asList = (value) => (Array.isArray(value) ? value.map(String) : [String(value)])
+/** A filter's patterns, or null when the value is not one GitHub accepts — which counts as firing. */
+function patternsOf(value) {
+  if (typeof value === 'string') {
+    return [value]
+  }
+  if (Array.isArray(value) && value.length > 0 && value.every((item) => typeof item === 'string')) {
+    return value
+  }
+  return null
+}
+
+const FILTER_KEYS = ['branches', 'branches-ignore', 'tags', 'tags-ignore']
 
 /** Whether a `branches` list selects `branch`: patterns apply in order, and a later `!` unselects. */
 function selectedBy(patterns, branch) {
@@ -102,11 +114,15 @@ export function pushFires(push, branch) {
   if (push === null || push === undefined || typeof push !== 'object' || Array.isArray(push)) {
     return true
   }
+  // `branches:` with no value, a number or a nested map is not a filter this reading can clear.
+  if (FILTER_KEYS.some((key) => push[key] !== undefined && patternsOf(push[key]) === null)) {
+    return true
+  }
   if (push.branches !== undefined) {
-    return selectedBy(asList(push.branches), branch)
+    return selectedBy(patternsOf(push.branches), branch)
   }
   if (push['branches-ignore'] !== undefined) {
-    return !asList(push['branches-ignore']).some((p) => filterPatternRegex(p).test(branch))
+    return !patternsOf(push['branches-ignore']).some((p) => filterPatternRegex(p).test(branch))
   }
   // A tags-only filter never fires on a branch push.
   return push.tags === undefined && push['tags-ignore'] === undefined
@@ -154,24 +170,39 @@ export function unservedLabels(files, entry = LANE) {
     }
     seen.add(path)
     const accepted = new Set(ACCEPTED_RUNNER_LABELS[path]?.labels ?? [])
-    for (const label of runnerLabelsOf(files[path])) {
+    let labels
+    let callees
+    try {
+      labels = runnerLabelsOf(files[path])
+      callees = calleesOf(files[path])
+    } catch (error) {
+      // A file the lane reaches but nobody can read could ask for any runner.
+      unserved.push({ path, error: error.message })
+      continue
+    }
+    for (const label of labels) {
       if (!accepted.has(label)) {
         unserved.push({ path, label })
       }
     }
-    queue.push(...calleesOf(files[path]))
+    queue.push(...callees)
   }
   return unserved
 }
 
+/** Whether a remote URL names this fork, in any of the URL shapes git accepts. */
+export const isForkUrl = (url) => /[/:]nplez1\/orca(?:\.git)?\/?$/.test(String(url ?? '').trim())
+
 /** Everything that makes pushing this candidate unsafe or pointless, as sentences. */
-export function refusalsFor({ toplevel, root, remotes, dirty, files, branch }) {
+export function refusalsFor({ toplevel, root, remotes, originUrl, dirty, files, branch }) {
   const problems = []
   if (toplevel && root && toplevel !== root) {
     problems.push(`run this from ${root} (the checkout this script lives in), not ${toplevel}`)
   }
   if (!remotes.includes('origin')) {
     problems.push("no 'origin' remote — the candidate goes to the fork")
+  } else if (originUrl !== undefined && !isForkUrl(originUrl)) {
+    problems.push(`origin is ${originUrl}, not ${REPO} — the candidate goes to the fork only`)
   }
   if (dirty.length > 0) {
     problems.push(
@@ -182,13 +213,25 @@ export function refusalsFor({ toplevel, root, remotes, dirty, files, branch }) {
   const lane = files[LANE]
   if (lane === undefined) {
     problems.push(`${LANE} is not in the candidate's tree`)
-  } else if (!triggersOf(lane).includes('workflow_dispatch')) {
-    problems.push(`${LANE} in the candidate's tree has no workflow_dispatch trigger`)
+  } else {
+    let triggers = null
+    try {
+      triggers = triggersOf(lane)
+    } catch (error) {
+      problems.push(`${LANE} in the candidate's tree does not parse: ${error.message}`)
+    }
+    if (triggers && !triggers.includes('workflow_dispatch')) {
+      problems.push(`${LANE} in the candidate's tree has no workflow_dispatch trigger`)
+    }
   }
   for (const { path, why } of workflowsFiredBy(files, branch)) {
     problems.push(`pushing ${branch} would start ${path}: ${why}`)
   }
-  for (const { path, label } of unservedLabels(files)) {
+  for (const { path, label, error } of unservedLabels(files)) {
+    if (error !== undefined) {
+      problems.push(`${path} is reachable from the lane and does not parse: ${error}`)
+      continue
+    }
     problems.push(
       `${path} asks for runner '${label}', which this fork does not provision (a job there queues ` +
         'for 24 h) — fix the workflow or record it in local/actions-enablement-contract.mjs'
@@ -196,6 +239,9 @@ export function refusalsFor({ toplevel, root, remotes, dirty, files, branch }) {
   }
   return problems
 }
+
+/** A ref `--cleanup` may touch: exactly the shape `candidateRef` makes, nothing that merely starts so. */
+export const isCandidateBranch = (branch) => /^sync-candidate\/[0-9a-f]{12}$/.test(branch)
 
 /** The run id GitHub printed for a dispatch, if it printed one. */
 export function runIdFrom(output) {
@@ -238,42 +284,62 @@ function facts(cwd, sha, branch) {
     toplevel = null
   }
   const dirty = git('status', '--porcelain', '--untracked-files=no').split('\n').filter(Boolean)
-  return { toplevel, root: ROOT, remotes, dirty, files: treeWorkflows(sha), branch }
+  const originUrl = remotes.includes('origin')
+    ? git('remote', 'get-url', 'origin').trim()
+    : undefined
+  return { toplevel, root: ROOT, remotes, originUrl, dirty, files: treeWorkflows(sha), branch }
 }
 
 const pause = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
 
-/** The dispatch's run id: printed by `gh workflow run`, or found by ref and commit shortly after. */
-function findRun(dispatchOutput, branch, sha) {
+/** The lane's dispatch runs on `branch`, newest first; [] when the list cannot be read. */
+function dispatchRuns(branch) {
+  const list = spawnSync(
+    'gh',
+    [
+      'run',
+      'list',
+      '--repo',
+      REPO,
+      '--workflow',
+      'fork-main-tests.yml',
+      '--branch',
+      branch,
+      '--event',
+      'workflow_dispatch',
+      '--limit',
+      '20',
+      '--json',
+      'databaseId,headSha'
+    ],
+    { encoding: 'utf8' }
+  )
+  try {
+    return JSON.parse(list.stdout || '[]')
+  } catch {
+    return []
+  }
+}
+
+/**
+ * The dispatch's run: the id `gh workflow run` printed, or a run of this commit on this ref that was not
+ * there before the dispatch — a re-dispatch of the same revision must not answer with the earlier run.
+ */
+export function newRunId(runs, sha, before) {
+  const run = runs.find((r) => r.headSha === sha && !before.has(String(r.databaseId)))
+  return run ? String(run.databaseId) : null
+}
+
+function findRun(dispatchOutput, branch, sha, before) {
   const printed = runIdFrom(dispatchOutput)
   if (printed) {
     return printed
   }
   for (let attempt = 0; attempt < 10; attempt += 1) {
     pause(3000)
-    const list = spawnSync(
-      'gh',
-      [
-        'run',
-        'list',
-        '--repo',
-        REPO,
-        '--workflow',
-        'fork-main-tests.yml',
-        '--branch',
-        branch,
-        '--event',
-        'workflow_dispatch',
-        '--limit',
-        '5',
-        '--json',
-        'databaseId,headSha'
-      ],
-      { encoding: 'utf8' }
-    )
-    const match = JSON.parse(list.stdout || '[]').find((run) => run.headSha === sha)
-    if (match) {
-      return String(match.databaseId)
+    const found = newRunId(dispatchRuns(branch), sha, before)
+    if (found) {
+      return found
     }
   }
   return null
@@ -288,6 +354,7 @@ function cleanup(dryRun) {
       const [sha, ref] = line.split('\t')
       return { sha, branch: ref.replace(/^refs\/heads\//, '') }
     })
+    .filter((ref) => isCandidateBranch(ref.branch))
   git('fetch', '--quiet', 'origin', 'main')
   const isMerged = (sha) =>
     spawnSync('git', ['merge-base', '--is-ancestor', sha, 'origin/main'], { cwd: ROOT }).status ===
@@ -300,7 +367,13 @@ function cleanup(dryRun) {
     console.log('linux-lane: no merged candidate refs to delete')
     return 0
   }
-  const args = ['push', 'origin', '--delete', ...remove.map((ref) => ref.branch)]
+  // Leased per ref: a candidate that moved since the listing is someone else's, and is left alone.
+  const args = [
+    'push',
+    ...remove.map((ref) => `--force-with-lease=refs/heads/${ref.branch}:${ref.sha}`),
+    'origin',
+    ...remove.map((ref) => `:refs/heads/${ref.branch}`)
+  ]
   console.log(`linux-lane: ${dryRun ? 'would run' : 'running'}: git ${args.join(' ')}`)
   if (dryRun) {
     return 0
@@ -318,7 +391,13 @@ function main() {
 
   const sha = git('rev-parse', 'HEAD').trim()
   const branch = candidateRef(sha)
-  const refusals = refusalsFor(facts(process.cwd(), sha, branch))
+  let refusals
+  try {
+    refusals = refusalsFor(facts(process.cwd(), sha, branch))
+  } catch (error) {
+    // Anything the safety read cannot finish is a refusal, never a pass.
+    refusals = [`the safety check could not finish: ${error.message.split('\n')[0]}`]
+  }
   if (refusals.length > 0) {
     for (const problem of refusals) {
       console.error(`linux-lane: refusing — ${problem}`)
@@ -326,7 +405,8 @@ function main() {
     process.exit(2)
   }
 
-  const push = ['push', 'origin', `${sha}:refs/heads/${branch}`]
+  // No tags ride along: a tag push is the one trigger shape the branch-name check does not cover.
+  const push = ['push', '--no-follow-tags', 'origin', `${sha}:refs/heads/${branch}`]
   const dispatch = ['workflow', 'run', 'fork-main-tests.yml', '--repo', REPO, '--ref', branch]
   console.log(`linux-lane: ${dryRun ? 'plan (safe to push)' : 'pushing'} ${sha.slice(0, 12)}`)
   console.log(`  1. git ${push.join(' ')}`)
@@ -341,13 +421,14 @@ function main() {
     console.error('linux-lane: the push failed, so nothing was dispatched')
     process.exit(1)
   }
+  const before = new Set(dispatchRuns(branch).map((run) => String(run.databaseId)))
   const dispatched = spawnSync('gh', dispatch, { cwd: ROOT, encoding: 'utf8' })
   process.stdout.write(`${dispatched.stdout ?? ''}${dispatched.stderr ?? ''}`)
   if (dispatched.status !== 0) {
     console.error(`linux-lane: ${branch} is pushed but the dispatch failed — re-run this command`)
     process.exit(1)
   }
-  const runId = findRun(`${dispatched.stdout ?? ''}${dispatched.stderr ?? ''}`, branch, sha)
+  const runId = findRun(`${dispatched.stdout ?? ''}${dispatched.stderr ?? ''}`, branch, sha, before)
   if (!runId) {
     console.log(
       `linux-lane: dispatched; find the run with ` +
