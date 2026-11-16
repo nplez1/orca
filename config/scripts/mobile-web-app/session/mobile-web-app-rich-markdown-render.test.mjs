@@ -52,8 +52,8 @@ const PAGE_ENTRY = `
 import { createElement, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
-import { MobileRichMarkdownEditor } from '../../../../mobile/src/components/rich-markdown/MobileRichMarkdownEditor'
-import { applyMobileColorScheme } from '../../../../mobile/src/theme/mobile-theme'
+import { MobileRichMarkdownEditor } from './rich-markdown/MobileRichMarkdownEditor'
+import { applyMobileColorScheme } from '../theme/mobile-theme'
 
 /**
  * What the route's own navigator supplies and a bare mount does not: react-navigation wraps every

@@ -9,12 +9,12 @@ export const ENTRY_SOURCE = `
 import { createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Text } from 'react-native'
-import { RpcClientProvider } from '../../../../mobile/src/transport/connection/client-context.web'
+import { RpcClientProvider } from '../transport/connection/client-context.web'
 import {
   MobileHtmlPreview,
   MOBILE_HTML_PREVIEW_SANDBOX,
   MOBILE_HTML_PREVIEW_SEALED_SANDBOX
-} from '../../../../mobile/src/files/preview/documents/MobileHtmlPreview'
+} from '../files/preview/documents/MobileHtmlPreview'
 
 window.__sandbox = MOBILE_HTML_PREVIEW_SANDBOX
 window.__sealedSandbox = MOBILE_HTML_PREVIEW_SEALED_SANDBOX
