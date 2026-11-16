@@ -1082,6 +1082,685 @@
       "status": "expected-deletion",
       "supersededBy": "relocated to the transcript-filesystem modules upstream split out; the fork test imports it from native-chat/wsl-transcript-gated-fs.ts",
       "reason": "Upstream split wsl-transcript-fs-access.ts and dropped this re-export; the constant's only fork consumer (the grok parser test) imports it from wsl-transcript-gated-fs.ts, which still declares and exports it."
+    },
+    {
+      "path": "src/cli/handlers/orchestration/runtime-compatibility.ts",
+      "symbol": "compatibilityCommandFallbackParams",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this function. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/cli/handlers/orchestration/runtime-compatibility.ts",
+      "symbol": "isRecord",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this function. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/cli/handlers/repo.ts",
+      "symbol": "REPO_HANDLERS.repo relocate",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/cli/handlers/repo.ts",
+      "symbol": "formatRepoRelocation",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this function. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/cli/handlers/repo.ts",
+      "symbol": "REPO_RELOCATION_MESSAGES",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this const. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/cli/handlers/repo.ts",
+      "symbol": "REPO_RELOCATION_MESSAGES.not-project-folder-layout",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/cli/handlers/repo.ts",
+      "symbol": "REPO_RELOCATION_MESSAGES.already-in-container",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/cli/handlers/repo.ts",
+      "symbol": "REPO_RELOCATION_MESSAGES.remote-host",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/cli/handlers/repo.ts",
+      "symbol": "REPO_RELOCATION_MESSAGES.windows",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/cli/handlers/repo.ts",
+      "symbol": "REPO_RELOCATION_MESSAGES.not-a-git-repo",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/cli/handlers/repo.ts",
+      "symbol": "REPO_RELOCATION_MESSAGES.unknown-default-branch",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/cli/handlers/repo.ts",
+      "symbol": "REPO_RELOCATION_MESSAGES.live-sessions",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/cli/handlers/repo.ts",
+      "symbol": "REPO_RELOCATION_MESSAGES.target-exists",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/cli/handlers/repo.ts",
+      "symbol": "REPO_RELOCATION_MESSAGES.cross-volume",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/main/ai-vault/session-list-fingerprint.ts",
+      "symbol": "ROW_DIGEST_HEX_LENGTH",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this const. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/main/ai-vault/session-list-fingerprint.ts",
+      "symbol": "AiVaultListSnapshot",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this type. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/main/ai-vault/session-list-fingerprint.ts",
+      "symbol": "AiVaultListSnapshot.fingerprint",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/main/ai-vault/session-list-fingerprint.ts",
+      "symbol": "AiVaultListSnapshot.digests",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/main/ai-vault/session-list-fingerprint.ts",
+      "symbol": "rowDigest",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this function. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/main/ai-vault/session-list-fingerprint.ts",
+      "symbol": "listingMetadata",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this function. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/main/ai-vault/session-list-fingerprint.ts",
+      "symbol": "listingMetadata.sessions",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/main/ai-vault/session-list-fingerprint.ts",
+      "symbol": "listingMetadata.scannedAt",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/main/ai-vault/session-list-fingerprint.ts",
+      "symbol": "listingMetadata.fingerprint",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/main/ai-vault/session-list-fingerprint.ts",
+      "symbol": "listingMetadata.unchanged",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/main/ai-vault/session-list-fingerprint.ts",
+      "symbol": "listingMetadata.hasMore",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/main/ai-vault/session-list-fingerprint.ts",
+      "symbol": "listingMetadata.nextOffset",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/main/ai-vault/session-list-fingerprint.ts",
+      "symbol": "listingMetadata.syncDelta",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/main/ai-vault/session-list-fingerprint.ts",
+      "symbol": "aiVaultListSnapshot",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this function. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/main/ai-vault/session-list-fingerprint.ts",
+      "symbol": "aiVaultListSnapshot.fingerprint",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/main/ai-vault/session-list-fingerprint.ts",
+      "symbol": "aiVaultListSnapshot.digests",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/main/ai-vault/session-scanner-values.ts",
+      "symbol": "MAX_DATE_MS",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this const. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/main/ai-vault/session-scanner-values.ts",
+      "symbol": "FUTURE_TIMESTAMP_SKEW_MS",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this const. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/main/ai-vault/session-scanner-values.ts",
+      "symbol": "sessionIdFromFileName",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this function. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/main/ai-vault/session-scanner-values.ts",
+      "symbol": "BYTE_ORDER_MARK",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this const. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/main/ai-vault/session-scanner-values.ts",
+      "symbol": "stripLeadingByteOrderMark",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this function. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/main/ipc/runtime-environments/runtime-environment-unreachable-hint.ts",
+      "symbol": "EPHEMERAL_VM_ENDPOINT_HINT",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this const. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/main/ipc/runtime-environments/runtime-environment-unreachable-hint.ts",
+      "symbol": "withEphemeralVmUnreachableHint",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this function. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/main/persistence/loading-store/repo-lifecycle-operations.ts",
+      "symbol": "RepoLifecycleOperations.relocateRepoPath",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/main/providers/working-directory-validation.ts",
+      "symbol": "validateWorkingDirectory.signal",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/main/startup/synthetic-title-runtime.ts",
+      "symbol": "ringPermissionBellWithoutLabel",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this function. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/main/startup/synthetic-title-runtime.ts",
+      "symbol": "paneTitleClaimsOwnState",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this function. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/preload/api/shell-api.ts",
+      "symbol": "ShellApi.openUrlInSystemBrowser",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/preload/api/shell-api.ts",
+      "symbol": "ShellApi.onContextualLinkRequested",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/preload/api/shell-api.ts",
+      "symbol": "ShellApi.markContextualLinkRouterReady",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/preload/api/shell-bridge.ts",
+      "symbol": "channel:shell:openUrlInSystemBrowser",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this channel. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/preload/api/shell-bridge.ts",
+      "symbol": "shellApi.openUrlInSystemBrowser",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/preload/api/shell-bridge.ts",
+      "symbol": "shellApi.onContextualLinkRequested",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/preload/api/shell-bridge.ts",
+      "symbol": "shellApi.markContextualLinkRouterReady",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/dashboard-popout/AgentKanbanCard.tsx",
+      "symbol": "AgentKanbanCardProps.onActivateCard",
+      "status": "expected-deletion",
+      "supersededBy": "relocated to src/renderer/src/components/dashboard/board/AgentKanbanCard.tsx",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/dashboard/build-dashboard-snapshot.ts",
+      "symbol": "buildDashboardSnapshot.cardClickAction",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/new-workspace/NewWorkspaceComposerProjectSection.tsx",
+      "symbol": "NewWorkspaceComposerProjectSectionProps.identityLocked",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/new-workspace/NewWorkspaceComposerProjectSection.tsx",
+      "symbol": "NewWorkspaceComposerProjectSectionProps.handleStartClone",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/new-workspace/NewWorkspaceComposerProjectSection.tsx",
+      "symbol": "NewWorkspaceComposerProjectSectionProps.handleUseExistingFolder",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/new-workspace/NewWorkspaceComposerProjectSection.tsx",
+      "symbol": "NewWorkspaceComposerProjectSectionProps.cloneProjectKind",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/new-workspace/NewWorkspaceComposerProjectSection.tsx",
+      "symbol": "NewWorkspaceComposerProjectSectionProps.cloneUrl",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/new-workspace/NewWorkspaceComposerProjectSection.tsx",
+      "symbol": "NewWorkspaceComposerProjectSectionProps.runTargetClone",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/new-workspace/composer-modal-data.ts",
+      "symbol": "ComposerModalData.lockedWorkspaceBranch",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/new-workspace/composer-modal-data.ts",
+      "symbol": "ComposerModalData.lockedWorkspaceIsPrimary",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/new-workspace/composer-modal-data.ts",
+      "symbol": "ComposerModalData.lockedWorkspacePushTarget",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/new-workspace/composer-modal-data.ts",
+      "symbol": "ComposerModalData.lockedWorkspaceSourceHostId",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/new-workspace/composer-modal-data.ts",
+      "symbol": "ComposerModalData.lockedWorkspaceSourceRuntimeOwnerEnvironmentId",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel/checks-panel-review.ts",
+      "symbol": "ChecksPanelReviewSelectionInput.githubFallback",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel/checks-panel-review.ts",
+      "symbol": "gitHubPRToChecksPanelReview",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this function. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel/checks-panel-review.ts",
+      "symbol": "gitHubReviewNumberPassesGates",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this function. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel/checks-panel-review.ts",
+      "symbol": "WorkspaceReviewStateInput",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this type. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel/checks-panel-review.ts",
+      "symbol": "WorkspaceReviewStateInput.prEntry",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel/checks-panel-review.ts",
+      "symbol": "WorkspaceReviewStateInput.hostedEntry",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel/checks-panel-review.ts",
+      "symbol": "WorkspaceReviewStateInput.currentHeadOid",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel/checks-panel-review.ts",
+      "symbol": "selectWorkspaceReviewState",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this function. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel/checks-panel-review.ts",
+      "symbol": "selectWorkspaceReviewState.hostedReview",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel/checks-panel-review.ts",
+      "symbol": "selectWorkspaceReviewState.pr",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel/checks-panel-review.ts",
+      "symbol": "selectWorkspaceReviewState.githubFallback",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel/checks-panel-review.ts",
+      "symbol": "selectWorkspaceReviewState.linkedPR",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel/checks-panel-review.ts",
+      "symbol": "selectWorkspaceReviewState.suppressedGitHubPR",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel/checks-panel-review.ts",
+      "symbol": "selectWorkspaceReviewState.linkedGitLabMR",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel/checks-panel-review.ts",
+      "symbol": "selectWorkspaceReviewState.linkedBitbucketPR",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel/checks-panel-review.ts",
+      "symbol": "selectWorkspaceReviewState.linkedAzureDevOpsPR",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel/checks-panel-review.ts",
+      "symbol": "selectWorkspaceReviewState.linkedGiteaPR",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/workspace-card/activity/use-worktree-activity-status.ts",
+      "symbol": "useWorktreeActivityStatus.terminalPaneIdsByTabId",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/workspace-card/activity/use-worktree-activity-status.ts",
+      "symbol": "useWorktreeActivityStatus.permissionYieldingAgentTypes",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/workspace-card/activity/worktree-agent-activity-summary.ts",
+      "symbol": "WorktreeAgentActivitySummary.terminalPaneIdsByTabId",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/workspace-card/activity/worktree-agent-activity-summary.ts",
+      "symbol": "WorktreeAgentActivitySummary.permissionYieldingAgentTypes",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/workspace-card/activity/worktree-agent-activity-summary.ts",
+      "symbol": "EMPTY_PERMISSION_YIELDING_AGENT_TYPES",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this const. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/workspace-card/activity/worktree-agent-activity-summary.ts",
+      "symbol": "EMPTY_SUMMARY.terminalPaneIdsByTabId",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/workspace-card/activity/worktree-agent-activity-summary.ts",
+      "symbol": "EMPTY_SUMMARY.permissionYieldingAgentTypes",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/workspace-card/activity/worktree-agent-activity-summary.ts",
+      "symbol": "addTerminalPaneId",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this function. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/status-bar/StatusBarProviderSegment.tsx",
+      "symbol": "CreditsSummary",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this function. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/shared/ephemeral-vm-recipe-runner.ts",
+      "symbol": "buildEphemeralVmRecipeLifecyclePayload",
+      "status": "expected-deletion",
+      "supersededBy": "relocated to src/shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-runner.ts",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this re-export. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/shared/ephemeral-vm-recipe-runner.ts",
+      "symbol": "buildEphemeralVmRecipeExtendPayload",
+      "status": "expected-deletion",
+      "supersededBy": "relocated to src/shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-runner.ts",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this re-export. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/shared/ephemeral-vm-recipe-runner.ts",
+      "symbol": "EphemeralVmRecipeLifecyclePayload",
+      "status": "expected-deletion",
+      "supersededBy": "relocated to src/shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-runner.ts",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this re-export. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/shared/github/checks-detail-polling-policy.ts",
+      "symbol": "STUCK_RUN_BACKOFF_MAX_MS",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this const. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/shared/github/checks-detail-polling-policy.ts",
+      "symbol": "rollupReportsUnseenRun",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this function. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/shared/github/checks-detail-polling-policy.ts",
+      "symbol": "ChecksDetailPollingPolicy.liveRun",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/shared/github/checks-detail-polling-policy.ts",
+      "symbol": "ChecksDetailPollingPolicy.failing",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/shared/github/checks-detail-polling-policy.ts",
+      "symbol": "ChecksDetailPollingPolicy.unchangedReads",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/shared/github/checks-detail-polling-policy.ts",
+      "symbol": "ChecksDetailPollingPolicy.signature",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/shared/rpc-contract/repo-update-params.ts",
+      "symbol": "createRepoUpdateSchema.updates.sharedDirectoriesMode",
+      "status": "expected-deletion",
+      "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
+      "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
     }
   ]
 }
