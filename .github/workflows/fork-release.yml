@@ -74,8 +74,9 @@ concurrency:
   cancel-in-progress: false
 
 # Why the same version for every job: the mac, windows and linux artifacts of one release must
-# agree, and the updater compares the version baked into each manifest. github.run_number is
-# identical across jobs in a run, so deriving from it keeps them in step without passing state around.
+# agree, and the updater compares the version baked into each manifest. `release-ref` derives it once,
+# from package.json and the run number, and every later job reads `needs.release-ref.outputs.version`
+# — so the version the guard approved is the version every job stamps, and the formula exists once.
 env:
   PUBLISH_OWNER: nplez1
 
@@ -86,6 +87,8 @@ jobs:
   # to be "the tag exists, upload into it".
   release-ref:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.guard.outputs.version }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
@@ -97,6 +100,7 @@ jobs:
           node-version-file: package.json
 
       - name: Require the fork's release branch and this commit's tag
+        id: guard
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -104,8 +108,12 @@ jobs:
         run: |
           set -euo pipefail
           base="$(node -p "require('./package.json').version")"
+          version="${base}-${SUFFIX:-np.${GITHUB_RUN_NUMBER}}"
           bash .github/scripts/fork-release-ref-guard.sh \
-            "$GITHUB_REF" "v${base}-${SUFFIX:-np.${GITHUB_RUN_NUMBER}}" "$GITHUB_SHA" "$PUBLISH_OWNER/orca"
+            "$GITHUB_REF" "v$version" "$GITHUB_SHA" "$PUBLISH_OWNER/orca"
+          # Why only after the guard passed: no later job can read a version it refused.
+          echo "version=$version" >>"$GITHUB_OUTPUT"
+          echo "Releasing $version"
 
   # Why: the suite, on the exact commit being released, before a single artifact is built. It is the
   # same reusable workflow, the same shard plan and the same fork shard verdict every other unit lane
@@ -236,8 +244,8 @@ jobs:
     needs: [release-ref, unit-tests, typecheck, lint]
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    outputs:
-      version: ${{ steps.version.outputs.version }}
+    env:
+      RELEASE_VERSION: ${{ needs.release-ref.outputs.version }}
     steps:
       # Why full history: the release notes are generated from `git log <previous release tag>..HEAD`,
       # and the default clone carries one commit and no tags. Deepening to the tag would not be
@@ -250,21 +258,6 @@ jobs:
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version-file: package.json
-
-      # Why the same formula as every leg's stamp: the legs bake it into their manifests and this job
-      # names the tag they upload into, so the two must agree without passing state to the legs.
-      - name: Resolve the release version
-        id: version
-        shell: bash
-        env:
-          SUFFIX: ${{ inputs.version_suffix }}
-        run: |
-          set -euo pipefail
-          base="$(node -p "require('./package.json').version")"
-          version="${base}-${SUFFIX:-np.${GITHUB_RUN_NUMBER}}"
-          echo "RELEASE_VERSION=$version" >>"$GITHUB_ENV"
-          echo "version=$version" >>"$GITHUB_OUTPUT"
-          echo "Releasing $version"
 
       # Why generated: the notes must say what changed, and a hand-maintained list goes stale. The
       # script derives the summary from git and never exits non-zero, so the guard below — not the
@@ -332,6 +325,8 @@ jobs:
     # off another job's `needs` is silently dropped the day that job's own `needs` change.
     needs: [release-ref, release-draft, unit-tests, typecheck, lint]
     runs-on: macos-15
+    env:
+      RELEASE_VERSION: ${{ needs.release-ref.outputs.version }}
     steps:
       # Why the default one-commit clone: the notes, which need history, are `release-draft`'s; the
       # build reads only `git rev-parse HEAD`. A full clone cost this leg 2-3 minutes.
@@ -406,15 +401,14 @@ jobs:
       # distinct from anything upstream publishes.
       - name: Stamp the release version
         shell: bash
-        env:
-          SUFFIX: ${{ inputs.version_suffix }}
         run: |
           set -euo pipefail
-          base="$(node -p "require('./package.json').version")"
-          version="${base}-${SUFFIX:-np.${GITHUB_RUN_NUMBER}}"
-          node -e "const fs=require('fs');const p=require('./package.json');p.version=process.argv[1];fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')" "$version"
-          echo "RELEASE_VERSION=$version" >>"$GITHUB_ENV"
-          echo "Releasing $version"
+          if [ -z "$RELEASE_VERSION" ]; then
+            echo "::error::release-ref passed no version to this job"
+            exit 1
+          fi
+          node -e "const fs=require('fs');const p=require('./package.json');p.version=process.argv[1];fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')" "$RELEASE_VERSION"
+          echo "Releasing $RELEASE_VERSION"
 
       - name: Build app
         run: pnpm build:release
@@ -491,6 +485,8 @@ jobs:
   windows:
     needs: [release-ref, release-draft, unit-tests, typecheck, lint]
     runs-on: windows-2022
+    env:
+      RELEASE_VERSION: ${{ needs.release-ref.outputs.version }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
@@ -526,15 +522,14 @@ jobs:
 
       - name: Stamp the release version
         shell: bash
-        env:
-          SUFFIX: ${{ inputs.version_suffix }}
         run: |
           set -euo pipefail
-          base="$(node -p "require('./package.json').version")"
-          version="${base}-${SUFFIX:-np.${GITHUB_RUN_NUMBER}}"
-          node -e "const fs=require('fs');const p=require('./package.json');p.version=process.argv[1];fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')" "$version"
-          echo "RELEASE_VERSION=$version" >>"$GITHUB_ENV"
-          echo "Releasing $version"
+          if [ -z "$RELEASE_VERSION" ]; then
+            echo "::error::release-ref passed no version to this job"
+            exit 1
+          fi
+          node -e "const fs=require('fs');const p=require('./package.json');p.version=process.argv[1];fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')" "$RELEASE_VERSION"
+          echo "Releasing $RELEASE_VERSION"
 
       - name: Build app
         run: pnpm build:release
@@ -590,6 +585,8 @@ jobs:
   linux:
     needs: [release-ref, release-draft, unit-tests, typecheck, lint]
     runs-on: ubuntu-latest
+    env:
+      RELEASE_VERSION: ${{ needs.release-ref.outputs.version }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
@@ -640,15 +637,14 @@ jobs:
       # greater than the last, and all three platforms must agree on it.
       - name: Stamp the release version
         shell: bash
-        env:
-          SUFFIX: ${{ inputs.version_suffix }}
         run: |
           set -euo pipefail
-          base="$(node -p "require('./package.json').version")"
-          version="${base}-${SUFFIX:-np.${GITHUB_RUN_NUMBER}}"
-          node -e "const fs=require('fs');const p=require('./package.json');p.version=process.argv[1];fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')" "$version"
-          echo "RELEASE_VERSION=$version" >>"$GITHUB_ENV"
-          echo "Releasing $version"
+          if [ -z "$RELEASE_VERSION" ]; then
+            echo "::error::release-ref passed no version to this job"
+            exit 1
+          fi
+          node -e "const fs=require('fs');const p=require('./package.json');p.version=process.argv[1];fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')" "$RELEASE_VERSION"
+          echo "Releasing $RELEASE_VERSION"
 
       - name: Build app
         run: pnpm build:release
@@ -716,7 +712,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      RELEASE_VERSION: ${{ needs.release-draft.outputs.version }}
+      RELEASE_VERSION: ${{ needs.release-ref.outputs.version }}
     steps:
       # Why full history: the guard below reads the published tags, and resolves a branch-named
       # target through the tag's own commit — the same checkout `release-ref` makes.

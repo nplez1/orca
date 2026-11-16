@@ -101,6 +101,20 @@ describe('the release dispatch is gated on test evidence', () => {
     }
   })
 
+  it('derives the version once, in the job that guards it, and every later job reads that', () => {
+    const text = readFileSync(
+      new URL('../../.github/workflows/fork-release.yml', import.meta.url),
+      'utf8'
+    )
+    expect(text.match(/GITHUB_RUN_NUMBER/g)).toHaveLength(1)
+    expect(RELEASE.jobs['release-ref'].outputs.version).toContain('steps.guard.outputs.version')
+    for (const job of PUBLISHING) {
+      expect(RELEASE.jobs[job].env?.RELEASE_VERSION, job).toBe(
+        '${{ needs.release-ref.outputs.version }}'
+      )
+    }
+  })
+
   it('never runs two releases at once, and never cancels one mid-upload', () => {
     expect(RELEASE.concurrency).toEqual({ group: 'fork-release', 'cancel-in-progress': false })
   })
