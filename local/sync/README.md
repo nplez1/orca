@@ -88,15 +88,45 @@ delimiter balance cannot prove a union is correct.
 `--propose` also attaches a per-hunk proof read from each side's syntax tree (via `typescript-api`,
 the 6.x JS API; the `typescript` dependency is the native TS 7 compiler and has none):
 upstream-unchanged (take ours), fork-unchanged (take theirs), identity-only (theirs with the fork's
-literals re-applied), import-only (three-way union). A proven file must also pass a whole-file gate:
-every relative or `@/` module path in it resolves to a path the index keeps, and it imports nothing an
-index stage removed — no tier can see a moved module, and on 2026-11-15 87 of 189 "proven" files
-failed one of those. `--apply-proven <decision.json>` re-proves each file from disk and writes only
-files where every hunk is proven and nothing changed since the proposal; a rerun reports what an
-earlier run wrote as `already`. It stages nothing and prints, never runs, the `git rm` a settled
-deletion needs. `--rename-forecast
+literals re-applied), import-only (three-way union). A proven file must also pass a whole-file gate
+(`lib/conflict-file-gate.mjs`), because no tier can see the tree, git's clean merge, or another file:
+
+- every relative, `@/`/`@renderer/` (resolved per project: `mobile/` and `docs/site/` map `@/` to
+  their own `src/`), `@orca/` workspace and `new URL(…, import.meta.url)` path names a file the index
+  keeps — stage 0, or both sides' stages; a modify/delete is undecided. A TS importer probes like the
+  compiler (never a `.d.ts` for a value import); a JS importer and a URL need the exact path;
+- it imports or re-exports nothing an index stage removed, and uses no name base imported that it
+  neither imports nor declares (a text scan: a false hit only refuses);
+- a binding a side re-pointed at another module keeps the other side's edits: if the other side
+  changed its declaration in the old module, the new module must be where git's renames say the old
+  one moved.
+
+`--apply-proven <decision.json>` refuses a decision proposed for another operation (merge head, HEAD,
+rebase step), re-proves each file from disk and writes only files where every hunk is proven and
+nothing changed since the proposal. A rerun re-checks what an earlier run wrote against the live index
+and reports it as `already`; a path that is no longer unmerged — staged, by hand or after review — has
+no stages left to check, so it is `REFUSED` and the run exits 1 having written nothing. It stages
+nothing and prints, never runs, the `git rm` a settled deletion needs. `--rename-forecast
 <old-base> <new-base>` runs before the merge and lists fork-added references (imports, `vi.mock`, path
 strings) that upstream's renames and deletions will leave pointing at nothing.
+
+**Replay evidence, 2026-11-15** (`a992b134ffe` + `1ce376b27e3`, 694 conflicted paths, compared with the
+merge that shipped, `7da96c11bd4`). Before the gate, 189 files were written and 88 of them differed
+from the merge: 54 stale module paths, 29 import unions that kept a binding one side had dropped, 4
+orphaned imports from git's clean merge, and `WorktreeCardStatusSlot.tsx`, which took upstream's
+`import type { WorktreeStatus }` from the shared rollup module while the fork had added `'setup'` to
+the renderer's own `WorktreeStatus` — `tsc` reports four errors with it in place of the merge's line.
+Now 100 are written, all byte-identical to `7da96c11bd4`; 594 are left manual and none is refused. The
+re-pointed-binding check also refuses `session-scanner-primary-parsers.ts`, correct only because the
+merge re-homed the fork's `parseJsonObject` change into upstream's new module by hand.
+
+**What the gate does not check**, so a written file can still be wrong in these ways: bare package
+specifiers (a removed dependency), `import.meta.glob` patterns, JSDoc `import()` types, `declare
+module` names, paths inside JSON or other string literals (`path.join(__dirname, '../x')`), template
+specifiers with substitutions, whether a resolved module still exports the imported name, a
+re-pointed binding whose old module only re-exports it from a third file, and scope: the unbound-name
+scan is not a binder, so a shadowing declaration anywhere hides a use. Typecheck is still the gate
+after the merge.
 
 The two mistakes it is designed to prevent, both made for real:
 
