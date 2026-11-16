@@ -17,7 +17,7 @@ vi.mock('@/components/ui/tooltip', () => ({
 
 // Why a stub: the question is whether the fallback's success releases the pending clone, not what
 // the dialog looks like — that has its own suite.
-vi.mock('@/components/new-workspace/SetProjectLocationDialog', () => ({
+vi.mock('@/components/new-workspace/project-location/SetProjectLocationDialog', () => ({
   SetProjectLocationDialog: ({
     option,
     initialPath,

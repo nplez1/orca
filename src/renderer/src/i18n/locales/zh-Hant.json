@@ -2582,6 +2582,9 @@
         "connectTimedOut": "連線逾時，可能仍在背景連線中。",
         "connectingHost": "連線中…",
         "connectHost": "連線",
+        "setLocation": "設定專案位置",
+        "setLocationOnHost": "在 {{host}} 上設定專案位置",
+        "setLocationTooltip": "選擇一個資料夾或將此專案複製到 {{host}} 上。",
         "addHost": "新增主機",
         "addSshHost": "新增 SSH 主機",
         "addSshHostHint": "透過 SSH 使用現有機器",
@@ -2973,6 +2976,8 @@
         "d09b7631b7": "切換 Jira 網站失敗。",
         "8029e2bd4d": "選擇一個 Linear 團隊以在 Linear 中開啟",
         "609532fae7": "無法儲存預設任務來源。",
+        "4826fd1ad8": "關閉 · Esc",
+        "1a06219d5c": "關閉任務",
         "3f594861a5": "無法儲存團隊選擇。",
         "d0d570b306": "無法切換 Linear 工作區。",
         "cb98f0350c": "已建立 {{value0}}",
@@ -5353,6 +5358,8 @@
           "filterSource": "按來源篩選",
           "allSources": "全部",
           "clearFilters": "清除篩選",
+          "closeSkills": "關閉技能",
+          "closeTooltip": "關閉 · Esc",
           "moreActions": "更多操作",
           "sharedLinks": "共用連結",
           "emptyCopy": "掃描的技能資料夾為空。安裝共用套件，或新增技能後重新整理。",
@@ -11169,6 +11176,10 @@
           }
         },
         "WorkspaceDirectorySetting": {
+          "1a2b3c4d5e": "用戶端預設值",
+          "2b3c4d5e6f": "套用於",
+          "3c4d5e6f7a": "覆寫用戶端預設值",
+          "4d5e6f7a8b": "繼承用戶端預設值",
           "5e6f7a8b9c": "重設",
           "6f7a8b9cad": "使用相對路徑（例如 .orca/worktrees）可讓每個專案使用各自的位置，使用絕對路徑則所有專案共用一個資料夾。"
         },
@@ -15012,7 +15023,12 @@
       "new": {
         "workspace": {
           "SetProjectLocationDialog": {
+            "title": "設定專案位置",
             "description": "選擇 {{project}} 位於 {{host}} 上的位置。",
+            "browseFolder": "瀏覽資料夾",
+            "browseFolderHelp": "使用此主機上已有的檢出或資料夾。",
+            "cloneFromUrl": "從 URL 複製",
+            "cloneFromUrlHelp": "將此存放庫複製到 {{host}} 上。",
             "saveLocation": "設定位置"
           },
           "SmartWorkspaceNameField": {
@@ -15157,6 +15173,8 @@
           "diagnosticsCopyFailed": "無法複製診斷資訊"
         },
         "MobilePageToolbar": {
+          "ad2284a9e2": "關閉 · Esc",
+          "9883b58693": "關閉 Orca Mobile",
           "fb5f28330e": "在側邊欄中顯示",
           "c669abcf8f": "從側邊欄隱藏",
           "e1c7b4a92d": "在設定 > 行動版中設定。",

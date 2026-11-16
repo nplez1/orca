@@ -6,7 +6,7 @@ import { useAppStore } from '@/store'
 import { useAgentDashboardPageEscape } from './use-agent-dashboard-page-escape'
 
 const overlay = vi.hoisted(() => ({ visible: false }))
-vi.mock('@/lib/visible-overlay', () => ({ hasVisibleOverlay: () => overlay.visible }))
+vi.mock('@/lib/overlay-interaction/visible-overlay', () => ({ hasVisibleOverlay: () => overlay.visible }))
 
 afterEach(() => {
   cleanup()

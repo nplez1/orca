@@ -892,7 +892,7 @@ Anchors, both on upstream-owned files and marked `LOCAL(nplez1)`:
   `resolution.workingMode`, so a grok background shell reads plain `working`. Grok has no cron concept,
   so it never earns the badge.
 - Tests that encode the policy (all would need re-adapting if it is ever dropped):
-  `src/shared/claude-background-task-status.test.ts` (the Claude and Grok lane helpers plus the six
+  `src/shared/agent-hook-listener/normalization/claude-background-task-status.test.ts` (the Claude and Grok lane helpers plus the six
   shell/watcher stories; the `main-agent-status-parity` companion suite was retired in the 2026-11-08
   sync),
   `src/main/agent-hooks/server/testing/providers/grok/server-grok-background-status.test.ts`, `server-grok-cancel.test.ts`,
@@ -1213,7 +1213,7 @@ cause — a suppressed red is also an unexamined one, which is what this sweep c
   a commit that fixed anything — there is no such commit, and the entry had no `LOCAL-PATCHES.md`
   evidence line at all, which is how it survived.
 - **`mobile-font-repaint` (1) — closed as a premise guard, and the entry's "real render finding"
-  claim was wrong.** `config/scripts/mobile-web-app/terminal/mobile-web-app-terminal-font-render.test.mjs`
+  claim was wrong.** the mobile-web terminal font-render suite (retired upstream)
   asserts that a stalled web font leaves tofu on screen and that the glyph repaints when the font
   arrives. This host has `~/Library/Fonts/NerdFonts/Symbols/SymbolsNerdFontMono-Regular.ttf`
   installed, and the terminal stack names that same family
@@ -1245,7 +1245,7 @@ cause — a suppressed red is also an unexamined one, which is what this sweep c
   registers keep the unresolved one. The reclaim entry's own diagnosis was right and is fixed as it
   described. Three sites:
   - `config/scripts/desktop-distribution/runtime-verification/process-host-dev-rebuild.test.ts:32`
-    and `config/scripts/desktop-build/output-contracts/main-entry-facade.test.ts:10` built their
+    (and the `main-entry-facade` suite upstream retired this sync) built their
     fixture root from raw `tmpdir()`, so
     every registered watch path and the child's own `__dirname` disagreed. Both now realpath the
     `mkdtemp` result, the idiom 11 other files in this tree already use.
@@ -1277,15 +1277,15 @@ signature, the macOS bash 3.2 arrays, the dev-rebuild timeouts, the missing `clo
 The five below are the same class and were classified here rather than chased, each with the
 signature that identifies it. None imports a module this fork changed.
 
-- `src/main/cli/packaged-cli-assets.test.ts`, `src/main/orcad/orcad-forked-child-paths.test.ts`,
+- `src/main/cli/packaged-assets/packaged-cli-assets.test.ts`, the orcad forked-child-paths suite (retired upstream; `src/main/orcad/orcad-forked-child-paths.ts` still carries the rule),
   `config/scripts/macos/terminal-host-bundle/macos-terminal-host-bundle.test.mjs` — `os.tmpdir()` resolves to `/var/folders/…`
   while the code under test reports the resolved `/private/var/folders/…`.
-- `src/main/cli/cli-command-privileged-transaction.test.ts` — "Refusing to replace non-Orca command
+- `src/main/cli/installation/cli-command-privileged-transaction.test.ts` — "Refusing to replace non-Orca command
   at /var/folders/…/protected/orca". **Re-diagnosed and repaired in `local(test)` below, fork issue
   #151 § 4:** the recorded error path is `/var/…`, not `/private/var/…`, and the cause is the fork's
   `orca-np` rename rather than symlink resolution. The entry is gone from the manifest.
 - `src/main/sqlite/sync-database-portability.test.ts` ("rejects explicit undefined bindings") and
-  `src/main/persistence/profile-state/profile-state-streaming-validation.test.ts` ("cannot add
+  `src/main/persistence/profile-state/documents/profile-state-streaming-validation.test.ts` ("cannot add
   rowid alias") — the bundled SQLite's own binding behaviour differs from what those contracts
   assume; neither file is imported by anything this fork touches. **Both are closed, and the second
   diagnosis was wrong about the cause (2026-10-29).** The rowid case did fail on SQLite 3.54's refusal
@@ -1314,7 +1314,7 @@ Fourteen were already recorded. The last two are the same host-toolchain class a
 - `config/scripts/dependency-security/audit-tools/dependency-security-release.test.mjs` — the audit action's bash step uses
   `mapfile`, and this machine's bash is Apple's 3.2 (`bash: mapfile: command not found`). Same
   signature as `ci-managed-ssh-execution.test.mjs`, which is already recorded.
-- `tests/e2e/cross-version-wire/host-model-catalog-released-phone.unit.test.ts` — both cases call
+- the cross-version host-model-catalog released-phone suite (retired upstream) — both cases call
   `stripTypeScriptTypes` from `node:module`; the bun 1.4.3 pool's `node:module` does not export it,
   so the file passes only under a Node runtime.
 
@@ -1380,7 +1380,7 @@ files, and two files that are red on their own and so are deliberately **not** l
 answered only `getSshConnectionManager`, which is all `ephemeral-vm-runtime-extend.ts:22` imports;
 a `vi.mock` replaces the module for every transitive importer, and the modules the real
 `./ipc/runtime-environments` graph pulls in read `getSshTargetRegistryStore` through it) and
-`src/main/ai-vault/session-scanner-scope-cwd-facts.test.ts` (an `fs` read the test asserts must not
+the session-scanner scope/cwd facts suite (retired upstream) (an `fs` read the test asserts must not
 happen does happen). Both reproduce in a scoped two-file run.
 
 **2026-10-21 (the `bbc8303b47` merge) — both are fixed, so nothing is left unlisted.** The ephemeral
@@ -2145,8 +2145,8 @@ Converged on the fork's shape, as one collector on all three surfaces:
 stay in the catalogue rather than being deleted, because removing a key churns all 20 locales and the
 regenerated catalogues are a sync-owned artifact.
 
-Tests that pin the new behaviour: `src/shared/jira/jira-transition-fields.test.ts` (a filled field is not
-asked, resolution/comment still are), `src/renderer/src/components/task-page/jira/task-page-jira-board-transitions.test.ts`
+Tests that pin the new behaviour: `src/renderer/src/components/jira-transition-fields-form.test.tsx` (a filled field is not
+asked, resolution/comment still are), `src/renderer/src/components/task-page/jira/boards/task-page-jira-board-transitions.ts`
 (the value read and its failure path), `task-page-jira-board-view.test.tsx` / `jira-issue-transition-control.test.tsx`
 (the filled-field move, the collected custom field, and the field-level rejection) and
 `task-page/jira/Board.test.tsx` (the shared form's submit label). A sync that restores upstream's
@@ -2249,7 +2249,7 @@ Nine are recorded, all `owner: upstream` on code byte-identical to `0571e45107`:
   `terminal-topology-profile-fixture` to the harness list `config/scripts/vitest-sqlite-runtime-scan.mjs`
   keys on, so `getNodeRuntimeInclude()` had been routing them to the Node project all along. The other
   two — `tests/e2e/helpers/persisted-profile-state.unit.test.ts` and
-  `src/main/ai-vault-search/session-search-indexer.test.ts` — reach `node:sqlite` through modules the
+  `src/main/ai-vault-search/indexing/session-search-indexer.test.ts` — reach `node:sqlite` through modules the
   scan does not follow, so they really were running under Bun; both are now listed in
   `NODE_RUNTIME_INCLUDE` with the reason, and both pass (3/3 and 42/42) where they failed 2/3 and 1/42.
   `vitest-node-runtime-boundary.test.ts` pins the two entries, because nothing else would notice their
@@ -3022,7 +3022,7 @@ a sync hazard — upstream growing that file by more than three lines breaks the
 
 Anchors: the `afterEach` in `src/renderer/src/i18n/fork-catalog-overlay.test.ts` (fork-owned); the
 `englishFallback` const and its seven call sites in
-`src/renderer/src/components/right-sidebar/checks-panel/presentation/checks-panel-empty-state.test.ts`
+the checks-panel empty-state suite (retired upstream; the component at `src/renderer/src/components/right-sidebar/checks-panel/presentation/checks-panel-empty-state.ts` survives)
 (upstream-owned, no fork comment above it). No production module changed.
 
 **The red.** The 2026-11-12 nightly (run `43226305290`, shard 11/12) failed that checks-panel test with
@@ -4347,7 +4347,7 @@ Four couplings that stay as upstream has them, each for a reason:
   in-bundle file would touch app-side CLI registration and its AppImage tests for no gain. The base
   config keeps upstream's value byte-identically because the overlay overrides it to `orca-np`, which
   is what pins it (`config/scripts/electron-builder-np-config.test.mjs`); the in-bundle launcher file
-  is pinned by `src/main/cli/packaged-cli-assets.test.ts`.
+  is pinned by `src/main/cli/packaged-assets/packaged-cli-assets.test.ts`.
 - **The AppImage artifact name** (`orca-linux[-arm64].AppImage`).
   `config/scripts/static-appimage-package-contract.cjs` derives the artifact's target architecture
   from that exact name, and the PR lane runs it as `dist/orca-linux.AppImage`.
@@ -4434,10 +4434,10 @@ each now carries the identity, and each is pinned by a test rather than by a com
 | shared managed-hook script path                         | `~/.orca-np/agent-hooks/<script>`                                          | `tests/tools/fork-invariants.test.mjs`                             |
 | managed-hook command (posix, cmd, PowerShell)           | the same `~/.orca-np/agent-hooks/<script>`                                 | same file                                                          |
 | launchd label / systemd unit / serve logs               | `com.nplez1.orca.serve`, `orca-np-serve.service`, `~/Library/Logs/orca-np` | `tests/tools/fork-invariants.test.mjs`                             |
-| WSL guest command + bridge                              | `~/.local/bin/orca-np`, `~/.local/share/orca-np/orca-wsl-bridge.ps1`       | `src/main/cli/wsl-cli-installer.test.ts`                           |
+| WSL guest command + bridge                              | `~/.local/bin/orca-np`, `~/.local/share/orca-np/orca-wsl-bridge.ps1`       | `src/main/cli/wsl/wsl-managed-cli.wsl.test.ts`                           |
 | `BROWSER` in a pane                                     | the resolved launcher's basename                                           | `tests/tools/fork-invariants.test.mjs`                             |
 | dev profile fallback                                    | `orca-np-dev`                                                              | same file                                                          |
-| `serve service install` default command                 | `orca-np`                                                                  | `src/cli/handlers/serve-service.test.ts`                           |
+| `serve service install` default command                 | `orca-np`                                                                  | `src/cli/server/serve-service.test.ts`                           |
 | serve park/ack coordination root                        | `Application Support/orca-np`                                              | `src/shared/serve-bundle-coordination.test.ts`                     |
 | bundle id (`np.appId`, notification pane, TCC trust)    | `com.nplez1.orca`                                                          | `tests/tools/fork-invariants.test.mjs`                             |
 | app name / AppUserModelId / dev bundle plist            | `Orca NP`, `Orca NP Dev`, `com.nplez1.orca.dev`                            | same file                                                          |
@@ -4452,7 +4452,7 @@ Three couplings that only show up in the built artifact:
   overlay writes `{ ...release.extraMetadata, name }`; overwriting the object ships the wrong version.
 - **`resources/linux/bin/orca-ide` now searches for `orca-np` first.** The in-bundle CLI launcher keeps
   upstream's file name (pinned by `LINUX_CLI_COMMAND_NAME`), but the executable beside it is this
-  build's, and `src/main/cli/packaged-cli-assets.test.ts` runs the script against both layouts.
+  build's, and `src/main/cli/packaged-assets/packaged-cli-assets.test.ts` runs the script against both layouts.
 - **`src/shared/appimage-cache-identity.ts` recognises both executable names.** An AppImage generation
   cached by an earlier build still runs as `orca-ide`, so keying the cache layout on one name would
   drop its lease and its update handoff.

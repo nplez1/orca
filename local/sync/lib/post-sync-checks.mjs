@@ -54,7 +54,7 @@ export const FEED_FILES = [
   'src/main/updater/lifecycle/updater-setup.ts',
   'src/main/updater/releases/updater-prerelease-feed.ts',
   'src/main/updater/releases/updater-release-readiness.ts',
-  'src/shared/release-channel.ts'
+  'src/shared/updater/release-channel.ts'
 ]
 
 /** True when one of `file`'s relative imports resolves to a file that carries the slug. */

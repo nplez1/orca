@@ -2178,6 +2178,9 @@
         "addRemoteOrcaServerHint": "Emparejar otro tiempo de ejecución Orca",
         "hostConnectionFailed": "Connection failed",
         "defaultBranchUpdateFailed": "No se pudo actualizar la rama predeterminada del proyecto. Inténtalo de nuevo.",
+        "setLocation": "Establecer ubicación del proyecto",
+        "setLocationOnHost": "Establecer ubicación del proyecto en {{host}}",
+        "setLocationTooltip": "Elige una carpeta o clona este proyecto en {{host}}.",
         "connect": "Conectar",
         "reconnect": "Reconectar",
         "setupConfigDefaultTabs": "Comandos de pestañas predeterminadas",
@@ -2522,6 +2525,8 @@
         "d09b7631b7": "No se pudo cambiar el sitio de Jira.",
         "8029e2bd4d": "Selecciona un equipo de Linear para abrirlo en Linear",
         "609532fae7": "No se pudo guardar la fuente de tarea predeterminada.",
+        "4826fd1ad8": "Cerrar · Esc",
+        "1a06219d5c": "Cerrar tareas",
         "3f594861a5": "No se pudo guardar la selección del equipo.",
         "d0d570b306": "No se pudo cambiar el espacio de trabajo Linear.",
         "cb98f0350c": "Se creó {{value0}}",
@@ -5006,6 +5011,8 @@
           "filterSource": "Filtrar por origen",
           "allSources": "Todo",
           "clearFilters": "Borrar filtros",
+          "closeSkills": "Cerrar skills",
+          "closeTooltip": "Cerrar · Esc",
           "moreActions": "Más acciones",
           "sharedLinks": "Enlaces compartidos",
           "emptyCopy": "Las carpetas de skills analizadas están vacías. Instala un paquete compartido o actualiza después de añadir una skill.",
@@ -11127,6 +11134,10 @@
           "permissionsTitle": "Completa la configuración para usar apps locales."
         },
         "WorkspaceDirectorySetting": {
+          "1a2b3c4d5e": "Predeterminado del cliente",
+          "2b3c4d5e6f": "Aplicar a",
+          "3c4d5e6f7a": "Anula el valor predeterminado del cliente",
+          "4d5e6f7a8b": "Hereda el valor predeterminado del cliente",
           "5e6f7a8b9c": "Restablecer",
           "6f7a8b9cad": "Usa una ruta relativa (p. ej., .orca/worktrees) para una ubicación por proyecto, o una ruta absoluta para una carpeta compartida."
         },
@@ -14980,7 +14991,12 @@
             "browse": "Browse run targets"
           },
           "SetProjectLocationDialog": {
+            "title": "Establecer ubicación del proyecto",
             "description": "Elige dónde se ubica {{project}} en {{host}}.",
+            "browseFolder": "Examinar carpeta",
+            "browseFolderHelp": "Usa un checkout o una carpeta existente en este host.",
+            "cloneFromUrl": "Clonar desde URL",
+            "cloneFromUrlHelp": "Clona este repositorio en {{host}}.",
             "saveLocation": "Establecer ubicación"
           },
           "projectCombobox": {
@@ -15055,6 +15071,8 @@
           "diagnosticsCopyFailed": "No se pudieron copiar los diagnósticos"
         },
         "MobilePageToolbar": {
+          "ad2284a9e2": "Cerrar · Esc",
+          "9883b58693": "Cerrar Orca Mobile",
           "fb5f28330e": "Mostrar en la barra lateral",
           "c669abcf8f": "Ocultar de la barra lateral",
           "e1c7b4a92d": "Configúralo en Ajustes > Móvil.",

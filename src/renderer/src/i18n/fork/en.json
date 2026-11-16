@@ -111,7 +111,10 @@
         "cloneSkippedFolderTaken": "{{path}} already exists. Pick {{host}} again to clone under another name, or use that folder.",
         "cloneSkippedFolderTakenByOtherRepo": "{{path}} already exists and holds a different repository. Pick {{host}} again to clone under another name.",
         "cloneProtocolSsh": "SSH",
-        "cloneProtocolHttps": "HTTPS"
+        "cloneProtocolHttps": "HTTPS",
+        "setLocation": null,
+        "setLocationOnHost": null,
+        "setLocationTooltip": null
       },
       "PullRequestPage": {
         "18f2af42ac": null,
@@ -180,7 +183,9 @@
         "linearTeamsLoadFailedTooltip": "Couldn't load Linear teams — retry",
         "linearTeamsLoadFailed": "Couldn't load Linear teams.",
         "pageLoadFailedUnknownReason": "GitHub did not return this page.",
-        "pageLoadFailedWithReason": "Couldn’t load page {{value0}} — {{value1}}"
+        "pageLoadFailedWithReason": "Couldn’t load page {{value0}} — {{value1}}",
+        "1a06219d5c": null,
+        "4826fd1ad8": null
       },
       "activity": {
         "ActivityPrototypePage": {
@@ -305,6 +310,10 @@
           "HomeSlide": {
             "5d94e8ddcc": null
           }
+        },
+        "MobilePageToolbar": {
+          "9883b58693": null,
+          "ad2284a9e2": null
         }
       },
       "native": {
@@ -837,7 +846,11 @@
           "machineOnlyNotice": "{{value0}} has no Orca server, so its server settings cannot be shown here. Choose this computer or one of its servers at the top of Settings."
         },
         "WorkspaceDirectorySetting": {
-          "remoteCaption": "The workspace folder on {{value0}}, as that machine spells it. It is never this computer’s path."
+          "remoteCaption": "The workspace folder on {{value0}}, as that machine spells it. It is never this computer’s path.",
+          "1a2b3c4d5e": null,
+          "2b3c4d5e6f": null,
+          "3c4d5e6f7a": null,
+          "4d5e6f7a8b": null
         },
         "RepoRootSetting": {
           "title": "Repository root folder",
@@ -1078,8 +1091,19 @@
       "new": {
         "workspace": {
           "SetProjectLocationDialog": {
-            "useExistingFolderTitle": "Use an existing folder"
+            "useExistingFolderTitle": "Use an existing folder",
+            "browseFolder": null,
+            "browseFolderHelp": null,
+            "cloneFromUrl": null,
+            "cloneFromUrlHelp": null,
+            "title": null
           }
+        }
+      },
+      "skills": {
+        "SkillsPage": {
+          "closeSkills": null,
+          "closeTooltip": null
         }
       }
     },
@@ -1152,6 +1176,9 @@
             }
           }
         }
+      },
+      "jira": {
+        "transitionFieldsNeedsUpdate": null
       }
     },
     "ssh": {
@@ -1218,6 +1245,17 @@
           "api": {
             "test": {
               "harness": {}
+            }
+          }
+        }
+      }
+    },
+    "main": {
+      "window": {
+        "dashboard": {
+          "popout": {
+            "window": {
+              "title": null
             }
           }
         }

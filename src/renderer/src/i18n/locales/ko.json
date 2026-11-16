@@ -2144,6 +2144,9 @@
         "addRemoteOrcaServerHint": "다른 Orca 런타임 페어링",
         "hostConnectionFailed": "Connection failed",
         "defaultBranchUpdateFailed": "프로젝트 기본 브랜치를 업데이트할 수 없습니다. 다시 시도해 보세요.",
+        "setLocation": "프로젝트 위치 설정",
+        "setLocationOnHost": "{{host}}에 프로젝트 위치 설정",
+        "setLocationTooltip": "폴더를 선택하거나 이 프로젝트를 {{host}}에 복제하세요.",
         "connect": "연결",
         "reconnect": "다시 연결",
         "setupConfigDefaultTabs": "기본 탭 명령",
@@ -2484,6 +2487,8 @@
         "d09b7631b7": "Jira 사이트를 전환하지 못했습니다.",
         "8029e2bd4d": "Linear에서 열려면 하나의 Linear 팀을 선택하세요.",
         "609532fae7": "기본 작업 소스를 저장하지 못했습니다.",
+        "4826fd1ad8": "닫기 · Esc",
+        "1a06219d5c": "작업 닫기",
         "3f594861a5": "팀 선택을 저장하지 못했습니다.",
         "d0d570b306": "Linear 워크스페이스를 전환하지 못했습니다.",
         "cb98f0350c": "{{value0}}을(를) 생성했습니다.",
@@ -4864,6 +4869,8 @@
           "filterSource": "소스별 필터",
           "allSources": "전체",
           "clearFilters": "필터 지우기",
+          "closeSkills": "스킬 닫기",
+          "closeTooltip": "닫기 · Esc",
           "moreActions": "추가 작업",
           "sharedLinks": "공유 링크",
           "emptyCopy": "검색한 스킬 폴더가 비어 있습니다. 공유 번들을 설치하거나 스킬을 추가한 후 새로 고치세요.",
@@ -10847,6 +10854,10 @@
           "permissionsTitle": "로컬 앱을 사용하려면 설정을 완료하세요."
         },
         "WorkspaceDirectorySetting": {
+          "1a2b3c4d5e": "클라이언트 기본값",
+          "2b3c4d5e6f": "적용 대상",
+          "3c4d5e6f7a": "클라이언트 기본값 재정의",
+          "4d5e6f7a8b": "클라이언트 기본값 상속",
           "5e6f7a8b9c": "재설정",
           "6f7a8b9cad": "상대 경로(예: .orca/worktrees)를 사용하면 프로젝트별 위치가 되고, 절대 경로를 사용하면 모든 프로젝트가 하나의 폴더를 공유합니다."
         },
@@ -14609,7 +14620,12 @@
             "browse": "실행 대상 검색"
           },
           "SetProjectLocationDialog": {
+            "title": "프로젝트 위치 설정",
             "description": "{{project}}이(가) {{host}}에 거주하는 곳을 선택하세요.",
+            "browseFolder": "폴더 찾아보기",
+            "browseFolderHelp": "이 호스트의 기존 체크아웃 또는 폴더를 사용하십시오.",
+            "cloneFromUrl": "URL에서 복제",
+            "cloneFromUrlHelp": "이 저장소를 {{host}}에 복제하세요.",
             "saveLocation": "위치 설정"
           },
           "projectCombobox": {
@@ -14684,6 +14700,8 @@
           "diagnosticsCopyFailed": "진단을 복사하지 못했습니다."
         },
         "MobilePageToolbar": {
+          "ad2284a9e2": "닫기 · Esc",
+          "9883b58693": "Orca 모바일 닫기",
           "fb5f28330e": "사이드바에 표시",
           "c669abcf8f": "사이드바에서 숨기기",
           "e1c7b4a92d": "설정 > 모바일에서 구성하세요.",

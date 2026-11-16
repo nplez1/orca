@@ -12,7 +12,7 @@ vi.mock('@/lib/agent-tab-focus-policy', () => ({
 }))
 // Why: the panels themselves are lazy-loaded real components; this file is about the
 // panel body's own click wiring, so a stand-in panel keeps it to that.
-vi.mock('@/lib/lazy-with-retry', () => ({
+vi.mock('@/app-shell/startup/lazy-with-retry', () => ({
   lazyWithRetry: () => () => createElement('div', null, 'panel body')
 }))
 

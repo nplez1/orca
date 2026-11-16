@@ -175,7 +175,7 @@ describe('bundle id com.nplez1.orca', () => {
   it('ships one appId in both copies of the compatibility contract', () => {
     const contract = JSON.parse(source('src/shared/local-build-compatibility-contract.json'))
     const declared = /appId: '([^']+)'/.exec(
-      source('src/shared/local-build-compatibility-contract.ts')
+      source('src/shared/remote-runtime/orcad-distribution/local-build-compatibility-contract.ts')
     )
 
     // Why: the build scripts read the JSON and the app reads the TypeScript copy, so an edit to one

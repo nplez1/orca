@@ -1061,6 +1061,27 @@
       "status": "expected-deletion",
       "supersededBy": "ephemeral-vm-runtimes-section-state.ts in the same directory",
       "reason": "Extracted by the 2026-11-10 sync’s max-lines split, behaviour unchanged."
+    },
+    {
+      "path": "src/main/git/runner.ts",
+      "symbol": "configureLocalLoginShellGitEnvironment",
+      "status": "expected-deletion",
+      "supersededBy": "relocated: the module is src/main/git/command-runner/local-login-shell-git-environment.ts, imported directly by startup/main-process-ready-foundation.ts",
+      "reason": "Upstream deleted the git/runner.ts re-export barrel, so this re-export has no home. The function itself survives in its own fork-only module and its one caller imports it from there. evidence: LOCAL-PATCHES.md § Sync log 2026-11-15, convergence-ledger.md § The git/runner.ts barrel is upstream's to delete"
+    },
+    {
+      "path": "src/main/github/pr-refresh-candidate-policy.ts",
+      "symbol": "ghAccountScope",
+      "status": "expected-deletion",
+      "supersededBy": "relocated to src/main/github/pull-requests/refresh/pr-refresh-candidate-policy.ts, where it is declared and used by refreshKey()",
+      "reason": "Upstream moved the PR-refresh candidate policy into github/pull-requests/refresh/ this sync. The function moved with it under the same name and one caller, so the old path is gone rather than the capability."
+    },
+    {
+      "path": "src/main/native-chat/wsl-transcript-fs-access.ts",
+      "symbol": "TRANSCRIPT_WHOLE_FILE_READ_MAX_BYTES",
+      "status": "expected-deletion",
+      "supersededBy": "relocated to the transcript-filesystem modules upstream split out; the fork test imports it from native-chat/wsl-transcript-gated-fs.ts",
+      "reason": "Upstream split wsl-transcript-fs-access.ts and dropped this re-export; the constant's only fork consumer (the grok parser test) imports it from wsl-transcript-gated-fs.ts, which still declares and exports it."
     }
   ]
 }

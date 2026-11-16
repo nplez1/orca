@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const scheduleAfterInputQuietMock = vi.hoisted(() => vi.fn())
 const shouldDeferActivationTerminalPrepMock = vi.hoisted(() => vi.fn())
 
-vi.mock('@/lib/input-quiet-scheduler', () => ({
+vi.mock('@/lib/window-activity/input-quiet-scheduler', () => ({
   scheduleAfterInputQuiet: scheduleAfterInputQuietMock
 }))
 

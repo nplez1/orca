@@ -2442,6 +2442,9 @@
         "connectTimedOut": "La connexion a expiré. Elle se poursuit peut-être en arrière-plan.",
         "connectingHost": "Connexion…",
         "connectHost": "Se connecter",
+        "setLocation": "Définir l'emplacement du projet",
+        "setLocationOnHost": "Définir l'emplacement du projet sur {{host}}",
+        "setLocationTooltip": "Choisissez un dossier ou clonez ce projet sur {{host}}.",
         "addHost": "Ajouter un hôte",
         "addSshHost": "Ajouter un hôte SSH",
         "addSshHostHint": "Utiliser une machine existante via SSH",
@@ -2793,6 +2796,8 @@
         "d09b7631b7": "Échec du changement de site Jira.",
         "8029e2bd4d": "Sélectionnez une équipe Linear à ouvrir dans Linear",
         "609532fae7": "Échec de l'enregistrement de la source de tâches par défaut.",
+        "4826fd1ad8": "Fermer · Esc",
+        "1a06219d5c": "Fermer les tâches",
         "3f594861a5": "Échec de l'enregistrement de la sélection d'équipe.",
         "d0d570b306": "Échec du changement d'espace de travail Linear.",
         "cb98f0350c": "{{value0}} créé",
@@ -5277,6 +5282,8 @@
           "filterSource": "Filtrer par source",
           "allSources": "Tous",
           "clearFilters": "Réinitialiser les filtres",
+          "closeSkills": "Fermer les skills",
+          "closeTooltip": "Fermer · Esc",
           "moreActions": "Plus d'actions",
           "sharedLinks": "Liens partagés",
           "emptyCopy": "Les dossiers de skills analysés sont vides. Installez un bundle partagé, ou actualisez après avoir ajouté un skill.",
@@ -11232,6 +11239,10 @@
           }
         },
         "WorkspaceDirectorySetting": {
+          "1a2b3c4d5e": "Valeur par défaut du client",
+          "2b3c4d5e6f": "Appliquer à",
+          "3c4d5e6f7a": "Remplace la valeur par défaut du client",
+          "4d5e6f7a8b": "Hérite de la valeur par défaut du client",
           "5e6f7a8b9c": "Réinitialiser",
           "6f7a8b9cad": "Utilisez un chemin relatif (ex. .orca/worktrees) pour un emplacement par projet, ou un chemin absolu pour un dossier partagé unique."
         },
@@ -15181,7 +15192,12 @@
       "new": {
         "workspace": {
           "SetProjectLocationDialog": {
+            "title": "Définir l'emplacement du projet",
             "description": "Choisissez l'emplacement de {{project}} sur {{host}}.",
+            "browseFolder": "Parcourir le dossier",
+            "browseFolderHelp": "Utilisez un checkout ou un dossier existant sur cet hôte.",
+            "cloneFromUrl": "Cloner depuis une URL",
+            "cloneFromUrlHelp": "Clonez ce dépôt sur {{host}}.",
             "saveLocation": "Définir l'emplacement"
           },
           "SmartWorkspaceNameField": {
@@ -15326,6 +15342,8 @@
           "diagnosticsCopyFailed": "Échec de la copie des diagnostics"
         },
         "MobilePageToolbar": {
+          "ad2284a9e2": "Fermer · Esc",
+          "9883b58693": "Fermer Orca Mobile",
           "fb5f28330e": "Afficher dans la barre latérale",
           "c669abcf8f": "Masquer de la barre latérale",
           "e1c7b4a92d": "À configurer dans Réglages > Mobile.",

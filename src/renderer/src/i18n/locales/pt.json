@@ -8718,6 +8718,10 @@
           "916f480036": "Remover Destino SSH"
         },
         "WorkspaceDirectorySetting": {
+          "1a2b3c4d5e": "Padrão do cliente",
+          "2b3c4d5e6f": "Aplicar a",
+          "3c4d5e6f7a": "Substitui o padrão do cliente",
+          "4d5e6f7a8b": "Herda o padrão do cliente",
           "5e6f7a8b9c": "Redefinir",
           "6f7a8b9cad": "Use um caminho relativo (ex.: .orca/worktrees) para um local por projeto, ou um caminho absoluto para uma pasta compartilhada única."
         },
@@ -14130,6 +14134,8 @@
           "filterSource": "Filtrar por origem",
           "allSources": "Todas",
           "clearFilters": "Limpar filtros",
+          "closeSkills": "Fechar skills",
+          "closeTooltip": "Fechar · Esc",
           "moreActions": "Mais ações",
           "sharedLinks": "Links compartilhados",
           "emptyCopy": "As pastas de skills escaneadas estão vazias. Instale um pacote compartilhado, ou atualize após adicionar uma skill.",
@@ -15251,6 +15257,8 @@
         "d09b7631b7": "Falha ao mudar de site do Jira.",
         "8029e2bd4d": "Selecione uma equipe do Linear para abrir no Linear",
         "609532fae7": "Falha ao salvar a origem de tarefa padrão.",
+        "4826fd1ad8": "Fechar · Esc",
+        "1a06219d5c": "Fechar tarefas",
         "3f594861a5": "Falha ao salvar a seleção de equipe.",
         "d0d570b306": "Falha ao mudar de espaço de trabalho do Linear.",
         "cb98f0350c": "{{value0}} criado(a)",
@@ -17223,6 +17231,8 @@
           "rateLimitedBody": "O Orca Relay está ocupado. Aguarde um minuto e tente novamente ou use a LAN para parear pelo Tailscale ou pela mesma rede Wi‑Fi."
         },
         "MobilePageToolbar": {
+          "ad2284a9e2": "Fechar · Esc",
+          "9883b58693": "Fechar o Orca Mobile",
           "fb5f28330e": "Mostrar na barra lateral",
           "c669abcf8f": "Ocultar da barra lateral",
           "e1c7b4a92d": "Configure em Configurações > Mobile.",
@@ -18156,6 +18166,9 @@
         "connectTimedOut": "A conexão excedeu o tempo limite. Ela pode ainda estar conectando em segundo plano.",
         "connectingHost": "Conectando…",
         "connectHost": "Conectar",
+        "setLocation": "Definir local do projeto",
+        "setLocationOnHost": "Definir local do projeto em {{host}}",
+        "setLocationTooltip": "Escolha uma pasta ou clone este projeto em {{host}}.",
         "addHost": "Adicionar host",
         "addSshHost": "Adicionar host SSH",
         "addSshHostHint": "Use uma máquina existente via SSH",
@@ -18182,7 +18195,12 @@
       "new": {
         "workspace": {
           "SetProjectLocationDialog": {
+            "title": "Definir local do projeto",
             "description": "Escolha onde {{project}} fica em {{host}}.",
+            "browseFolder": "Navegar pela pasta",
+            "browseFolderHelp": "Use um checkout ou pasta existente neste host.",
+            "cloneFromUrl": "Clonar de URL",
+            "cloneFromUrlHelp": "Clone este repositório em {{host}}.",
             "saveLocation": "Definir local"
           },
           "SmartWorkspaceNameField": {

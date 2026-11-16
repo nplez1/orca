@@ -205,14 +205,14 @@ describe('the probe session loop', () => {
         query: () => Object.assign(parkedSession(messages), { close: vi.fn() })
       })
     }))
-    vi.doMock('../../claude/claude-agent-sdk-process-spawn', () => ({
+    vi.doMock('../../claude/child-process/claude-agent-sdk-process-spawn', () => ({
       createClaudeCodeProcessSpawn: () => ({ spawn: vi.fn() })
     }))
   }
 
   afterEach(() => {
     vi.doUnmock('../../claude/claude-stream-json-connection')
-    vi.doUnmock('../../claude/claude-agent-sdk-process-spawn')
+    vi.doUnmock('../../claude/child-process/claude-agent-sdk-process-spawn')
     vi.resetModules()
   })
 

@@ -10,9 +10,6 @@ vi.mock('@/lib/agent-session/launch/new-tab/launch-agent-in-new-tab.ts', () => (
 vi.mock('@/lib/agent-session/launch/new-tab/launch-agent-in-new-tab-host-agents.ts', () => ({
   shouldQueueTerminalFocusAfterMenuClose
 }))
-vi.mock('@/lib/agent-session/launch/routing/agent-launch-request-id.ts', () => ({
-  newAgentLaunchRequestId: () => 'req-1'
-}))
 vi.mock('@/components/native-chat/composer/focus/native-chat-composer-focus-intent.ts', () => ({
   captureNativeChatComposerFocusIntent: () => ({ kind: 'none' })
 }))

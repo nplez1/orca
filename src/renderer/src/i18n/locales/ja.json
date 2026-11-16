@@ -2651,6 +2651,9 @@
         "addRemoteOrcaServerHint": "別の Orca ランタイムとペアリングします",
         "hostConnectionFailed": "接続に失敗しました",
         "defaultBranchUpdateFailed": "プロジェクトのデフォルトブランチを更新できませんでした。再試行。",
+        "setLocation": "プロジェクトの場所を設定する",
+        "setLocationOnHost": "プロジェクトの場所を {{host}} に設定します",
+        "setLocationTooltip": "フォルダーを選択するか、このプロジェクトを {{host}} に複製します。",
         "connect": "接続",
         "reconnect": "再接続",
         "setupConfigDefaultTabs": "デフォルトタブのコマンド",
@@ -2992,6 +2995,8 @@
         "d09b7631b7": "Jira サイトの切り替えに失敗しました。",
         "8029e2bd4d": "Linear で開く Linear チームを 1 つ選択",
         "609532fae7": "デフォルトのタスクソースを保存できませんでした。",
+        "4826fd1ad8": "閉じる・Esc",
+        "1a06219d5c": "タスクを閉じる",
         "3f594861a5": "チーム選択を保存できませんでした。",
         "d0d570b306": "Linear ワークスペースの切り替えに失敗しました。",
         "cb98f0350c": "{{value0}} を作成しました",
@@ -5429,6 +5434,8 @@
           "filterSource": "ソースで絞り込み",
           "allSources": "すべて",
           "clearFilters": "フィルターをクリア",
+          "closeSkills": "スキルを閉じる",
+          "closeTooltip": "閉じる · Esc",
           "moreActions": "その他の操作",
           "sharedLinks": "共有リンク",
           "emptyCopy": "スキャンしたスキルフォルダーは空です。共有バンドルをインストールするか、スキルを追加後に更新してください。",
@@ -11519,6 +11526,10 @@
           "permissionsTitle": "ローカルアプリを使用するには、セットアップを完了してください。"
         },
         "WorkspaceDirectorySetting": {
+          "1a2b3c4d5e": "クライアントのデフォルト",
+          "2b3c4d5e6f": "適用先",
+          "3c4d5e6f7a": "クライアントのデフォルトを上書き",
+          "4d5e6f7a8b": "クライアントのデフォルトを継承",
           "5e6f7a8b9c": "リセット",
           "6f7a8b9cad": "相対パス（例: .orca/ワークツリー）を指定するとプロジェクトごとの場所になり、絶対パスを指定すると全プロジェクトで 1 つのフォルダーを共有します。"
         },
@@ -15419,7 +15430,12 @@
             "browse": "実行ターゲットを参照"
           },
           "SetProjectLocationDialog": {
+            "title": "プロジェクトの場所を設定する",
             "description": "{{project}} が {{host}} に住んでいる場所を選択してください。",
+            "browseFolder": "フォルダーを参照",
+            "browseFolderHelp": "このホスト上の既存のチェックアウトまたはフォルダーを使用します。",
+            "cloneFromUrl": "URL からクローン",
+            "cloneFromUrlHelp": "このリポジトリのクローンを {{host}} に作成します。",
             "saveLocation": "場所を設定する"
           },
           "projectCombobox": {
@@ -15508,6 +15524,8 @@
           "diagnosticsCopyFailed": "診断情報のコピーに失敗しました"
         },
         "MobilePageToolbar": {
+          "ad2284a9e2": "閉じる・Esc",
+          "9883b58693": "Orca モバイルを閉じる",
           "fb5f28330e": "サイドバーに表示",
           "c669abcf8f": "サイドバーから非表示",
           "e1c7b4a92d": "[設定] > [モバイル] で設定します。",

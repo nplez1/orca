@@ -24,7 +24,7 @@ vi.mock('../tab-bar/TabBar', () => ({ default: () => null }))
 vi.mock('../tab-bar/TabBarQuickCommandsButton', () => ({
   TabBarQuickCommandsButton: () => null
 }))
-vi.mock('@/lib/pane-manager/client-hosted-browser-row-state', () => ({
+vi.mock('@/runtime/browser/client-hosting/client-hosted-browser-row-state', () => ({
   useClientHostedBrowserRows: () => []
 }))
 vi.mock('@/components/tab-bar/use-tab-bar-default-agent', () => ({

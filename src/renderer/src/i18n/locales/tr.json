@@ -2735,6 +2735,9 @@
         "connectTimedOut": "Bağlantı zaman aşımına uğradı. Arka planda hâlâ bağlanıyor olabilir.",
         "connectingHost": "Bağlanıyor…",
         "connectHost": "Bağlan",
+        "setLocation": "Proje konumunu ayarla",
+        "setLocationOnHost": "{{host}} üzerinde proje konumunu ayarla",
+        "setLocationTooltip": "Bir klasör seçin veya bu projeyi {{host}} üzerine clone'layın.",
         "addHost": "Sunucu ekle",
         "addSshHost": "SSH sunucusu ekle",
         "addSshHostHint": "SSH üzerinden mevcut bir makineyi kullanın",
@@ -3135,6 +3138,8 @@
         "d09b7631b7": "Jira sitesi değiştirilemedi.",
         "8029e2bd4d": "Linear'da açmak için bir Linear takımı seçin",
         "609532fae7": "Varsayılan görev kaynağı kaydedilemedi.",
+        "4826fd1ad8": "Kapat · Esc",
+        "1a06219d5c": "Görevleri kapat",
         "3f594861a5": "Takım seçimi kaydedilemedi.",
         "d0d570b306": "Linear çalışma alanı değiştirilemedi.",
         "cb98f0350c": "{{value0}} oluşturuldu",
@@ -5576,6 +5581,8 @@
           "filterSource": "Kaynağa göre filtrele",
           "allSources": "Tümü",
           "clearFilters": "Filtreleri temizle",
+          "closeSkills": "Becerileri kapat",
+          "closeTooltip": "Kapat · Esc",
           "moreActions": "Diğer işlemler",
           "sharedLinks": "Paylaşılan bağlantılar",
           "emptyCopy": "Taranan beceri klasörleri boş. Paylaşılan bir paket yükleyin veya bir beceri ekledikten sonra yenileyin.",
@@ -11461,6 +11468,10 @@
           }
         },
         "WorkspaceDirectorySetting": {
+          "1a2b3c4d5e": "İstemci varsayılanı",
+          "2b3c4d5e6f": "Şuna uygula",
+          "3c4d5e6f7a": "İstemci varsayılanını geçersiz kılar",
+          "4d5e6f7a8b": "İstemci varsayılanını devralır",
           "5e6f7a8b9c": "Sıfırla",
           "6f7a8b9cad": "Proje başına bir konum için göreli bir yol (ör. .orca/worktrees) veya paylaşılan tek bir klasör için mutlak bir yol kullanın."
         },
@@ -15372,7 +15383,12 @@
       "new": {
         "workspace": {
           "SetProjectLocationDialog": {
+            "title": "Proje konumunu ayarla",
             "description": "{{project}} projesinin {{host}} üzerinde nerede duracağını seçin.",
+            "browseFolder": "Klasöre göz at",
+            "browseFolderHelp": "Bu host'ta mevcut bir checkout veya klasör kullanın.",
+            "cloneFromUrl": "URL'den klonla",
+            "cloneFromUrlHelp": "Bu repoyu {{host}} üzerine klonlayın.",
             "saveLocation": "Konumu ayarla"
           },
           "SmartWorkspaceNameField": {
@@ -15517,6 +15533,8 @@
           "diagnosticsCopyFailed": "Tanılama bilgileri kopyalanamadı"
         },
         "MobilePageToolbar": {
+          "ad2284a9e2": "Kapat · Esc",
+          "9883b58693": "Orca Mobile'ı kapat",
           "fb5f28330e": "Kenar çubuğunda göster",
           "c669abcf8f": "Kenar çubuğundan gizle",
           "e1c7b4a92d": "Ayarlar > Mobil bölümünden yapılandırın.",

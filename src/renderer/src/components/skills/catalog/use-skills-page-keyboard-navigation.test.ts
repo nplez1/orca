@@ -6,7 +6,7 @@ import { installAppKeyboardRouter } from '@/lib/keyboard/app-keyboard-router'
 import { useSkillsPageKeyboardNavigation } from './use-skills-page-keyboard-navigation'
 
 const overlay = vi.hoisted(() => ({ visible: false }))
-vi.mock('@/lib/visible-overlay', () => ({ hasVisibleOverlay: () => overlay.visible }))
+vi.mock('@/lib/overlay-interaction/visible-overlay', () => ({ hasVisibleOverlay: () => overlay.visible }))
 
 beforeAll(() => installAppKeyboardRouter())
 

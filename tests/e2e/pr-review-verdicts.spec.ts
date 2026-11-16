@@ -2,7 +2,7 @@ import { test, expect } from './helpers/orca-app'
 import { openChecks } from './helpers/source-control-ai-generation'
 import { seedPRCommentsSidebarFixture } from './helpers/pr-comments-sidebar-fixture'
 import { waitForActiveWorktree, waitForSessionReady } from './helpers/store'
-import type { PRComment } from '../../src/shared/github/comment-types'
+import type { PRComment } from '../../src/shared/github/comments/comment-types'
 
 /**
  * GitHub's review submissions on one PR: a change request that carried a comment body, and an

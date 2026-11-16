@@ -26,7 +26,7 @@ vi.mock('@/components/ui/popover', () => ({
 }))
 
 // Why a stub: the question is which action the row routes to, not what the dialog looks like.
-vi.mock('@/components/new-workspace/SetProjectLocationDialog', () => ({
+vi.mock('@/components/new-workspace/project-location/SetProjectLocationDialog', () => ({
   SetProjectLocationDialog: ({ option }: { option: { hostId: string } | null }) =>
     option ? <div>{`dialog for ${option.hostId}`}</div> : null
 }))

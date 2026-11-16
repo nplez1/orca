@@ -8,7 +8,7 @@
 // docs/reference/remote-wire-compatibility.md.
 
 import { beforeAll, describe, expect, it } from 'vitest'
-import { parseAiVaultListResult } from '../../../src/main/ai-vault/session-list-result-validation'
+import { parseAiVaultListResult } from '../../../src/main/ai-vault/listing/session-list-result-validation'
 import {
   importReleaseCheckoutModule,
   materializeReleaseCheckout,

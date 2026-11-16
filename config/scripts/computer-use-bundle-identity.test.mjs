@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { ORCA_APP_ID } from '../../src/shared/local-build-compatibility'
+import { ORCA_APP_ID } from '../../src/shared/remote-runtime/orcad-distribution/local-build-compatibility'
 import {
   COMPUTER_USE_BUNDLE_ID,
   COMPUTER_USE_DISPLAY_NAME
