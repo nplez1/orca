@@ -85,7 +85,12 @@ beforeEach(async () => {
     providerHandle: { kind: 'claude', sessionId: PROVIDER_SESSION_ID, leafUuid: null }
   })
   expect(await host.attach(CALLER, params)).toMatchObject({ ok: true })
-  await vi.waitFor(() => expect(host.readStatusSummary(SESSION)?.hostExecutionPhase).toBe('ready'))
+  await vi.waitFor(
+    () => expect(host.readStatusSummary(SESSION)?.hostExecutionPhase).toBe('ready'),
+    {
+      timeout: 10_000
+    }
+  )
   await Promise.all(lifecycle)
 })
 

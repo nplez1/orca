@@ -2844,6 +2844,21 @@ rejected delivery, not an argument for changing the decision.
 `electron.vite.config.ts` keeps upstream's `popout` entry deleted along with `popout.html`: an entry
 that resolves nothing does not build, and the fork's comment there says why.
 
+### `local(sync)`: the sync's subagent prompts are checked in, and the Linux lane runs early
+
+`local/sync/templates/` holds the prompts the 2026-11-15 release agent wrote from scratch — the release
+brief (the documented way to start a sync and release), the conflict protocol, the per-batch resolver
+prompt and four repair prompts — with that run's lessons as rules: batches of at most 20 paths staged
+file by file (its 51-file batch staged nothing in 26 minutes), no repo-wide commands in a resolver, no
+`sleep` polling (23 polls, 162 minutes), and one runner per heavy gate.
+
+`local/sync/linux-lane.mjs` is UPSTREAM-SYNC-RUNBOOK.md Step 3.5: push HEAD to `sync-candidate/<sha12>`
+and dispatch `fork-main-tests.yml` there, because four of the six 2026-11-16 release dispatches failed
+in `fork-release.yml`'s Linux unit lane at 8–60 minutes a loop. It refuses a candidate whose tree has a
+`push`/`create` trigger that would fire for the ref, or an unprovisioned runner label the lane can
+reach; `--cleanup` deletes only candidate refs `origin/main` contains, each leased to its listed sha.
+Guarded by `tests/tools/linux-lane.test.mjs`.
+
 ### `local(test)`: two `orca-runtime` defects were test bugs, not environment reds
 
 `local/unit-known-red.json` carried three `orca-runtime` items as `macos-path-semantics`. Both causes
@@ -3365,11 +3380,18 @@ signed, notarized path by itself once it does. The release body comes from
 `.github/fork-release-notes.md`, rendered per release with the version, commit, date, and a signing
 paragraph that follows the signing mode.
 
-The three jobs are **serialized** (`linux: needs: windows`, `windows: needs: macos`) because every
-leg appends into one release and electron-builder decides create-vs-append at upload time. The
-`macos` job creates the draft, and the undraft is the last step of the last leg — so "published"
-means every platform's update manifest exists, and each leg asserts its own (`latest-mac.yml`,
-`latest.yml`, `latest-linux.yml`).
+The three legs run **in parallel** (since 2026-11-16) behind a `release-draft` job that generates the
+notes and creates the draft, and ahead of a `publish` job that needs all three. electron-builder's
+GitHub publisher creates the release only when its listing finds none for the tag
+(electron-publish 26.15.3 `GitHubPublisher.getOrCreateRelease`); a draft it finds is always appended
+to, so with the draft created before any leg starts there is no create-vs-append decision left to race.
+Until then the legs were serialized (`linux: needs: windows`, `windows: needs: macos`) because the
+draft was created inside `macos` — 44 minutes of legs in v1.4.214-np.56 (run 43826476774), against
+~26 for the longest leg alone. Each leg asserts its own manifest (`latest-mac.yml`, `latest.yml`,
+`latest-linux.yml`); `publish` re-asserts all three, that exactly one release carries the tag, the
+body, and `fork-release-ref-guard.sh` — which now holds a draft (not only a new tag) above the newest
+published `-np.` tag, so a `gh run rerun --failed` that keeps an hours-old `release-ref` cannot
+undraft below a release published since.
 
 **The lane runs the compiler's and the lint gate's verdicts (2026-11-14, #298).** Two jobs sit beside
 `unit-plan`/`unit-tests` and every artifact leg names both in `needs`: `typecheck` (`pnpm tc` on the
@@ -3431,8 +3453,13 @@ Two follow-ups this release exposed, neither fixed here:
   than a rename inside a release.
 - **A retried release uploads cleanly now.** electron-builder appends to the release and fails on an
   existing asset name, so the two failed attempts on `np.38` (Apple stapling timeout, then
-  `already_exists`) could not be retried as they stood; each leg now clears its own assets first via
+  `already_exists`) could not be retried as they stood; each leg then cleared its own assets first via
   `.github/actions/clear-release-assets`, matched by name so one leg never deletes another's.
+  **Corrected 2026-11-16:** that step never matched anything — its patterns were written `\\.`, a literal
+  backslash to `grep -E` (np.56's retry: `cleared 0 asset(s)`) — and was deleted. What makes a retry
+  upload cleanly is electron-publish's own overwrite of an `already_exists` name
+  (`gitHubPublisher.js:153-154`), which np.38 defeated only because GitHub had renamed the
+  `Orca NP-…` blockmap; `mac.artifactName` has kept every name GitHub-safe since.
 
 Why the unsigned path explicitly `unset`s the `CSC_*`/`APPLE_*` variables instead of leaving them
 empty: an unset secret still _defines_ them as empty strings, electron-builder reads a defined
@@ -4133,6 +4160,67 @@ implementer with auto-merge should not be guessing at it. And `close` never remo
 the pipeline keeps it on a closed issue as the audit record; an `update` whose red has cleared does
 remove it, which revokes the delegation before a workspace can merge a fix for a failure that is gone.
 
+#### Only the nightly's reds reached the issue (2026-11-16)
+
+A triage of every red run from 2026-11-12 to 11-16 found seventeen failure emails and one issue behind
+thirteen of them. Those thirteen were the 11-15/16 upstream sync and release on `main` — a macOS native
+build (`cannot find 'TrustedOrcaApplication' in scope`), `check-upstream-file-comments`, five unit shard
+verdicts and two PR-branch iterations — and every one was green by 08:23Z, with the release gate passing
+at 07:49Z and `v1.4.214-np.56` published at 09:05Z. The one lane left red, `Main blocking work guards`,
+was an upstream lane the sync re-enabled and the enablement sweep correctly disabled.
+
+What was not fine is that nothing would have said so. The other four were `Mirror upstream release tags`
+failing on **four consecutive scheduled days**: upstream re-pointed `v1.4.256`, the fork had it at
+another commit, and `.github/scripts/fork-tag-mirror-guard.sh` refused — correctly, because adopting
+upstream's commit for a published tag name is a release decision. The only record was the failure email,
+cleared by hand on 11-15T19:21Z.
+
+Why it was invisible: `ci-health-report.mjs` owns one issue and it carried three checks — enablement, the
+nightly's liveness, stuck runs. A nightly red does reach it, and that is the machinery working as
+intended: #423 opened 2026-11-12T15:06Z carrying `check-nightly-liveness — exit 1 "nightly red (failure)
+at 1.8h old"`, `agent:auto` applied by `nplez1` (not `github-actions[bot]`, which the driver refuses),
+picked up by the driver, closed when the shard's red cleared. A red in any _other_ lane reached nothing.
+
+So `local/check-fork-lane-red.mjs` is the fourth check. Its scope is four deliberate bounds: fork-owned
+`REQUIRED` lanes only (an upstream lane's red is a sync or a disable, not a row someone should chase);
+`--branch main` only (a PR-branch red cannot merge, and reading it would redden the daily issue on every
+work-in-progress push); the **newest** verdict rather than every run, which is what makes it self-healing
+— a lane whose newest verdict is green has been fixed; and `cancelled` is not a verdict, since 11 of the
+21 non-success runs in the 11-16 window were `concurrency.cancel-in-progress` supersessions.
+
+Two lanes are excluded, with the reason stated in the module rather than implied. `fork-main-tests.yml`
+belongs to `check-nightly-liveness`, which also separates "stopped firing" from "fired and failed" — a
+distinction a run-list reader cannot make. `fork-ci-health.yml` is the reporter itself: its own red (an
+unset `AGENT_DELEGATE_TOKEN`, a crash) is the one signal that cannot be delivered inside the issue it
+maintains, and stays a failure email. That is the same gap recorded above as "every detector lives
+inside the thing that was off", and it is stated rather than papered over.
+
+**A red in the tag mirror is exit 3, not exit 1.** It has two failure causes and both are a person's:
+the guard refusing to move a tag, where which commit a published tag points at is not an agent's call,
+and `FORK_TAG_MIRROR_TOKEN` missing or expired, which is a secret rotation. Exit 3 withholds `agent:auto`
+from the whole issue through the existing `judgeDelegation` rule — an agent handed a red it may not
+resolve resolves it anyway — so the issue still opens, and the four red days stop being silent.
+
+**What that costs, stated because it is not free.** Because exit 3 vetoes the whole issue, a decision red
+that persists also withholds the delegation of every other red for as long as it persists. Replay
+2026-11-12 → 11-15 with this check in place and the nightly red of 11-12 would have been withheld until
+the tag was cleared by hand on 11-15. With the enablement check that veto was a rare one-off; here it can
+last days. Keeping it is still the right call — the alternative is handing an agent an issue containing a
+release decision — but the mitigation is that a decision red is now visible instead of email-only: the
+issue opens and its body names the choice under `DECISION:`. Narrowing the veto (a check marking its own
+rows as out of scope without vetoing the others') is the change to make if a long decision red ever holds
+a real fix hostage.
+
+**`fork-release` is a delegable red that a merge does not clear.** Its only trigger is a dispatch, so its
+newest verdict moves only when someone cuts another release — and one of its failures is
+`cannot find 'TrustedOrcaApplication' in scope`, a macOS native build break that no other lane compiles,
+which is why it is not simply excluded. The row says so under `DISPATCH:` instead: fix the failure, and
+the re-run is a release decision. Left out of this: the same argument would apply to anything dispatched
+by hand, and nothing yet bounds a stale dispatch red's age.
+
+The same triage found `local/queued-known-ghosts.json` carrying `43095501923`, a run that completed as
+`cancelled` on 2026-11-15T17:39Z; the check had been reporting it for pruning. Removed.
+
 #### The stale-nightly check could not name the third cause (2026-11-08, #291)
 
 The disable above surfaced as `check-nightly-liveness` exit 1: _"the newest scheduled run is 40h old
@@ -4434,10 +4522,10 @@ each now carries the identity, and each is pinned by a test rather than by a com
 | shared managed-hook script path                         | `~/.orca-np/agent-hooks/<script>`                                          | `tests/tools/fork-invariants.test.mjs`                             |
 | managed-hook command (posix, cmd, PowerShell)           | the same `~/.orca-np/agent-hooks/<script>`                                 | same file                                                          |
 | launchd label / systemd unit / serve logs               | `com.nplez1.orca.serve`, `orca-np-serve.service`, `~/Library/Logs/orca-np` | `tests/tools/fork-invariants.test.mjs`                             |
-| WSL guest command + bridge                              | `~/.local/bin/orca-np`, `~/.local/share/orca-np/orca-wsl-bridge.ps1`       | `src/main/cli/wsl/wsl-managed-cli.wsl.test.ts`                           |
+| WSL guest command + bridge                              | `~/.local/bin/orca-np`, `~/.local/share/orca-np/orca-wsl-bridge.ps1`       | `src/main/cli/wsl/wsl-managed-cli.wsl.test.ts`                     |
 | `BROWSER` in a pane                                     | the resolved launcher's basename                                           | `tests/tools/fork-invariants.test.mjs`                             |
 | dev profile fallback                                    | `orca-np-dev`                                                              | same file                                                          |
-| `serve service install` default command                 | `orca-np`                                                                  | `src/cli/server/serve-service.test.ts`                           |
+| `serve service install` default command                 | `orca-np`                                                                  | `src/cli/server/serve-service.test.ts`                             |
 | serve park/ack coordination root                        | `Application Support/orca-np`                                              | `src/shared/serve-bundle-coordination.test.ts`                     |
 | bundle id (`np.appId`, notification pane, TCC trust)    | `com.nplez1.orca`                                                          | `tests/tools/fork-invariants.test.mjs`                             |
 | app name / AppUserModelId / dev bundle plist            | `Orca NP`, `Orca NP Dev`, `com.nplez1.orca.dev`                            | same file                                                          |

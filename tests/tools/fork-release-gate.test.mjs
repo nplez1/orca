@@ -16,7 +16,9 @@ function ancestors(job, seen = new Set()) {
   return seen
 }
 
-const PUBLISHING = ['macos', 'windows', 'linux']
+const LEGS = ['macos', 'windows', 'linux']
+/** Every job that creates, uploads into or undrafts the release. */
+const PUBLISHING = ['release-draft', ...LEGS, 'publish']
 
 describe('the release dispatch is gated on test evidence', () => {
   it('has a job that runs the fork unit suite', () => {
@@ -27,7 +29,7 @@ describe('the release dispatch is gated on test evidence', () => {
     expect(suiteJob?.[0]).toBe('unit-tests')
   })
 
-  it('every artifact leg waits for the suite, transitively', () => {
+  it('every publishing job waits for the suite, transitively', () => {
     for (const job of PUBLISHING) {
       expect([...ancestors(job)], job).toContain('unit-tests')
     }
@@ -85,9 +87,64 @@ describe('the release dispatch is gated on test evidence', () => {
     }
   })
 
-  it('keeps the artifact legs serialized, which is why they share one release', () => {
-    expect(needsOf(RELEASE, 'windows')).toContain('macos')
-    expect(needsOf(RELEASE, 'linux')).toContain('windows')
+  it('runs the legs in parallel, behind the one job that creates the draft', () => {
+    // Why: electron-builder creates the release itself when its listing finds none, so a leg that
+    // could start before the draft exists would race the others to create it.
+    for (const leg of LEGS) {
+      expect(needsOf(RELEASE, leg), leg).toContain('release-draft')
+      for (const other of LEGS) {
+        expect([...ancestors(leg)], `${leg} waits for ${other}`).not.toContain(other)
+      }
+    }
+    for (const leg of LEGS) {
+      expect([...ancestors('release-draft')], leg).not.toContain(leg)
+    }
+  })
+
+  it('derives the version once, in the job that guards it, and every later job reads that', () => {
+    const text = readFileSync(
+      new URL('../../.github/workflows/fork-release.yml', import.meta.url),
+      'utf8'
+    )
+    expect(text.match(/GITHUB_RUN_NUMBER/g)).toHaveLength(1)
+    expect(RELEASE.jobs['release-ref'].outputs.version).toContain('steps.guard.outputs.version')
+    for (const job of PUBLISHING) {
+      expect(RELEASE.jobs[job].env?.RELEASE_VERSION, job).toBe(
+        '${{ needs.release-ref.outputs.version }}'
+      )
+    }
+  })
+
+  it('refuses an empty version in every job that reads it', () => {
+    for (const job of PUBLISHING.filter((name) => name !== 'publish')) {
+      const scripts = runScripts({ jobs: { job: RELEASE.jobs[job] } }).join('\n')
+      expect(scripts, job).toContain('if [ -z "$RELEASE_VERSION" ]; then')
+    }
+  })
+
+  it('never runs two releases at once, and never cancels one mid-upload', () => {
+    expect(RELEASE.concurrency).toEqual({ group: 'fork-release', 'cancel-in-progress': false })
+  })
+
+  it('creates the release in exactly one job, and never in a leg', () => {
+    const creating = Object.entries(RELEASE.jobs)
+      .filter(([, job]) =>
+        runScripts({ jobs: { job } }).some((run) => run.includes('gh release create'))
+      )
+      .map(([name]) => name)
+
+    expect(creating).toEqual(['release-draft'])
+  })
+
+  it('refuses to upload into a release that is already published', () => {
+    // electron-builder skips the upload to a published release under `releaseType: draft`, with
+    // exit 0, so a run into one would be green and replace nothing.
+    const create = runScripts({ jobs: { job: RELEASE.jobs['release-draft'] } }).find((run) =>
+      run.includes('gh release create')
+    )
+
+    expect(create).toContain('--json isDraft')
+    expect(create).toContain('is already published')
   })
 
   it('still refuses any ref but the release line', () => {
@@ -138,9 +195,9 @@ describe('the release dispatch is gated on the compiler and the lint verdict', (
     expect(verdict?.env?.ORCA_CODE_QUALITY_BASE).toBe('HEAD')
   })
 
-  it('every artifact leg waits for both verdicts, not only the first one in the chain', () => {
-    // `windows` and `linux` would inherit them through `macos`; naming both anyway is what keeps the
-    // gate when the upload-race serialization is relaxed.
+  it('every publishing job names both verdicts, not only the first job that waits for them', () => {
+    // Each would inherit them through `release-draft`; naming them anyway is what keeps the gate the
+    // day that job's own `needs` change.
     for (const job of PUBLISHING) {
       expect(needsOf(RELEASE, job), job).toContain('typecheck')
       expect(needsOf(RELEASE, job), job).toContain('lint')
@@ -187,7 +244,7 @@ describe('a release does not go public without its change summary', () => {
   })
 
   it('guards the generated notes before anything is created', () => {
-    const steps = RELEASE.jobs.macos.steps
+    const steps = RELEASE.jobs['release-draft'].steps
     const notes = steps.findIndex((step) =>
       (step.run ?? '').includes('fork-release-notes-guard.mjs /tmp/notes.md')
     )
@@ -208,13 +265,56 @@ describe('a release does not go public without its change summary', () => {
     )
   })
 
-  it('undrafts nowhere else, and only from the last platform leg', () => {
+  it('undrafts in one job, and only once every platform leg is done', () => {
     const undrafting = Object.entries(RELEASE.jobs)
       .filter(([, job]) =>
         runScripts({ jobs: { job } }).some((run) => run.includes('--draft=false'))
       )
       .map(([name]) => name)
 
-    expect(undrafting).toEqual(['linux'])
+    expect(undrafting).toEqual(['publish'])
+    for (const leg of LEGS) {
+      expect(needsOf(RELEASE, 'publish'), leg).toContain(leg)
+    }
+  })
+
+  it('lets a validation run skip only the undraft, after every check', () => {
+    const publish = runScripts(RELEASE).find((run) => run.includes('--draft=false')) ?? ''
+    const skip = publish.indexOf('KEEP_DRAFT')
+
+    expect(RELEASE.on.workflow_dispatch.inputs.keep_draft.default).toBe(false)
+    expect(skip).toBeGreaterThan(publish.indexOf('fork-release-notes-guard.mjs'))
+    expect(skip).toBeLessThan(publish.indexOf('--draft=false'))
+  })
+
+  it('reads whether the release is a draft in a way a gh failure cannot pass', () => {
+    // `set -e` does not trip on a failure inside a `[` argument, so an inline read failed open.
+    const publish = runScripts(RELEASE).find((run) => run.includes('--draft=false')) ?? ''
+
+    expect(publish).toMatch(/^\s*draft="\$\(gh release view [^\n]*--json isDraft/m)
+    expect(publish).not.toMatch(/\[ "\$\(gh release view/)
+    expect(publish).toContain('if [ "$draft" = "false" ]; then')
+    expect(publish).toContain('if [ "$draft" != "true" ]; then')
+    expect(publish).toMatch(/^\s*set -euo pipefail$/m)
+  })
+
+  it('checks every platform manifest before the undraft', () => {
+    const scripts = runScripts({ jobs: { job: RELEASE.jobs.publish } }).join('\n')
+
+    for (const manifest of ['latest-mac.yml', 'latest.yml', 'latest-linux.yml']) {
+      expect(scripts, manifest).toContain(manifest)
+    }
+    expect(scripts.indexOf('latest-linux.yml')).toBeLessThan(scripts.indexOf('--draft=false'))
+  })
+
+  it('reads full history wherever the notes or the tags are read', () => {
+    // The notes span a rebase, and the guard compares against published tags: a one-commit clone
+    // has neither. The legs need neither, so they keep the cheap clone.
+    for (const job of ['release-ref', 'release-draft', 'publish']) {
+      const checkout = RELEASE.jobs[job].steps.find((step) =>
+        String(step.uses ?? '').startsWith('actions/checkout@')
+      )
+      expect(checkout?.with?.['fetch-depth'], job).toBe(0)
+    }
   })
 })
