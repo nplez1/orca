@@ -77,3 +77,14 @@ test('a waiver on a row that produced a result is recorded as ignored, not count
   skipped.waive('c', 'asked for --skip-typecheck')
   assert.equal(skipped.result(), 'pass')
 })
+
+test('a run of selected rows is never a clean run, even when every row passed', () => {
+  const built = report(['a', STATUS.passed]).markPartial(['a'], 18)
+  assert.equal(built.ok, true)
+  assert.equal(built.result(), 'partial-pass')
+  assert.match(
+    built.render(),
+    /result: PARTIAL PASS \(--only a: 1 of 18 check\(s\), not a clean post-sync run\)/
+  )
+  assert.deepEqual(built.toJSON().partial, { only: ['a'], total: 18 })
+})

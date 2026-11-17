@@ -19,6 +19,7 @@ import { forkSymbolSurvival } from './fork-symbol-check.mjs'
 import { citedGuards } from './cited-guards.mjs'
 import { upstreamDeletedForkTests } from './deleted-fork-tests.mjs'
 import { localeDrift } from './locale-drift.mjs'
+import { nativeMacosBuild } from './native-build.mjs'
 import {
   FORK_SLUG,
   builderConfig,
@@ -107,8 +108,8 @@ export function postSyncRows({ tip, source, problem, options }) {
     ],
     [
       'upstream-deleted-fork-tests',
-      'fork-modified test files that are gone at HEAD after the sync',
-      'for each one, either it was re-homed and the re-homed file carries the fork cases, or its loss is recorded in local/sync/upstream-deleted-fork-tests-baseline.json with a reason',
+      'fork-modified test files, and fork-added test cases, that are gone at HEAD after the sync',
+      'for each file, either it was re-homed and the re-homed file carries the fork cases, or its loss is recorded in local/sync/upstream-deleted-fork-tests-baseline.json with a reason; for each fork-added case, move it next to the module it tests now, or record it under `cases[file][title]` with a reason (`node local/sync/lib/deleted-fork-tests.mjs --baseline-init --accept <why>` writes them)',
       () => upstreamDeletedForkTests(tip, source, problem)
     ],
     [
@@ -134,6 +135,12 @@ export function postSyncRows({ tip, source, problem, options }) {
       'repo-wide oxlint passes',
       'a merge resolved into a file that now breaks a repo-wide rule (max-lines is the usual one); split the file rather than bumping the cap',
       repoLint
+    ],
+    [
+      'native-macos-build',
+      'every Swift target under native/ compiles',
+      'a merge took upstream Swift that names a type or API the fork renamed or removed (TrustedOrcaApplication -> OrcaBundleIdentity, 2026-11-15); fix the call site before the macOS release leg finds it',
+      () => nativeMacosBuild(options)
     ],
     [
       'typecheck',

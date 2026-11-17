@@ -81,3 +81,9 @@ test('the three rows the sync review asked for are wired, once each', () => {
     row('locale-drift', { problem: 'the state file names another sync' })[3]()
   )
 })
+
+test('the native build is a row, ahead of the typecheck', () => {
+  const ids = postSyncRowIds({})
+  assert.ok(ids.includes('native-macos-build'))
+  assert.ok(ids.indexOf('native-macos-build') < ids.indexOf('typecheck'))
+})
