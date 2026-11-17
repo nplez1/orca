@@ -30,6 +30,7 @@ describe('lanePaths', () => {
   it('judges the fork-owned required lanes that nothing else reports on', () => {
     expect(lanePaths()).toEqual([
       '.github/workflows/fork-main-gates.yml',
+      '.github/workflows/fork-performance-contracts.yml',
       '.github/workflows/fork-pr-gates.yml',
       '.github/workflows/fork-release.yml',
       '.github/workflows/fork-upstream-tags.yml'

@@ -94,6 +94,17 @@ describe('inherited crons', () => {
     }
   })
 
+  // The perf contracts are the one lane whose clock this fork owns but whose work is upstream's file, so
+  // the cron reaches it through a call edge. A retargeted or dropped `uses:` leaves a scheduled lane that
+  // runs green doing nothing, which every other check here reports as healthy.
+  it('reaches the perf contracts through the fork lane that carries their clock', () => {
+    const caller = '.github/workflows/fork-performance-contracts.yml'
+
+    expect(readFacts([caller])[caller].callees).toEqual([
+      '.github/workflows/performance-contracts.yml'
+    ])
+  })
+
   it('leaves no inherited cron enabled in this checkout', () => {
     const enabled = [...REQUIRED, ...ALLOWED_INERT]
     // Scoped to the enabled set: `readFacts` also resolves callees, and a disabled callee may carry a
