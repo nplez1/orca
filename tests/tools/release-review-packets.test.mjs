@@ -338,6 +338,51 @@ process.stdin.on('end', () => {
       problem: 'the CLI exited 3 (signal none)'
     })
   })
+
+  it('re-runs one slice without reviving the rest of a tampered batch', async () => {
+    const repo = tempGitRepo('orca-review-marker-')
+    dirs.push(repo.dir)
+    repo.commit('base', { 'src/a.ts': 'one\n' })
+    const dir = scratch()
+    writeFileSync(join(dir, 'prompt-A.txt'), 'review slice A')
+    writeFileSync(
+      join(dir, 'tree-changed.json'),
+      JSON.stringify({ slices: ['A', 'B'], paths: ['src/a.ts'] })
+    )
+    const fake = join(dir, 'fake-claude.mjs')
+    // Why the fake writes: a reviewer that changes the tree is the failure the marker records, so the
+    // marker has to keep voiding the slice this run did not re-check.
+    writeFileSync(
+      fake,
+      `#!/usr/bin/env node
+import { appendFileSync } from 'node:fs'
+process.stdin.resume()
+process.stdin.on('end', () => {
+  appendFileSync(${JSON.stringify(join(repo.dir, 'src/a.ts'))}, 'reviewer was here\\n')
+  const answer = 'ok\\n\\n\`\`\`orca-review-verdict\\n{"findings": []}\\n\`\`\`\\n'
+  process.stdout.write(JSON.stringify({ subtype: 'success', is_error: false, total_cost_usd: 0.1, result: answer }))
+})
+`
+    )
+    chmodSync(fake, 0o755)
+    await runSlices({
+      jobs: [{ id: 'A', dir, addDirs: [dir] }],
+      cwd: repo.dir,
+      claude: fake,
+      concurrency: 1,
+      timeoutMs: 30_000,
+      log: () => {}
+    })
+    expect(readReport(dir, 'A')).toMatchObject({
+      status: 'no-report',
+      problem: 'the reviewer changed the working tree during this run'
+    })
+    expect(readReport(dir, 'B').status).toBe('no-report')
+    expect(JSON.parse(readFileSync(join(dir, 'tree-changed.json'), 'utf8')).slices).toEqual([
+      'B',
+      'A'
+    ])
+  })
 })
 
 describe('prepare', () => {

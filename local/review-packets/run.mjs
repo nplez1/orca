@@ -6,7 +6,7 @@
 // needs, pre-approved (`--permission-mode dontAsk` denies the rest without a prompt to hang on), and
 // the packet directory by `--add-dir`, because a linked worktree's git dir is outside its tree.
 import { execFileSync, spawn } from 'node:child_process'
-import { closeSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { closeSync, existsSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { REVIEWER } from '../pr-body-claims.mjs'
 import { outputPaths, readReport, treeChangeMarker } from './verdict.mjs'
@@ -83,12 +83,31 @@ export function reviewerArgs({ addDirs, maxBudgetUsd }) {
   ]
 }
 
+/** Removes this slice from a tamper marker, so a narrowed re-run clears only what it re-ran. */
+function clearMarker(dir, id) {
+  const path = join(dir, treeChangeMarker)
+  if (!existsSync(path)) {
+    return
+  }
+  try {
+    const marker = JSON.parse(readFileSync(path, 'utf8'))
+    const rest = (marker.slices ?? []).filter((slice) => slice !== id)
+    if (rest.length) {
+      writeFileSync(path, `${JSON.stringify({ ...marker, slices: rest }, null, 2)}\n`)
+      return
+    }
+  } catch {
+    // an unreadable marker voids the packet, so clearing it is the only recovery
+  }
+  rmSync(path, { force: true })
+}
+
 function runOne({ claude, args, cwd, dir, id, timeoutMs }) {
   const paths = outputPaths(dir, id)
   for (const path of [paths.out, paths.err, paths.run]) {
     rmSync(path, { force: true })
   }
-  rmSync(join(dir, treeChangeMarker), { force: true })
+  clearMarker(dir, id)
   const prompt = readFileSync(paths.prompt, 'utf8')
   const out = openSync(paths.out, 'w')
   const err = openSync(paths.err, 'w')
