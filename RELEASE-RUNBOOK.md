@@ -29,13 +29,27 @@ the publish, and the `latest-mac.yml` / `latest.yml` manifests.
 This step is **complete** — the pipeline ran unsigned on 2026-09-16 and has published every release
 from np.6 to np.11 since, so the only reason to repeat it is a change to `fork-release.yml` itself.
 
+**It is no longer the way to validate a workflow change.** `MAC_CERTS` is set, so a dispatch signs and
+notarizes; an unsigned run would mean deleting the secret. And an unsigned run was never
+"nothing deployed": it ended in `--draft=false`, so it published a real release that every install
+updates to. Validate with `keep_draft` instead — the whole run, signed, with every check in `publish`,
+stopping one command short of the undraft:
+
 ```bash
-gh workflow run fork-release.yml --repo nplez1/orca --ref main
+gh workflow run fork-release.yml --repo nplez1/orca --ref main -f keep_draft=true
 gh run watch --repo nplez1/orca
+gh release view v<version> --repo nplez1/orca --json isDraft,assets --jq '.isDraft, .assets[].name'
+gh release delete v<version> --repo nplez1/orca --yes   # a draft has no tag to clean up
 ```
 
-A published release should appear with `latest-mac.yml`, the `.zip`, the `.dmg`, `latest.yml`, and
-`orca-windows-setup.exe`, and a body that opens with a generated change summary (see
+It still consumes a run number and must pass the same gates and version guard, so it is a real
+dispatch in every respect but the last step. What it proves for the parallel legs (2026-11-16): one
+release carries the tag, every leg appended to the draft `release-draft` created, and all three
+manifests are on it. The `local/dispatch-release.mjs` gate does not pass `keep_draft`; a validation
+run publishes nothing, so dispatching it directly is not a bypass.
+
+A published release should appear with `latest-mac.yml`, the `.zip`, the `.dmg`, `latest.yml`,
+`orca-windows-setup.exe`, `latest-linux.yml`, the `.AppImage`, the `.deb` and the `.rpm`, and a body that opens with a generated change summary (see
 [Release notes](#release-notes--read-the-draft-before-it-goes-live) below). Keep that release; it is
 also your rollback artifact.
 
@@ -188,8 +202,8 @@ is nothing else to change.
 
 ## Release notes — read the draft before it goes live
 
-The body is generated, not written: `.github/scripts/fork-release-notes.mjs` runs in the macos job and
-fills the `{{CHANGE_SUMMARY}}` placeholder in `.github/fork-release-notes.md`, which holds the static
+The body is generated, not written: `.github/scripts/fork-release-notes.mjs` runs in the
+`release-draft` job and fills the `{{CHANGE_SUMMARY}}` placeholder in `.github/fork-release-notes.md`, which holds the static
 install and project sections. Nothing about the notes is hand-maintained per release, because a
 hand-written "worth knowing" list is what made these releases read as install instructions with no
 list of changes.
@@ -222,30 +236,31 @@ Where the summary comes from:
 **Why the checkout fetches full history:** the summary needs `git log` over the range, and the default
 one-commit clone has neither the commits nor the tags. It is a full clone of this repository (a few
 minutes on the runner), which is the price of a range that spans a rebase; do not lower `fetch-depth`
-in the macos job to speed it up. The generator detects a shallow checkout and refuses to guess, which
+in the `release-draft` job to speed it up. (The legs do not read history, so they keep the one-commit
+clone — that is two to three minutes off `macos`, the longest leg.) The generator detects a shallow checkout and refuses to guess, which
 would leave every future release without a summary.
 
 **The generator cannot fail the release; the workflow does.** No history, a tag that does not exist,
 or a shallow clone produces a warning, a body without a summary, and exit 0 — the generator keeps no
 veto. `.github/scripts/fork-release-notes-guard.mjs` is the gate instead, and it runs twice: on the
-generated body in the macos job, and again on the draft's live body in the linux job immediately
-before `--draft=false`. It refuses a body with no `## What changed` heading, one carrying the
+generated body in the `release-draft` job, and again on the draft's live body in the `publish` job
+immediately before `--draft=false`. It refuses a body with no `## What changed` heading, one carrying the
 generator's own "A change summary could not be generated" fallback, and one under 400 bytes. Until
 2026-10-29 the macos job published a minimal `Built from <sha>` body instead of failing, so a
 summary-less release went live whenever the generator could not produce one.
 
 **Read the body of the draft before publishing.** The release is created as a draft and only
-`gh release edit --draft=false` at the end of the linux job makes it public, which is the window for
+`gh release edit --draft=false` at the end of the `publish` job makes it public, which is the window for
 exactly this check — and the guard above is what now refuses a body with no summary. **A release does
 not go public without the change summary**: the body must carry `## What changed` for the range since
 the previous `-np.` tag. When the guard refuses, nothing has gone public, and what to do next depends
 on which of its two sites refused:
 
-- **The generated notes (macos job).** It fails before a draft, a tag or an asset exists, so the
+- **The generated notes (`release-draft` job).** It fails before a draft, a tag or an asset exists, so the
   cause is the only thing to fix and a fresh dispatch is the recovery. The generator's warning is in
   the same step's log; a shallow clone is the usual cause. (A _missing previous tag_ is not — the
   generator warns and summarizes from the tip, and that body passes.)
-- **The draft's body (linux job).** The release stays a draft, which no installed build can see. The
+- **The draft's body (`publish` job).** The release stays a draft, which no installed build can see. The
   body to fix is the draft's own: `gh release edit v<version> --notes-file notes.md`, or delete the
   draft and start over. **A re-dispatch does not rewrite it** — an existing draft skips
   `gh release create`, so a re-run re-checks the same body and refuses again.
@@ -255,7 +270,7 @@ An install-only body is the failure the generator replaced, not an acceptable fa
 Reading the draft is still worth doing, because the guard proves a summary _exists_, not that it is
 right — a generator bug or a mis-resolved previous tag is exactly what a reader catches and no check
 can. A body that is present but wrong is an edit, not a refusal — `gh release edit v<version>
---notes-file notes.md` — and the linux job's check runs on whatever the body then says.
+--notes-file notes.md` — and the `publish` job's check runs on whatever the body then says.
 
 ```bash
 gh release view v<version> --repo nplez1/orca --json body --jq .body | less
@@ -272,7 +287,7 @@ git cherry "$prev" HEAD | grep -c '^-'           # of those, already shipped by 
 What to look for: the summary is present and starts with the features and fixes; the headline count
 matches what `git cherry` says the previous release does not already contain; the comparison link is
 `<previous tag>...<this tag>` and is not broken; the install table names the version being released;
-the signing paragraph matches this run (the macos job logs `signed=true` or `signed=false`). If the
+the signing paragraph matches this run (the macos job warns `Unsigned build` when it is not signing). If the
 body is wrong, edit the release (`gh release edit v<version> --notes-file notes.md`) before flipping it
 public — or leave it as a draft and delete it, since an installed build cannot see a draft.
 
@@ -344,33 +359,76 @@ grep -rn "nplez1/orca" src/main/updater-prerelease-feed.ts src/main/updater/upda
 ## When a leg fails: retry, do not re-cut
 
 A run can fail _after_ it has uploaded something — a notarization stapling timeout at Apple's ticket
-service (error 68, "The network connection was lost"), or any lost connection. electron-builder
-appends to the existing release, so the retry then dies on its own first attempt's asset names:
+service (error 68, "The network connection was lost"), or any lost connection. The version does not
+change on a re-run: `github.run_number` stays the same across attempts, so a re-run republishes the
+same `-np.<n>` tag into the same draft.
 
-```
-422 Unprocessable Entity — ReleaseAsset: already_exists (field: name)
-```
+**Why the legs run in parallel (2026-11-16).** They used to be serialized (`windows` after `macos`,
+`linux` after `windows`) because the draft was created inside `macos`, and electron-builder's GitHub
+publisher creates the release itself when its listing finds none for the tag — two legs that both
+missed it would each create one. Now `release-draft` creates the draft, with its body, before any leg
+starts; a publisher that finds a draft always appends to it (electron-publish
+`GitHubPublisher.getOrCreateRelease`), so there is no create decision left to race. `publish` waits for
+all three legs, confirms exactly one release carries the tag and that `latest-mac.yml`, `latest.yml`
+and `latest-linux.yml` are all on it, re-checks the body and the guard, and only then undrafts. On
+v1.4.214-np.56 that is ~26 minutes of legs instead of 44.
 
-That is not a build problem, and the version does not change: `github.run_number` stays the same
-across re-runs, so `gh run rerun <id>` republishes the same `-np.<n>` tag.
+**A re-upload of an existing name is handled by electron-builder itself**: on
+`422 ReleaseAsset already_exists` it deletes the asset and uploads again (electron-publish 26.15.3,
+`gitHubPublisher.js:153-154` → `overwriteArtifact`, `:114-125`). It finds the asset by exact name, so
+it only works for names GitHub does not rewrite — on np.38 the mac blockmap was uploaded as
+`Orca NP-…` and stored as `Orca.NP-…`, the overwrite never found it, and the retry died on
+`already_exists`. `mac.artifactName` in `config/electron-builder.np.config.cjs` keeps every name
+GitHub-safe since.
 
-**Each leg clears its own assets first** (`.github/actions/clear-release-assets`, called before
-"Package and publish" in all three jobs). Each leg passes the extended-regex alternation of the names
-it publishes, so re-running one job never deletes another leg's artifacts, and a first attempt is
-unchanged because a missing release or no match is a no-op. So:
+Until 2026-11-16 each leg also ran a `.github/actions/clear-release-assets` step before packaging. It
+never cleared anything: its patterns were written `latest\\.yml`, which `grep -E` reads as a literal
+backslash, so np.56's retry logged `cleared 0 asset(s)`. It was deleted rather than repaired, because a
+working one would delete a published release's live manifests before electron-builder skipped the
+upload to it. Before a leg uploads, it now checks that its release is still a draft
+(`.github/scripts/fork-release-require-draft.sh`), so a leg re-run on its own (`Re-run job`, or
+`--failed` after the draft was deleted) refuses instead of creating a second release or passing on the
+assets already there.
+
+**`--failed` is a legitimate retry now:**
 
 ```bash
-gh run rerun <run-id> --repo nplez1/orca     # re-runs every job; failed legs re-upload cleanly
+gh run rerun <run-id> --failed --repo nplez1/orca   # the failed leg(s) and `publish`; nothing else
+gh run rerun <run-id> --repo nplez1/orca            # everything, gates included — never needed for a leg
 ```
 
-Delete the draft and start over (`gh release delete v<version> --yes --cleanup-tag`) only when the
-_draft body_ is wrong — a re-run keeps the body it created.
+Releases share one concurrency group (`fork-release`, never cancelled in progress), and GitHub keeps
+at most one run _pending_ in it: anything queued behind a pending run — a dispatch, a `keep_draft`
+validation, a `--failed` re-run — cancels that pending run. Queue nothing behind a release that is
+already waiting.
 
-**`--failed` is not a re-run of the whole workflow.** It re-runs only the jobs that failed, so a
-`gh run rerun <id> --failed` on a run whose `release-ref` job passed skips the version guard entirely
-and can republish below the newest `-np.` tag. Installs ignore a release that is not newer, but
-`releases/latest` can then point at it. Use a full `gh run rerun <id>`, or a fresh dispatch (which
-runs the guard again), whenever the version is in question.
+It re-runs only the failed jobs and their dependents, so a failed `macos` re-runs `macos` and
+`publish`, and keeps the gates, the draft and the legs that passed. That used to be unsafe because
+`release-ref` — the version guard — is one of the jobs it keeps, and the published tags can move
+between attempts. What made it safe is that `publish` runs `fork-release-ref-guard.sh` again
+immediately before the undraft, and the guard now holds a **draft** to the newest published `-np.` tag
+too (only an already-published tag is exempt, because it cannot be above itself). The ref, the commit,
+the inputs and the gate verdicts belong to the run and cannot change between attempts; the tags are
+the one input that can, and they are re-read where they matter.
+
+A re-dispatch into an **already-published** tag is refused by `release-draft`: under
+`releaseType: draft` electron-builder skips the upload to a release that is not a draft (warning,
+exit 0), so the legs would replace nothing. Dispatch a new version instead.
+
+**When `publish`'s guard refuses because a newer `-np.` tag was published since this run's draft**,
+the draft can never go public: the newer tag stays newer, so `--failed` (or any re-run) refuses again,
+forever. Delete the draft and dispatch a new version:
+
+```bash
+gh release delete v<version> --repo nplez1/orca --yes   # a draft has no tag to clean up
+node local/dispatch-release.mjs
+```
+
+Delete the draft and start over (`gh release delete v<version> --yes`) only when the _draft body_ is
+wrong — a re-run keeps the body it created. **After deleting a draft, the next run must be a full
+`gh run rerun <id>` or a fresh dispatch, never `--failed` or a single re-run job:** only
+`release-draft` creates the draft, and `--failed` keeps the `release-draft` that passed. Every leg
+then refuses at "Require this run's draft release" — which is the guard working, not a new failure.
 
 ## The Linux leg, first run (2026-10-21, `v1.4.214-np.38`)
 
