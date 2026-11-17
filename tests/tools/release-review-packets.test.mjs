@@ -6,9 +6,10 @@ import { REVIEWER } from '../../local/pr-body-claims.mjs'
 import { validateManifest } from '../../local/release-review-gate.mjs'
 import { partitionEntries } from '../../local/review-packets/exclusions.mjs'
 import { buildManifest, reviewState } from '../../local/review-packets/manifest.mjs'
-import { prepareSync } from '../../local/review-packets/packet.mjs'
+import { prepareDelta, prepareSync } from '../../local/review-packets/packet.mjs'
 import { reviewerArgs, runSlices } from '../../local/review-packets/run.mjs'
 import { parsePatch, planSlices } from '../../local/review-packets/slices.mjs'
+import { reviewCoverage } from '../../local/release-review-packets.mjs'
 import { readReport } from '../../local/review-packets/verdict.mjs'
 import { tempGitRepo } from '../../local/sync/lib/temp-git-repo.mjs'
 
@@ -200,6 +201,7 @@ describe('manifest', () => {
       join(delta, 'packet.json'),
       JSON.stringify({
         kind: 'delta',
+        findings: ['A-1'],
         slices: [{ id: 'delta-1', scope: 'delta a..b', files: 1, bytes: 5 }]
       })
     )
@@ -237,6 +239,16 @@ describe('manifest', () => {
     addDelta(sync, false)
     const manifest = buildManifest(reviewState(sync), { revision: 'r'.repeat(40) })
     expect(manifest.slices[0].unresolved).toBe(1)
+  })
+
+  it('ignores a round-1 slice that claims to resolve another slice\u2019s finding', () => {
+    const sync = packets()
+    writeRun(sync, 'B', {
+      result: success({ resolved: [{ id: 'A-1', resolved: true }], findings: [] }, 3)
+    })
+    const manifest = buildManifest(reviewState(sync), { revision: 'r'.repeat(40) })
+    expect(manifest.slices[0].unresolved).toBe(1)
+    expect(manifest.slices[0].findings[0].status).toBe('open')
   })
 })
 
@@ -338,5 +350,72 @@ describe('prepare', () => {
     expect(prompt).toContain(join(out, 'slice-A.patch'))
     expect(prompt).toContain('src/renderer/src/i18n/locales/zh.json: modified')
     expect(readFileSync(join(out, 'slice-A.patch'), 'utf8')).toContain('+resolved')
+  })
+
+  it('refuses a delta range over the byte budget instead of handing it to one reviewer', () => {
+    const repo = tempGitRepo('orca-review-delta-')
+    dirs.push(repo.dir)
+    repo.commit('base', { 'src/a.ts': 'one\n' })
+    const r1 = repo.git('rev-parse', 'HEAD').trim()
+    repo.commit('fix', { 'src/a.ts': `${'x'.repeat(4000)}\n` })
+    const r2 = repo.git('rev-parse', 'HEAD').trim()
+    const prepare = () =>
+      prepareDelta({
+        root: repo.dir,
+        range: `${r1}..${r2}`,
+        findings: [],
+        parentDir: join(scratch(), 'packet'),
+        context: context(),
+        budgetBytes: 500
+      })
+    expect(prepare).toThrow(/over the 500-byte budget/)
+  })
+})
+
+describe('crash regressions', () => {
+  it('writes no slice for a diff that has no hunks', () => {
+    expect(planSlices([], 1000)).toEqual([])
+  })
+
+  it('splits a delete plus an add of one path instead of recursing on it', () => {
+    const section = (header) =>
+      `diff --git a/x.ts b/x.ts\n${header}@@ -1 +1 @@\n-${'x'.repeat(120)}\n+${'y'.repeat(120)}\n`
+    const entries = parsePatch(
+      section('deleted file mode 100644\n') + section('new file mode 100644\n')
+    )
+    expect(entries.map((entry) => [entry.path, entry.status])).toEqual([
+      ['x.ts', 'deleted'],
+      ['x.ts', 'added']
+    ])
+    const text = planSlices(entries, 200)
+      .flatMap((slice) => slice.entries.map((entry) => entry.text))
+      .join('')
+    expect(text).toContain('deleted file mode')
+    expect(text).toContain('new file mode')
+  })
+})
+
+describe('coverage', () => {
+  const packet = (extra) => ({ kind: 'sync', merge: 'a'.repeat(40), ...extra })
+
+  it('stops the manifest at the last reviewed range rather than at HEAD', () => {
+    const state = {
+      rounds: [
+        { packet: packet() },
+        { packet: { kind: 'delta', range: 'a..b', r1: 'a'.repeat(40), r2: 'b'.repeat(40) } },
+        { packet: { kind: 'delta', range: 'b..c', r1: 'b'.repeat(40), r2: 'c'.repeat(40) } }
+      ]
+    }
+    expect(reviewCoverage(state)).toEqual({ end: 'c'.repeat(40), gaps: [] })
+  })
+
+  it('reports a delta that does not start where the reviewed range ended', () => {
+    const state = {
+      rounds: [
+        { packet: packet() },
+        { packet: { kind: 'delta', range: 'x..c', r1: 'f'.repeat(40), r2: 'c'.repeat(40) } }
+      ]
+    }
+    expect(reviewCoverage(state).gaps).toHaveLength(1)
   })
 })

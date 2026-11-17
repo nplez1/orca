@@ -14,7 +14,8 @@
  *   node local/release-review-packets.mjs --run [--slices A,C] [--concurrency 6]
  *                                         [--max-budget-usd <per slice>] [--timeout-min 90]
  *   node local/release-review-packets.mjs --status
- *   node local/release-review-packets.mjs --print > local/sync/release-review/$(git rev-parse HEAD).json
+ *   node local/release-review-packets.mjs --print > /var/tmp/manifest.json   # inspect only
+ *   node local/release-review-packets.mjs --write    # records it for the revision it covers
  *
  * Every mode works on HEAD's sync (the newest merge on HEAD's first-parent line), or on `--merge`.
  * Packets live in `<git dir>/orca-review/sync-<merge>/`; `--packet <dir>` names one directly.
@@ -22,9 +23,9 @@
  *
  * Exit: 0 done, 1 refused or incomplete, 2 usage.
  */
-import { readFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { validateManifest } from './release-review-gate.mjs'
+import { manifestPath, reviewNeutralOnly, validateManifest } from './release-review-gate.mjs'
 import { loadCoverageContext } from './review-packets/exclusions.mjs'
 import { buildManifest, openFindings, reviewState } from './review-packets/manifest.mjs'
 import {
@@ -38,7 +39,7 @@ import {
 import { runSlices } from './review-packets/run.mjs'
 
 const repoRoot = git(join(import.meta.dirname, '..'), ['rev-parse', '--show-toplevel']).trim()
-const MODES = ['prepare', 'run', 'status', 'print']
+const MODES = ['prepare', 'run', 'status', 'print', 'write']
 const VALUED = [
   'merge',
   'budget-kb',
@@ -50,6 +51,11 @@ const VALUED = [
   'timeout-min',
   'packet'
 ]
+/** Why validated: `--timeout-min x` becomes `setTimeout(NaN)`, which fires at once and kills every
+ * slice, and `--concurrency x` starts no worker at all — both after paying for the packet. */
+const NUMERIC = ['budget-kb', 'concurrency', 'max-budget-usd', 'timeout-min']
+
+const short = (sha) => String(sha).slice(0, 12)
 
 export function parseArgs(argv) {
   const options = { mode: null }
@@ -62,6 +68,9 @@ export function parseArgs(argv) {
       options.mode = name
     } else if (VALUED.includes(name) && argv[i + 1] !== undefined) {
       options[name] = argv[i + 1]
+      if (NUMERIC.includes(name) && !(Number(argv[i + 1]) > 0)) {
+        throw new Error(`--${name} takes a positive number, got ${JSON.stringify(argv[i + 1])}`)
+      }
       i += 1
     } else {
       throw new Error(`unknown argument: ${argv[i]}`)
@@ -95,6 +104,7 @@ function readFindings(file) {
 
 function prepare(options) {
   const context = loadCoverageContext(repoRoot)
+  const budgetBytes = Math.round(Number(options['budget-kb'] ?? DEFAULT_BUDGET_KB) * 1024)
   if (options.delta) {
     const parentDir = syncDirFor(options)
     const findings = options.findings
@@ -105,7 +115,8 @@ function prepare(options) {
       range: options.delta,
       findings,
       parentDir,
-      context
+      context,
+      budgetBytes
     })
     console.log(`delta packet: ${dir}`)
     console.log(
@@ -117,7 +128,6 @@ function prepare(options) {
   if (!merge) {
     throw new Error('HEAD has no merge on its first-parent line; pass --merge <sha>')
   }
-  const budgetBytes = Math.round(Number(options['budget-kb'] ?? DEFAULT_BUDGET_KB) * 1024)
   const { dir, packet } = prepareSync({
     root: repoRoot,
     merge,
@@ -146,6 +156,10 @@ function prepare(options) {
 }
 
 function status(state) {
+  if (!state.slices.length) {
+    console.error('  no slices: the packet holds no hunks to review')
+    return 1
+  }
   for (const entry of state.slices) {
     const { report } = entry
     const counts = report.counts
@@ -177,13 +191,61 @@ async function run(options) {
   return status(reviewState(syncDir))
 }
 
-function print(options) {
-  const revision = git(repoRoot, ['rev-parse', 'HEAD']).trim()
-  const manifest = buildManifest(reviewState(syncDirFor(options)), { revision })
-  console.log(JSON.stringify(manifest, null, 2))
-  // Why validate here as well as at the gate: the person redirecting this into the manifest file
-  // should hear now, not at dispatch, that a slice is still missing.
-  const problems = validateManifest(manifest, { revision })
+/**
+ * Where the review stops, and every break in the chain that leads there.
+ *
+ * Why the chain and not HEAD: round 1 reviews the merge's own resolution and a delta reviews only the
+ * range it was given, so naming HEAD as the reviewed revision would certify commits no slice read.
+ * The gate's `reviewedRevision` then accepts only review-neutral commits after the revision named
+ * here, which is the same rule the hand-written manifests were held to.
+ */
+export function reviewCoverage(state) {
+  let end = state.rounds[0].packet.merge
+  const gaps = []
+  for (const { packet } of state.rounds.slice(1)) {
+    if (packet.r1 !== end) {
+      gaps.push(
+        `delta ${packet.range} starts at ${short(packet.r1)} but the reviewed range ends at ${short(end)}, so the commits between them were never reviewed`
+      )
+    }
+    end = packet.r2
+  }
+  return { end, gaps }
+}
+
+/** Paths changed after the reviewed revision that a release review would have to cover. */
+function uncoveredPaths(end) {
+  const head = git(repoRoot, ['rev-parse', 'HEAD']).trim()
+  if (head === end) {
+    return []
+  }
+  const touched = git(repoRoot, ['diff', '--name-only', end, head]).split('\n').filter(Boolean)
+  return touched.filter((path) => !reviewNeutralOnly([path]))
+}
+
+function print(options, write = false) {
+  const state = reviewState(syncDirFor(options))
+  const { end, gaps } = reviewCoverage(state)
+  const manifest = buildManifest(state, { revision: end })
+  const uncovered = uncoveredPaths(end)
+  const problems = [
+    ...gaps,
+    ...validateManifest(manifest, { revision: end }),
+    ...(uncovered.length
+      ? [
+          `${uncovered.length} path(s) changed after the reviewed revision ${short(end)} (${uncovered.slice(0, 5).join(', ')}${uncovered.length > 5 ? ', …' : ''}); prepare a delta round over them`
+        ]
+      : [])
+  ]
+  if (write && !problems.length) {
+    const path = join(repoRoot, manifestPath(end))
+    writeFileSync(path, `${JSON.stringify(manifest, null, 2)}\n`)
+    console.log(`manifest: ${path}`)
+  } else if (!write) {
+    console.log(JSON.stringify(manifest, null, 2))
+  }
+  // Why the problems go to stderr in both modes: the manifest names the revision it covers, which is
+  // routinely not HEAD, so a redirect cannot be trusted to have recorded a complete review.
   for (const problem of problems) {
     console.error(`release-review: not yet complete — ${problem}`)
   }
@@ -207,6 +269,9 @@ async function main(argv) {
     }
     if (options.mode === 'status') {
       return status(reviewState(syncDirFor(options)))
+    }
+    if (options.mode === 'write') {
+      return print(options, true)
     }
     return print(options)
   } catch (error) {

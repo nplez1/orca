@@ -11,6 +11,8 @@ export const SEVERITIES = ['BLOCKER', 'SHOULD-FIX', 'MINOR', 'NIT']
 /** The severities AGENTS.md § PR gate 2 says must be fixed before the release. */
 export const BLOCKING = new Set(['BLOCKER', 'SHOULD-FIX'])
 export const VERDICT_FENCE = 'orca-review-verdict'
+/** Written beside a packet when a run changed the working tree; while it is there, nothing reported. */
+export const treeChangeMarker = 'tree-changed.json'
 
 const COUNT_KEYS = { BLOCKER: 'blockers', 'SHOULD-FIX': 'shouldFix', MINOR: 'minors', NIT: 'nits' }
 
@@ -56,6 +58,22 @@ export function parseVerdict(answer) {
   }
 }
 
+/** The tools the CLI refused the reviewer, and whether one of them was the packet itself. */
+function denialProblem(result, dir) {
+  const denials = Array.isArray(result.permission_denials) ? result.permission_denials : []
+  const onPacket = denials.find((denial) => {
+    const input = denial?.tool_input ?? {}
+    const path = String(input.file_path ?? input.path ?? input.notebook_path ?? '')
+    return path.startsWith(dir)
+  })
+  return {
+    problem: onPacket
+      ? `the reviewer was denied ${onPacket.tool_name ?? 'a tool'} on the packet, so it did not read the patch`
+      : null,
+    denied: denials.map((denial) => denial?.tool_name ?? 'a tool')
+  }
+}
+
 export const outputPaths = (dir, id) => ({
   prompt: join(dir, `prompt-${id}.txt`),
   out: join(dir, `out-${id}.json`),
@@ -66,6 +84,12 @@ export const outputPaths = (dir, id) => ({
 /** The state of one slice from its files on disk. */
 export function readReport(dir, id) {
   const paths = outputPaths(dir, id)
+  if (existsSync(join(dir, treeChangeMarker))) {
+    return {
+      status: 'no-report',
+      problem: 'the reviewer changed the working tree during this run'
+    }
+  }
   if (!existsSync(paths.run)) {
     return { status: 'not-run', problem: 'never run' }
   }
@@ -93,11 +117,23 @@ export function readReport(dir, id) {
   if (!parsed.ok) {
     return { status: 'no-report', problem: parsed.problem, cost, run }
   }
+  // Why this is checked after the answer parses: a review that could not read its patch still produces
+  // a well-formed verdict, and the 2026-11-15 pass shipped exactly that kind of silence.
+  const denial = denialProblem(result, dir)
+  if (denial.problem) {
+    return { status: 'no-report', problem: denial.problem, cost, run }
+  }
+  const warning = [
+    parsed.warning,
+    denial.denied.length ? `denied: ${denial.denied.join(', ')}` : null
+  ]
+    .filter(Boolean)
+    .join('; ')
   return {
     status: 'reported',
     verdict: parsed.verdict,
     counts: parsed.counts,
-    warning: parsed.warning,
+    warning: warning || null,
     cost,
     run
   }

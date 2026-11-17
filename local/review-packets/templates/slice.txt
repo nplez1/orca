@@ -12,9 +12,9 @@ Left out of every slice, because another gate verifies the content ({{EXCLUDED_F
 {{EXCLUDED_LIST}}
 Their content is not your subject, but their presence is. If one of them was added or deleted where it should not be (for example a generated file committed at a path its generator does not write), report it. Their hunks are in {{EXCLUDED_PATCH}} if you need to look.
 
-Tools: Read, Grep and Glob on the tree and on the packet files above. Bash allows only read-only git (`git show`, `git log`, `git diff`, `git grep`, `git blame`, `git ls-tree`, `git ls-files`, `git cat-file`, `git rev-parse`, `git merge-base`, `git rev-list`) plus `wc`, `head` and `tail`. Run git from the working directory, without `-C` and without pipes into anything else. Everything else is denied, so do not spend turns on it.
+Tools: Read, Grep and Glob on the tree and on the packet files above. Bash allows only read-only git (`git show`, `git log`, `git blame`, `git ls-tree`, `git ls-files`, `git cat-file`, `git rev-parse`, `git merge-base`, `git rev-list`) plus `wc`, `head` and `tail`. Run git from the working directory, without `-C` and without pipes into anything else. Everything else is denied, so do not spend turns on it.
 
-Read-only. Do not run tests, typecheck, lint or the app; the implementer runs them after you. If coverage is missing, report it as a finding. Do not modify any file.
+Read-only. Do not run tests, typecheck, lint or the app; the implementer runs them after you. If coverage is missing, report it as a finding. Do not modify any file: a run that changes the working tree is discarded, whatever it reported.
 
 What to judge, per hunk:
 1. Is the resolution correct? Does it keep BOTH sides' intent (upstream's new shape, the fork's delta) rather than silently dropping one?

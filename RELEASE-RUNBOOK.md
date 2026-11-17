@@ -185,7 +185,7 @@ node local/release-review-packets.mjs --status               # per slice: report
 # fix the blocking findings, commit, then re-check the fix as a delta round:
 node local/release-review-packets.mjs --prepare --delta <R1>..<R2>   # findings default to the open ones
 node local/release-review-packets.mjs --run                  # runs only the new delta slice
-node local/release-review-packets.mjs --print > local/sync/release-review/$(git rev-parse HEAD).json
+node local/release-review-packets.mjs --write                # records the manifest for the revision it covers
 node local/release-review-gate.mjs                           # still the authority
 ```
 
@@ -203,12 +203,17 @@ node local/release-review-gate.mjs                           # still the authori
 - **`--run`** drives the reviewer `REVIEWER` names (`--model <alias> --effort <thinking>`). It allows only
   Read/Grep/Glob and read-only git (`--permission-mode dontAsk`) and hands the reviewer the packet with
   `--add-dir`. Each slice writes `out-<id>.json`, `err-<id>.log` and `run-<id>.json` next to its prompt.
-  A non-zero exit, an `is_error` result or an answer without its closing ` ```orca-review-verdict ` block is
-  `no-report`. A re-run runs only the slices that have no report. `--max-budget-usd` caps each slice,
+  A non-zero exit, an `is_error` result, an answer without its closing ` ```orca-review-verdict ` block, or a
+  run the CLI refused the packet read on is `no-report`, and so is every slice of a batch that changed the
+  working tree. A re-run runs only the slices that have no report. `--max-budget-usd` caps each slice,
   `--slices A,C` narrows the run, and `--concurrency` defaults to 6.
-- **`--print`** generates the manifest from the outputs: per slice its verdict, counts, cost and findings
-  (ids `A-1`, …), with `unresolved` counting the BLOCKER/SHOULD-FIX findings that no later delta round has
-  marked resolved. It exits 1, and says why, while the manifest would not clear the gate.
+- **`--print` / `--write`** generate the manifest from the outputs: per slice its verdict, counts, cost and
+  findings (ids `A-1`, …), with `unresolved` counting the BLOCKER/SHOULD-FIX findings that no later delta
+  round has marked resolved. The revision the manifest names is the one the review **covers** — the merge,
+  then the end of each delta round — never today's HEAD, because a code commit after the last reviewed range
+  was never read by a slice. The gate then accepts only doc and review-record commits on top of it, which is
+  its own rule. Both modes exit 1 and say why while the manifest would not clear; `--write` refuses to record
+  one, and reports code changed past the covered revision as a missing delta round.
 
 `node local/release-review-gate.mjs --print` still prints the bare manifest shape, for a waiver or a review
 run some other way.

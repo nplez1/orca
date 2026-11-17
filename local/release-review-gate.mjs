@@ -217,7 +217,7 @@ function main(argv) {
     console.error(`release-review-gate: REFUSE — no review manifest for ${revision.slice(0, 12)}`)
     console.error(`  expected: ${manifestPath(revision)}`)
     console.error(
-      `  generate one from the review packets: node local/release-review-packets.mjs --print > ${manifestPath(revision)}`
+      `  record one from the review packets: node local/release-review-packets.mjs --write`
     )
     return 1
   }

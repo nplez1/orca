@@ -11,6 +11,13 @@ export function parsePatch(text) {
   const sections = text.split(/^(?=diff --git )/m).filter((part) => part.startsWith('diff --git '))
   return sections.map((section) => {
     const head = /^diff --git a\/(.+?) b\/(.+)$/m.exec(section)
+    if (!head) {
+      // Why a message rather than a TypeError: a quoted or `noprefix` header is a git-config
+      // surprise, and the reader needs to see which section it was.
+      throw new Error(
+        `cannot read the paths of a diff section: ${section.split('\n')[0].slice(0, 200)}`
+      )
+    }
     const header = section.split(/^@@ /m)[0]
     const deleted = /^deleted file mode/m.test(header)
     let added = 0
@@ -57,6 +64,11 @@ export function groupBySubsystem(entries, budget, depth = 0, prefix = '') {
     const key =
       segments.length > depth + 1 ? `${segments.slice(0, depth + 1).join('/')}/` : entry.path
     buckets.set(key, [...(buckets.get(key) ?? []), entry])
+  }
+  if (buckets.size < 2) {
+    // Why stop: nothing left to split by, and recursing on one unchanged bucket never terminates —
+    // a delete plus an add of the same path puts both sections in one bucket forever.
+    return [{ prefix, entries, bytes }]
   }
   return [...buckets].flatMap(([key, bucket]) => groupBySubsystem(bucket, budget, depth + 1, key))
 }
@@ -150,8 +162,10 @@ function pack(groups, budget, cap) {
   for (const group of groups) {
     if (group.bytes > budget) {
       flush()
-      for (const part of splitEntry(group.entries[0], budget)) {
-        slices.push({ prefixes: [group.prefix], entries: [part], bytes: part.bytes })
+      for (const entry of group.entries) {
+        for (const part of splitEntry(entry, budget)) {
+          slices.push({ prefixes: [group.prefix], entries: [part], bytes: part.bytes })
+        }
       }
       continue
     }
@@ -174,6 +188,11 @@ function pack(groups, budget, cap) {
  * (reading the tree around a hunk) is paid per slice whatever its size.
  */
 export function planSlices(entries, budget) {
+  if (!entries.length) {
+    // Why empty rather than one blank slice: a clean merge writes no hunks, and a blank slice would
+    // reach a reviewer as a paid prompt about nothing.
+    return []
+  }
   const groups = groupBySubsystem(entries, budget)
   const count = pack(groups, budget, budget).length
   let low = Math.max(1, ...groups.filter((g) => g.bytes <= budget).map((g) => g.bytes))

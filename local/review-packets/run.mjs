@@ -5,16 +5,22 @@
 // `git show --remerge-diff` all prompted. So the reviewer gets exactly the tools a read-only review
 // needs, pre-approved (`--permission-mode dontAsk` denies the rest without a prompt to hang on), and
 // the packet directory by `--add-dir`, because a linked worktree's git dir is outside its tree.
-import { spawn } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { closeSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { REVIEWER } from '../pr-body-claims.mjs'
-import { outputPaths, readReport } from './verdict.mjs'
+import { outputPaths, readReport, treeChangeMarker } from './verdict.mjs'
 
+/**
+ * Why `diff` and `grep` are absent while `show` and `log` stay: every Bash rule here is a prefix
+ * match, so a pre-approved command keeps whatever its own flags allow. `git grep -O<cmd>` runs an
+ * arbitrary program and `git diff --output=<path>` writes one, and neither can be excluded from a
+ * prefix rule. `show --output` and `log --output` can write a file too, which is why a run that
+ * changes the tree is refused rather than reported on.
+ */
 const READ_ONLY_GIT = [
   'show',
   'log',
-  'diff',
-  'grep',
   'blame',
   'ls-tree',
   'ls-files',
@@ -82,6 +88,7 @@ function runOne({ claude, args, cwd, dir, id, timeoutMs }) {
   for (const path of [paths.out, paths.err, paths.run]) {
     rmSync(path, { force: true })
   }
+  rmSync(join(dir, treeChangeMarker), { force: true })
   const prompt = readFileSync(paths.prompt, 'utf8')
   const out = openSync(paths.out, 'w')
   const err = openSync(paths.err, 'w')
@@ -111,6 +118,9 @@ function runOne({ claude, args, cwd, dir, id, timeoutMs }) {
     timer = setTimeout(() => {
       timedOut = true
       child.kill('SIGTERM')
+      // Why a second timer: SIGTERM asks, and a runner with no deadline is the failure this timeout
+      // exists to prevent.
+      setTimeout(() => child.kill('SIGKILL'), 10_000).unref()
     }, timeoutMs)
     child.on('error', (error) => finish({ exitCode: null, signal: null, error: error.message }))
     child.on('close', (exitCode, signal) => finish({ exitCode, signal }))
@@ -137,6 +147,7 @@ export async function runSlices({
     log(`  ${job.id}: already reported, not re-run`)
   }
   const queue = [...pending]
+  const before = treeState(cwd)
   const worker = async () => {
     for (let job = queue.shift(); job; job = queue.shift()) {
       log(`  ${job.id}: started`)
@@ -149,5 +160,45 @@ export async function runSlices({
     }
   }
   await Promise.all(Array.from({ length: Math.max(1, concurrency) }, worker))
+  // Why this check exists at all: the reviewer is told to change nothing, and a Bash allowlist that
+  // is a prefix match cannot promise that. A changed tree is refused here instead of being reported
+  // on, because the answers were written against a tree that no longer matches what was reviewed.
+  const touched = before === null ? [] : changedPaths(before, treeState(cwd) ?? before)
+  if (touched.length) {
+    const dirs = [...new Set(pending.map((job) => job.dir))]
+    for (const dir of dirs) {
+      writeFileSync(join(dir, treeChangeMarker), `${JSON.stringify(touched, null, 2)}\n`)
+    }
+    log(
+      `  the reviewer changed ${touched.length} path(s) in the tree: ${touched.slice(0, 5).join(', ')}`
+    )
+    log('  every slice in this batch now reads as no-report; clean the tree and re-run')
+  }
   return pending.map((job) => job.id)
+}
+
+function treeState(cwd) {
+  try {
+    return execFileSync('git', ['status', '--porcelain'], {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore']
+    })
+  } catch {
+    // Why null: a cwd outside a repository is not evidence that the reviewer changed anything.
+    return null
+  }
+}
+
+/** Paths whose status line differs between two `git status --porcelain` readings. */
+function changedPaths(before, after) {
+  const lines = (text) =>
+    new Map(
+      text
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => [line.slice(3), line.slice(0, 2)])
+    )
+  const [was, now] = [lines(before), lines(after)]
+  return [...now].filter(([path, status]) => was.get(path) !== status).map(([path]) => path)
 }

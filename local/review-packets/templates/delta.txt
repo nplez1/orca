@@ -14,9 +14,9 @@ The delta is `git diff {{R1}}..{{R2}}`, {{DELTA_FILES}} file(s) and {{DELTA_BYTE
 
 Read ALL of it. The current text of every touched file is in the tree; read the ones you need.
 {{EXCLUDED_NOTE}}
-Tools: Read, Grep and Glob on the tree and on the packet files above. Bash allows only read-only git (`git show`, `git log`, `git diff`, `git grep`, `git blame`, `git ls-tree`, `git ls-files`, `git cat-file`, `git rev-parse`, `git merge-base`, `git rev-list`) plus `wc`, `head` and `tail`. Run git from the working directory, without `-C` and without pipes into anything else. Everything else is denied.
+Tools: Read, Grep and Glob on the tree and on the packet files above. Bash allows only read-only git (`git show`, `git log`, `git blame`, `git ls-tree`, `git ls-files`, `git cat-file`, `git rev-parse`, `git merge-base`, `git rev-list`) plus `wc`, `head` and `tail`. Run git from the working directory, without `-C` and without pipes into anything else. Everything else is denied.
 
-Read-only. Do not run tests, typecheck, lint or the app; the implementer runs them after you. If coverage is missing, report it as a finding. Do not modify any file.
+Read-only. Do not run tests, typecheck, lint or the app; the implementer runs them after you. If coverage is missing, report it as a finding. Do not modify any file: a run that changes the working tree is discarded, whatever it reported.
 
 Fork invariants that still apply: Orca NP identity (`~/.orca-np`, `com.nplez1.orca`, CLI `orca-np`); no dashboard pop-out; no SSH relay; `git/runner.ts` does not exist; `AiVaultSearchSettings` uses `contentEnabled`.
 

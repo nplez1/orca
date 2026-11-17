@@ -40,7 +40,13 @@ export function reviewState(syncDir) {
             }))
           : []
       for (const answer of report.status === 'reported' ? (report.verdict.resolved ?? []) : []) {
-        if (answer?.id) {
+        // Why only a delta round, and only its own findings: round 1 reviewed upstream-authored text,
+        // and a sync slice that answered `resolved` for another slice's finding would close it with no
+        // re-check at all. A delta round is the only thing asked to answer resolutions, and only about
+        // the findings it was handed.
+        const asked =
+          packet.kind === 'delta' && (packet.findings ?? []).includes(String(answer?.id))
+        if (answer?.id && asked) {
           resolutions.set(String(answer.id), {
             resolved: answer.resolved === true,
             note: answer.note ?? '',
@@ -112,8 +118,10 @@ export function buildManifest(state, { revision }) {
     base: sync.base,
     upstream: sync.upstream,
     mergeCommit: sync.merge,
-    reviewer: REVIEWER,
-    generatedBy: 'node local/release-review-packets.mjs --print',
+    // Why the packet's reviewer and not today's constant: the manifest is a record of the review that
+    // happened, and `release-review-gate.mjs` refuses it when that is not the reviewer it requires.
+    reviewer: sync.reviewer ?? REVIEWER,
+    generatedBy: 'node local/release-review-packets.mjs --write',
     artifact: {
       ...sync.artifact,
       reviewedBytes: sync.reviewed.bytes,
