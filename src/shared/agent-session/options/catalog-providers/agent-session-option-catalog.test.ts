@@ -98,7 +98,7 @@ describe('pi launch catalog', () => {
   it('launches Pi on a chosen model and thinking level', () => {
     const preferences = { model: 'deepseek/deepseek-flash', effort: 'xhigh' }
 
-    expect(getAgentSessionOptionLaunchCatalog('pi')).toBeDefined()
+    expect(getAgentSessionOptionLaunchCatalog('pi')).not.toBeNull()
     expect(checkAgentLaunchModelPreferences({ agent: 'pi', ...preferences })).toEqual({
       preferences
     })
