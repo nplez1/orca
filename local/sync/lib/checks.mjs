@@ -11,7 +11,7 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { toolchainVersions } from '../../gate-verdict-cache.mjs'
-import { withPassCache } from './pass-cache.mjs'
+import { dependencyState, withPassCache } from './pass-cache.mjs'
 import {
   STATUS,
   git,
@@ -116,10 +116,15 @@ export function typecheck(options) {
   if (options.skipTypecheck) {
     return { status: STATUS.skipped, summary: 'skipped by --skip-typecheck', details: [] }
   }
-  // Keyed on the node toolchain too: the tree and lockfile pin the compiler, not the runtime under it.
+  // Keyed on the toolchain and the installed dependencies too: the tree and lockfile pin the compiler,
+  // and `node_modules` is where the compiler and every `@types` actually come from.
   return withPassCache({
     name: 'typecheck',
-    inputs: { command: TYPE_CHECK_COMMAND, node: toolchainVersions().node },
+    inputs: {
+      command: TYPE_CHECK_COMMAND,
+      node: toolchainVersions().node,
+      deps: dependencyState()
+    },
     noCache: options.noCache,
     check: () => {
       const result = run(pnpmCommand(), ['tc'], { cwd: repoRoot() })

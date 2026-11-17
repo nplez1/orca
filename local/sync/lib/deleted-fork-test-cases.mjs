@@ -14,11 +14,25 @@
 import { execFileSync } from 'node:child_process'
 import { STATUS, changedNames, gitText, repoRoot, splitNul } from './run.mjs'
 
-// `it(` / `test(` with any chain of modifiers (`.only`, `.skip`, `.skipIf(x)`, ...), then a string
-// literal. `.each` tables put the title in a second call and are not read. Not after `.` or a word, so
-// `/re/.test('x')` and `xit(` are not cases.
+// `it(` / `test(` with any chain of modifiers (`.only`, `.skip`, `.skipIf(isWin())`, ...), then a
+// string literal. `.each` tables put the title in a second call and are not read. Not after `.` or a
+// word, so `/re/.test('x')` and `xit(` are not cases.
 const CASE =
-  /(?<![\w.$])(?:it|test)((?:\.\w+(?:\([^()]*\))?)*)\s*\(\s*(['"`])((?:\\[\s\S]|(?!\2)[^\\])*)\2/g
+  /(?<![\w.$])(?:it|test)((?:\.\w+(?:\((?:[^()]|\([^()]*\))*\))?)*)\s*\(\s*(['"`])((?:\\[\s\S]|(?!\2)[^\\])*)\2/g
+
+/** What a reasonless init writes. It is not a reason, so it never records a case. */
+export const UNRECORDED_REASON = 'recorded without a reason'
+
+/** Whether `cases` records this one with a reason of its own. */
+export function caseRecorded(cases, { file, title }) {
+  const reason = cases?.[file]?.[title]
+  return typeof reason === 'string' && reason !== UNRECORDED_REASON
+}
+
+/** The gone cases `cases` does not record with a reason of its own. */
+export function unrecordedCases(cases, gone) {
+  return gone.filter((entry) => !caseRecorded(cases, entry))
+}
 
 /** The case titles one test file declares, decoded so a quote-style change is not a rename. */
 export function testTitles(source) {
@@ -121,8 +135,7 @@ export function compareDeletedForkCases({ baseline, gone, range }) {
     baseline.base === range.base &&
     baseline.tip === range.tip
   const known = bound ? (baseline.cases ?? {}) : {}
-  const recorded = ({ file, title }) => typeof known[file]?.[title] === 'string'
-  const appeared = gone.filter((entry) => !recorded(entry))
+  const appeared = gone.filter((entry) => !caseRecorded(known, entry))
   const present = new Set(gone.map(({ file, title }) => `${file}\0${title}`))
   const stale = Object.entries(known).flatMap(([file, titles]) =>
     Object.keys(titles ?? {})

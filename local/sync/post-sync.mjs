@@ -113,6 +113,7 @@ ${wrapIds(postSyncRowIds({}))}
   -h, --help                 this text
 
 Exit code is non-zero if any hard check fails, or if a check could not run and was not waived.
+A passing --only run exits 0, so read its result line: 0 does not mean the whole report is clean.
 A clean run deletes the pre-sync state file: it describes one merge and must not outlive it.`)
 }
 

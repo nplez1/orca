@@ -22,10 +22,12 @@ import path from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 import {
+  UNRECORDED_REASON,
   buildCaseBaseline,
   caseOutcome,
   compareDeletedForkCases,
-  measureGoneForkCases
+  measureGoneForkCases,
+  unrecordedCases
 } from './deleted-fork-test-cases.mjs'
 import { STATUS, changedNames, gitText, repoRoot, run, splitNul } from './run.mjs'
 import {
@@ -135,7 +137,7 @@ export function describeComparison(comparison, { total, moved = [] }) {
 async function main(argv = process.argv.slice(2), root = process.cwd()) {
   if (!argv.includes('--baseline-init')) {
     process.stderr.write(
-      'usage: node local/sync/lib/deleted-fork-tests.mjs --baseline-init [--accept <reason>]\n'
+      'usage: node local/sync/lib/deleted-fork-tests.mjs --baseline-init --accept <reason>\n'
     )
     return 2
   }
@@ -207,12 +209,22 @@ async function main(argv = process.argv.slice(2), root = process.cwd()) {
           range: { base: pinned.base, tip }
         })
   const newCases = caseComparison?.appeared.length ?? 0
+  // A case needs a reason of its own: the placeholder a reasonless init writes accepts every case
+  // silently, which is the blanket acceptance this check exists to stop.
+  const previousCases = caseComparison?.bound ? (previous.cases ?? {}) : {}
+  const reasonlessCases = unrecordedCases(previousCases, measuredCases.gone).length
   const unrecorded =
-    comparison !== null && (!comparison.bound || comparison.appeared.length > 0 || newCases > 0)
+    (comparison !== null && (!comparison.bound || comparison.appeared.length > 0)) ||
+    reasonlessCases > 0
   if (unrecorded && accepted === null) {
+    const why =
+      previous === null
+        ? `${gone.length} path(s) and ${measuredCases.gone.length} test case(s), and no baseline records them yet`
+        : !comparison.bound
+          ? `the baseline was written for ${previous.base.slice(0, 10)}/${previous.tip.slice(0, 10)}, not this range`
+          : `${comparison.appeared.length} path(s) and ${newCases} test case(s) this range did not have before, and ${reasonlessCases} test case(s) with no reason of their own`
     process.stderr.write(
-      `deleted-fork-tests: refusing to record unrecorded loss — ` +
-        `${comparison.bound ? `${comparison.appeared.length} path(s) and ${newCases} test case(s) this range did not have before` : `the baseline was written for ${previous.base.slice(0, 10)}/${previous.tip.slice(0, 10)}, not this range`}. ` +
+      `deleted-fork-tests: refusing to record unrecorded loss — ${why}. ` +
         'Pass --accept <reason> when the loss is not this branch\u2019s to fix.\n'
     )
     return 1
@@ -221,7 +233,7 @@ async function main(argv = process.argv.slice(2), root = process.cwd()) {
     'Fork-modified test files that are gone at HEAD after a sync (deleted by upstream, or by the ' +
     'resolution). Bound to one sync range: a baseline whose base/tip do not match the range being ' +
     'checked records nothing. Regenerate with `node local/sync/lib/deleted-fork-tests.mjs ' +
-    '--baseline-init [--accept <reason>]`.'
+    '--baseline-init --accept <reason>`: every lost path and case needs a reason.'
   // Re-running on the same range is the documented way to lock in a shrink, and it passes no
   // `--accept`; dropping the reason that is already recorded would lose it for good, because this
   // tool has no prune mode to carry it forward.
@@ -234,7 +246,7 @@ async function main(argv = process.argv.slice(2), root = process.cwd()) {
     // A case's own recorded reason survives a re-init; a new case takes this run's reason.
     cases: buildCaseBaseline(measuredCases.gone, {
       previous: comparison?.bound ? previous.cases : null,
-      accepted: keptReason ?? 'recorded without a reason'
+      accepted: keptReason ?? UNRECORDED_REASON
     })
   })
   writeFileSync(path.join(where, BASELINE_PATH), `${JSON.stringify(baseline, null, 2)}\n`)

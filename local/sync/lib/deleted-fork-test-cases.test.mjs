@@ -5,10 +5,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  UNRECORDED_REASON,
   buildCaseBaseline,
+  caseRecorded,
   compareDeletedForkCases,
   goneForkCases,
-  testTitles
+  testTitles,
+  unrecordedCases
 } from './deleted-fork-test-cases.mjs'
 
 test('reads it/test titles in every shape the fork writes, and nothing that only looks like one', () => {
@@ -16,6 +19,7 @@ test('reads it/test titles in every shape the fork writes, and nothing that only
     "it('plain', () => {})",
     'test("double \\"quoted\\"", () => {})',
     "it.skipIf(process.platform === 'win32')('modified', () => {})",
+    "it.skipIf(a && isWin())('nested parens', () => {})",
     '  it(',
     "    'wrapped by the formatter',",
     '    async () => {}',
@@ -32,6 +36,7 @@ test('reads it/test titles in every shape the fork writes, and nothing that only
       'plain',
       'double "quoted"',
       'modified',
+      'nested parens',
       'wrapped by the formatter',
       'template',
       "escaped 'quote'"
@@ -95,4 +100,29 @@ test('a recorded case that is back is stale, and a re-init keeps each recorded r
     'src/a.test.ts': { 'fork lost': 'why' },
     'src/b.test.ts': { new: 'this run' }
   })
+})
+
+// A reasonless init writes a placeholder. It is not a reason, so the case stays unrecorded instead of
+// being silently accepted — the blanket acceptance this check exists to stop.
+test('a placeholder reason records nothing, so a reasonless init stays red', () => {
+  assert.equal(
+    caseRecorded({ 'src/a.test.ts': { 'fork lost': 'upstream retired it' } }, lost[0]),
+    true
+  )
+  assert.equal(
+    caseRecorded({ 'src/a.test.ts': { 'fork lost': UNRECORDED_REASON } }, lost[0]),
+    false
+  )
+  const placeholder = compareDeletedForkCases({
+    baseline: { ...range, cases: { 'src/a.test.ts': { 'fork lost': UNRECORDED_REASON } } },
+    gone: lost,
+    range
+  })
+  assert.deepEqual(placeholder.appeared, lost)
+  assert.deepEqual(
+    unrecordedCases({ 'src/a.test.ts': { 'fork lost': UNRECORDED_REASON } }, lost),
+    lost
+  )
+  assert.deepEqual(unrecordedCases({}, lost), lost, 'no baseline records nothing')
+  assert.deepEqual(unrecordedCases({ 'src/a.test.ts': { 'fork lost': 'why' } }, lost), [])
 })

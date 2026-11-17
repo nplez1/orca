@@ -8,6 +8,10 @@
 // package (the release builds the same targets in release mode, per arch, then lipo and codesign), and
 // `swiftc -typecheck` of each single-file helper at the release's deployment target. Discovered rather
 // than listed, so a helper upstream adds is compiled before the release leg meets it.
+//
+// What this cannot catch, and the release leg still can: a link or `-sectcreate` failure (helpers are
+// typechecked, not linked), a non-host arch, and arch- or DEBUG-conditional code. Nothing carries any
+// of those today; if one is added, this row is no longer a proxy for that leg.
 
 import { existsSync, readdirSync } from 'node:fs'
 import path from 'node:path'
@@ -83,17 +87,28 @@ export function nativeMacosBuild(options = {}) {
     }
   }
   const version = run('swift', ['--version'])
-  if (version.code === null) {
+  // `/usr/bin/swift` is the xcrun stub without the command line tools: it exits non-zero rather than
+  // failing to spawn, so `code === null` would report a good tree as broken.
+  if (!version.ok) {
     return {
       status: STATUS.unavailable,
-      summary: 'swift is not on PATH (install the Xcode command line tools)',
-      details: []
+      summary: 'swift is not usable here (install the Xcode command line tools)',
+      details: tailText(`${version.stdout}\n${version.stderr}`, 5)
     }
   }
+  const sdk = run('xcrun', ['--show-sdk-version'])
   return withPassCache({
     name: 'native-macos-build',
     paths: [NATIVE_DIR],
-    inputs: { roots, swift: version.stdout.trim(), arch: process.arch },
+    // The row's own flags and the SDK are inputs: changing a compile argument must not reuse a pass.
+    inputs: {
+      roots,
+      swift: version.stdout.trim(),
+      arch: process.arch,
+      sdk: sdk.ok ? sdk.stdout.trim() : null,
+      target: HELPER_DEPLOYMENT_TARGET,
+      buildSystem: 'native'
+    },
     noCache: options.noCache,
     check: () => {
       const scratch = path.join(syncOutputDir(), 'native-build')

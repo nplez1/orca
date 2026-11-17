@@ -10,7 +10,7 @@ import { tempGitRepo } from './temp-git-repo.mjs'
 const { dir: repo, write, commit, remove } = tempGitRepo('orca-pass-cache-')
 after(remove)
 process.chdir(repo)
-const { withPassCache } = await import('./pass-cache.mjs')
+const { withPassCache, dependencyState } = await import('./pass-cache.mjs')
 const { STATUS } = await import('./run.mjs')
 
 commit('base', { 'src/a.ts': 'export const a = 1\n', 'native/x/main.swift': 'print(1)\n' })
@@ -71,4 +71,17 @@ test('a path-scoped key ignores content outside its paths', () => {
   write({ 'native/x/main.swift': 'print(2)\n' })
   cached(STATUS.passed, { name: 'native', paths: ['native'] })
   assert.equal(runs, 2)
+})
+
+test('the installed dependency set is in the key, and git cannot see it', () => {
+  write({ '.gitignore': 'node_modules\n' })
+  commit('ignore node_modules')
+  const absent = dependencyState()
+  assert.match(absent, /^node_modules\/\.modules\.yaml:absent/)
+  write({ 'node_modules/.modules.yaml': 'hoistPattern: []\n' })
+  const installed = dependencyState()
+  assert.notEqual(installed, absent, 'a fresh install is a different dependency set')
+  assert.match(installed, /^node_modules\/\.modules\.yaml:[0-9a-f]{16}/)
+  write({ 'node_modules/.modules.yaml': 'hoistPattern: ["*"]\n' })
+  assert.notEqual(dependencyState(), installed, 'a second install is another key')
 })

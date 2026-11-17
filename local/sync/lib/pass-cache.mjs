@@ -3,22 +3,42 @@
 // Why: the last release ran post-sync 30 times, and `pnpm tc` inside every run was most of the 86
 // minutes, re-proving trees it had already proven. A pass is a property of the content it ran on, so it
 // is keyed on that content — HEAD's tree plus the uncommitted diff plus every untracked file — and on the
-// toolchain. A FAIL is never recorded: a red row must be re-run to be believed fixed.
+// toolchain and the installed dependency set. A FAIL is never recorded: a red row must be re-run to be
+// believed fixed.
 //
 // The record shape and its acceptance test are the unit gate's (`local/gate-verdict-cache.mjs`), with the
 // content key in place of the revision. Read-only on the repository: hashing uses no `-w`.
 
 import { createHash } from 'node:crypto'
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import {
   cachedVerdictPath,
   cachedVerdictProblem,
   readCachedVerdict
 } from '../../gate-verdict-cache.mjs'
-import { STATUS, git, gitText, syncOutputDir } from './run.mjs'
+import { STATUS, git, gitText, repoRoot, syncOutputDir } from './run.mjs'
 
 const sha256 = (text) => createHash('sha256').update(text).digest('hex')
+
+/** What pnpm rewrites when it installs. Both are gitignored, so the content key cannot see them. */
+const INSTALL_STATE = ['node_modules/.modules.yaml', 'node_modules/.pnpm/lock.yaml']
+
+/**
+ * The installed dependency set a typecheck compiles against. Without it a merge that lands a new
+ * lockfile caches a pass made against the old install and hands it back after `pnpm install`.
+ */
+export function dependencyState() {
+  return INSTALL_STATE.map((file) => {
+    let text = null
+    try {
+      text = readFileSync(path.join(repoRoot(), file), 'utf8')
+    } catch {
+      return `${file}:absent`
+    }
+    return `${file}:${sha256(text).slice(0, 16)}`
+  }).join(',')
+}
 
 /**
  * The content `paths` (the whole tree when empty) has right now, or null when it cannot be read — no
