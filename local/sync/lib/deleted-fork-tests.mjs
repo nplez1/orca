@@ -13,12 +13,20 @@
 //   node local/sync/lib/deleted-fork-tests.mjs --baseline-init --accept "<why>"
 //
 // The pure part is `forkModifiedTests` + `compareDeletedForkTests`; `upstreamDeletedForkTests()` is the
-// post-sync row, and the CLI at the bottom writes the baseline.
+// post-sync row, and the CLI at the bottom writes the baseline. The same row and baseline also carry the
+// case-level check (lib/deleted-fork-test-cases.mjs): a fork-added `it`/`test` title in no test file at
+// HEAD, acknowledged per case under `cases[file][title]` with a reason.
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
+import {
+  buildCaseBaseline,
+  caseOutcome,
+  compareDeletedForkCases,
+  measureGoneForkCases
+} from './deleted-fork-test-cases.mjs'
 import { STATUS, changedNames, gitText, repoRoot, run, splitNul } from './run.mjs'
 import {
   BACKUP_REF,
@@ -49,12 +57,20 @@ export function forkModifiedTests({ changed, presentAtHead }) {
   return { modified, gone, moved }
 }
 
-export function buildBaseline(gone, { base, tip, accepted, note }) {
+export function buildBaseline(gone, { base, tip, accepted, note, cases }) {
   const files = {}
   for (const file of [...gone].sort()) {
     files[file] = true
   }
-  return { note, base, tip, ...(accepted ? { accepted } : {}), total: gone.length, files }
+  return {
+    note,
+    base,
+    tip,
+    ...(accepted ? { accepted } : {}),
+    total: gone.length,
+    files,
+    ...(cases ? { cases } : {})
+  }
 }
 
 /**
@@ -165,6 +181,15 @@ async function main(argv = process.argv.slice(2), root = process.cwd()) {
     changed: splitNul(changed.stdout),
     presentAtHead: new Set(splitNul(listing))
   })
+  const measuredCases = measureGoneForkCases({
+    oldBase,
+    tip,
+    isTest: (file) => TEST_FILE.test(file)
+  })
+  if (measuredCases.problem) {
+    process.stderr.write(`deleted-fork-tests: ${measuredCases.problem}\n`)
+    return 2
+  }
   const previous = readBaseline(where).baseline
   // A count comparison across two ranges proves nothing: the next sync loses a different set, so
   // "300 is fewer than 449" would rebaseline silently. The test is the same one the row runs — a
@@ -173,11 +198,21 @@ async function main(argv = process.argv.slice(2), root = process.cwd()) {
     previous === null
       ? null
       : compareDeletedForkTests({ baseline: previous, gone, range: { base: pinned.base, tip } })
-  const unrecorded = comparison !== null && (!comparison.bound || comparison.appeared.length > 0)
+  const caseComparison =
+    previous === null
+      ? null
+      : compareDeletedForkCases({
+          baseline: previous,
+          gone: measuredCases.gone,
+          range: { base: pinned.base, tip }
+        })
+  const newCases = caseComparison?.appeared.length ?? 0
+  const unrecorded =
+    comparison !== null && (!comparison.bound || comparison.appeared.length > 0 || newCases > 0)
   if (unrecorded && accepted === null) {
     process.stderr.write(
       `deleted-fork-tests: refusing to record unrecorded loss — ` +
-        `${comparison.bound ? `${comparison.appeared.length} path(s) this range did not have before` : `the baseline was written for ${previous.base.slice(0, 10)}/${previous.tip.slice(0, 10)}, not this range`}. ` +
+        `${comparison.bound ? `${comparison.appeared.length} path(s) and ${newCases} test case(s) this range did not have before` : `the baseline was written for ${previous.base.slice(0, 10)}/${previous.tip.slice(0, 10)}, not this range`}. ` +
         'Pass --accept <reason> when the loss is not this branch\u2019s to fix.\n'
     )
     return 1
@@ -195,11 +230,16 @@ async function main(argv = process.argv.slice(2), root = process.cwd()) {
     base: pinned.base,
     tip,
     accepted: keptReason,
-    note
+    note,
+    // A case's own recorded reason survives a re-init; a new case takes this run's reason.
+    cases: buildCaseBaseline(measuredCases.gone, {
+      previous: comparison?.bound ? previous.cases : null,
+      accepted: keptReason ?? 'recorded without a reason'
+    })
   })
   writeFileSync(path.join(where, BASELINE_PATH), `${JSON.stringify(baseline, null, 2)}\n`)
   process.stdout.write(
-    `deleted-fork-tests: wrote ${BASELINE_PATH} — ${gone.length} path(s)` +
+    `deleted-fork-tests: wrote ${BASELINE_PATH} — ${gone.length} path(s), ${measuredCases.gone.length} test case(s)` +
       `${previous ? ` (was ${previous.total})` : ''}\n`
   )
   if (unrecorded) {
@@ -285,19 +325,31 @@ export function upstreamDeletedForkTests(tip, source, problem = null) {
       ]
     }
   }
-  const comparison = compareDeletedForkTests({
+  const range = { base: pinned.base, tip }
+  const comparison = compareDeletedForkTests({ baseline, gone, range })
+  // A file the baseline accepts can still have carried fork cases: that is the loss the file grain hid.
+  const cases = caseOutcome({
+    oldBase,
+    tip,
     baseline,
-    gone,
-    range: { base: pinned.base, tip }
+    range,
+    isTest: (file) => TEST_FILE.test(file)
   })
+  const clean = comparison.clean && cases.clean
+  const fileSummary = comparison.clean
+    ? `${gone.length} fork-modified test file(s) gone at HEAD, all recorded for this range`
+    : `${comparison.appeared.length} fork-modified test file(s) gone at HEAD and not recorded`
+  const caseSummary = cases.clean
+    ? `${cases.gone.length} fork-added case(s) gone, all recorded`
+    : (cases.summary ??
+      `${cases.appeared} fork-added test case(s) in no test file at HEAD and not recorded`)
   return {
-    status: comparison.clean ? STATUS.passed : STATUS.failed,
-    summary: comparison.clean
-      ? `${gone.length} fork-modified test file(s) gone at HEAD, all recorded for this range`
-      : `${comparison.appeared.length} fork-modified test file(s) gone at HEAD and not recorded`,
+    status: clean ? STATUS.passed : STATUS.failed,
+    summary: `${fileSummary}; ${caseSummary}`,
     details: [
       `${modified.length} test file(s) the fork modified between ${oldBase.slice(0, 10)} and the pre-sync tip`,
-      ...describeComparison(comparison, { total: gone.length, moved })
+      ...describeComparison(comparison, { total: gone.length, moved }),
+      ...cases.details
     ]
   }
 }

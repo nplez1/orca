@@ -10,6 +10,8 @@
 
 import { existsSync } from 'node:fs'
 import path from 'node:path'
+import { toolchainVersions } from '../../gate-verdict-cache.mjs'
+import { withPassCache } from './pass-cache.mjs'
 import {
   STATUS,
   git,
@@ -114,12 +116,20 @@ export function typecheck(options) {
   if (options.skipTypecheck) {
     return { status: STATUS.skipped, summary: 'skipped by --skip-typecheck', details: [] }
   }
-  const result = run(pnpmCommand(), ['tc'], { cwd: repoRoot() })
-  return {
-    status: result.ok ? STATUS.passed : STATUS.failed,
-    summary: result.ok ? 'clean' : `failed (exit ${result.code ?? 'did not run'})`,
-    details: result.ok ? [] : tailText(`${result.stdout}\n${result.stderr}`, 40)
-  }
+  // Keyed on the node toolchain too: the tree and lockfile pin the compiler, not the runtime under it.
+  return withPassCache({
+    name: 'typecheck',
+    inputs: { command: TYPE_CHECK_COMMAND, node: toolchainVersions().node },
+    noCache: options.noCache,
+    check: () => {
+      const result = run(pnpmCommand(), ['tc'], { cwd: repoRoot() })
+      return {
+        status: result.ok ? STATUS.passed : STATUS.failed,
+        summary: result.ok ? 'clean' : `failed (exit ${result.code ?? 'did not run'})`,
+        details: result.ok ? [] : tailText(`${result.stdout}\n${result.stderr}`, 40)
+      }
+    }
+  })
 }
 
 /**

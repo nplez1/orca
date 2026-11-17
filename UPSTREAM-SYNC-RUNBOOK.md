@@ -71,7 +71,7 @@ a conflict for you.
 node local/sync/pre-sync.mjs [--prepare] [--json] [--skip-typecheck]
 node local/sync/conflicts.mjs [--summary|--json|--verify]
 node local/sync/conflicts.mjs --merge-tree <base> <other>      # dry run, no working tree touched
-node local/sync/post-sync.mjs [--json] [--skip-typecheck] [--waive <id>:<reason>]
+node local/sync/post-sync.mjs [--json] [--skip-typecheck] [--no-cache] [--only <id>,...] [--waive <id>:<reason>]
 node local/sync/fork-symbols.mjs [--json]               # also a post-sync row; run it alone to see why
 node local/sync/identity-sweep.mjs [--json|--fix]
 ```
@@ -242,10 +242,32 @@ derived catalogs (regenerate + both localization verifiers), the builder config 
 anchors that hold the fork's release repo (they must still name `nplez1/orca`, and nothing under
 `src/main/updater/` may name upstream's), the locale catalogs byte-identical to upstream, every test
 path and package script `LOCAL-PATCHES.md` cites still existing, the lost-content diff, the exported
-surface of every fork-only module the sync deleted, the fork-modified test files the sync left gone,
-the names the fork added to a surviving file that the merged file no longer declares (the
-`fork-symbols.mjs` scan, run here as the `fork-symbol-survival` row), fork-added references that
-resolve to nothing at HEAD, and `pnpm tc`.
+surface of every fork-only module the sync deleted, the fork-modified test files the sync left gone
+and the fork-added test cases no test file at HEAD still carries (a retired suite takes the fork's
+cases with it, and a file-level acknowledgement does not cover them), the names the fork added to a
+surviving file that the merged file no longer declares (the `fork-symbols.mjs` scan, run here as the
+`fork-symbol-survival` row), fork-added references that resolve to nothing at HEAD, every Swift target
+under `native/` compiling (`native-macos-build`, macOS only, ~10 s), and `pnpm tc`.
+
+**Read the saved report; do not re-run to see a section.** Every run writes the whole report to
+`$(git rev-parse --absolute-git-dir)/orca-sync/post-sync-last.txt` (and `.json`) and prints that path
+last. The 2026-11-15 sync ran this command 30 times, mostly to `grep` a different section, with
+`pnpm tc` inside each run. After a fix, re-check only the row it touches:
+
+```bash
+node local/sync/post-sync.mjs --only typecheck,native-macos-build
+```
+
+An `--only` run is never a clean run: its result line says `PARTIAL`, it saves to
+`post-sync-partial-last.*` so the full report stays readable, and it leaves the pre-sync state file in
+place. Finish with one full run. The typecheck and native rows cache a PASS per exact content (HEAD's
+tree, the uncommitted diff and untracked files, plus the toolchain), so that full run re-proves only
+what changed; a FAIL is never cached, and `--no-cache` forces both.
+
+The native row exists because nothing else local compiles Swift: the 2026-11-15 merge took upstream's
+`main.swift` calling `TrustedOrcaApplication`, a type the fork had replaced with `OrcaBundleIdentity`,
+and only the CI macOS release leg found it, six hours later. Off macOS it reports `N/A` and needs a
+`--waive`.
 
 It also refuses to measure the wrong sync. The pre-sync tip and the recorded new base are checked against
 HEAD — on a merge they have to be its first and second parents — so a state file or backup ref left by an
