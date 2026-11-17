@@ -60,9 +60,15 @@ export function liveSides(state, rev, gitText) {
     return base ? { base, ours: head, theirs: operation } : null
   }
   if (state.kind === 'revert') {
-    return { base: operation, ours: head, theirs: rev(`${operation}^`) }
+    // `revert -m N` reverses against the parent the caller named, which `^` is not.
+    return rev(`${operation}^2`) === null
+      ? { base: operation, ours: head, theirs: rev(`${operation}^`) }
+      : null
   }
-  return { base: rev(`${operation}^`), ours: head, theirs: operation }
+  // `cherry-pick -m N` replays against the named parent; a merge commit has no single `^`.
+  return rev(`${operation}^2`) === null
+    ? { base: rev(`${operation}^`), ours: head, theirs: operation }
+    : null
 }
 
 /** The one merge base of two commits, or null: a criss-cross merge's virtual base no commit holds. */

@@ -89,3 +89,19 @@ test('liveSides takes the commits from the operation readState names, not from l
   })
   assert.equal(liveSides({ kind: 'none' }, rev, bases('b\n')), null)
 })
+
+test('a cherry-pick or revert of a merge refuses: `^` is not the parent the caller named', () => {
+  const refs = {
+    HEAD: 'h',
+    CHERRY_PICK_HEAD: 'p',
+    'p^': 'p1',
+    'p^2': 'p2',
+    REVERT_HEAD: 'r',
+    'r^': 'r1',
+    'r^2': 'r2'
+  }
+  const rev = (ref) => refs[ref] ?? null
+  const gitText = () => null
+  assert.equal(liveSides({ kind: 'cherry-pick' }, rev, gitText), null)
+  assert.equal(liveSides({ kind: 'revert' }, rev, gitText), null)
+})

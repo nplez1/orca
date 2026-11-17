@@ -318,3 +318,157 @@ test('catFileBatch reads several blobs in one process and leaves out what it can
   assert.deepEqual([...texts.keys()], ['package.json', 'local/sync/README.md'])
   assert.match(texts.get('package.json'), /"name"/)
 })
+
+// `export { x } from`, `export * as ns from` and `import x = require()` carry a binding exactly as an
+// import does, and `export * from` carries a module with no name of its own. Before this, all four were
+// invisible to the check: `importSources` read static import declarations only, so a re-export re-point
+// kept upstream's edit out and nothing noticed.
+test('a re-export or an `import = require` re-point is refused when the other side changed the old module', () => {
+  for (const [baseLine, newLine, pattern] of [
+    [
+      "export { Status } from './status'",
+      "export { Status } from './rollup'",
+      /export Status .*ours changed/
+    ],
+    ["export * as S from './status'", "export * as S from './rollup'", /export S .*ours changed/],
+    ["import S = require('./status')", "import S = require('./rollup')", /^S .*ours changed/],
+    ["export * from './status'", "export * from './rollup'", /^\.\/status \(no longer referenced/]
+  ]) {
+    const found = rePointed({
+      importLine: baseLine,
+      newLine,
+      oldModule: "export type Status = 'a'\n",
+      edited: at('status.ts')
+    })
+    assert.match(found.join(), pattern, baseLine)
+  }
+})
+
+/**
+ * A conflict at `path` (the post-merge home of a moved importer), with each side's own tree beside it.
+ * `carried` is what the index holds the merge's own result of.
+ */
+const movedImporter = ({
+  path,
+  basePath,
+  baseLine,
+  oursLine,
+  theirsLine = baseLine,
+  resolvedLine = oursLine,
+  sides,
+  renames,
+  carried = []
+}) => {
+  const parse = (text) => parseSource(path, text).sf
+  return swappedProviders({
+    path,
+    resolvedSf: parse(resolvedLine),
+    sides: { base: parse(baseLine), ours: parse(oursLine), theirs: parse(theirsLine) },
+    history: historyOf(
+      {
+        base: { [basePath]: `${baseLine}\n`, ...sides.base },
+        ours: { [basePath]: `${oursLine}\n`, ...sides.ours },
+        theirs: { [path]: `${theirsLine}\n`, ...sides.theirs }
+      },
+      renames,
+      carried
+    )
+  })
+}
+
+test('a same-text specifier is refused when the importer’s own move re-means it', () => {
+  // `./status` names `a/status.ts` next to base's `a/foo.ts`; at the new home it names `b/status.ts`.
+  const found = movedImporter({
+    path: 'src/b/foo.ts',
+    basePath: 'src/a/foo.ts',
+    baseLine: "import { S } from './status'",
+    oursLine: "import { S } from './status'\nconst fork = 1",
+    sides: {
+      base: { 'src/a/status.ts': 'export const S = 1\n' },
+      ours: { 'src/a/status.ts': 'export const S = 1\nconst FORK = 2\n' },
+      theirs: { 'src/b/status.ts': 'export const S = 9\n' }
+    },
+    renames: { theirs: [['src/a/foo.ts', 'src/b/foo.ts']] }
+  })
+  assert.match(found.join(), /^S \(now from src\/b\/status\.ts; theirs changed src\/a\/status\.ts/)
+})
+
+test('a move the merge carried is refused when the moved copy’s own import re-means', () => {
+  // Upstream moved `a/m.ts` to `b/m.ts` and left `a/types.ts` behind: the moved copy still says
+  // `./types`, which from its new home names a file the merge does not keep.
+  const moved = {
+    path: 'src/lib/use.ts',
+    basePath: 'src/x/use.ts',
+    baseLine: "import { S } from './m'",
+    oursLine: "import { S } from './m'\nconst fork = 1",
+    sides: {
+      base: {
+        'src/x/m.ts': "export type { S } from './types'\n",
+        'src/x/types.ts': 'export type S = 1\n'
+      },
+      ours: { 'src/x/types.ts': 'export type S = 1 | 2\n' },
+      theirs: { 'src/lib/m.ts': "export type { S } from './types'\n" }
+    },
+    renames: {
+      theirs: [
+        ['src/x/use.ts', 'src/lib/use.ts'],
+        ['src/x/m.ts', 'src/lib/m.ts']
+      ]
+    },
+    carried: ['src/lib/m.ts']
+  }
+  // Both shapes refuse: the same text, and the rewrite a move usually brings with it.
+  assert.match(movedImporter(moved).join(), /^S \(now from src\/lib\/m\.ts; theirs changed/)
+  assert.match(
+    movedImporter({
+      ...moved,
+      theirsLine: "import { S } from './m.ts'",
+      resolvedLine: "import { S } from './m.ts'"
+    }).join(),
+    /moved copy's \.\/types changed meaning/
+  )
+})
+
+test('a move the merge carried still passes when the whole directory moved', () => {
+  const found = movedImporter({
+    path: 'src/lib/use.ts',
+    basePath: 'src/x/use.ts',
+    baseLine: "import { S } from './m'",
+    oursLine: "import { S } from './m'\nconst fork = 1",
+    sides: {
+      base: {
+        'src/x/m.ts': "export type { S } from './types'\n",
+        'src/x/types.ts': 'export type S = 1\n'
+      },
+      ours: { 'src/x/types.ts': 'export type S = 1 | 2\n' },
+      theirs: {
+        'src/lib/m.ts': "export type { S } from './types'\n",
+        'src/lib/types.ts': 'export type S = 1\n'
+      }
+    },
+    renames: {
+      theirs: [
+        ['src/x/use.ts', 'src/lib/use.ts'],
+        ['src/x/m.ts', 'src/lib/m.ts'],
+        ['src/x/types.ts', 'src/lib/types.ts']
+      ]
+    },
+    carried: ['src/lib/m.ts']
+  })
+  assert.deepEqual(found, [])
+})
+
+test('an unchanged reference is left alone: an alias or a workspace package cannot re-mean', () => {
+  const parse = (text) => parseSource('src/renderer/src/lib/a/thing.ts', text).sf
+  const line = "import '@orca/foo/register'\nimport './styles.css'\nimport '@/store'\n"
+  assert.deepEqual(
+    swappedProviders({
+      path: 'src/renderer/src/lib/a/thing.ts',
+      resolvedSf: parse(line),
+      sides: { base: parse(line), ours: parse(line), theirs: parse(line) },
+      // A history that resolves nothing: unchanged text must not be resolved at all.
+      history: historyOf({ base: {}, ours: {}, theirs: {} })
+    }),
+    []
+  )
+})

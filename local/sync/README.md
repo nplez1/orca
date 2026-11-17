@@ -99,12 +99,19 @@ literals re-applied), import-only (three-way union). A proven file must also pas
   neither imports nor declares at module scope (a text scan: an inner parameter of the same name does
   not count, and a shadowed use is a false hit, which only refuses);
 - a binding a side re-pointed at another module keeps the other side's edits
-  (`lib/conflict-provider-gate.mjs`). It passes when the new module is the old one moved and the
-  index holds the merge's own three-way result of that move, or when the other side changed nothing,
-  byte for byte, in the old module and everything it imports, and resolves every one of those imports
-  to the same file. Anything it cannot trace refuses: an old module that is an `@orca/` package, an
-  `@orca/` import in the closure, a path base cannot resolve, a file that does not parse, a merge
-  with more than one merge base.
+  (`lib/conflict-provider-gate.mjs`). The binding and its target are compared **by the file each
+  resolves to**, not by specifier text: the same `./status` names another module once its importer
+  moves. It covers static imports, named and namespace re-exports, and `import x = require()`; a
+  module reference with no name of its own (`export * from`, a dynamic `import()`) is compared as a
+  set, and one base had that the resolution no longer makes is checked the same way. It passes when
+  the new module is the old one moved and the index holds the merge's own three-way result of that
+  move, or when the other side changed nothing, byte for byte, in the old module and everything it
+  imports, and resolves every one of those imports to the same file. The move also has to leave the
+  moved copy's own imports naming what the merge carried — a partial move silently re-means `./types`
+  — and its own closure is otherwise not re-checked. Anything it cannot trace refuses: an old module
+  that is an `@orca/` package, an `@orca/` import in the closure, a path base cannot resolve, a file
+  that does not parse or cannot be read, a merge with more than one merge base, a cherry-pick or
+  revert of a merge commit (whose `-m` parent `^` is not).
 
 `--apply-proven <decision.json>` refuses a decision proposed for another operation (merge head, HEAD,
 rebase step), re-proves each file from disk and writes only files where every hunk is proven and
@@ -133,13 +140,15 @@ change was re-homed by hand): in 12 the other side had edited something in the o
 in 6 the closure could not be traced (an `@orca/` package, or a path base cannot resolve). That is the
 price of not tracing re-exports, aliases and dependencies by hand.
 `--propose` took 34 s, of which `git diff -M -l0` is 5.3 s on upstream's 7,872 renames (0.05 s on the
-fork's one); the default rename limit stopped pairing at 6,940.
+fork's one); the default rename limit stopped pairing at 6,940. The re-export, `import = require`,
+resolution-by-file and moved-copy checks were added after that replay and have not been replayed, so
+84 is a floor: they only ever refuse more, and how much is unmeasured.
 
 **What the gate does not check**, so a written file can still be wrong in these ways:
 
-- specifiers it cannot read: bare packages (a removed dependency), `import.meta.glob` patterns,
-  template specifiers with substitutions, `declare module` names, paths inside JSON or other string
-  literals (`path.join(__dirname, '../x')`);
+- specifiers it cannot read: bare npm packages (a removed dependency) and the `@orca-cloud/*` path
+  aliases in `cloud/`, `import.meta.glob` patterns, template specifiers with substitutions, `declare
+  module` names, paths inside JSON or other string literals (`path.join(__dirname, '../x')`);
 - dependencies the re-pointed-binding closure cannot see: CSS `@import` and `composes`, `///
   <reference path>`, JSDoc `import()` types in a JS module, and ambient or global `.d.ts` files no
   module imports;

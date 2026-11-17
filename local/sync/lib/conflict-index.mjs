@@ -91,12 +91,20 @@ export function catFileBatch(commit, allPaths) {
     if (end === -1) {
       break
     }
-    const header = out.subarray(offset, end).toString('utf8').split(' ')
+    const header = out.subarray(offset, end).toString('utf8')
     offset = end + 1
-    if (header[1] === 'missing' || header.length < 3) {
+    // `<rev>:<path>` is echoed whole, spaces included: only the tail says the object is missing.
+    if (header.endsWith(' missing')) {
       continue
     }
-    const size = Number(header[2])
+    const fields = header.split(' ')
+    if (fields.length < 3) {
+      break
+    }
+    const size = Number(fields[2])
+    if (!Number.isFinite(size) || offset + size > out.length) {
+      break
+    }
     texts.set(path, out.subarray(offset, offset + size).toString('utf8'))
     offset += size + 1
   }
