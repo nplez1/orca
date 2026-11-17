@@ -169,6 +169,40 @@ describe('reports', () => {
     expect(readReport(dir, 'D')).toMatchObject({ status: 'no-report' })
     expect(readReport(dir, 'E').status).toBe('not-run')
   })
+
+  it('voids only the slices a tampered batch ran, so a narrowed re-run cannot revive the rest', () => {
+    const dir = scratch()
+    const verdict = { slice: 'A', findings: [] }
+    for (const id of ['A', 'B']) {
+      writeRun(dir, id, { result: success(verdict) })
+    }
+    writeFileSync(
+      join(dir, 'tree-changed.json'),
+      JSON.stringify({ slices: ['A'], paths: ['src/a.ts'] })
+    )
+    expect(readReport(dir, 'A').status).toBe('no-report')
+    expect(readReport(dir, 'B').status).toBe('reported')
+  })
+
+  it('counts a slice the CLI denied the packet read on as no-report', () => {
+    const dir = scratch()
+    const verdict = { slice: 'A', findings: [] }
+    const denial = {
+      tool_name: 'Read',
+      tool_input: { file_path: join(dir, 'slice-A.patch') }
+    }
+    writeRun(dir, 'A', {
+      result: { ...success(verdict), permission_denials: [denial] }
+    })
+    writeRun(dir, 'B', {
+      result: {
+        ...success({ ...verdict, slice: 'B' }),
+        permission_denials: [{ tool_name: 'Bash', tool_input: { command: 'ls' } }]
+      }
+    })
+    expect(readReport(dir, 'A')).toMatchObject({ status: 'no-report' })
+    expect(readReport(dir, 'B')).toMatchObject({ status: 'reported' })
+  })
 })
 
 describe('manifest', () => {

@@ -213,7 +213,9 @@ node local/release-review-gate.mjs                           # still the authori
   then the end of each delta round — never today's HEAD, because a code commit after the last reviewed range
   was never read by a slice. The gate then accepts only doc and review-record commits on top of it, which is
   its own rule. Both modes exit 1 and say why while the manifest would not clear; `--write` refuses to record
-  one, and reports code changed past the covered revision as a missing delta round.
+  one, and reports code changed past the covered revision as a missing delta round. A merge that resolved
+  nothing writes no slices at all, and the gate refuses an empty slice list — that release needs a waiver
+  with its reason, because there is no review to record.
 
 `node local/release-review-gate.mjs --print` still prints the bare manifest shape, for a waiver or a review
 run some other way.

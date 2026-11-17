@@ -11,8 +11,25 @@ export const SEVERITIES = ['BLOCKER', 'SHOULD-FIX', 'MINOR', 'NIT']
 /** The severities AGENTS.md § PR gate 2 says must be fixed before the release. */
 export const BLOCKING = new Set(['BLOCKER', 'SHOULD-FIX'])
 export const VERDICT_FENCE = 'orca-review-verdict'
-/** Written beside a packet when a run changed the working tree; while it is there, nothing reported. */
+/** Written beside a packet when a run changed the working tree; the slices it names have no report. */
 export const treeChangeMarker = 'tree-changed.json'
+
+/**
+ * Why per slice and not per directory: a narrowed re-run clears its own slice, and a marker keyed by
+ * directory would either revive the tainted answers beside it or discard a clean one.
+ */
+function voidsReport(dir, id) {
+  const path = join(dir, treeChangeMarker)
+  if (!existsSync(path)) {
+    return false
+  }
+  try {
+    const marker = JSON.parse(readFileSync(path, 'utf8'))
+    return !Array.isArray(marker?.slices) || marker.slices.includes(id)
+  } catch {
+    return true
+  }
+}
 
 const COUNT_KEYS = { BLOCKER: 'blockers', 'SHOULD-FIX': 'shouldFix', MINOR: 'minors', NIT: 'nits' }
 
@@ -84,7 +101,7 @@ export const outputPaths = (dir, id) => ({
 /** The state of one slice from its files on disk. */
 export function readReport(dir, id) {
   const paths = outputPaths(dir, id)
-  if (existsSync(join(dir, treeChangeMarker))) {
+  if (voidsReport(dir, id)) {
     return {
       status: 'no-report',
       problem: 'the reviewer changed the working tree during this run'

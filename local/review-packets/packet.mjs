@@ -25,7 +25,7 @@ export const git = (root, args) =>
  * on the release review rather than on the setting.
  */
 export const DIFF_CONFIG = ['-c', 'core.quotePath=false']
-export const DIFF_OPTIONS = ['--no-color', '--src-prefix=a/', '--dst-prefix=b/']
+export const DIFF_OPTIONS = ['--no-color', '--no-ext-diff', '--src-prefix=a/', '--dst-prefix=b/']
 
 export function renderTemplate(text, vars) {
   return text.replace(/\{\{([A-Z0-9_]+)\}\}/g, (_, key) => {

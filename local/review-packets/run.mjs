@@ -165,14 +165,29 @@ export async function runSlices({
   // on, because the answers were written against a tree that no longer matches what was reviewed.
   const touched = before === null ? [] : changedPaths(before, treeState(cwd) ?? before)
   if (touched.length) {
-    const dirs = [...new Set(pending.map((job) => job.dir))]
-    for (const dir of dirs) {
-      writeFileSync(join(dir, treeChangeMarker), `${JSON.stringify(touched, null, 2)}\n`)
+    const byDir = new Map()
+    for (const job of pending) {
+      byDir.set(job.dir, [...(byDir.get(job.dir) ?? []), job.id])
+    }
+    for (const [dir, ids] of byDir) {
+      // Why merged rather than overwritten: a batch that was already marked must keep its ids, or the
+      // next narrowed run revives answers it never re-checked.
+      const path = join(dir, treeChangeMarker)
+      let previous = []
+      try {
+        previous = JSON.parse(readFileSync(path, 'utf8')).slices ?? []
+      } catch {
+        previous = []
+      }
+      writeFileSync(
+        path,
+        `${JSON.stringify({ slices: [...new Set([...previous, ...ids])], paths: touched }, null, 2)}\n`
+      )
     }
     log(
       `  the reviewer changed ${touched.length} path(s) in the tree: ${touched.slice(0, 5).join(', ')}`
     )
-    log('  every slice in this batch now reads as no-report; clean the tree and re-run')
+    log('  the slices this batch ran now read as no-report; clean the tree and re-run them')
   }
   return pending.map((job) => job.id)
 }

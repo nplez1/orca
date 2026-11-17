@@ -24,7 +24,8 @@
  * Exit: 0 done, 1 refused or incomplete, 2 usage.
  */
 import { readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
+import { REVIEWER } from './pr-body-claims.mjs'
 import { manifestPath, reviewNeutralOnly, validateManifest } from './release-review-gate.mjs'
 import { loadCoverageContext } from './review-packets/exclusions.mjs'
 import { buildManifest, openFindings, reviewState } from './review-packets/manifest.mjs'
@@ -71,6 +72,10 @@ export function parseArgs(argv) {
       if (NUMERIC.includes(name) && !(Number(argv[i + 1]) > 0)) {
         throw new Error(`--${name} takes a positive number, got ${JSON.stringify(argv[i + 1])}`)
       }
+      // Why capped: a larger delay overflows setTimeout and fires at once, killing every slice.
+      if (name === 'timeout-min' && Number(argv[i + 1]) > 1440) {
+        throw new Error('--timeout-min is capped at 1440 (one day)')
+      }
       i += 1
     } else {
       throw new Error(`unknown argument: ${argv[i]}`)
@@ -84,7 +89,8 @@ export function parseArgs(argv) {
 
 function syncDirFor(options) {
   if (options.packet) {
-    return options.packet
+    // Why absolute: a denial's path is matched against this prefix, and a relative one matches nothing.
+    return resolve(options.packet)
   }
   const merge = options.merge ?? headSyncMerge(repoRoot)
   if (!merge) {
@@ -172,9 +178,59 @@ function status(state) {
   return state.slices.every((entry) => entry.report.status === 'reported') ? 0 : 1
 }
 
+/**
+ * Why refuse before spending: the reviewer reads the working tree while the prompt names a revision, so
+ * a dirty tree or a moved HEAD means the answers describe a tree nobody will release.
+ */
+function runProblems(packet) {
+  const problems = []
+  const stale = ['provider', 'alias', 'name', 'thinking'].filter(
+    (key) => packet.reviewer?.[key] !== REVIEWER[key]
+  )
+  if (packet.reviewer && stale.length) {
+    problems.push(
+      `the packet was prepared for another reviewer (${stale.join(', ')} differ); prepare it again`
+    )
+  }
+  const dirty = git(repoRoot, ['status', '--porcelain', '--untracked-files=no'])
+    .split('\n')
+    .filter(Boolean)
+  if (dirty.length) {
+    const paths = dirty
+      .slice(0, 3)
+      .map((line) => line.slice(3))
+      .join(', ')
+    problems.push(
+      `the working tree has ${dirty.length} uncommitted change(s) (${paths}), and the reviewer reads it as it is`
+    )
+  }
+  const revision = packet.revision ?? packet.r2 ?? packet.merge
+  try {
+    const moved = git(repoRoot, ['diff', '--name-only', revision, 'HEAD'])
+      .split('\n')
+      .filter(Boolean)
+      .filter((path) => !reviewNeutralOnly([path]))
+    if (moved.length) {
+      problems.push(
+        `${moved.length} path(s) changed since the packet's revision ${short(revision)} (${moved.slice(0, 3).join(', ')}); prepare a packet for HEAD`
+      )
+    }
+  } catch {
+    problems.push(`the packet's revision ${short(revision)} is not in this repository`)
+  }
+  return problems
+}
+
 async function run(options) {
   const syncDir = syncDirFor(options)
   const state = reviewState(syncDir)
+  const blocked = runProblems(state.rounds.at(-1).packet)
+  if (blocked.length) {
+    for (const problem of blocked) {
+      console.error(`release-review: refusing to run — ${problem}`)
+    }
+    return 1
+  }
   const only = options.slices ? new Set(options.slices.split(',')) : null
   const jobs = state.slices
     .filter((entry) => !only || only.has(entry.slice.id))
@@ -228,8 +284,19 @@ function print(options, write = false) {
   const { end, gaps } = reviewCoverage(state)
   const manifest = buildManifest(state, { revision: end })
   const uncovered = uncoveredPaths(end)
+  let ancestor = true
+  try {
+    git(repoRoot, ['merge-base', '--is-ancestor', end, 'HEAD'])
+  } catch {
+    ancestor = false
+  }
   const problems = [
     ...gaps,
+    ...(ancestor
+      ? []
+      : [
+          `the reviewed revision ${short(end)} is not an ancestor of HEAD, so the gate cannot find its manifest`
+        ]),
     ...validateManifest(manifest, { revision: end }),
     ...(uncovered.length
       ? [
