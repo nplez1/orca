@@ -4148,13 +4148,17 @@ reportable, and the fork's own file is one a sync cannot touch at all.
 
 - `performance-contracts.yml` gains `workflow_call:` and nothing else. Its `pull_request` leg, its
   matrix and its own `workflow_dispatch` are untouched.
-- The caller runs `15 9 */2 * *` and `workflow_dispatch`, on `ubuntu-latest`, with no `timeout-minutes`
-  of its own — the key is not allowed on a job that calls a reusable workflow, and the callee's 20
-  minutes per leg is the bound that matters.
+- The caller runs `15 9 */2 * *` and `workflow_dispatch`. Its one job has neither `runs-on` nor
+  `timeout-minutes` — neither key is allowed on a job that calls a reusable workflow, so what runs is
+  the callee's three-OS matrix, and its 20 minutes per leg is the bound.
 - **The two concurrency groups must differ.** A called workflow shares the caller's `github` context,
   so the callee's `performance-contracts-${{ github.event.pull_request.number || github.ref }}`
   resolves to `performance-contracts-refs/heads/main`; two workflows in one group deadlock, and GitHub
   resolves that by cancelling the run.
+- **Known cost of that shared group:** a _direct_ dispatch of `performance-contracts.yml` on `main`
+  joins the same group, so it cancels a scheduled call in flight. A cancelled run is not a verdict, so
+  nothing reports a false red — the cost is up to four days without one. The caller's own group is
+  separate and cannot collide with anything.
 - `FORK_SCHEDULES` gains the caller with its reason, and `EXPECTED_TRIGGERS` gains `workflow_call` for
   the callee — so a sync that drops it fails the table-vs-file test before the scheduled run breaks
   with `startup_failure`.
@@ -4164,6 +4168,13 @@ reportable, and the fork's own file is one a sync cannot touch at all.
   failure that check exists to end — but it is new automated work on lanes that were 21 of 24 green.
 - Cost: 85 min/week at daily, ~43 at this cadence, and 0 billable minutes on standard runners for a
   public repository.
+- **`*/2` on day-of-month means odd days, so a 31-day month runs the 31st and the 1st back to back.**
+  Two runs a month land a day apart; harmless, and cheaper than a cron that has to stay in step with
+  month lengths.
+
+**Upstream's `config/performance-audit.md` still says this lane "runs daily", and is left alone.** The
+sentence is true of upstream's own copy, which keeps its cron, and editing it would put a conflict
+point in an upstream file at every sync for a cadence note this section already carries.
 
 **The `OK` verdict is only reachable after the merge.** A required lane that exists only on a branch is
 `STALE` (no workflow file by that path on the repository) and `MISSING` (required but absent) until the

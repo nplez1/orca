@@ -42,7 +42,7 @@ coverage by itself.
 
 Incremental Claude scans and persisted Claude cache checkpoints are also included.
 
-`.github/workflows/performance-contracts.yml` runs every other day and manually on Linux,
+`.github/workflows/performance-contracts.yml` runs daily and manually on Linux,
 macOS and Windows, and on PRs changing this tooling or any listed contract file.
 It uploads per-OS JSON test results, plus the source inventory once from Linux
 because that scan is OS-independent. Its schedule starts after merge. Run the existing
