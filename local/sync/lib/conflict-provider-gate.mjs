@@ -203,6 +203,8 @@ const isRelative = (specifier) => /^\.\.?(?:\/|$)/.test(specifier)
 // its `exports` through history, so a re-point away from one refuses. Bare npm packages are skipped.
 const isWorkspace = (specifier) => specifier.startsWith('@orca/')
 const isModulePath = (specifier) => isPath(specifier) || isWorkspace(specifier)
+// Two `@orca/` names under `mobile/` are aliases into `mobile/src`, not packages: they move with it.
+const MOBILE_ALIAS = /^@orca\/test-(?:mobile|host)\//
 
 /**
  * Names the resolved file imports from another module than base did, where the side that did NOT pick
@@ -266,10 +268,18 @@ export function swappedProviders({ path, resolvedSf, sides, history }) {
 
   /**
    * Whether an unchanged specifier can only still name what it named before. A relative path moves with
-   * its importer; an alias resolves from a project root, so it survives a move inside that project.
+   * its importer; an alias resolves from a project root, so it survives a move inside that project; a
+   * workspace package resolves through its manifest, so no move re-means it.
    */
-  const keepsItsMeaning = (specifier) =>
-    isRelative(specifier) ? basePath === path : aliasProject(basePath) === aliasProject(path)
+  const keepsItsMeaning = (specifier) => {
+    if (isRelative(specifier)) {
+      return basePath === path
+    }
+    if (isWorkspace(specifier) && !MOBILE_ALIAS.test(specifier)) {
+      return true
+    }
+    return aliasProject(basePath) === aliasProject(path)
+  }
 
   // Same bytes are not enough: the other side may resolve an edge elsewhere (a new `types.ts` that
   // TypeScript probes before base's `types/index.ts`), so each edge has to land on the same file.

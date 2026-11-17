@@ -500,9 +500,26 @@ test('a move the merge carried still passes when the whole directory moved', () 
   )
 })
 
+test('an unchanged workspace import survives a move to another project, a mobile alias does not', () => {
+  const path = 'src/renderer/src/lib/b/thing.ts'
+  const line = "import { p } from '@orca/process-host'\n"
+  const parse = (text) => parseSource(path, text).sf
+  const found = swappedProviders({
+    path,
+    resolvedSf: parse(line),
+    sides: { base: parse(line), ours: parse(line), theirs: parse(line) },
+    history: historyOf(
+      { base: { 'src/lib/b/thing.ts': line }, ours: {}, theirs: { [path]: line } },
+      { theirs: [['src/lib/b/thing.ts', path]] }
+    )
+  })
+  assert.deepEqual(found, [])
+})
+
 test('an unchanged reference is left alone: an alias or a workspace package cannot re-mean', () => {
   const parse = (text) => parseSource('src/renderer/src/lib/a/thing.ts', text).sf
-  const line = "import '@orca/foo/register'\nimport './styles.css'\nimport '@/store'\n"
+  const line =
+    "import '@orca/foo/register'\nimport '@orca/test-mobile/phone'\nimport './styles.css'\nimport '@/store'\n"
   assert.deepEqual(
     swappedProviders({
       path: 'src/renderer/src/lib/a/thing.ts',
