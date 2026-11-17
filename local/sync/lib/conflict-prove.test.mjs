@@ -1,20 +1,11 @@
-// Fixture tests for the per-hunk proof tiers and the --apply-proven planner. No git, no filesystem:
+// Fixture tests for the per-hunk proof tiers. No git, no filesystem:
 //   node --test local/sync/lib/conflict-prove.test.mjs
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { planApplyProven } from './conflict-apply-proven.mjs'
-import { proveFile, sha256, upstreamIdentity } from './conflict-prove.mjs'
+import { proveFile, upstreamIdentity } from './conflict-prove.mjs'
+import { file, hunk, proveWithIndex } from './conflict-test-fixtures.mjs'
 
-const hunk = ({ ours, base, theirs }) => [
-  '<<<<<<< ours',
-  ...ours,
-  ...(base === null ? [] : ['||||||| base', ...base]),
-  '=======',
-  ...theirs,
-  '>>>>>>> theirs'
-]
-const file = (...parts) => [...parts.flat(), ''].join('\n')
 const only = (merged, path = 'src/a.ts') => proveFile({ path, merged }).hunks[0]
 
 test('upstream touching only comments and whitespace proves ours', () => {
@@ -182,14 +173,14 @@ test('a space on one line of JSX text renders, so upstream removing it is a chan
 
 test('whitespace between JSX children is a change only where it renders', () => {
   const children = (lines) => file('const el = (', '  <div>', hunk(lines), '  </div>', ')')
-  const reindented = proveFile({
-    path: 'src/a.tsx',
-    merged: children({
+  const reindented = proveWithIndex(
+    'src/a.tsx',
+    children({
       ours: ['      <A />'],
       base: ['    <A />'],
       theirs: ['    <A />', '    <B />']
     })
-  })
+  )
   assert.equal(reindented.hunks[0].tier, 'fork-unchanged')
   assert.equal(
     reindented.resolvedText,
@@ -356,6 +347,20 @@ test('import-only is refused when another hunk on the other side binds the same 
   )
 })
 
+test('import-only is refused when one side drops a binding the other re-pointed at a moved module', () => {
+  // The 2026-11-15 shape: the fork dropped `p`, upstream moved its module, so no specifier is shared.
+  const proof = only(
+    file(
+      hunk({
+        ours: ["import { a } from './a'"],
+        base: ["import { p } from './p'"],
+        theirs: ["import { p } from './moved/p'"]
+      })
+    )
+  )
+  assert.equal(proof.tier, null)
+})
+
 test('import-only keeps a comment trailing the last import of a side', () => {
   const proof = only(
     file(
@@ -390,135 +395,14 @@ test('a file is fully proven only when every hunk is, and only then carries a re
     theirs: ['// c', 'const a = 0']
   })
   const both = hunk({ ours: ['const b = 1'], base: ['const b = 0'], theirs: ['const b = 2'] })
-  const partial = proveFile({ path: 'src/a.ts', merged: file(proven, 'mid()', both) })
+  const partial = proveWithIndex('src/a.ts', file(proven, 'mid()', both))
   assert.equal(partial.fullyProven, false)
   assert.equal(partial.provenHunks, 1)
   assert.equal(partial.resolvedText, undefined)
-  const whole = proveFile({ path: 'src/a.ts', merged: file('top()', proven, 'end()') })
+  const whole = proveWithIndex('src/a.ts', file('top()', proven, 'end()'))
   assert.equal(whole.fullyProven, true)
   assert.equal(whole.resolvedText, file('top()', 'const a = 1', 'end()'))
   assert.equal(proveFile({ path: 'docs/a.md', merged: file(proven) }).fullyProven, false)
-})
-
-// ---- --apply-proven
-
-const proven = file(
-  hunk({ ours: ['const a = 1'], base: ['const a = 0'], theirs: ['// c', 'const a = 0'] })
-)
-const contested = file(
-  hunk({ ours: ['const b = 1'], base: ['const b = 0'], theirs: ['const b = 2'] })
-)
-const decisionFor = (files) => ({
-  mode: 'live',
-  files: files.map(([path, merged, extra = {}]) => {
-    const { resolvedText: _text, ...proof } = proveFile({ path, merged })
-    return { path, status: 'UU', proof, ...extra }
-  })
-})
-
-const worktree = (readText, unmerged = ['src/p.ts', 'src/c.ts'], links = []) => ({
-  readText,
-  unmerged: new Set(unmerged),
-  isSymlink: (path) => links.includes(path)
-})
-
-test('apply-proven writes the fully proven file and reports the rest', () => {
-  const disk = { 'src/p.ts': proven, 'src/c.ts': contested }
-  const plan = planApplyProven(
-    decisionFor([
-      ['src/p.ts', proven],
-      ['src/c.ts', contested]
-    ]),
-    worktree((path) => disk[path] ?? null)
-  )
-  assert.deepEqual(
-    plan.writes.map((write) => [write.path, write.text]),
-    [['src/p.ts', file('const a = 1')]]
-  )
-  assert.deepEqual(
-    plan.unproven.map((item) => item.path),
-    ['src/c.ts']
-  )
-})
-
-test('apply-proven refuses a file edited since --propose', () => {
-  const plan = planApplyProven(
-    decisionFor([['src/p.ts', proven]]),
-    worktree(() => `${proven}// edited\n`)
-  )
-  assert.equal(plan.writes.length, 0)
-  assert.match(plan.refused[0].reason, /changed since --propose/)
-})
-
-test('apply-proven re-proves rather than trusting a hand-edited decision', () => {
-  const decision = decisionFor([['src/c.ts', contested]])
-  decision.files[0].proof.fullyProven = true
-  decision.files[0].proof.resolvedSha = sha256('anything')
-  const plan = planApplyProven(
-    decision,
-    worktree(() => contested)
-  )
-  assert.equal(plan.writes.length, 0)
-  assert.match(plan.refused[0].reason, /does not reproduce/)
-})
-
-test('apply-proven refuses a proven file whose recorded resolution is not the one it re-derives', () => {
-  const decision = decisionFor([['src/p.ts', proven]])
-  decision.files[0].proof.resolvedSha = sha256('a resolution from another prover')
-  const plan = planApplyProven(
-    decision,
-    worktree(() => proven)
-  )
-  assert.equal(plan.writes.length, 0)
-  assert.match(plan.refused[0].reason, /does not reproduce/)
-})
-
-test('apply-proven writes only a path git lists as unmerged, and never through a symlink', () => {
-  const decision = decisionFor([
-    ['src/p.ts', proven],
-    ['src/link.ts', proven]
-  ])
-  const plan = planApplyProven(
-    decision,
-    worktree(() => proven, ['src/link.ts'], ['src/link.ts'])
-  )
-  assert.equal(plan.writes.length, 0)
-  assert.deepEqual(
-    plan.refused.map((item) => [item.path, item.reason]),
-    [
-      ['src/p.ts', 'git does not list it as unmerged'],
-      ['src/link.ts', 'it is a symlink; writing would follow it']
-    ]
-  )
-  assert.throws(() => planApplyProven(decision, { readText: () => proven }), /unmerged/)
-})
-
-test('a ledger deletion is printed as a command, never planned as a write', () => {
-  const plan = planApplyProven(
-    {
-      mode: 'live',
-      files: [{ path: 'src/old file.ts', proposal: { action: 'delete', provenance: 'ledger' } }]
-    },
-    worktree(() => {
-      throw new Error('a deletion must not read the file')
-    })
-  )
-  assert.deepEqual(
-    plan.removals.map((item) => item.command),
-    ["git rm -- 'src/old file.ts'"]
-  )
-  assert.equal(plan.writes.length, 0)
-})
-
-test('a --merge-tree decision has no worktree to write', () => {
-  assert.throws(
-    () =>
-      planApplyProven(
-        { mode: 'merge-tree', files: [] },
-        worktree(() => null)
-      ),
-    /live/
-  )
 })
 
 // A directive comment is code. These are the shapes that used to prove as "upstream changed only

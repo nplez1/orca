@@ -15,7 +15,6 @@
 
 import { spawnSync } from 'node:child_process'
 import { existsSync, lstatSync, readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
 import process from 'node:process'
 import {
   classifyFile,
@@ -25,12 +24,18 @@ import {
 } from './lib/conflict-classify.mjs'
 import { deletionFor, pendingDeletionPaths } from './lib/expected-deletions.mjs'
 import { readDeletionManifestFromGit } from './lib/deletion-manifest-git.mjs'
-import { planApplyProven, renderApplyPlan } from './lib/conflict-apply-proven.mjs'
-import { proveFile } from './lib/conflict-prove.mjs'
+import { attachProofs, planApplyProven, renderApplyPlan } from './lib/conflict-apply-proven.mjs'
+import {
+  gitProviderHistory,
+  indexModuleOracle,
+  treeModuleOracle,
+  workspaceSourceLookup
+} from './lib/conflict-index.mjs'
 import { proposeAll } from './lib/conflict-propose.mjs'
 import { renameForecast } from './lib/fork-surface-git.mjs'
 import { renderForecast } from './lib/rename-forecast.mjs'
 import { classCounts, renderSummary, renderText } from './lib/conflict-report.mjs'
+import { liveSides, readState, singleMergeBase } from './lib/conflict-state.mjs'
 
 const LEDGER_URL = new URL('./convergence-ledger.md', import.meta.url)
 const DELETIONS_URL = new URL('./expected-deletions.json', import.meta.url)
@@ -42,6 +47,8 @@ const MESSAGE = /^(Auto-merging|CONFLICT|Warning:|fatal:|error:|Failed to merge)
 const OID = /^[0-9a-f]{40}([0-9a-f]{24})?$/
 // Merged text per path, kept out of the classified file so --json does not carry every file twice.
 const MERGED = new Map()
+// The three stages per path, for the prover's whole-file import check; out of --json for the same reason.
+const STAGES = new Map()
 
 const HELP = `conflict triage for an upstream sync stop — advisory only
 
@@ -69,9 +76,12 @@ them; it never commits, and it refuses to act on a \`--merge-tree\` run because 
 --propose also attaches a per-hunk proof, read from each side's syntax tree (comments and whitespace
 dropped): upstream-unchanged (take ours), fork-unchanged (take theirs), identity-only (take theirs with
 the fork's identity literals re-applied; re-run identity-sweep.mjs), import-only (three-way union with
-no duplicate module or binding). --apply-proven reads \`--propose --json\` output, re-proves each file
-from the bytes on disk, and writes only files where EVERY hunk is proven and nothing changed since.
-It stages nothing, and prints the \`git rm\` a ledger/manifest deletion needs instead of running it.
+no duplicate module or binding); the resolved file must also pass the whole-file gate (local/sync/
+README.md). --apply-proven reads \`--propose --json\` output for the live operation, re-proves each
+file from the bytes on disk, and writes only files where EVERY hunk is proven and nothing changed
+since; a rerun re-runs the whole-file gate on what an earlier run wrote (\`already\`) and reports a
+path no longer unmerged as \`staged\` without failing. It stages nothing, and prints the \`git rm\`
+a ledger/manifest deletion needs instead.
 
 --rename-forecast runs before the merge: upstream's renames and deletions in <old-base>..<new-base>,
 matched against the lines the fork added since <old-base> (default tip HEAD) — import specifiers,
@@ -130,6 +140,26 @@ function remember(path, merged) {
   return merged
 }
 
+function sides(path, stages) {
+  STAGES.set(path, stages)
+  return stages
+}
+
+const indexStages = (path) => ({
+  base: blobAt(':1', path),
+  ours: blobAt(':2', path),
+  theirs: blobAt(':3', path)
+})
+
+const workspaceSource = () => workspaceSourceLookup(gitText(['rev-parse', '--show-toplevel']))
+const rev = (ref) => gitText(['rev-parse', '--verify', '-q', ref], { allowFailure: true })
+const historyFor = (sides, stagesAt = null) =>
+  sides && Object.values(sides).every(Boolean) ? gitProviderHistory(gitText, sides, stagesAt) : null
+const indexOracle = () =>
+  indexModuleOracle(gitText(['ls-files', '-s', '-z']) ?? '', workspaceSource(), (stagesAt) =>
+    historyFor(liveSides(liveState(), rev, gitText), stagesAt)
+  )
+
 const unmergedPaths = () =>
   (gitText(['diff', '--name-only', '--diff-filter=U', '-z']) ?? '').split('\u0000').filter(Boolean)
 
@@ -151,37 +181,11 @@ function unmergedStatuses() {
   return statuses
 }
 
-function readState(gitDir) {
-  const info = (name) => {
-    try {
-      return readFileSync(join(gitDir, name), 'utf8').trim()
-    } catch {
-      return ''
-    }
-  }
-  const rebase = ['rebase-merge', 'rebase-apply'].find((dir) => existsSync(join(gitDir, dir)))
-  if (rebase) {
-    const [step, total] = rebase === 'rebase-merge' ? ['msgnum', 'end'] : ['next', 'last']
-    return {
-      kind: 'rebase',
-      step: Number(info(`${rebase}/${step}`) || 0),
-      total: Number(info(`${rebase}/${total}`) || 0),
-      branch: info(`${rebase}/head-name`).replace('refs/heads/', ''),
-      onto: info(`${rebase}/onto`).slice(0, 10)
-    }
-  }
-  for (const [file, kind] of [
-    ['MERGE_HEAD', 'merge'],
-    ['CHERRY_PICK_HEAD', 'cherry-pick'],
-    ['REVERT_HEAD', 'revert']
-  ]) {
-    if (existsSync(join(gitDir, file))) {
-      const head = info(file).split('\n')[0].trim().slice(0, 10)
-      return { kind, head, subject: info('MERGE_MSG').split('\n')[0] }
-    }
-  }
-  return { kind: 'none' }
-}
+// HEAD's oid too: a rebase step and a later merge onto the same upstream share everything else.
+const liveState = () => ({
+  ...readState(gitText(['rev-parse', '--git-dir'])),
+  headOid: gitText(['rev-parse', 'HEAD'])
+})
 
 // ------------------------------------------------------------------ adapters
 
@@ -191,13 +195,11 @@ function readLive() {
     classifyFile({
       path,
       status: statuses.get(path) ?? null,
-      base: blobAt(':1', path),
-      ours: blobAt(':2', path),
-      theirs: blobAt(':3', path),
+      ...sides(path, indexStages(path)),
       merged: remember(path, worktreeText(path))
     })
   )
-  return { mode: 'live', state: readState(gitText(['rev-parse', '--git-dir'])), files, notes: [] }
+  return { mode: 'live', state: liveState(), files, notes: [] }
 }
 
 function readMergeTree(base, other) {
@@ -245,9 +247,7 @@ function readMergeTree(base, other) {
     return classifyFile({
       path,
       status: deleted ?? (baseContent === null ? 'AA' : null),
-      base: baseContent,
-      ours,
-      theirs,
+      ...sides(path, { base: baseContent, ours, theirs }),
       merged: remember(path, blobAt(tree, path))
     })
   })
@@ -377,6 +377,9 @@ function runApplyProven(decisionPath) {
   const plan = planApplyProven(JSON.parse(readFileSync(decisionPath, 'utf8')), {
     readText: worktreeText,
     unmerged: new Set(unmergedPaths()),
+    moduleExists: indexOracle(),
+    readStages: indexStages,
+    state: liveState(),
     isSymlink: (path) => {
       try {
         return lstatSync(path).isSymbolicLink()
@@ -611,19 +614,21 @@ function main() {
           file.proposal = proposal
         }
       }
-      for (const file of result.files) {
-        const { resolvedText: _text, ...proof } = proveFile({
-          path: file.path,
-          status: file.status,
-          merged: MERGED.get(file.path) ?? null
-        })
-        file.proof = proof
-      }
-      const proven = result.files.filter((file) => file.proof.fullyProven).length
-      const hunks = result.files.reduce((sum, file) => sum + file.proof.hunkCount, 0)
-      const provenHunks = result.files.reduce((sum, file) => sum + file.proof.provenHunks, 0)
+      const moduleExists =
+        result.mode === 'merge-tree'
+          ? treeModuleOracle(
+              gitText(['ls-tree', '-r', '-z', '--name-only', result.state.tree]) ?? '',
+              result.files,
+              workspaceSource(),
+              historyFor({
+                base: singleMergeBase(gitText, result.state.base, result.state.other),
+                ours: result.state.base,
+                theirs: result.state.other
+              })
+            )
+          : indexOracle()
       result.notes.push(
-        `proof: ${provenHunks} of ${hunks} hunk(s) proven; ${proven} of ${result.files.length} path(s) fully proven (--apply-proven writes only those)`
+        attachProofs(result.files, { merged: MERGED, stages: STAGES, moduleExists })
       )
       const settled = result.files.filter((file) => file.proposal)
       result.notes.push(
@@ -677,4 +682,5 @@ function main() {
   }
 }
 
-process.exit(main())
+// Not process.exit(): it drops a piped stdout's unflushed tail, and --apply-proven | tail lost its summary.
+process.exitCode = main()
