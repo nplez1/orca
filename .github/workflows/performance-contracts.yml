@@ -1,8 +1,6 @@
 name: Performance contracts
 
 on:
-  # Why: the clock for this lane lives in `fork-performance-contracts.yml`, a file this fork owns, so a
-  # sync cannot restore upstream's cron here without the enablement check reporting it as `SCHEDULE`.
   workflow_call:
   workflow_dispatch:
   pull_request:

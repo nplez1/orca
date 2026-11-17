@@ -4146,8 +4146,10 @@ would therefore switch the guard off for exactly the file 2026-11-06 was about �
 own `15 9 * * *` would be silent, and so would a change back to daily. Leaving it out keeps both
 reportable, and the fork's own file is one a sync cannot touch at all.
 
-- `performance-contracts.yml` gains `workflow_call:` and nothing else. Its `pull_request` leg, its
-  matrix and its own `workflow_dispatch` are untouched.
+- `performance-contracts.yml` gains `workflow_call:` and nothing else — not even a `#` comment, because
+  `local/check-upstream-file-comments.mjs` freezes the fork's comment lines in upstream-owned files and
+  the reasoning already lives in the caller and in this section. Its `pull_request` leg, its matrix and
+  its own `workflow_dispatch` are untouched.
 - The caller runs `15 9 */2 * *` and `workflow_dispatch`. Its one job has neither `runs-on` nor
   `timeout-minutes` — neither key is allowed on a job that calls a reusable workflow, so what runs is
   the callee's three-OS matrix, and its 20 minutes per leg is the bound.
@@ -4160,17 +4162,19 @@ reportable, and the fork's own file is one a sync cannot touch at all.
   nothing reports a false red — the cost is up to four days without one. The caller's own group is
   separate and cannot collide with anything.
 - `FORK_SCHEDULES` gains the caller with its reason, and `EXPECTED_TRIGGERS` gains `workflow_call` for
-  the callee — so a sync that drops it fails the table-vs-file test before the scheduled run breaks
-  with `startup_failure`.
+  the callee and `['schedule', 'workflow_dispatch']` for the caller — so a sync that drops
+  `workflow_call` fails the table-vs-file test before the scheduled run breaks with `startup_failure`.
+  One test pins the call edge itself: a retargeted `uses:` would otherwise leave a scheduled lane that
+  runs green doing nothing.
 - The caller is in `REQUIRED` (a `FORK_SCHEDULES` path must be), which puts it in
   `check-fork-lane-red.mjs`'s judged set: a red run on `main` now opens or updates `Fork CI health:
   attention` and delegates `agent:auto`. That is intended — a lane on a clock with no owner is the
   failure that check exists to end — but it is new automated work on lanes that were 21 of 24 green.
+  Its header now says so, and the report's name column widened from 18 to 26 for the longer lane name.
 - Cost: 85 min/week at daily, ~43 at this cadence, and 0 billable minutes on standard runners for a
   public repository.
-- **`*/2` on day-of-month means odd days, so a 31-day month runs the 31st and the 1st back to back.**
-  Two runs a month land a day apart; harmless, and cheaper than a cron that has to stay in step with
-  month lengths.
+- **`*/2` on day-of-month means odd days, so a month with 31 days runs the 31st and then the 1st a day
+  apart.** Harmless, and cheaper than a cron that has to stay in step with month lengths.
 
 **Upstream's `config/performance-audit.md` still says this lane "runs daily", and is left alone.** The
 sentence is true of upstream's own copy, which keeps its cron, and editing it would put a conflict
@@ -4180,7 +4184,10 @@ point in an upstream file at every sync for a cadence note this section already 
 `STALE` (no workflow file by that path on the repository) and `MISSING` (required but absent) until the
 file lands on `main`, so `node local/check-actions-enablement.mjs` on the branch reports exactly those
 two and exits 1. That is the same transient `fork-pr-gates.yml` had on 2026-10-29, and the post-merge
-shape is what the table tests pin.
+shape is what the table tests pin. `check-fork-lane-red.mjs` reads `cannot tell` (exit 2) on the branch
+for the same reason — its runs endpoint is keyed by workflow file name, and the file is registered by
+the push to `main`. After that push the lane reads `NO RUNS` until its first 15:09, which is exit 0, so
+no false red is possible in between.
 
 #### The health issue delegates itself (2026-11-08)
 

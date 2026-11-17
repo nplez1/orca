@@ -13,10 +13,10 @@
  *
  *   - **fork-owned lanes only** (`REQUIRED` ∩ the fork-owned workflow paths). An upstream lane this
  *     fork enabled fails here for upstream's reasons, and its remedy is a sync or a disable, not a red
- *     row that says "someone should look". `fork-performance-contracts.yml` is the one exception in
- *     spirit: it is fork-owned by path but its work is upstream's file, and it is here deliberately —
- *     a perf contract that reddened on `main` is a regression an agent can scope, and nothing else
- *     would report it.
+ *     row that says "someone should look". `fork-performance-contracts.yml` is the same shape as
+ *     `fork-main-tests.yml` — a fork caller around upstream's workflow — and unlike that one it is not
+ *     in `COVERED_ELSEWHERE`, because nothing else reports a perf contract that reddened on `main`, and
+ *     a perf regression is something an agent can scope.
  *   - **the release line only** (`--branch main`). A red on a PR branch cannot merge and is fixed by
  *     pushing; reading PR runs would redden the issue every time a work-in-progress was pushed. A
  *     PR-triggered lane has nothing to judge here unless someone dispatched it on `main`, which
