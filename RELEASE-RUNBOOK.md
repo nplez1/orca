@@ -171,9 +171,54 @@ recorded `"no-report"` and **fails** — silence is the failure this gate was bu
 represented by an absent field. A waiver clears silent slices and never the reviewer, because the reviewer
 is a fact about which review happened.
 
+### Running the review — `local/release-review-packets.mjs`
+
+The review is four commands, not an improvised script. On 2026-11-15 it was improvised: a 10.1 MB remerge
+diff cut into six equal line ranges, a hand-written prompt, six `claude -p … &` runs of which four failed
+first time because the sandbox refused `/tmp` and `git show --remerge-diff`, two hand-written delta prompts,
+and a manifest assembled by hand. 62% of that diff was generated or mechanical content.
+
 ```bash
-node local/release-review-gate.mjs --print > local/sync/release-review/$(git rev-parse HEAD).json
+node local/release-review-packets.mjs --prepare              # HEAD's sync: diff, filter, slice, prompts
+node local/release-review-packets.mjs --run                  # every slice with no report yet, in parallel
+node local/release-review-packets.mjs --status               # per slice: reported / no-report / not-run
+# fix the blocking findings, commit, then re-check the fix as a delta round:
+node local/release-review-packets.mjs --prepare --delta <R1>..<R2>   # findings default to the open ones
+node local/release-review-packets.mjs --run                  # runs only the new delta slice
+node local/release-review-packets.mjs --write                # records the manifest for the revision it covers
+node local/release-review-gate.mjs                           # still the authority
 ```
+
+- **`--prepare`** writes `git show --remerge-diff` of HEAD's sync (the newest first-parent merge, or
+  `--merge <sha>`) into `<git dir>/orca-review/sync-<merge>/`, never `/tmp`. It leaves out content another gate
+  verifies, by the rule list in `local/review-packets/exclusions.mjs`. Each rule names its check: locale
+  catalogs → `post-sync:locale-drift` + `verify:localization-catalogs`, ratchet baselines → the ratchet that
+  reads that file, generated catalogs → their `verify:*` step, mobile vendor bundles → the postinstall
+  generator their header names. A rule whose check is not in `local/gate-lint.mjs` or the post-sync rows
+  excludes nothing (`react-compiler-bailout-baseline.txt` stays in, because its ratchet runs only in upstream
+  CI). Every excluded file is still listed in each prompt with its status and `+/-` counts, because whether it
+  belongs in git at all is still the reviewer's question. The slices are path-prefix runs under a byte
+  budget (`--budget-kb`, default 384). A file is split, at hunk boundaries, only when it alone is over the
+  budget.
+- **`--run`** drives the reviewer `REVIEWER` names (`--model <alias> --effort <thinking>`). It allows only
+  Read/Grep/Glob and read-only git (`--permission-mode dontAsk`) and hands the reviewer the packet with
+  `--add-dir`. Each slice writes `out-<id>.json`, `err-<id>.log` and `run-<id>.json` next to its prompt.
+  A non-zero exit, an `is_error` result, an answer without its closing ` ```orca-review-verdict ` block, or a
+  run the CLI refused the packet read on is `no-report`, and so is every slice of a batch that changed the
+  working tree. A re-run runs only the slices that have no report. `--max-budget-usd` caps each slice,
+  `--slices A,C` narrows the run, and `--concurrency` defaults to 6.
+- **`--print` / `--write`** generate the manifest from the outputs: per slice its verdict, counts, cost and
+  findings (ids `A-1`, …), with `unresolved` counting the BLOCKER/SHOULD-FIX findings that no later delta
+  round has marked resolved. The revision the manifest names is the one the review **covers** — the merge,
+  then the end of each delta round — never today's HEAD, because a code commit after the last reviewed range
+  was never read by a slice. The gate then accepts only doc and review-record commits on top of it, which is
+  its own rule. Both modes exit 1 and say why while the manifest would not clear; `--write` refuses to record
+  one, and reports code changed past the covered revision as a missing delta round. A merge that resolved
+  nothing writes no slices at all, and the gate refuses an empty slice list — that release needs a waiver
+  with its reason, because there is no review to record.
+
+`node local/release-review-gate.mjs --print` still prints the bare manifest shape, for a waiver or a review
+run some other way.
 
 ## Step 2 — publish the first signed release
 
