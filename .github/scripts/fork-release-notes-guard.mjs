@@ -1,6 +1,6 @@
 // Refuse a release body with no change summary, in the two places that decide whether one is ever
-// published: the notes the macos job writes into the draft, and the body of the release the linux job
-// is about to undraft.
+// published: the notes the `release-draft` job writes into the draft, and the body of the release the
+// `publish` job is about to undraft.
 //
 // Why a guard and not the shell test it replaces: the runbook promises no release goes public without
 // `## What changed` for the range, and the workflow published a minimal `Built from <sha>` body

@@ -63,6 +63,10 @@ export const CHECKS = [
     fixArgs: ['--fix']
   },
   { name: 'check-nightly-liveness', script: 'local/check-nightly-liveness.mjs' },
+  // Why the lane-red check earns a slot: the two above watch one lane and the repository's switches.
+  // Nothing watched a lane that had *run and failed*, so 2026-11-12 → 11-15 produced four red days of
+  // `fork-upstream-tags` with no issue behind them (LOCAL-PATCHES.md § local(ci), 2026-11-16).
+  { name: 'check-fork-lane-red', script: 'local/check-fork-lane-red.mjs' },
   { name: 'check-queued-runs', script: 'local/check-queued-runs.mjs' }
 ]
 
@@ -81,18 +85,20 @@ export const AGENT_AUTO_LABEL = 'agent:auto'
  * auto-merge pointed at it would be guessing at what to fix.
  */
 export function judgeDelegation(checks) {
-  // Exit 3 first, and it wins over a delegable red: the finding is a fork-owned lane someone enabled on
-  // purpose. Neither available action is one an agent may take — disabling it undoes a person's decision,
-  // and widening `REQUIRED` hides the finding the issue forbids hiding — so this is a decision, not a
-  // scoped defect. It withholds the label from the whole issue rather than from that check: an agent
-  // handed a red it may not resolve will resolve it anyway.
+  // Exit 3 first, and it wins over a delegable red: the finding is one whose available remedies are all
+  // a person's — a fork-owned lane someone enabled on purpose, or a red whose fix is a release decision
+  // (the tag mirror's guard). None of those actions is one an agent may take, so this is a decision and
+  // not a scoped defect. It withholds the label from the whole issue rather than from that check: an
+  // agent handed a red it may not resolve will resolve it anyway. Why the reason does not name the
+  // finding: more than one check can exit 3 now, and each check's own output below says which decision
+  // it is — a summary that guessed would be wrong for the next check to use exit 3.
   const undecided = checks.filter((check) => check.code === 3)
   if (undecided.length > 0) {
     return {
       delegate: false,
       reason:
         `${undecided.map((check) => check.name).join(', ')} needs a decision only a person can make` +
-        ' — a fork-owned lane is enabled that nobody listed, and a sync cannot have done that'
+        ' — its output below names it, and none of the answers open to it is a code change'
     }
   }
   const red = checks.filter((check) => check.code === 1)

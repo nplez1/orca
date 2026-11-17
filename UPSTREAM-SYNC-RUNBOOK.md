@@ -1,7 +1,10 @@
 # Upstream sync runbook
 
 How to bring `main` up to upstream `main` and publish a release from it. The short
-instruction is **"sync upstream"**; everything below is what that means.
+instruction is **"sync upstream"**; everything below is what that means. To run a sync and release
+end to end, **start the agent with
+[local/sync/templates/release-brief.md](./local/sync/templates/release-brief.md)**, which walks these
+steps and RELEASE-RUNBOOK.md's in order.
 
 Companions: [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) for the patch series that must survive,
 [BRANCHES.md](./BRANCHES.md) for what each branch is, [RELEASE-RUNBOOK.md](./RELEASE-RUNBOOK.md)
@@ -74,6 +77,7 @@ node local/sync/conflicts.mjs --merge-tree <base> <other>      # dry run, no wor
 node local/sync/post-sync.mjs [--json] [--skip-typecheck] [--no-cache] [--only <id>,...] [--waive <id>:<reason>]
 node local/sync/fork-symbols.mjs [--json]               # also a post-sync row; run it alone to see why
 node local/sync/identity-sweep.mjs [--json|--fix]
+node local/sync/linux-lane.mjs [--dry-run] [--cleanup]   # Step 3.5: the Linux unit lane, early
 ```
 
 `local/sync/convergence-ledger.md` is not a script: it is the durable record of _which side wins_
@@ -93,7 +97,7 @@ the 2026-10-05 sync expensive to diagnose: a clean tree (nothing here is safe to
 stray conflict markers, **the tip typechecks before you start**, the derived localization catalog
 regenerating to no diff, `local(` commits confined to `main`, `rerere.enabled` +
 `merge.conflictStyle zdiff3`, and it records old base / old tip / new base plus the dry-run conflict
-set. Nothing on the remote changes until Step 4.
+set. Nothing on the remote changes until Step 4, except the `sync-candidate/*` ref Step 3.5 pushes.
 
 ## Step 1 — the sync
 
@@ -174,6 +178,19 @@ Stages survive until you `git add`, so this works at any point in either operati
 When upstream has built the same thing, ask the fork's owner which way to converge, then **write the
 answer into the ledger** in the same commit. Decisions already taken are in
 [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md).
+
+### Fanning out to resolvers
+
+A sync-sized conflict set is resolved by subagents, from checked-in prompts: write
+[`conflict-protocol.md`](./local/sync/templates/conflict-protocol.md) once to
+`$(git rev-parse --git-dir)/orca-sync/PROTOCOL.md`, then hand each batch a
+[`resolve-batch.md`](./local/sync/templates/resolve-batch.md). **A batch is at most 20 paths from one
+area, resolved and `git add`-ed file by file**; `package.json` and the lockfiles are never batched
+(resolve `package.json` centrally and regenerate each lockfile); and a resolver never runs a repo-wide
+command — the
+2026-11-15 batch of 51 staged nothing in 26 minutes while re-splits of 22 and 19 finished in under
+ten. The `repair-*.md` templates beside them hand Step 3's and the release gates' reds to fixers.
+[release-brief.md](./local/sync/templates/release-brief.md) § Orchestration has the rest of the rules.
 
 ### Traps, all of them hit for real
 
@@ -349,6 +366,62 @@ Then the gates that no script can judge:
 - `pnpm run check:code-quality:changed` (against `upstream/main` for a sync-sized change). Findings
   in fork-only files are expected debt; a finding in a file this sync touched is not.
 
+## Step 3.5 — the early Linux lane
+
+As soon as `post-sync.mjs` and `pnpm tc` pass, and the merge and its repairs are committed, run the
+release workflow's Linux unit lane on the candidate — long before the release gates:
+
+```bash
+node local/sync/linux-lane.mjs --dry-run   # the plan and the safety verdict; pushes nothing
+node local/sync/linux-lane.mjs             # push HEAD to sync-candidate/<sha12>, dispatch fork-main-tests.yml
+```
+
+**Why.** Five of the six 2026-11-16 release dispatches failed, four of them in `fork-release.yml`'s Linux
+unit lane on Linux-only or Electron tests the Mac gate quarantines or skips; each one cost a fix, a
+review-manifest commit, a push and a dispatch, 8–60 minutes a loop. `fork-main-tests.yml` runs the same
+reusable `unit-tests.yml`, shard plan and fork shard verdict on `ubuntu-24.04-arm` in about 12 minutes,
+at no cost.
+
+**Why it is safe**, checked 2026-11-16:
+
+- A dispatch runs **the ref's own copy** of the workflow — and so the merged `unit-tests.yml` and
+  `local/nightly-linux-known-red.json`. Run 43332008251 on `nplez1/issue-401` ran the `scale` job 44
+  minutes before #401 added it to `main`.
+- **No `push` trigger matches `sync-candidate/*`.** The tree's `on.push` filters are `branches: [main]`
+  (seven files), `branches: [Jinwoo-H/windows-update-survival]` (two) and tags only (two), and no file
+  has `create`. A file new to the repository arrives enabled and a sync can add one, so the script
+  re-reads every workflow in the candidate's tree and refuses a `push` or `create` trigger that would
+  fire for the ref (a `paths` filter counts as matching), and any unprovisioned runner label the lane
+  can reach.
+- The concurrency group is `fork-main-unit-tests-${{ github.ref }}`, so a candidate neither cancels nor
+  shares the nightly's slot. One ref per revision means candidates never cancel each other; a
+  re-dispatch of the same revision supersedes its earlier run.
+- The health checks do not read it as the nightly: `check-nightly-liveness.mjs` lists `--branch main`
+  only; `check-fork-lane-red.mjs` reads `branch=main` only and leaves `fork-main-tests.yml` to the
+  liveness check (`COVERED_ELSEWHERE`); `ci-health-report.mjs` sweeps only on `refs/heads/main`; and
+  `check-actions-enablement.mjs` judges per-workflow repository state, which no ref changes.
+  `check-queued-runs.mjs` is repository-wide by design, so a candidate job stuck waiting for a runner
+  is reported like any other. A bare `gh run list --workflow fork-main-tests.yml -L1` _does_ show a
+  candidate run — add `--branch main` when you mean the nightly.
+
+**Triage in parallel.** Start `gh run watch <id> --repo nplez1/orca --compact --exit-status` as one
+background command and let its exit notify you; meanwhile carry on with Step 3's review and the local
+release gates. A red shard is fixed or classified exactly as a release-lane red is (RELEASE-RUNBOOK.md
+Step 1.5): `gh run download <id> --repo nplez1/orca`, then
+`node local/check-nightly-linux-parity.mjs --failures <dir>`, and hand the reds to a fixer with
+[`repair-tests.md`](./local/sync/templates/repair-tests.md). Commit the fixes and re-run the script on
+the new HEAD.
+
+**Run it again on the final revision**, before `node local/dispatch-release.mjs`, and wait for it to
+pass. The one exemption: a later commit that touches only `local/sync/release-review/*.json` does not
+need a third run, because no test reads a review manifest. Markdown is not exempt — some suites read
+the repository's `*.md` files.
+
+**Clean up after the release ships:** `node local/sync/linux-lane.mjs --cleanup` (`--dry-run` lists)
+deletes the candidate refs `origin/main` already contains and keeps, by name, any whose commit it does
+not, since that ref may be the only remote copy. No workflow in the tree has a `delete` trigger, and the
+runs' history survives the ref.
+
 ## Step 4 — push
 
 The release line's push and its sweep are one command: a workflow file new to that push arrives
@@ -376,6 +449,6 @@ from the new line.
 
 ## Step 6 — release
 
-`gh workflow run fork-release.yml --repo nplez1/orca --ref main`, then follow
-[RELEASE-RUNBOOK.md](./RELEASE-RUNBOOK.md). The version stamps itself as
-`<package.json version>-np.<run number>`, so no number is chosen by hand.
+Follow [RELEASE-RUNBOOK.md](./RELEASE-RUNBOOK.md): its gates, then `node local/dispatch-release.mjs`,
+which refuses an unreviewed or unswept dispatch — not a bare `gh workflow run`. The version stamps
+itself as `<package.json version>-np.<run number>`, so no number is chosen by hand.
