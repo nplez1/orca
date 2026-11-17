@@ -137,7 +137,7 @@ export function describeComparison(comparison, { total, moved = [] }) {
 async function main(argv = process.argv.slice(2), root = process.cwd()) {
   if (!argv.includes('--baseline-init')) {
     process.stderr.write(
-      'usage: node local/sync/lib/deleted-fork-tests.mjs --baseline-init --accept <reason>\n'
+      'usage: node local/sync/lib/deleted-fork-tests.mjs --baseline-init [--accept <reason>]\n'
     )
     return 2
   }
@@ -222,7 +222,7 @@ async function main(argv = process.argv.slice(2), root = process.cwd()) {
         ? `${gone.length} path(s) and ${measuredCases.gone.length} test case(s), and no baseline records them yet`
         : !comparison.bound
           ? `the baseline was written for ${previous.base.slice(0, 10)}/${previous.tip.slice(0, 10)}, not this range`
-          : `${comparison.appeared.length} path(s) and ${newCases} test case(s) this range did not have before, and ${reasonlessCases} test case(s) with no reason of their own`
+          : `${comparison.appeared.length} path(s) and ${newCases} test case(s) this range did not have before${reasonlessCases > newCases ? `, and ${reasonlessCases - newCases} recorded case(s) with no reason of their own` : ''}`
     process.stderr.write(
       `deleted-fork-tests: refusing to record unrecorded loss — ${why}. ` +
         'Pass --accept <reason> when the loss is not this branch\u2019s to fix.\n'
@@ -233,7 +233,8 @@ async function main(argv = process.argv.slice(2), root = process.cwd()) {
     'Fork-modified test files that are gone at HEAD after a sync (deleted by upstream, or by the ' +
     'resolution). Bound to one sync range: a baseline whose base/tip do not match the range being ' +
     'checked records nothing. Regenerate with `node local/sync/lib/deleted-fork-tests.mjs ' +
-    '--baseline-init --accept <reason>`: every lost path and case needs a reason.'
+    '--baseline-init [--accept <reason>]`: a range that adds a path or a case needs a reason, and ' +
+    'every case needs one of its own.'
   // Re-running on the same range is the documented way to lock in a shrink, and it passes no
   // `--accept`; dropping the reason that is already recorded would lose it for good, because this
   // tool has no prune mode to carry it forward.

@@ -20,6 +20,9 @@ import { withPassCache } from './pass-cache.mjs'
 import { STATUS, repoRoot, run, syncOutputDir, tailText } from './run.mjs'
 
 export const NATIVE_DIR = 'native'
+// The release's build system (build-computer-macos.mjs), shared with the cache key: a flag this row
+// compiles with must not change without changing what it thinks it proved.
+const BUILD_SYSTEM = 'native'
 // The `-target` the release's helper scripts pass (config/scripts/native-build/macos/).
 const HELPER_DEPLOYMENT_TARGET = '11.0'
 
@@ -48,7 +51,7 @@ function compile(root, scratch) {
       '--scratch-path',
       path.join(scratch, root.dir),
       '--build-system',
-      'native'
+      BUILD_SYSTEM
     ])
   }
   const arch = process.arch === 'arm64' ? 'arm64' : 'x86_64'
@@ -107,7 +110,7 @@ export function nativeMacosBuild(options = {}) {
       arch: process.arch,
       sdk: sdk.ok ? sdk.stdout.trim() : null,
       target: HELPER_DEPLOYMENT_TARGET,
-      buildSystem: 'native'
+      buildSystem: BUILD_SYSTEM
     },
     noCache: options.noCache,
     check: () => {

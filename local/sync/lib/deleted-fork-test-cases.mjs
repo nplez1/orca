@@ -145,12 +145,14 @@ export function compareDeletedForkCases({ baseline, gone, range }) {
   return { bound, appeared, stale, clean: bound && appeared.length === 0 }
 }
 
-/** The `cases` map a baseline writes: a reason already recorded for a case is kept over the new one. */
-export function buildCaseBaseline(gone, { previous, accepted }) {
+/** The `cases` map a baseline writes: a reason already recorded for a case is kept over the new one. */ export function buildCaseBaseline(
+  gone,
+  { previous, accepted }
+) {
   const cases = {}
   for (const { file, title } of gone) {
     cases[file] ??= {}
-    cases[file][title] = previous?.[file]?.[title] ?? accepted
+    cases[file][title] = caseRecorded(previous, { file, title }) ? previous[file][title] : accepted
   }
   return cases
 }
