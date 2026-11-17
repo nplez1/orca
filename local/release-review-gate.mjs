@@ -26,6 +26,10 @@
  *   node local/release-review-gate.mjs --revision <sha>   validate another revision's
  *   node local/release-review-gate.mjs --print            print the manifest the gate expects
  *
+ * The review itself is prepared, run and recorded by `local/release-review-packets.mjs`, whose
+ * `--print` writes this manifest from the slices' own verdicts. This file stays the authority on
+ * whether that manifest clears.
+ *
  * Exit: 0 complete, 1 refuse, 2 usage.
  */
 import { execFileSync } from 'node:child_process'
@@ -213,7 +217,7 @@ function main(argv) {
     console.error(`release-review-gate: REFUSE — no review manifest for ${revision.slice(0, 12)}`)
     console.error(`  expected: ${manifestPath(revision)}`)
     console.error(
-      `  scaffold one with: node local/release-review-gate.mjs --print > ${manifestPath(revision)}`
+      `  generate one from the review packets: node local/release-review-packets.mjs --print > ${manifestPath(revision)}`
     )
     return 1
   }
