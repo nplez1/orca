@@ -4174,7 +4174,8 @@ reportable, and the fork's own file is one a sync cannot touch at all.
 - Cost: 85 min/week at daily, ~43 at this cadence, and 0 billable minutes on standard runners for a
   public repository.
 - **`*/2` on day-of-month means odd days, so a month with 31 days runs the 31st and then the 1st a day
-  apart.** Harmless, and cheaper than a cron that has to stay in step with month lengths.
+  apart** (and a leap February its 29th and the 1st). Harmless, and cheaper than a cron that has to stay
+  in step with month lengths.
 
 **Upstream's `config/performance-audit.md` still says this lane "runs daily", and is left alone.** The
 sentence is true of upstream's own copy, which keeps its cron, and editing it would put a conflict
@@ -4186,8 +4187,8 @@ file lands on `main`, so `node local/check-actions-enablement.mjs` on the branch
 two and exits 1. That is the same transient `fork-pr-gates.yml` had on 2026-10-29, and the post-merge
 shape is what the table tests pin. `check-fork-lane-red.mjs` reads `cannot tell` (exit 2) on the branch
 for the same reason — its runs endpoint is keyed by workflow file name, and the file is registered by
-the push to `main`. After that push the lane reads `NO RUNS` until its first 15:09, which is exit 0, so
-no false red is possible in between.
+the push to `main`. After that push the lane reads `NO RUNS` until its first scheduled run — 09:15 UTC
+on an odd day — or a dispatch, which is exit 0, so no false red is possible in between.
 
 #### The health issue delegates itself (2026-11-08)
 
