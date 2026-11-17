@@ -25,6 +25,9 @@ const ALIAS_ROOTS = [
   ['tests/', RENDERER_ALIASES]
 ]
 export const ALIAS_PREFIXES = ['@/', '@renderer/']
+/** The project an alias resolves against, by where the importer lives; `''` when no alias applies. */
+export const aliasProject = (from) =>
+  ALIAS_ROOTS.find(([under]) => from.startsWith(under))?.[0] ?? ''
 // Workspace packages resolve through package.json `exports` (`orca-source`), never through a path.
 export const WORKSPACE_PREFIX = '@orca/'
 // Extension and `index` probing is TypeScript's resolution; a JS importer runs under Node, which needs

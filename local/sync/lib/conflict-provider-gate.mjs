@@ -12,7 +12,7 @@
 // modules and a change to what the declaration depends on. The binding is paired by the file it resolves
 // to, not by specifier text, since a relative specifier re-means when its importer moves. That costs
 // coverage; it does not write a wrong file. Anything that cannot be traced refuses.
-import { modulePaths, resolvesInIndex } from './conflict-module-resolve.mjs'
+import { aliasProject, modulePaths, resolvesInIndex } from './conflict-module-resolve.mjs'
 import { parseSource, scriptKindFor, ts } from './ts-source.mjs'
 
 export const SIDES = ['base', 'ours', 'theirs']
@@ -246,16 +246,30 @@ export function swappedProviders({ path, resolvedSf, sides, history }) {
     )
   }
 
-  /** Which side wrote the merged specifier (`null` when it is base's), and the file it names there. */
-  const targetOf = (name, specifier) => {
-    const writer =
-      ours.named.get(name) === specifier
-        ? 'ours'
-        : theirs.named.get(name) === specifier
-          ? 'theirs'
-          : null
+  /**
+   * Which side the merged specifier's meaning belongs to, and the file it names. A side that wrote a text
+   * base did not have is the side that re-pointed it. When the text is base's own, no side re-pointed and
+   * the re-meaning came from a move, so the side that moved the importer is the one whose layout counts;
+   * when that is not exactly one side, neither is privileged and both are checked.
+   */
+  const targetOf = (name, specifier, was) => {
+    const holders = ['ours', 'theirs'].filter(
+      (side) => (side === 'ours' ? ours.named.get(name) : theirs.named.get(name)) === specifier
+    )
+    const movers = holders.filter(
+      (side) => basePath !== path && history.renamedTo(side, basePath) === path
+    )
+    const candidates = specifier === was ? movers : holders
+    const writer = candidates.length === 1 ? candidates[0] : null
     return { writer, target: resolveMerged(writer, specifier) }
   }
+
+  /**
+   * Whether an unchanged specifier can only still name what it named before. A relative path moves with
+   * its importer; an alias resolves from a project root, so it survives a move inside that project.
+   */
+  const keepsItsMeaning = (specifier) =>
+    isRelative(specifier) ? basePath === path : aliasProject(basePath) === aliasProject(path)
 
   // Same bytes are not enough: the other side may resolve an edge elsewhere (a new `types.ts` that
   // TypeScript probes before base's `types/index.ts`), so each edge has to land on the same file.
@@ -300,15 +314,19 @@ export function swappedProviders({ path, resolvedSf, sides, history }) {
         before.set(specifier, to)
       }
     }
-    return modulePaths(moved.sf)
-      .filter(({ specifier, kind }) => {
-        const to = before.get(specifier)
-        return (
-          to !== undefined &&
-          history.resolve(taker, now, specifier, kind) !== history.renamedTo(taker, to)
-        )
-      })
-      .map(({ specifier }) => specifier)
+    return modulePaths(moved.sf).flatMap(({ specifier, kind }) => {
+      const to = before.get(specifier)
+      if (to === undefined) {
+        // An import the other side added to the old module is carried into the moved copy, where it can
+        // re-mean the same way. Only a relative one can be checked without its alias project.
+        return isRelative(specifier) && history.resolve(taker, now, specifier, kind) === null
+          ? [`${specifier} (added, and it resolves to nothing from the move)`]
+          : []
+      }
+      return history.resolve(taker, now, specifier, kind) === history.renamedTo(taker, to)
+        ? []
+        : [specifier]
+    })
   }
 
   const checkNamed = (name, specifier) => {
@@ -317,9 +335,9 @@ export function swappedProviders({ path, resolvedSf, sides, history }) {
       return null // a binding the fork added, or one from a bare package upstream cannot have edited
     }
     // Unchanged text says nothing on its own: a relative specifier re-means when its importer moves, so
-    // only an alias, a workspace package (both resolved from a project root), or an importer still at
-    // its base path can be taken as the same module.
-    if (specifier === was && (!isRelative(was) || basePath === path)) {
+    // only an alias inside its own project, a workspace package (resolved from a project root), or an
+    // importer still at its base path can be taken as the same module.
+    if (specifier === was && keepsItsMeaning(was)) {
       return null
     }
     if (isWorkspace(was)) {
@@ -331,7 +349,7 @@ export function swappedProviders({ path, resolvedSf, sides, history }) {
     }
     // The same specifier text can name another file once the importer moves, so compare the file, not
     // the text. Only the identical path is exempt: a module that moved still needs the `carries` proof.
-    const { writer, target } = targetOf(name, specifier)
+    const { writer, target } = targetOf(name, specifier, was)
     if (target !== null && target === old) {
       return null
     }
@@ -367,9 +385,9 @@ export function swappedProviders({ path, resolvedSf, sides, history }) {
   /** A module reference base had, paired with the same reference in the resolution, or checked on its own. */
   const checkUnnamed = (specifier) => {
     const kept = resolved.unnamed.has(specifier)
-    // An alias or a workspace package resolves from a project root, so its text is its module; a relative
-    // one only keeps its meaning while its importer stays put.
-    if (kept && (!isRelative(specifier) || basePath === path)) {
+    // An alias keeps its project, and a workspace package resolves from a project root; a relative one
+    // only keeps its meaning while its importer stays put.
+    if (kept && keepsItsMeaning(specifier)) {
       return null
     }
     const old = history.resolve('base', basePath, specifier)

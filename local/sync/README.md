@@ -107,8 +107,10 @@ literals re-applied), import-only (three-way union). A proven file must also pas
   the new module is the old one moved and the index holds the merge's own three-way result of that
   move, or when the other side changed nothing, byte for byte, in the old module and everything it
   imports, and resolves every one of those imports to the same file. The move also has to leave the
-  moved copy's own imports naming what the merge carried — a partial move silently re-means `./types`
-  — and its own closure is otherwise not re-checked. Anything it cannot trace refuses: an old module
+  moved copy's own imports naming what the merge carried, including any the other side added — a
+  partial move silently re-means `./types` — and its own closure is otherwise not re-checked. The
+  binding is paired by the side that wrote it, or, when the text is base's own, by the side that
+  moved the importer. Anything it cannot trace refuses: an old module
   that is an `@orca/` package, an `@orca/` import in the closure, a path base cannot resolve, a file
   that does not parse or cannot be read, a merge with more than one merge base, a cherry-pick or
   revert of a merge commit (whose `-m` parent `^` is not).

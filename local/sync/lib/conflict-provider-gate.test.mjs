@@ -390,7 +390,25 @@ test('a same-text specifier is refused when the importer’s own move re-means i
     },
     renames: { theirs: [['src/a/foo.ts', 'src/b/foo.ts']] }
   })
-  assert.match(found.join(), /^S \(now from src\/b\/status\.ts; theirs changed src\/a\/status\.ts/)
+  assert.match(found.join(), /^S \(now from src\/b\/status\.ts; ours changed src\/a\/status\.ts/)
+  // The side that moved the importer is the one whose layout counts, so an old module the *fork* edited
+  // is the one to compare: upstream keeping it byte-identical must still refuse.
+  const kept = movedImporter({
+    path: 'src/b/foo.ts',
+    basePath: 'src/a/foo.ts',
+    baseLine: "import { S } from './status'",
+    oursLine: "import { S } from './status'\nconst fork = 1",
+    sides: {
+      base: { 'src/a/status.ts': 'export const S = 1\n' },
+      ours: { 'src/a/status.ts': 'export const S = 1\nconst FORK = 2\n' },
+      theirs: {
+        'src/a/status.ts': 'export const S = 1\n',
+        'src/b/status.ts': 'export const S = 9\n'
+      }
+    },
+    renames: { theirs: [['src/a/foo.ts', 'src/b/foo.ts']] }
+  })
+  assert.match(kept.join(), /^S \(now from src\/b\/status\.ts; ours changed src\/a\/status\.ts/)
 })
 
 test('a move the merge carried is refused when the moved copy’s own import re-means', () => {
@@ -417,8 +435,10 @@ test('a move the merge carried is refused when the moved copy’s own import re-
     },
     carried: ['src/lib/m.ts']
   }
-  // Both shapes refuse: the same text, and the rewrite a move usually brings with it.
-  assert.match(movedImporter(moved).join(), /^S \(now from src\/lib\/m\.ts; theirs changed/)
+  // Both shapes refuse, and both through the moved copy's imports: base's own text, and the rewrite a
+  // move usually brings with it. (Before the attribution fix, the first fell through to the closure and
+  // refused for the wrong reason, which also made the whole-directory test below pass by accident.)
+  assert.match(movedImporter(moved).join(), /moved copy's \.\/types changed meaning/)
   assert.match(
     movedImporter({
       ...moved,
@@ -427,10 +447,27 @@ test('a move the merge carried is refused when the moved copy’s own import re-
     }).join(),
     /moved copy's \.\/types changed meaning/
   )
+  // An import the other side added to the old module is carried into the moved copy, where it re-means
+  // the same way: here it resolves to nothing at all.
+  const added = {
+    ...moved,
+    sides: {
+      ...moved.sides,
+      theirs: { 'src/lib/m.ts': "export type { S } from './types'\nimport './extra'\n" }
+    }
+  }
+  assert.match(
+    movedImporter({
+      ...added,
+      theirsLine: "import { S } from './m.ts'",
+      resolvedLine: "import { S } from './m.ts'"
+    }).join(),
+    /\.\/extra \(added, and it resolves to nothing from the move\)/
+  )
 })
 
 test('a move the merge carried still passes when the whole directory moved', () => {
-  const found = movedImporter({
+  const moved = {
     path: 'src/lib/use.ts',
     basePath: 'src/x/use.ts',
     baseLine: "import { S } from './m'",
@@ -454,8 +491,13 @@ test('a move the merge carried still passes when the whole directory moved', () 
       ]
     },
     carried: ['src/lib/m.ts']
-  })
-  assert.deepEqual(found, [])
+  }
+  assert.deepEqual(movedImporter(moved), [])
+  // It passes on the merge's pairing proof, not by accident: without it the closure refuses.
+  assert.match(
+    movedImporter({ ...moved, carried: [] }).join(),
+    /^S \(now from src\/lib\/m\.ts; ours changed/
+  )
 })
 
 test('an unchanged reference is left alone: an alias or a workspace package cannot re-mean', () => {
