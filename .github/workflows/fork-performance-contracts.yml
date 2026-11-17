@@ -1,0 +1,40 @@
+name: Fork performance contracts
+
+# Why: `performance-contracts.yml` runs `config/vitest.performance.config.ts`, which the nightly unit
+# suite does not cover, and its `pull_request` trigger is path-gated to ~18 named contract files — so a
+# change that slows something down without touching one of them was caught by nothing after #288
+# removed upstream's inherited cron from that file.
+#
+# Why a caller instead of putting the cron back in that file: `FORK_SCHEDULES` reports a cron on a file
+# it has no entry for, and `EXPECTED_TRIGGERS` pins a lane's trigger *keys*, not the cron's value — so
+# listing upstream's file there would switch the guard off for exactly the file 2026-11-06 was about,
+# and a sync restoring its daily `15 9 * * *` would then be silent. Keeping the clock in a fork-owned
+# file leaves that file's own `schedule:` a reportable event, and a sync cannot touch this one at all.
+#
+# Why every other day: measured 2026-11-01..07, this lane was 85 min/week at daily and 43 at this
+# cadence, against ~1,875 min/week for the whole repo before #288. The contracts count operations and
+# retained memory rather than wall clock, so a day's drift is not a day's lost signal.
+#
+# Why `workflow_dispatch` as well: a red row from `check-fork-lane-red.mjs` is cleared by the next
+# verdict on `main`, and a dispatch is the only way to produce one without waiting for the clock.
+on:
+  schedule:
+    - cron: '15 9 */2 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Why the ref is in the group: a dispatch can target any branch, and one on a feature branch must not
+  # cancel the release line's run. Why the group is not the callee's: a called workflow shares the
+  # caller's `github` context, so the callee's own group resolves to `performance-contracts-<ref>` — two
+  # workflows in one group deadlock, and GitHub resolves that by cancelling the run.
+  group: fork-performance-contracts-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contracts:
+    # Why no `timeout-minutes`: the key is not allowed on a job that calls a reusable workflow. The
+    # callee's own 20 minutes per matrix leg is the bound, and it is the one that matters.
+    uses: ./.github/workflows/performance-contracts.yml

@@ -6,8 +6,9 @@
 // is logic; every entry carries the reason it exists.
 
 // Must stay enabled: the release build, the daily v* tag mirror, the nightly full unit suite, the
-// cheap PR lane, the daily health check that watches the rest, and the lanes enabled on
-// 2026-10-31 after the cost premise was measured to be zero (LOCAL-PATCHES.md § local(ci)).
+// cheap PR lane, the daily health check that watches the rest, the perf contracts and the fork-owned
+// caller that puts them on a clock, and the lanes enabled on 2026-10-31 after the cost premise was
+// measured to be zero (LOCAL-PATCHES.md § local(ci)).
 export const REQUIRED = [
   '.github/workflows/fork-release.yml',
   '.github/workflows/fork-upstream-tags.yml',
@@ -40,8 +41,13 @@ export const REQUIRED = [
   '.github/workflows/node-server-tests.yml',
   // Why: auto-update correctness, ~7 min of macOS across six observed PR runs.
   '.github/workflows/macos-updater-tests.yml',
-  // Why: perf regression contract on PRs and nightly, 21 of 24 observed runs green.
-  '.github/workflows/performance-contracts.yml'
+  // Why: perf regression contract on PRs, and every other day through `fork-performance-contracts.yml`
+  // — the contracts config is separate from the nightly unit suite, so nothing else covers it.
+  '.github/workflows/performance-contracts.yml',
+  // Why: the clock for the lane above. It is a fork-owned caller rather than a `schedule:` on that
+  // upstream file, because `FORK_SCHEDULES` reports a cron only on a file it has no entry for — listing
+  // the upstream file there would make a sync restoring its own cron silent.
+  '.github/workflows/fork-performance-contracts.yml'
 ]
 
 // Inert without a manual dispatch or a caller — active is fine, and so is disabled. Their pinned
@@ -79,7 +85,12 @@ export const EXPECTED_TRIGGERS = {
   '.github/workflows/mobile.yml': ['pull_request', 'push'],
   '.github/workflows/node-server-tests.yml': ['pull_request', 'workflow_dispatch', 'workflow_call'],
   '.github/workflows/macos-updater-tests.yml': ['pull_request', 'workflow_dispatch'],
-  '.github/workflows/performance-contracts.yml': ['workflow_dispatch', 'pull_request'],
+  '.github/workflows/performance-contracts.yml': [
+    'workflow_dispatch',
+    'pull_request',
+    'workflow_call'
+  ],
+  '.github/workflows/fork-performance-contracts.yml': ['schedule', 'workflow_dispatch'],
   '.github/workflows/zcode-account-contract.yml': ['workflow_dispatch'],
   '.github/workflows/unit-module-cache-benchmark.yml': ['workflow_dispatch'],
   '.github/workflows/windows-native-preparation-benchmark.yml': ['workflow_dispatch'],
@@ -115,7 +126,9 @@ export const FORK_SCHEDULES = {
   '.github/workflows/fork-ci-health.yml':
     'watches the other lanes; a watchdog with no clock is not one',
   '.github/workflows/fork-upstream-tags.yml':
-    "mirrors upstream's release tags, which the fork's release line is cut from"
+    "mirrors upstream's release tags, which the fork's release line is cut from",
+  '.github/workflows/fork-performance-contracts.yml':
+    'every other day: the perf contracts, which the nightly unit suite does not run and whose PR leg is path-gated'
 }
 
 /**
