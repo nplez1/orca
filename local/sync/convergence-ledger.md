@@ -931,6 +931,17 @@ barrel. The barrel's own `.test.ts` extension is upstream's and stays. Nineteen 
 twentieth new `.spec.ts` is `tui-agent-startup.spec.ts`, the case above, whose fork expectations were
 re-homed by that same commit.
 
+**2026-11-17 addendum.** `b9b4a115c53` (`#42316`, "remove low-value CLI dashboard and browser
+examples") deleted the only tests pinning Pi launch-time model selection: the whole of
+`src/shared/agent-launch/choices/agent-launch-model-preferences.test.ts` and the
+`agent.launch.pi-model.v1` refusal case in `src/cli/index-agent-launch.test.ts`. That was collateral —
+the feature those tests covered (`#41006`, `#42255`) is live and is the only way a caller can pin a Pi
+worker to a named model — so the coverage came back under this section's rule rather than as a
+restored file: the Pi cases live in the surviving `agent-session-option-catalog.test.ts`, next to the
+catalog they cover, and the capability refusal in the surviving `index-agent-launch.test.ts`. A sync
+that renames `checkAgentLaunchModelPreferences`, `resolveAgentSessionOptionLaunch` or the launch
+catalog keeps those two suites compiling; do not restore the retired file to hold them.
+
 ---
 
 ## Node-runtime test inclusion
