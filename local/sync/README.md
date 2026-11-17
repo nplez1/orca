@@ -6,15 +6,15 @@ real breakage are one command instead of a list you read off a runbook at the en
 
 The process they belong to is [UPSTREAM-SYNC-RUNBOOK.md](../../UPSTREAM-SYNC-RUNBOOK.md).
 
-| Tool                    | Use it when                                    | Mutates anything?                                                                        |
-| ----------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `pre-sync.mjs`          | before starting a sync                         | refs and git config only with `--prepare`; the catalog gate rewrites the derived catalog |
-| `conflicts.mjs`         | stopped in a conflict, or to predict one       | no                                                                                       |
-| `post-sync.mjs`         | the tree is resolved and you are about to push | the catalog check rewrites the derived catalog (that rewriting _is_ the check)           |
-| `identity-sweep.mjs`    | any time the tree is not conflicted            | only with `--fix`                                                                        |
-| `fork-symbols.mjs`      | after the merge, beside post-sync              | no                                                                                       |
-| `linux-lane.mjs`        | post-sync and `pnpm tc` pass; again at the end | pushes a `sync-candidate/<sha12>` ref and dispatches `fork-main-tests.yml` on it         |
-| `convergence-ledger.md` | every time a convergence question comes up     | edit it when you settle one                                                              |
+| Tool                    | Use it when                                    | Mutates anything?                                                                                                              |
+| ----------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `pre-sync.mjs`          | before starting a sync                         | refs and git config only with `--prepare`; the catalog gate rewrites the derived catalog                                       |
+| `conflicts.mjs`         | stopped in a conflict, or to predict one       | no                                                                                                                             |
+| `post-sync.mjs`         | the tree is resolved and you are about to push | the catalog check rewrites the derived catalog (that rewriting _is_ the check); its report and row caches go under the git dir |
+| `identity-sweep.mjs`    | any time the tree is not conflicted            | only with `--fix`                                                                                                              |
+| `fork-symbols.mjs`      | after the merge, beside post-sync              | no                                                                                                                             |
+| `linux-lane.mjs`        | post-sync and `pnpm tc` pass; again at the end | pushes a `sync-candidate/<sha12>` ref and dispatches `fork-main-tests.yml` on it                                               |
+| `convergence-ledger.md` | every time a convergence question comes up     | edit it when you settle one                                                                                                    |
 
 **Neither sync script is read-only.** `pre-sync.mjs` and `post-sync.mjs` both run
 `pnpm run sync:localization-runtime-catalog`, which rewrites the derived catalog with `--fix`; that
@@ -108,10 +108,13 @@ the builder config, the update-feed anchors and the whole `src/main/updater/` tr
 package script `LOCAL-PATCHES.md` cites (`citedGuards`), the lost-content diff, the exported surface of
 every deleted fork-only module (each name searched for a surviving reference — a deleted module is
 invisible to a modified-files diff), the fork-modified test files the sync left gone
-(`upstreamDeletedForkTests`, baselined per sync range), the fork-added names a merged file no longer
+(`upstreamDeletedForkTests`, baselined per sync range) and the fork-added test cases in no test file
+at HEAD (same row and baseline, acknowledged per case), the fork-added names a merged file no longer
 declares (`forkSymbolSurvival`, so `fork-symbols.mjs` below runs as one row of this command rather than
-as a step somebody has to remember), fork-added module specifiers that resolve to nothing at HEAD, and
-`pnpm tc`. "Skipped" and "unavailable"
+as a step somebody has to remember), fork-added module specifiers that resolve to nothing at HEAD, every Swift target under `native/`
+compiling, and `pnpm tc`. Every run saves its report to `<git-dir>/orca-sync/post-sync-last.txt`
+(and `.json`): read that rather than re-running, and re-check one row with `--only <id>`. A partial run
+never retires the state file, and the typecheck and native rows cache a PASS per exact content. "Skipped" and "unavailable"
 are reported as themselves; `unavailable` fails the run unless `--waive <id>:<reason>` records why, and
 the waiver is printed. A clean run deletes the pre-sync state file, and the tip and base every range
 check uses are checked against HEAD's own parents first (`lib/sync-range.mjs`).

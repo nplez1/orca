@@ -54,8 +54,11 @@ export function run(command, args, options = {}) {
   const spawn = {
     cwd: options.cwd,
     encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: [options.input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
     maxBuffer: 256 * 1024 * 1024
+  }
+  if (options.input !== undefined) {
+    spawn.input = options.input
   }
   if (options.timeoutMs) {
     spawn.timeout = options.timeoutMs
@@ -93,7 +96,11 @@ export function repoRoot() {
 }
 
 export function git(args, options = {}) {
-  return run('git', args, { cwd: options.cwd ?? repoRoot(), timeoutMs: options.timeoutMs })
+  return run('git', args, {
+    cwd: options.cwd ?? repoRoot(),
+    timeoutMs: options.timeoutMs,
+    input: options.input
+  })
 }
 
 // Trimmed stdout, or null when the command failed — the shape most ref lookups want.
@@ -171,6 +178,15 @@ export function stateFilePath() {
   return path.join(gitDir(), STATE_FILE_NAME)
 }
 
+/**
+ * Where post-sync keeps what a later run or a reader needs: the last report and the row caches. Beside
+ * the state file, in the per-worktree git dir, for the same reason — nothing here may become a tracked
+ * or ignorable path.
+ */
+export function syncOutputDir() {
+  return path.join(gitDir(), 'orca-sync')
+}
+
 export function readSyncState() {
   for (const [source, file] of [
     ['git-dir state file', stateFilePath()],
@@ -212,6 +228,16 @@ export class Report {
     this.checks = []
     this.waived = new Map()
     this.ignoredWaivers = []
+    this.partial = null
+  }
+
+  /**
+   * A run of selected rows. It can pass, but it is never a clean run of the whole report: the verdict
+   * line says so, and the result is `partial-pass`, so nothing that reads either can take it for one.
+   */
+  markPartial(only, total) {
+    this.partial = { only: [...only], total }
+    return this
   }
 
   // Positional rather than an options object: both tools add eight checks, and the field names
@@ -273,7 +299,8 @@ export class Report {
   }
 
   result() {
-    return this.ok ? 'pass' : 'fail'
+    const verdict = this.ok ? 'pass' : 'fail'
+    return this.partial === null ? verdict : `partial-${verdict}`
   }
 
   render(summary) {
@@ -321,7 +348,14 @@ export class Report {
               .map((check) => check.id)
               .join(', ')} (waive one with --waive <id>:<reason>)`
           : `result: PASS — no hard gate failed${this.waived.size > 0 ? `, ${this.waived.size} waived` : ''}`
-    lines.push(verdict)
+    lines.push(
+      this.partial === null
+        ? verdict
+        : verdict.replace(
+            /^result: (\w+)/,
+            `result: PARTIAL $1 (--only ${this.partial.only.join(',')}: ${this.checks.length} of ${this.partial.total} check(s), not a clean post-sync run)`
+          )
+    )
     for (const failure of this.failures) {
       lines.push(`  fix: ${failure.look}`)
     }
@@ -337,6 +371,7 @@ export class Report {
       generatedAt: new Date().toISOString(),
       meta: this.meta,
       result: this.result(),
+      ...(this.partial === null ? {} : { partial: this.partial }),
       checks: this.checks,
       notRun: this.notRun.map((check) => ({ id: check.id, status: check.status })),
       unwaived: this.unwaived.map((check) => check.id),
