@@ -8,8 +8,9 @@
  * pull_request/push/schedule trigger then spends minutes and adds mystery checks to every PR.
  *
  *   node local/check-actions-enablement.mjs          report only; exit 1 on drift
- *   node local/check-actions-enablement.mjs --fix    disable everything that drifted, and stop the
- *                                                   runs it had already started
+ *   node local/check-actions-enablement.mjs --fix    disable everything that drifted, stop the runs it
+ *                                                   had already started, and re-enable a `REQUIRED`
+ *                                                   lane that was turned off
  *
  * Four things this does beyond comparing names, because a name is not what spends the minutes:
  *
@@ -30,12 +31,23 @@
  *   queued and in-progress runs of whatever it disables, because disabling a workflow does not stop a
  *   run that is already going.
  *
- * Exit codes: 0 clean, 1 drift or an unverifiable entry, 2 cannot reach the API — "cannot tell" is
- * never a pass — and 3 a finding only a person may resolve: a **fork-owned** lane is enabled and is not
- * on the live list, which a sync cannot have caused, and the only two remedies are disabling a lane
- * someone enabled on purpose or widening the list to hide it. A `REQUIRED` lane that changed shape stays
- * at 1 and is delegable, because correcting its pin is a decision an agent can make and record.
+ * `--fix` works in **both** directions since 2026-11-19. Disabling inherited drift was always
+ * self-healing; re-enabling a `REQUIRED` lane that someone turned off was not, and that direction is
+ * the one a diff cannot fix — so the delegation it produced could never close its own issue. See
+ * `planEnables` for the guard that stops it restoring a lane whose shape is itself a hazard.
+ *
+ * Exit codes: 0 clean, 1 drift or an unverifiable entry that a diff can fix, 2 cannot reach the API —
+ * "cannot tell" is never a pass — and 3 a finding only a person may resolve, which means repository
+ * state rather than a file. Two cases reach 3: a **fork-owned** lane is enabled and is not on the live
+ * list, which a sync cannot have caused and whose only remedies are disabling a lane someone enabled on
+ * purpose or widening the list to hide it; and a `REQUIRED` lane that is present but off, because
+ * restoring it is `gh workflow enable` and no branch can carry it. A `REQUIRED` lane that changed shape
+ * stays at 1 and is delegable, because correcting its pin is a decision an agent can make and record.
  * `local/ci-health-report.mjs` reads those codes: 1 delegates to the autonomous pipeline, 2 and 3 do not.
+ *
+ * Why a lane the sweep *held* is 3 and not 1: its remedy looks like a diff, but a person may have turned
+ * the lane off because of the shape it is held for, so undoing that is their call rather than a scoped
+ * defect. Exit 1 would hand an agent a red whose only correct answer is "ask a person".
  */
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
@@ -50,13 +62,21 @@ import {
   REQUIRED
 } from './actions-enablement-contract.mjs'
 import { isForkOwnedPath } from './fork-owned-paths.mjs'
+import { REPO, applyFixes, firstLine, residualProblems } from './actions-enablement-sweep.mjs'
 
-const REPO = 'nplez1/orca'
 const ROOT = resolve(import.meta.dirname, '..')
 
 // Re-exported: `LOCAL-PATCHES.md` § local(ci) and both test files name this module's `REQUIRED`, and a
 // name that moved is a doc that stopped being true.
 export { ACCEPTED_RUNNER_LABELS, ALLOWED_INERT, EXPECTED_TRIGGERS, FORK_SCHEDULES, REQUIRED }
+// Same reason for the sweep half, which moved to its own module on 2026-11-19 to stay inside the
+// 600-counted-line budget: the callers and tests name these on this module.
+export {
+  CANCELLABLE_STATUSES,
+  applyFixes,
+  cancellableRuns,
+  residualProblems
+} from './actions-enablement-sweep.mjs'
 
 /**
  * Runner families this fork does not provision, as patterns rather than one vendor's prefix. A job
@@ -89,15 +109,6 @@ function unprovisionedIn(value) {
 
 /** Triggers that run with a write token against a fork's code. Never acceptable on an active file. */
 const FORBIDDEN_TRIGGERS = new Set(['pull_request_target', 'workflow_run'])
-
-/** Run states that would still execute, i.e. that `--fix` has to cancel rather than wait out. */
-export const CANCELLABLE_STATUSES = new Set([
-  'queued',
-  'requested',
-  'waiting',
-  'pending',
-  'in_progress'
-])
 
 /**
  * The `on:` keys of a workflow file. Handles the three shapes GitHub accepts — `on: push`,
@@ -237,13 +248,6 @@ export function judgeActionsEnabled(payload) {
     reason: `Actions is disabled for ${REPO}, so no lane here can run at all`,
     allowedActions: payload.allowed_actions ?? null
   }
-}
-
-/** The runs `--fix` must cancel: disabling a workflow does not touch a run already going. */
-export function cancellableRuns(runs) {
-  return (runs ?? [])
-    .filter((run) => CANCELLABLE_STATUSES.has(run.status))
-    .map((run) => run.databaseId)
 }
 
 const sameTriggers = (left, right) =>
@@ -443,29 +447,6 @@ export function judgeEnablement(
   }
 }
 
-/**
- * The problems left after a run: under `--fix`, a target that was disabled (and had its runs
- * cancelled) is resolved. One that failed to disable is not — and neither is one that was disabled
- * but still has a run this command could not cancel.
- */
-export function residualProblems({ verdict, fix = false, disabled = [], failed = [] }) {
-  const handled = new Set(fix ? disabled : [])
-  for (const path of failed) {
-    handled.delete(path)
-  }
-  const outstanding = verdict.disableTargets.filter((target) => !handled.has(target.path)).length
-  return (
-    outstanding +
-    verdict.needsDecision.length +
-    verdict.missing.length +
-    verdict.stale.length +
-    verdict.unreadable.length +
-    verdict.unapprovedRunners.length +
-    verdict.forbiddenTriggers.length +
-    verdict.inheritedSchedules.length
-  )
-}
-
 function gh(args) {
   return execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 })
 }
@@ -516,74 +497,106 @@ export function readFacts(paths, root = ROOT) {
   return facts
 }
 
-function firstLine(error) {
-  return String(error?.message ?? error)
-    .split('\n')[0]
-    .trim()
-}
-
 /**
- * Print the verdict, disabling and cancelling under `--fix`, and return the paths it handled plus
- * the ones it could not.
+ * The `REQUIRED` lanes `--fix` may turn back on, and the ones it must not.
  *
- * `runGh` is a parameter so the two failure modes a real `gh` hides — disabling succeeded but the run
- * lookup failed, and the cancel itself failing — are covered by tests without a network.
+ * Why this exists at all: `REQUIRED` already means "disabled is drift", but the check could only
+ * *report* a disabled lane, and the remedy is `gh workflow enable` — repository state, so no branch can
+ * carry it. The health report therefore delegated the finding to an agent, which opened a PR that could
+ * not contain the fix. That is the same trap `LOCAL-PATCHES.md` § local(ci) records for the disable
+ * direction, mirrored, and it is what issue #447 was.
+ *
+ * Why the lanes are judged *as if they were on* rather than enabled on sight: the trigger, runner and
+ * cron checks in `judgeEnablement` only loop over active files, so a disabled lane has never been
+ * judged at all. Restoring one unchecked could bring back a runner label nothing provisions (a 24 h
+ * queue), a write-token trigger, or an inherited cron — the 2026-11-06 shape. A lane that fails any of
+ * those stays off and says why: an off lane is the lesser hazard. An ordinary red test is not a reason
+ * to hold one back; `check-fork-lane-red` gives that an owner.
+ *
+ * A held lane still exits 3 rather than 1 even though its own remedy is a diff: see the exit-code note
+ * in this module's header for why. Read the rest of the exit-3 rule there too.
+ *
+ * An `absent` lane is never a target: restoring the file is a diff, which is exactly what an agent can
+ * carry, so it stays a plain `MISSING` at exit 1.
  */
-export function applyFixes(verdict, fix, runGh = gh, log = console.log) {
-  const disabled = []
-  const failed = []
-  for (const target of verdict.disableTargets) {
-    if (!fix) {
-      continue
-    }
-    if (target.id === null) {
-      failed.push(target.path)
-      console.error(`  FAILED   no workflow id to disable for ${target.path}`)
-      continue
-    }
-    try {
-      runGh(['workflow', 'disable', String(target.id), '--repo', REPO])
-      disabled.push(target.path)
-      log(`  disabled ${target.path} (${target.why})`)
-    } catch (error) {
-      failed.push(target.path)
-      console.error(`  FAILED   could not disable ${target.path}: ${firstLine(error)}`)
-      continue
-    }
-    // Cancelling is a second step on purpose: disabling does not stop a run already going, and the
-    // run ids are read by workflow id (which works for a disabled workflow) rather than by path.
-    try {
-      const runs = cancellableRuns(
-        JSON.parse(
-          runGh([
-            'run',
-            'list',
-            '--repo',
-            REPO,
-            '--workflow',
-            String(target.id),
-            '--limit',
-            '50',
-            '--json',
-            'databaseId,status'
-          ])
-        )
-      )
-      for (const runId of runs) {
-        runGh(['run', 'cancel', String(runId), '--repo', REPO])
-      }
-      if (runs.length > 0) {
-        log(`  cancelled ${runs.length} run(s) of ${target.path} that were still going`)
-      }
-    } catch (error) {
-      failed.push(target.path)
-      const reason = firstLine(error)
-      console.error(
-        `  FAILED   ${target.path} is disabled, but its running jobs could not be cancelled: ${reason}`
-      )
+export function planEnables({ workflows, facts = {} }, options = {}) {
+  const { required = REQUIRED } = options
+  const byPath = new Map(workflows.map((workflow) => [workflow.path, workflow]))
+  const off = required
+    .map((path) => ({ path, workflow: byPath.get(path) }))
+    .filter(({ workflow }) => workflow !== undefined && workflow.state !== 'active')
+  if (off.length === 0) {
+    return { enableTargets: [], blockedEnables: [] }
+  }
+  const offPaths = new Set(off.map((entry) => entry.path))
+  const flipped = workflows.map((workflow) =>
+    offPaths.has(workflow.path) ? { ...workflow, state: 'active' } : workflow
+  )
+  const verdict = judgeEnablement({ workflows: flipped, facts }, options)
+  const blockers = new Map()
+  const block = (path, why) => {
+    if (!blockers.has(path)) {
+      blockers.set(path, why)
     }
   }
-  return { disabled, failed }
+  // Ordered by how actionable the reason is, because the first one that matches is the one printed: a
+  // hazard in the lane beats a hazard in something it calls, which beats a pin that no longer matches,
+  // which in turn beats "unproven".
+  for (const entry of verdict.forbiddenTriggers) {
+    block(entry.path, `${entry.triggers.join(', ')} runs with a write token`)
+  }
+  for (const entry of verdict.inheritedSchedules) {
+    block(entry.path, 'it carries a cron this fork never asked for')
+  }
+  const runnerHazards = new Map()
+  for (const entry of verdict.unapprovedRunners) {
+    block(entry.path, `it asks for ${entry.labels.join(', ')}, which this fork does not provision`)
+    runnerHazards.set(entry.path, entry.labels)
+  }
+  const readHazards = new Map()
+  for (const entry of verdict.unreadable) {
+    block(entry.path, `it cannot be read: ${entry.reason}`)
+    readHazards.set(entry.path, entry.reason)
+  }
+  // A callee's hazard is the lane's hazard: a called workflow runs whatever its own enablement state is,
+  // so restoring the caller would put that label on triggers it did not have. Walked from each lane
+  // rather than read off `reachedFrom`, which is only whoever reached the file first — a callee shared
+  // with an active lane is attributed to that lane, and the off lane would otherwise go unheld.
+  for (const { path } of off) {
+    const seen = new Set()
+    const queue = [...(facts[path]?.callees ?? [])]
+    while (queue.length > 0) {
+      const reached = queue.shift()
+      if (seen.has(reached) || reached === path) {
+        continue
+      }
+      seen.add(reached)
+      queue.push(...(facts[reached]?.callees ?? []))
+      if (runnerHazards.has(reached)) {
+        block(path, `it calls ${reached}, which asks for ${runnerHazards.get(reached).join(', ')}`)
+      }
+      if (readHazards.has(reached)) {
+        block(path, `it calls ${reached}, which cannot be read: ${readHazards.get(reached)}`)
+      }
+    }
+  }
+  for (const drift of verdict.triggerDrift) {
+    block(drift.path, `its triggers changed shape: [${drift.all.join(', ')}]`)
+  }
+  for (const pinned of verdict.unpinned) {
+    block(pinned.path, 'no triggers are pinned for it')
+  }
+  const enableTargets = []
+  const blockedEnables = []
+  for (const { path, workflow } of off) {
+    const why = blockers.get(path)
+    if (why === undefined) {
+      enableTargets.push({ path, id: workflow.id, state: workflow.state })
+    } else {
+      blockedEnables.push({ path, state: workflow.state, why })
+    }
+  }
+  return { enableTargets, blockedEnables }
 }
 
 function report(verdict, fix) {
@@ -604,6 +617,11 @@ function report(verdict, fix) {
   }
   for (const m of verdict.missing) {
     console.log(`  MISSING  required but ${m.state}: ${m.path}`)
+  }
+  for (const held of verdict.blockedEnables ?? []) {
+    console.log(
+      `  HELD     required but ${held.state}, and not re-enabled because ${held.why}: ${held.path}`
+    )
   }
   for (const s of verdict.stale) {
     console.log(`  STALE    pinned entry with ${s.reason}: ${s.path}`)
@@ -645,14 +663,26 @@ function report(verdict, fix) {
     console.log(`  UNKNOWN  cannot read the workflow: ${u.path}: ${u.reason}`)
   }
 
-  const { disabled, failed } = applyFixes(verdict, fix)
+  const { enabled, disabled, failed } = applyFixes(verdict, fix, gh)
   const residual = residualProblems({ verdict, fix, disabled, failed })
   if (verdict.actionsDisabled) {
     return residual + 1
   }
   if (residual > 0) {
-    if (verdict.disableTargets.length > 0 && !fix) {
+    if ((verdict.disableTargets.length > 0 || (verdict.enableTargets ?? []).length > 0) && !fix) {
       console.log('  fix: node local/check-actions-enablement.mjs --fix')
+    }
+    if (enabled.length > 0) {
+      console.log(
+        '  the sweep re-enabled a required lane and this run stays red on purpose, so the change is' +
+          ' reported rather than silent: the next run reads it active and closes the issue'
+      )
+    }
+    if (verdict.blockedEnables?.length > 0) {
+      console.log(
+        '  a lane held back is off for a reason of its own — fix the shape it is held for, then the' +
+          ' next run restores it. Do not widen REQUIRED to make this check green.'
+      )
     }
     if (
       verdict.triggerDrift.length > 0 ||
@@ -694,7 +724,12 @@ function report(verdict, fix) {
           'a person decides whether it belongs here. Do not disable it to make this check green.'
       )
     }
+    const offTargets = new Set((verdict.enableTargets ?? []).map((target) => target.path))
     for (const path of failed) {
+      if (offTargets.has(path)) {
+        console.log(`  STILL    ${path} could not be re-enabled`)
+        continue
+      }
       // A workflow can be off and still be a problem: disabling does not stop a run already going.
       console.log(
         disabled.includes(path)
@@ -707,9 +742,12 @@ function report(verdict, fix) {
 }
 
 /**
- * The exit code for a finished run, from the verdict alone so it can be pinned by a test: 3 only when a
- * fork-owned lane is enabled and nobody listed it, which is the one finding whose two remedies — disable
- * it, or widen the list — are both forbidden to an agent. Everything else that is red stays 1.
+ * The exit code for a finished run, from the verdict alone so it can be pinned by a test. 3 means the
+ * finding is repository state, not a file, so no branch can carry the fix and an agent handed it would
+ * open a PR that cannot close the issue. Two findings are that shape: a fork-owned lane enabled and
+ * nobody listing it (the remedies are disable it or widen the list, both forbidden to an agent), and a
+ * `REQUIRED` lane that is present but off (the remedy is `gh workflow enable`). An `absent` lane stays
+ * at 1, because restoring the file *is* a diff. Everything else that is red stays 1.
  */
 export function exitCodeFor(verdict, residual) {
   if (residual === 0) {
@@ -718,7 +756,8 @@ export function exitCodeFor(verdict, residual) {
   const decided = verdict.needsDecision.some(
     (entry) => entry.kind === 'fork-owned' && !entry.listed
   )
-  return decided ? 3 : 1
+  const restorable = (verdict.missing ?? []).some((entry) => entry.state !== 'absent')
+  return decided || restorable ? 3 : 1
 }
 
 function main() {
@@ -740,11 +779,10 @@ function main() {
     actionsEnabled = null
   }
 
-  const verdict = judgeEnablement({
-    workflows,
-    facts: readFacts(Object.keys(EXPECTED_TRIGGERS), ROOT)
-  })
+  const facts = readFacts(Object.keys(EXPECTED_TRIGGERS), ROOT)
+  const verdict = judgeEnablement({ workflows, facts })
   verdict.actionsDisabled = actionsEnabled
+  Object.assign(verdict, planEnables({ workflows, facts }))
   const residual = report(verdict, fix)
   const code = exitCodeFor(verdict, residual)
   if (code !== 0) {

@@ -66,12 +66,16 @@ jobs:
         with:
           native-runtime: none
 
-      # `--fix` lets the enablement check clear inherited drift itself. What it may disable is decided
-      # in `local/check-actions-enablement.mjs`: never a `REQUIRED` lane, and never a fork-owned one
-      # (`.github/workflows/fork-*.yml`), because a sync cannot have added those — a person did, so a
-      # person decides (that case exits 3, which withholds `agent:auto`). What it disabled is quoted into
-      # the close comment when an issue was open; when none was, the run log and the workflows' own
-      # `disabled_manually` state are the record.
+      # `--fix` lets the enablement check clear inherited drift itself, and restore a `REQUIRED` lane
+      # that was turned off. What it may disable is decided in `local/check-actions-enablement.mjs`:
+      # never a `REQUIRED` lane, and never a fork-owned one (`.github/workflows/fork-*.yml`), because a
+      # sync cannot have added those — a person did, so a person decides (that case exits 3, which
+      # withholds `agent:auto`). What it may re-enable is `planEnables`' call: only a lane whose shape
+      # would pass the active-lane checks, so restoring one cannot bring back a 24 h queue, a
+      # write-token trigger or an inherited cron. A day that re-enabled something still exits 3 — the
+      # change is reported instead of silent, and the next clean run closes the issue. What it disabled
+      # is quoted into the close comment when an issue was open; when none was, the run log and the
+      # workflows' own `disabled_manually` state are the record.
       - name: Run the health checks and report
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

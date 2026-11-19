@@ -7,7 +7,9 @@ import {
   applyFixes,
   REQUIRED,
   cancellableRuns,
+  exitCodeFor,
   judgeEnablement,
+  planEnables,
   readFacts,
   residualProblems,
   triggersOf,
@@ -265,7 +267,11 @@ describe('applying --fix', () => {
 
     const result = applyFixes(driftState(), true, failingGh(calls), () => {})
 
-    expect(result).toEqual({ disabled: ['.github/workflows/wsl-orcad-e2e.yml'], failed: [] })
+    expect(result).toEqual({
+      enabled: [],
+      disabled: ['.github/workflows/wsl-orcad-e2e.yml'],
+      failed: []
+    })
     expect(calls[0]).toEqual(['workflow', 'disable', '7', '--repo', 'nplez1/orca'])
     expect(calls[1]).toEqual(expect.arrayContaining(['run', 'list', '--workflow', '7']))
     expect(calls[1]).not.toContain('.github/workflows/wsl-orcad-e2e.yml')
@@ -277,6 +283,7 @@ describe('applying --fix', () => {
     const calls = []
 
     expect(applyFixes(driftState(), false, failingGh(calls), () => {})).toEqual({
+      enabled: [],
       disabled: [],
       failed: []
     })
@@ -293,7 +300,11 @@ describe('applying --fix', () => {
       () => {}
     )
 
-    expect(result).toEqual({ disabled: [], failed: ['.github/workflows/wsl-orcad-e2e.yml'] })
+    expect(result).toEqual({
+      enabled: [],
+      disabled: [],
+      failed: ['.github/workflows/wsl-orcad-e2e.yml']
+    })
   })
 
   it('keeps a disabled workflow disabled and outstanding when the cancel step fails', () => {
@@ -311,5 +322,134 @@ describe('applying --fix', () => {
         failed: result.failed
       })
     ).toBe(1)
+  })
+})
+
+// The mirror of the disable sweep. A `REQUIRED` lane that is present but off is repository state, so no
+// branch can carry the fix: issue #447 was three of them, delegated to an agent whose PR could not
+// contain the answer. These cases pin both halves — that it is restored, and that it is restored
+// *visibly*, since `disabled_manually` only ever comes from a deliberate act.
+describe('restoring a required lane the sweep can restore', () => {
+  const off = '.github/workflows/performance-contracts.yml'
+
+  const offState = (mutate) => {
+    const state = healthy()
+    state.workflows = state.workflows.map((workflow) =>
+      workflow.path === off ? { ...workflow, id: 11, state: 'disabled_manually' } : workflow
+    )
+    mutate?.(state)
+    return state
+  }
+
+  const verdictFor = (state) => ({ ...judgeEnablement(state), ...planEnables(state) })
+
+  it('targets a required lane that is off, and enables it by workflow id', () => {
+    const verdict = verdictFor(offState())
+
+    expect(verdict.enableTargets).toEqual([{ path: off, id: 11, state: 'disabled_manually' }])
+
+    const calls = []
+    const result = applyFixes(
+      verdict,
+      true,
+      (args) => {
+        calls.push(args)
+        return ''
+      },
+      () => {}
+    )
+
+    expect(calls).toEqual([['workflow', 'enable', '11', '--repo', 'nplez1/orca']])
+    expect(result.enabled).toEqual([off])
+  })
+
+  it('stays outstanding and exits 3 on the day it restored one, rather than reading clean', () => {
+    const verdict = verdictFor(offState())
+    const residual = residualProblems({ verdict, fix: true, disabled: [], failed: [] })
+
+    expect(residual).toBe(1)
+    expect(exitCodeFor(verdict, residual)).toBe(3)
+  })
+
+  it('never targets a lane whose file is gone, because restoring that is a diff', () => {
+    const state = healthy()
+    state.workflows = state.workflows.filter((workflow) => workflow.path !== off)
+    const verdict = verdictFor(state)
+
+    expect(verdict.enableTargets).toEqual([])
+    expect(verdict.missing).toEqual([{ path: off, state: 'absent' }])
+    expect(exitCodeFor(verdict, residualProblems({ verdict }))).toBe(1)
+  })
+
+  // The active-lane checks only loop over active files, so an off lane has never been judged. Restoring
+  // one whose shape is itself a hazard would bring the hazard back with it — a 24 h queue, a write
+  // token, or the inherited cron of 2026-11-06.
+  it.each([
+    ['an inherited cron', { triggers: [...EXPECTED_TRIGGERS[off], 'schedule'] }],
+    ['a runner nothing provisions', { runnerLabels: ['blacksmith-8vcpu-ubuntu-2404'] }],
+    ['a write-token trigger', { triggers: ['pull_request_target', ...EXPECTED_TRIGGERS[off]] }],
+    ['a file that cannot be read', { error: 'not in this checkout' }]
+  ])('holds a lane back for %s', (_label, hazard) => {
+    const state = offState((unhealthy) => {
+      // `readFacts` writes `{ error }` alone for a file it could not read, so the fixture has to match
+      // that shape rather than keep the triggers it could not have read.
+      unhealthy.facts[off] = hazard.error ? hazard : { ...unhealthy.facts[off], ...hazard }
+    })
+    const verdict = planEnables(state)
+
+    expect(verdict.enableTargets).toEqual([])
+    expect(verdict.blockedEnables.map((entry) => entry.path)).toEqual([off])
+  })
+
+  // The 2026-10-26 incident shape: a called workflow runs whatever its own state is, so the caller is
+  // the decision. `fork-release.yml` is an *active* required lane and reaches the callee first, so the
+  // hazard is attributed to it — which is exactly why the hold cannot be read off `reachedFrom`, and
+  // why this fixture has an active lane sharing the callee.
+  it('holds a lane back for a hazard in a workflow it calls, even when an active lane calls it too', () => {
+    const callee = '.github/workflows/unit-tests.yml'
+    const shared = '.github/workflows/fork-release.yml'
+    const state = offState((unhealthy) => {
+      unhealthy.facts[shared] = { ...unhealthy.facts[shared], callees: [callee] }
+      unhealthy.facts[off] = { ...unhealthy.facts[off], callees: [callee] }
+      unhealthy.facts[callee] = {
+        triggers: ['workflow_call'],
+        runnerLabels: ['self-hosted'],
+        callees: []
+      }
+    })
+    const verdict = planEnables(state)
+
+    expect(verdict.enableTargets).toEqual([])
+    expect(verdict.blockedEnables.map((entry) => entry.path)).toEqual([off])
+  })
+
+  it('reports an enable the token refused, and leaves it outstanding', () => {
+    const result = applyFixes(
+      verdictFor(offState()),
+      true,
+      () => {
+        throw new Error('HTTP 403')
+      },
+      () => {}
+    )
+
+    expect(result.enabled).toEqual([])
+    expect(result.failed).toEqual([off])
+  })
+
+  it('enables nothing without --fix', () => {
+    const calls = []
+
+    applyFixes(
+      verdictFor(offState()),
+      false,
+      (args) => {
+        calls.push(args)
+        return ''
+      },
+      () => {}
+    )
+
+    expect(calls).toEqual([])
   })
 })

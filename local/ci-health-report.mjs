@@ -32,7 +32,8 @@
  *
  *   node local/ci-health-report.mjs               run the checks, open/update/close the issue
  *   node local/ci-health-report.mjs --dry-run     print the verdict and the action it would take
- *   node local/ci-health-report.mjs --fix         let the enablement check clear inherited drift
+ *   node local/ci-health-report.mjs --fix         let the enablement check clear inherited drift, and
+ *                                                restore a `REQUIRED` lane someone turned off
  *
  * Why the sweep runs here at all: an upstream sync that adds a workflow file enables it, and GitHub has
  * no tree-level way to say "off" (`LOCAL-PATCHES.md` § local(ci)). `local/sync/publish-sync.mjs` sweeps
@@ -266,12 +267,14 @@ export function decideAction({ ok, issueNumber }) {
 }
 
 /**
- * Whether this invocation may sweep, i.e. let a check turn things off.
+ * Whether this invocation may sweep, i.e. let a check change the repository's enablement state.
  *
  * Why the ref and not just the flag: a `workflow_dispatch` runs the tree of the ref it was dispatched
  * on, and a branch cut before a lane joined `REQUIRED` sees that lane as active-but-unlisted — the
- * sweep would then disable a lane the release line needs. Only the release line may sweep. A run with
- * no `GITHUB_REF` at all is a person at a terminal, which is the one case that keeps its own judgment.
+ * sweep would then disable a lane the release line needs. Only the release line may sweep. The same
+ * guard covers the enable direction for the mirror-image reason: an old branch's `REQUIRED` still names
+ * lanes main has since dropped. A run with no `GITHUB_REF` at all is a person at a terminal, which is
+ * the one case that keeps its own judgment.
  */
 export function maySweep({ fix, dryRun, ref }) {
   if (!fix || dryRun) {
