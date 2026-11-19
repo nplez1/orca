@@ -377,6 +377,20 @@ describe('the sweep', () => {
     expect(exitCodeFor(forkOwned, 1)).toBe(3)
     expect(exitCodeFor(required, 1)).toBe(1)
     expect(exitCodeFor(listedForkOwned, 1)).toBe(1)
+    // The second exit-3 case: a required lane that is present but off. The remedy is `gh workflow
+    // enable`, so a branch cannot carry it and an agent would open a PR that cannot close the issue.
+    // `absent` stays delegable, because restoring the file *is* a diff.
+    const switchedOff = {
+      needsDecision: [],
+      missing: [{ path: '.github/workflows/mobile.yml', state: 'disabled_manually' }]
+    }
+    expect(exitCodeFor(switchedOff, 1)).toBe(3)
+    expect(
+      exitCodeFor(
+        { needsDecision: [], missing: [{ path: '.github/workflows/mobile.yml', state: 'absent' }] },
+        1
+      )
+    ).toBe(1)
   })
 
   it('closes with the plain line when nothing was disabled', () => {

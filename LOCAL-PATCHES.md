@@ -3712,6 +3712,44 @@ repos/nplez1/orca/actions/workflows` answers at any time. Root cause was not fix
 or its sweep failed and nobody acted. The daily sweep is the backstop for every route that skips it — a
 gatekeeper merge, a hand push, a sync that did not use that script.
 
+#### The sweep runs both ways, because one direction cannot be a diff (2026-11-19, #447)
+
+The 2026-11-19 health issue was three `REQUIRED` lanes `disabled_manually` — `fork-release.yml`,
+`node-server-tests.yml` and `performance-contracts.yml` — disabled inside a nine-second window at
+`2026-11-19T02:35:27–36 PST`. Nothing in the tree caused it: `git log --all` has no commit between
+2026-11-17 and the check that reported it, no run started in that window, and `sweepable()` refuses to
+put a `REQUIRED` path into `disableTargets` by any of its three routes. The actor is not recoverable
+from a fork: `gh api repos/nplez1/orca/audit-log` is 404 without admin. The three were restored with
+`gh workflow enable` at 07:49 PST, ten minutes after the red run, and the check read `OK`.
+
+**The finding was one line of output and one dead end.** `REQUIRED` already meant "disabled is drift",
+but the check could only _report_ a disabled lane, and the remedy is repository state. So the daily lane
+applied `agent:auto`, an agent opened a PR, and no diff could contain the fix — the same trap the
+section above records for the disable direction, mirrored, and this time nothing closed the loop.
+
+**What changed.** `--fix` now re-enables a `REQUIRED` lane that is present but off, and two rules keep
+that from being a silent tug-of-war:
+
+- **A day that re-enabled something still exits 3.** `disabled_manually` only ever comes from a
+  deliberate act — the census has never held a `disabled_inactivity` or a `disabled_fork` — so a person
+  may have meant it. Exit 3 opens or updates the issue _without_ `agent:auto` and shows what was
+  restored; the next clean run closes it. A lane someone keeps turning off reopens the issue every day,
+  which is the point: the conflict is visible rather than papered over each morning.
+- **A lane is restored only if it would pass the active-lane checks** (`planEnables`). The trigger,
+  runner and cron checks only loop over _active_ files, so a disabled lane has never been judged; turning
+  one on unchecked could bring back a `blacksmith-*` label (a 24 h queue), a `pull_request_target`, or an
+  inherited cron. Those stay off with the reason printed. An ordinary red test is not a reason to hold a
+  lane back — `check-fork-lane-red` gives that an owner.
+
+An `absent` lane is still exit 1, because restoring the file _is_ a diff, which is exactly what an agent
+can carry. The acting half of the check moved to `local/actions-enablement-sweep.mjs` in the same
+change: `local/check-actions-enablement.mjs` was at 570 of the 600 counted-line budget, and the judging
+half is the half worth reading on its own — the same split, and the same reason, as
+`local/actions-enablement-contract.mjs`.
+
+Root cause is not fixed here either: whatever disabled three required lanes in nine seconds was not the
+tree and left no record a fork can read. The sweep is the backstop, and now it can also undo it.
+
 #### The cost premise was wrong, and the PR lane that follows from it (audit #221 C2)
 
 This section said the fleet being fully on "burned nearly the full month in a few days", and put the
