@@ -5,7 +5,7 @@
 // sessions (`sessionSummary.openOnHost`), and an SSH target's transcript is fetched
 // over the connection the desktop holds. Only an id this build cannot parse is
 // unsupported — a newer host kind it must not guess about.
-import { LOCAL_EXECUTION_HOST_ID, parseExecutionHostId } from './execution-host'
+import { LOCAL_EXECUTION_HOST_ID, parseExecutionHostId } from './execution-host/execution-host'
 
 export function isSessionSummaryHostSupported(hostId: string | null | undefined): boolean {
   const requested = hostId?.trim()

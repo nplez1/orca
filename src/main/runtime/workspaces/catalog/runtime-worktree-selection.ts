@@ -3,7 +3,7 @@ import {
   getRepoExecutionHostId,
   getRepoSshConnectionId,
   type ExecutionHostId
-} from '../../../../shared/execution-host'
+} from '../../../../shared/execution-host/execution-host'
 import { splitWorktreeId } from '../../../../shared/worktree/id'
 import type { GitPushTarget, GitWorktreeInfo } from '../../../../shared/worktree/types'
 import type { GhAccountBinding } from '../../../../shared/github/accounts/account-binding'

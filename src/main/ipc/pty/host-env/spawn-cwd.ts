@@ -3,9 +3,9 @@ import type { FolderWorkspace } from '../../../../shared/folder-workspaces/folde
 import {
   getConnectionExecutionHostId,
   type ExecutionHostId
-} from '../../../../shared/execution-host'
+} from '../../../../shared/execution-host/execution-host'
 import { stat } from 'node:fs/promises'
-import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../shared/constants'
+import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../shared/workspace/identity/floating-workspace-id'
 import type { Store } from '../../../persistence/loading-store/store'
 import { parseWorkspaceKey } from '../../../../shared/workspace/identity/workspace-scope'
 import { isWslUncPath } from '../../../../shared/file-access/wsl-paths'

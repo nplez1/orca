@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ComponentProps } from 'react'
 import type { JiraIssue, JiraSprintAssignment } from '../../../shared/jira/jira-types'
-import { JiraIssueMetadataBar } from './jira-issue-workspace-chrome'
+import { JiraIssueMetadataBar } from './task-page/jira/issue-workspace/jira-issue-workspace-chrome'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { defaultScopeHost } from '@/runtime/hosts/selection/default-creation-host'
 

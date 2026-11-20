@@ -177,19 +177,29 @@ export class PrActionsEngine {
     this.setError(outcome.error)
   }
 
-  async merge(method?: GitHubPRMergeMethod, bypassBranchProtection = false): Promise<boolean> {
+  /**
+   * Second argument is either `expectedHeadSha` (the PR head the user saw when choosing to merge;
+   * GitHub refuses if it moved) or the confirmed branch-protection bypass flag. Both surfaces pass
+   * positionally, so either shape routes to the matching mutation field.
+   */
+  async merge(
+    method?: GitHubPRMergeMethod,
+    headOrBypass?: string | null | boolean
+  ): Promise<boolean> {
     const { cfg, identity } = this
     const { prNumber, prRepo } = cfg
     this.setBusy({ kind: 'merge' })
     this.setError(null)
     try {
+      const headOrBypassArgs =
+        typeof headOrBypass === 'boolean'
+          ? { bypassBranchProtection: headOrBypass }
+          : { expectedHeadSha: headOrBypass }
       const outcome = await cfg.mutations.mergePR({
         prNumber,
         method,
         prRepo,
-        // Why: only the caller that showed the bypass confirmation sets this; it is what tells the
-        // host to merge with admin privileges instead of reporting the unmet requirement.
-        ...(bypassBranchProtection ? { bypassBranchProtection: true } : {})
+        ...headOrBypassArgs
       })
       this.settle(identity, outcome, { onSuccess: () => {}, onRevert: () => {} })
       return outcome.ok

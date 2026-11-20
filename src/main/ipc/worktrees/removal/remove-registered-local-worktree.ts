@@ -5,7 +5,7 @@ import {
   nativeWindowsMarkerMissing,
   usesNativeWindowsRemoval
 } from '../../../git/worktrees/removal/windows-worktree-removal'
-import type { ExecutionHostId } from '../../../../shared/execution-host'
+import type { ExecutionHostId } from '../../../../shared/execution-host/execution-host'
 import type { RemoveWorktreeResult } from '../../../../shared/worktree/create-types'
 import type { GitPushTarget, GitWorktreeInfo } from '../../../../shared/worktree/types'
 import { assertWorktreeUnlockedForRemoval } from '../../../../shared/worktree/removal/removal'
@@ -19,13 +19,13 @@ import { withWorktreeRemoveStageSpan } from '../../../observability/instrumentat
 import { assertNestedWorktreeRemovalApproval } from '../../../workspaces/removal/nested-worktree-removal-plan'
 import { findRegisteredDeletableWorktree } from '../../../workspaces/removal/worktree-removal-safety'
 import { CLIENT_REMOVAL_HOME } from '../../../workspaces/removal/worktree-removal-home-guard'
-import { cleanupUnusedWorktreePushTargetRemote } from '../../worktree-remote'
+import { cleanupUnusedWorktreePushTargetRemote } from '../worktree-remote'
 import { findExistingWorktreeSymlinkPaths } from '../../../git/worktrees/content-paths/worktree-symlink-detection'
-import { removeWorktreeLinkedPaths } from '../../worktree-symlinks'
+import { removeWorktreeLinkedPaths } from '../linked-paths/worktree-symlinks'
 import { removeStaleWorktreeMaterializationStagingDirectories } from '../../worktree-materialization-staging'
 import { invalidateAuthorizedRootsCacheForRepo } from './registered-worktree-roots-scoped-invalidation'
 import { runWorktreeChangeInvalidators } from '../listing/worktree-change-invalidators'
-import { formatWorktreeRemovalError, isOrphanedWorktreeError } from '../../worktree-logic'
+import { formatWorktreeRemovalError, isOrphanedWorktreeError } from '../paths/worktree-logic'
 import type { RemoveWorktreeArgs } from '../ipc-context-schemas'
 import type { WorktreeIpcContext } from '../worktree-ipc-context'
 import {
@@ -34,7 +34,7 @@ import {
 } from './preserved-branch-cleanup'
 import { cleanupOrphanedLocalWorktreeRemoval } from './orphaned-local-worktree-cleanup'
 import {
-  removeWorktreeMetadataAndTransientState,
+  removeDeletedCheckoutMetadataAndTransientState,
   stopPtysForDestructiveWorktreeRemoval
 } from './worktree-removal-ownership'
 import * as backgroundRemoval from '../../../workspaces/removal/worktree-background-removal'
@@ -182,8 +182,7 @@ export async function removeRegisteredLocalWorktree(
         return result
       },
       publish: () => context.runtime.publishWorktreeRemovalChange(repoId),
-      admissionFailed: () => removalGate.finish(false),
-      cleanupPushTargetRemote: cleanupPushTarget
+      admissionFailed: () => removalGate.finish(false)
     })
     await backgroundRemoval.waitForWorktreeRemovalAcceptance(args.worktreeId)
     return { removing: true }
@@ -296,7 +295,7 @@ async function finishLocalWorktreeRemoval({
   )
   context.runtime.clearOptimisticReconcileToken(args.worktreeId)
   await withWorktreeRemoveStageSpan('metadata_purge', 'local', async () => {
-    removeWorktreeMetadataAndTransientState(
+    await removeDeletedCheckoutMetadataAndTransientState(
       context,
       args.worktreeId,
       removalHostId,

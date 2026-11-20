@@ -9,14 +9,14 @@ import { findVisibleBrowserLinkTarget } from './visible-browser-link-target'
 import { isLiveLinkOpenGroup, liveLinkOpenGroupIds } from '../../links/placement/link-open-intent'
 import type { LinkOpenIntent } from '../../links/placement/link-open-intent'
 import { runtimeEnvironmentIdOrLocalUnlessTwin } from '../../workspace/ownership/worktree-runtime-owner'
-import type { Tab } from '../../../../../shared/tab-types'
+import type { Tab } from '../../../../../shared/workspace-layout/tab-groups/tab-types'
 import type { AppState } from '@/store/types'
 import type {
   BrowserPage,
   BrowserPageDocLocation,
   BrowserWorkspace
 } from '../../../../../shared/browser/workspaces/browser-workspace-types'
-import type { ExecutionHostId } from '../../../../../shared/execution-host'
+import type { ExecutionHostId } from '../../../../../shared/execution-host/execution-host'
 
 export type BrowserLinkDestination = {
   worktreeId: string

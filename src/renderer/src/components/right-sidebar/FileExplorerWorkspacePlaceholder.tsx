@@ -1,5 +1,5 @@
 import { useTranslate } from '@/i18n/use-translate'
-import type { RightSidebarExplorerView } from '../../../../shared/ui-chrome-types'
+import type { RightSidebarExplorerView } from '../../../../shared/ui-chrome/ui-chrome-types'
 
 /** Why its own component: the explorer mounts with no workspace far more often than it renders a tree. */
 export function FileExplorerWorkspacePlaceholder({

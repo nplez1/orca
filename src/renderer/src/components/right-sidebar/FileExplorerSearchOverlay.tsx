@@ -1,6 +1,6 @@
 import { cn } from '@/lib/class-names'
 import { useTranslate } from '@/i18n/use-translate'
-import type { RightSidebarExplorerView } from '../../../../shared/ui-chrome-types'
+import type { RightSidebarExplorerView } from '../../../../shared/ui-chrome/ui-chrome-types'
 import { SearchResultsPane } from './file-explorer/content-search/SearchResultsPane'
 import type { useFileSearchPanel } from './file-explorer/content-search/useFileSearchPanel'
 

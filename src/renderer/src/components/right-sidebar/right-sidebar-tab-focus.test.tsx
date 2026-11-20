@@ -89,6 +89,7 @@ function PanelTabs(): React.JSX.Element {
   const [request] = useState(1)
   const { selectActivityTab } = useRightSidebarTabRouting({
     visibleItems,
+    isBotPage: false,
     activeFolderWorkspaceKey: null,
     pluginSystemEnabled: false,
     pluginFetchStatus: 'idle',

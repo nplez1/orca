@@ -13,11 +13,11 @@ import { CLOSED_TERMINAL_TAB_TOMBSTONE_TTL_MS } from '../../../../../../shared/w
 import type { ClosedTerminalTabTombstonesByTabId } from '../../../../../../shared/workspace-layout/terminal-surfaces/closed-terminal-tab-tombstones'
 import { getWorktreeIdsWithStructuredChat } from '../../worktree-list/listing/visible-worktree-activity-inputs'
 import type { AgentStatusEntry } from '../../../../../../shared/agent-status/contracts/agent-status-types'
-import type { Tab } from '../../../../../../shared/tab-types'
+import type { Tab } from '../../../../../../shared/workspace-layout/tab-groups/tab-types'
 import {
   hasUnknownStructuredChat,
   type StructuredChatSleptAtByPaneKey
-} from '@/store/slices/agent-status/structured-chat-slept-at'
+} from '@/store/slices/agent-status/structured-sessions/structured-chat-slept-at'
 
 type TabLike = { id: string }
 

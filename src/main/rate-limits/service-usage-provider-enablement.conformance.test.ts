@@ -385,13 +385,13 @@ describe('usage provider enablement conformance', () => {
     resetRateLimitProviderMocks()
     mockFreshBackgroundProviderFetches()
     vi.mocked(fetchActiveClaudeRateLimits).mockImplementation(async () => okProvider('claude', 12))
-    vi.mocked(hasMiniMaxSessionCookie).mockReturnValue(true)
-    vi.mocked(hasMiniMaxApiKey).mockReturnValue(true)
-    vi.mocked(hasZcodePlanApiKey).mockReturnValue(true)
-    vi.mocked(hasDeepSeekApiKey).mockReturnValue(true)
-    vi.mocked(hasFireworksCredentials).mockReturnValue(true)
-    vi.mocked(hasDeepInfraApiKey).mockReturnValue(true)
-    vi.mocked(hasCopilotCredentials).mockReturnValue(true)
+    vi.mocked(hasMiniMaxSessionCookie).mockResolvedValue(true)
+    vi.mocked(hasMiniMaxApiKey).mockResolvedValue(true)
+    vi.mocked(hasZcodePlanApiKey).mockResolvedValue(true)
+    vi.mocked(hasDeepSeekApiKey).mockResolvedValue(true)
+    vi.mocked(hasFireworksCredentials).mockResolvedValue(true)
+    vi.mocked(hasDeepInfraApiKey).mockResolvedValue(true)
+    vi.mocked(hasCopilotCredentials).mockResolvedValue(true)
     // Why a live session each: a `missing` reader makes the grok/cursor presence flags read
     // false whether or not the switch gates them, so the flag assertions would be vacuous.
     vi.mocked(readGrokAuthSession).mockReturnValue({
@@ -455,7 +455,7 @@ async function verifySwitchHonored(
     await service.refresh()
     expect(service.fetchAllCalls).toBe(1)
 
-    const state = service.getState()
+    const state = await service.getState()
     for (const provider of disabledProviders) {
       expectProviderNotQueried(wiring[provider], provider, state)
       expect(stateSlot(state, provider)).toBeNull()
@@ -478,9 +478,10 @@ async function verifySwitchHonored(
     window.emit('focus')
     expect(service.fetchAllCalls).toBe(2)
     await service.inFlight
+    const settledState = await service.getState()
     for (const provider of disabledProviders) {
-      expectProviderNotQueried(wiring[provider], provider, service.getState())
-      expect(stateSlot(service.getState(), provider)).toBeNull()
+      expectProviderNotQueried(wiring[provider], provider, settledState)
+      expect(stateSlot(settledState, provider)).toBeNull()
     }
   } finally {
     service.stop()

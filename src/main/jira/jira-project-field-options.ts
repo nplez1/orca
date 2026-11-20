@@ -49,7 +49,7 @@ export async function readIssueProjectKey(
     return asString(asRecord(values.project).key)
   } catch (error) {
     if (isAuthError(error)) {
-      clearToken(entry.site.id)
+      await clearToken(entry)
       throw error
     }
     recordSwallowedFailure('jira', error, 'issue project read failed')
@@ -111,7 +111,7 @@ export async function readProjectFieldOptions(
       }
     } catch (error) {
       if (isAuthError(error)) {
-        clearToken(entry.site.id)
+        await clearToken(entry)
         throw error
       }
       recordSwallowedFailure('jira', error, `project ${kind} read failed`)

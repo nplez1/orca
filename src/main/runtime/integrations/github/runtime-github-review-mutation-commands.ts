@@ -1,6 +1,6 @@
 import type { GhAccountBinding } from '../../../../shared/github/accounts/account-binding'
 import type { GitHubRepositoryIdentity as GitHubOwnerRepo } from '../../../../shared/github/repositories/repository-identity'
-import type { GitHubPullRequestStateUpdate } from '../../../../shared/issue-mutation-types'
+import type { GitHubPullRequestStateUpdate } from '../../../../shared/work-items/issue-mutation-types'
 import type { GitHubReactionContent } from '../../../../shared/github/comments/comment-types'
 import type { Repo } from '../../../../shared/repository/repo-types'
 import type { LocalProjectGhExecOptions } from '../../../workspaces/execution-host/project-runtime-git-options'
@@ -14,7 +14,7 @@ import { setPRCommentReaction } from '../../../github/client/update/pr-comment-r
 import { setPRFileViewed } from '../../../github/client/update/pr-file-viewed'
 import { updatePRDetails, updatePRTitle } from '../../../github/client/update/pr-details'
 import { updatePRState } from '../../../github/client/update/pr-state'
-import { getRepoRoutingConnectionId } from '../../../../shared/execution-host'
+import { getRepoRoutingConnectionId } from '../../../../shared/execution-host/execution-host'
 
 type LocalGitArgs = [] | [LocalProjectGhExecOptions]
 
@@ -135,6 +135,7 @@ export class RuntimeGitHubReviewMutationCommands {
     prNumber: number,
     method?: 'merge' | 'squash' | 'rebase',
     prRepo?: GitHubOwnerRepo | null,
+    expectedHeadSha?: string | null,
     bypassBranchProtection = false
   ): Promise<Awaited<ReturnType<typeof mergePR>>> {
     const repo = await this.deps.resolveRepo(repoSelector)
@@ -146,6 +147,7 @@ export class RuntimeGitHubReviewMutationCommands {
       method,
       getRepoRoutingConnectionId(repo),
       prRepo ?? null,
+      expectedHeadSha ?? null,
       localGitOptions,
       { bypassBranchProtection }
     )

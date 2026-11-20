@@ -1,9 +1,12 @@
 import type { Repo } from '../../../shared/repository/repo-types'
 import { mapWithConcurrency } from '../../../shared/concurrency/map-with-concurrency'
-import { getRepoExecutionHostId, type ExecutionHostId } from '../../../shared/execution-host'
+import {
+  getRepoExecutionHostId,
+  type ExecutionHostId
+} from '../../../shared/execution-host/execution-host'
 import { WORKTREE_REFRESH_CONCURRENCY } from '../store/slices/worktrees/listing/worktree-slice-constants'
 import type { AppState } from '../store/types'
-import type { StartupActions } from '../app-shell/startup-actions-selector'
+import type { StartupActions } from '../app-shell/startup/startup-actions-selector'
 import { useAppStore } from '../store'
 import { purgeHydratedWorktrees } from '../store/slices/worktrees/listing/hydrated-worktree-purge'
 import type { WorktreeRefreshResult } from '../store/slices/worktrees/listing/worktree-refresh-result'

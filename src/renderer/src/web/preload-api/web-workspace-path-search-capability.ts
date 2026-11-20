@@ -5,7 +5,7 @@ import {
   observeWebRuntimeStatus,
   requireActiveEnvironment,
   subscribeWebRuntimeStatus
-} from './web-runtime-session'
+} from '../runtime/client/web-runtime-session'
 
 const CACHE_TTL_MS = 60_000
 const CACHE_MAX_ENTRIES = 16

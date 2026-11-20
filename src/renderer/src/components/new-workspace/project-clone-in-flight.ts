@@ -1,4 +1,4 @@
-import type { ExecutionHostId } from '../../../../shared/execution-host'
+import type { ExecutionHostId } from '../../../../shared/execution-host/execution-host'
 
 /** What a clone onto a host came to, in terms every surface that asked can report. */
 export type ProjectCloneOutcome =

@@ -3,7 +3,7 @@ import {
   LOCAL_EXECUTION_HOST_ID,
   toRuntimeExecutionHostId,
   toSshExecutionHostId
-} from '../../../../../shared/execution-host'
+} from '../../../../../shared/execution-host/execution-host'
 import { resolveSettingsHostScope, type SettingsHostScopeHost } from './settings-host-scope'
 
 const LOCAL_HOST: SettingsHostScopeHost = { id: LOCAL_EXECUTION_HOST_ID, label: 'Local Mac' }

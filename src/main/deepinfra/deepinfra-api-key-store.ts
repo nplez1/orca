@@ -7,20 +7,8 @@ const deepInfraApiKeyStore = createEncryptedApiKeyFileStore({
   logScope: 'deepinfra'
 })
 
-export function hasDeepInfraApiKey(): boolean {
-  return deepInfraApiKeyStore.has()
-}
-
+export const hasDeepInfraApiKey = deepInfraApiKeyStore.has
 export const getDeepInfraApiKeyProtection = deepInfraApiKeyStore.protection
-
-export function saveDeepInfraApiKey(key: string): void {
-  deepInfraApiKeyStore.save(key)
-}
-
-export function readDeepInfraApiKey(): string | null {
-  return deepInfraApiKeyStore.read()
-}
-
-export function clearDeepInfraApiKey(): void {
-  deepInfraApiKeyStore.clear()
-}
+export const saveDeepInfraApiKey = deepInfraApiKeyStore.save
+export const readDeepInfraApiKey = deepInfraApiKeyStore.read
+export const clearDeepInfraApiKey = deepInfraApiKeyStore.clear

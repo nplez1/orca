@@ -10,14 +10,14 @@ const mocks = vi.hoisted(() => ({
   environment: vi.fn()
 }))
 
-vi.mock('./web-runtime-calls', () => ({
+vi.mock('../runtime/client/web-runtime-calls', () => ({
   callEnvironmentEnvelope: (...args: unknown[]) => mocks.call(...args)
 }))
 vi.mock('./web-storage', () => ({
   SETTINGS_STORAGE_KEY: 'orca.web.settings.v1',
   readJson: () => mocks.foldSettings()
 }))
-vi.mock('./web-runtime-session', () => ({
+vi.mock('../runtime/client/web-runtime-session', () => ({
   requireActiveEnvironmentOrNull: () => mocks.environment()
 }))
 

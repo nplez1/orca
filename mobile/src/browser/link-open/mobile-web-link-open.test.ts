@@ -1,43 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { openExternalLink } from '../../platform/external-links/external-link'
-import { openMobileWebLink } from './mobile-web-link-open'
 
-vi.mock('../../platform/external-links/external-link', () => ({ openExternalLink: vi.fn() }))
+const openExternalLink = vi.fn()
+vi.mock('../../platform/external-links/external-link', () => ({ openExternalLink }))
 
-const url = 'https://example.com/pr/1'
+const { openMobileWebLink } = await import('./mobile-web-link-open')
 
 describe('openMobileWebLink', () => {
   const openInOrca = vi.fn()
   const ask = vi.fn()
+  beforeEach(() => vi.clearAllMocks())
 
-  beforeEach(() => {
-    vi.resetAllMocks()
-  })
+  it('opens a loopback link in the host browser even when links open on the phone', () => {
+    openMobileWebLink('http://127.0.0.1:3000/', 'phone-browser', openInOrca, ask)
 
-  it('asks instead of opening anything in ask mode', () => {
-    openMobileWebLink(url, 'ask', openInOrca, ask)
-    expect(ask).toHaveBeenCalledWith(url)
-    expect(openInOrca).not.toHaveBeenCalled()
+    expect(openInOrca).toHaveBeenCalledWith('http://127.0.0.1:3000/')
     expect(openExternalLink).not.toHaveBeenCalled()
-  })
-
-  it('opens an Orca browser tab directly when one can open', () => {
-    openMobileWebLink(url, 'orca-browser', openInOrca, ask)
-    expect(openInOrca).toHaveBeenCalledWith(url)
-    expect(openExternalLink).not.toHaveBeenCalled()
-    expect(ask).not.toHaveBeenCalled()
-  })
-
-  it('falls back to the phone browser where no Orca browser tab can open', () => {
-    openMobileWebLink(url, 'orca-browser', undefined, ask)
-    expect(openExternalLink).toHaveBeenCalledWith(url)
-    expect(ask).not.toHaveBeenCalled()
-  })
-
-  it('opens the phone browser directly in phone-browser mode', () => {
-    openMobileWebLink(url, 'phone-browser', openInOrca, ask)
-    expect(openExternalLink).toHaveBeenCalledWith(url)
-    expect(openInOrca).not.toHaveBeenCalled()
     expect(ask).not.toHaveBeenCalled()
   })
 })

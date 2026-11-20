@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
+import CommentMarkdown from '@/components/comment-markdown/CommentMarkdown'
 import { GHCommentComposer } from '@/components/github-item-dialog/discuss-item/gh-comment-composer'
 import { GHEditSection } from '@/components/github-item-dialog/edit-item-fields/gh-edit-section'
 import type { PRComment } from '../../../../shared/github/comments/comment-types'

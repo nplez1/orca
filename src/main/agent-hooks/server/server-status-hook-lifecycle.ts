@@ -19,8 +19,16 @@ export abstract class AgentHookServerStatusHookLifecycle extends AgentHookServer
   readonly claudeAgentViews = new ClaudeAgentViewBridge()
   protected readonly claudePermissionHooks = new ClaudePermissionHookHolds()
   private statusHookInitialization: Promise<void> | null = null
+  private restoredOwnersChecked: Promise<void> = Promise.resolve()
   private statusSpoolDrainTimer: ReturnType<typeof setInterval> | null = null
   private statusSpoolDrainInFlight: Promise<void> | null = null
+
+  /** Settles once replayed hooks are in and each replayed pane's agent was probed once. */
+  whenRestoredOwnersChecked(): Promise<void> {
+    return (this.statusHookInitialization ?? Promise.resolve())
+      .catch(() => undefined)
+      .then(() => this.restoredOwnersChecked)
+  }
 
   /** Answers a hook post: a worker's PermissionRequest waits for its coordinator's or person's answer;
    *  plugins see only calls status accepted, so a fenced or reused pane's old agent is skipped. */
@@ -47,10 +55,7 @@ export abstract class AgentHookServerStatusHookLifecycle extends AgentHookServer
       this.claudeAgentViews.clear()
       this.flushStatusPersistSync()
       this.stopOpenCodeBinderLoop()
-      for (const timer of this.assistantMessageRetryTimers.values()) {
-        clearTimeout(timer)
-      }
-      this.assistantMessageRetryTimers.clear()
+      this.clearAllAssistantMessageRetries()
       this.clearAllTranscriptPolls()
       this.clearScreenPromptReads()
     }
@@ -104,9 +109,9 @@ export abstract class AgentHookServerStatusHookLifecycle extends AgentHookServer
           return
         }
         // Replayed owners may have died while Orca was down; probe each pane once.
-        for (const paneKey of replayedPaneKeys) {
-          void this.checkAgentPresence(paneKey)
-        }
+        this.restoredOwnersChecked = Promise.allSettled(
+          [...replayedPaneKeys].map((paneKey) => this.checkAgentPresence(paneKey))
+        ).then(() => undefined)
       }
       this.ownerStateInitialized = true
       this.adoptHydratedScreenPromptRows()

@@ -1,7 +1,7 @@
 import { runAsyncTask, runAsyncTaskWithFailure } from '@/lib/async-task-with-cleanup'
 /* eslint-disable max-lines -- Why: upstream's manual refresh plus the fork's carry-over of the
    refreshed PR's repo and head SHA into the acknowledgement path. */
-import { getRepoExecutionHostId } from '../../../../../../shared/execution-host'
+import { getRepoExecutionHostId } from '../../../../../../shared/execution-host/execution-host'
 import { useCallback } from 'react'
 import { useAppStore } from '@/store/index'
 import { buildGitHubPRRefreshStateClearToken } from '@/store/github/refresh/pr-refresh-state'

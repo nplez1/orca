@@ -109,9 +109,9 @@ describe('deciding whether a host may apply a payload', () => {
 })
 
 describe('applying a payload on the receiving host', () => {
-  it('stores the credential and reports a clean sync', () => {
+  it('stores the credential and reports a clean sync', async () => {
     const port = fakePort()
-    const { report, state } = applyHostSettingsPayload({
+    const { report, state } = await applyHostSettingsPayload({
       payload: payload(),
       registry: createHostSettingsCredentialRegistry([port]),
       now: NOW
@@ -122,9 +122,9 @@ describe('applying a payload on the receiving host', () => {
     expect(state).toEqual({ kind: 'synced', revision: 7, syncedAt: NOW })
   })
 
-  it('refuses a sealed credential on a host that cannot seal, and never reports a clean sync', () => {
+  it('refuses a sealed credential on a host that cannot seal, and never reports a clean sync', async () => {
     const port = fakePort({ canSeal: false })
-    const { report, state } = applyHostSettingsPayload({
+    const { report, state } = await applyHostSettingsPayload({
       payload: payload(),
       registry: createHostSettingsCredentialRegistry([port]),
       now: NOW
@@ -140,9 +140,9 @@ describe('applying a payload on the receiving host', () => {
     })
   })
 
-  it('replicates a value the host can hold at the same protection', () => {
+  it('replicates a value the host can hold at the same protection', async () => {
     const port = fakePort({ canSeal: false })
-    const { report } = applyHostSettingsPayload({
+    const { report } = await applyHostSettingsPayload({
       payload: payload({ upserts: [credential({ protection: 'plaintext' })] }),
       registry: createHostSettingsCredentialRegistry([port]),
       now: NOW
@@ -151,9 +151,9 @@ describe('applying a payload on the receiving host', () => {
     expect(report.outcomes).toEqual({ [CREDENTIAL_ID]: 'applied' })
   })
 
-  it('keeps a deliberate local value when the credential only fills an empty host', () => {
+  it('keeps a deliberate local value when the credential only fills an empty host', async () => {
     const port = fakePort({ existing: { payload: 'mine', protection: 'sealed' } })
-    const { report, state } = applyHostSettingsPayload({
+    const { report, state } = await applyHostSettingsPayload({
       payload: payload({ upserts: [credential({ onlyIfEmpty: true })] }),
       registry: createHostSettingsCredentialRegistry([port]),
       now: NOW
@@ -166,9 +166,9 @@ describe('applying a payload on the receiving host', () => {
     expect(state).toMatchObject({ kind: 'partial', refusals: [CREDENTIAL_ID] })
   })
 
-  it('fills an empty host even when the credential only fills empty hosts', () => {
+  it('fills an empty host even when the credential only fills empty hosts', async () => {
     const port = fakePort()
-    const { report } = applyHostSettingsPayload({
+    const { report } = await applyHostSettingsPayload({
       payload: payload({ upserts: [credential({ onlyIfEmpty: true })] }),
       registry: createHostSettingsCredentialRegistry([port]),
       now: NOW
@@ -178,8 +178,8 @@ describe('applying a payload on the receiving host', () => {
     expect(report.outcomes).toEqual({ [CREDENTIAL_ID]: 'applied' })
   })
 
-  it('refuses a credential whose kind this build has no adapter for', () => {
-    const { report, state } = applyHostSettingsPayload({
+  it('refuses a credential whose kind this build has no adapter for', async () => {
+    const { report, state } = await applyHostSettingsPayload({
       payload: payload({ upserts: [credential({ id: 'jira:site-1', kind: 'jira' })] }),
       registry: createHostSettingsCredentialRegistry([]),
       now: NOW
@@ -189,9 +189,9 @@ describe('applying a payload on the receiving host', () => {
     expect(state).toMatchObject({ kind: 'partial', refusals: ['jira:site-1'] })
   })
 
-  it('removes a revoked credential and proves it is gone', () => {
+  it('removes a revoked credential and proves it is gone', async () => {
     const port = fakePort({ existing: { payload: 'old', protection: 'sealed' } })
-    const { report, state } = applyHostSettingsPayload({
+    const { report, state } = await applyHostSettingsPayload({
       payload: payload({ upserts: [], removals: [CREDENTIAL_ID] }),
       registry: createHostSettingsCredentialRegistry([port]),
       replicatedIds: [CREDENTIAL_ID],
@@ -203,11 +203,11 @@ describe('applying a payload on the receiving host', () => {
     expect(state).toMatchObject({ kind: 'synced' })
   })
 
-  it('reports a removal it cannot prove instead of claiming the token is gone', () => {
+  it('reports a removal it cannot prove instead of claiming the token is gone', async () => {
     const port = fakePort({ existing: { payload: 'stubborn', protection: 'sealed' } })
     port.remove = vi.fn()
 
-    const { report, state } = applyHostSettingsPayload({
+    const { report, state } = await applyHostSettingsPayload({
       payload: payload({ upserts: [], removals: [CREDENTIAL_ID] }),
       registry: createHostSettingsCredentialRegistry([port]),
       replicatedIds: [CREDENTIAL_ID],
@@ -218,12 +218,12 @@ describe('applying a payload on the receiving host', () => {
     expect(state).toMatchObject({ kind: 'partial', refusals: [CREDENTIAL_ID] })
   })
 
-  it('leaves a value the user entered on this host alone when a removal names it', () => {
+  it('leaves a value the user entered on this host alone when a removal names it', async () => {
     const port = fakePort({ existing: { payload: 'mine', protection: 'sealed' } })
     const remove = vi.fn(port.remove)
     port.remove = remove
 
-    const { report, state } = applyHostSettingsPayload({
+    const { report, state } = await applyHostSettingsPayload({
       payload: payload({ upserts: [], removals: [CREDENTIAL_ID] }),
       registry: createHostSettingsCredentialRegistry([port]),
       now: NOW
@@ -237,10 +237,10 @@ describe('applying a payload on the receiving host', () => {
     expect(state).toMatchObject({ kind: 'partial', refusals: [CREDENTIAL_ID] })
   })
 
-  it('lets the upsert decide when one payload names the same id for writing and removal', () => {
+  it('lets the upsert decide when one payload names the same id for writing and removal', async () => {
     const port = fakePort()
 
-    const { report } = applyHostSettingsPayload({
+    const { report } = await applyHostSettingsPayload({
       payload: payload({ upserts: [credential()], removals: [CREDENTIAL_ID] }),
       registry: createHostSettingsCredentialRegistry([port]),
       now: NOW

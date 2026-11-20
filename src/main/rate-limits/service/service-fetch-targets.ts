@@ -1,5 +1,7 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget (242/300); the fork's +65-line delta rides inside it, and splitting costs a permanent sync hunk. */
 import { RateLimitServiceResultPolicy } from './service-result-policy'
 import { fetchCodexRateLimits } from '../providers/codex/codex-fetcher'
+import { withCodexReadingAccount } from '../providers/codex/codex-reading-account'
 import { fetchKimiRateLimits } from '../providers/kimi/kimi-fetcher'
 import {
   isSystemDefaultClaudeAuth,
@@ -21,7 +23,8 @@ import type { NormalizedClaudeAccountSelectionTarget } from '../../claude-accoun
 import type {
   ProviderRateLimits,
   RateLimitState,
-  CodexRateLimitResetOutcome
+  CodexRateLimitResetOutcome,
+  UsageReadingAccount
 } from '../../../shared/agent-usage/rate-limits/rate-limit-types'
 import type { DisableableUsageProviderId } from '../../../shared/usage-provider-enablement'
 import { ApiKeyFileUnreadableError } from '../../credentials/api-key-file-unreadable-error'
@@ -56,6 +59,7 @@ export abstract class RateLimitServiceFetchTargets extends RateLimitServiceResul
   protected async resolveCodexHome(target?: CodexAccountSelectionTarget): Promise<{
     skip: boolean
     homePath: string | null
+    readingAccount?: UsageReadingAccount
   }> {
     const resolution = await this.codexHomePathResolver?.(target)
     if (!resolution) {
@@ -63,7 +67,11 @@ export abstract class RateLimitServiceFetchTargets extends RateLimitServiceResul
     }
     return resolution.kind === 'skip'
       ? { skip: true, homePath: null }
-      : { skip: false, homePath: resolution.codexHomePath }
+      : {
+          skip: false,
+          homePath: resolution.codexHomePath,
+          readingAccount: resolution.readingAccount
+        }
   }
 
   // WSL home resolution probes wsl.exe; chain it so other providers start immediately.
@@ -158,7 +166,6 @@ export abstract class RateLimitServiceFetchTargets extends RateLimitServiceResul
       }
     }
 
-    const scopedCodex = this.applyStalePolicy(fresh, stateBeforeReset.codex)
     const currentCodexHome = await this.resolveCodexHome(target)
     // Skips carry no provenance; never publish them as System Default usage.
     const stillActive =
@@ -166,13 +173,18 @@ export abstract class RateLimitServiceFetchTargets extends RateLimitServiceResul
       this.isSameCodexTarget(this.codexFetchTarget, target) &&
       this.getCodexProvenance(target, currentCodexHome.homePath) ===
         this.getCodexProvenance(target, codexHomePath)
+    // Still the redeemed home, so its account (if it is that account's own home) took this reading.
+    const attributed = stillActive
+      ? withCodexReadingAccount(fresh, currentCodexHome.readingAccount)
+      : fresh
+    const scopedCodex = this.applyStalePolicy(attributed, stateBeforeReset.codex)
     if (stillActive) {
       // Redemption is newer than prior reads; invalidate their generations before publishing.
       this.codexFetchGeneration += 1
       this.trackActiveFailureStreak('codex', fresh)
       this.updateState({
         ...this.state,
-        codex: this.applyStalePolicy(fresh, this.state.codex)
+        codex: this.applyStalePolicy(attributed, this.state.codex)
       })
     }
 
@@ -198,7 +210,7 @@ export abstract class RateLimitServiceFetchTargets extends RateLimitServiceResul
   // fork-comment-ok: fork-only behaviour; the why must sit above the code a sync rewrites.
   // Why: a disabled provider must not read the credential store at all, so the
   // empty config is returned before the injected resolver (and its disk read) runs.
-  protected resolveOpenCodeGoConfig(): OpenCodeGoResolvedConfig {
+  protected async resolveOpenCodeGoConfig(): Promise<OpenCodeGoResolvedConfig> {
     if (this.isUsageProviderDisabled('opencode-go')) {
       return {
         sessionCookie: '',
@@ -215,7 +227,7 @@ export abstract class RateLimitServiceFetchTargets extends RateLimitServiceResul
     try {
       return {
         ...config,
-        apiKey: this.openCodeGoApiKeyResolver?.() ?? '',
+        apiKey: (await this.openCodeGoApiKeyResolver?.()) ?? '',
         apiKeyError: null,
         apiKeyReadSkipped: false
       }
@@ -235,7 +247,7 @@ export abstract class RateLimitServiceFetchTargets extends RateLimitServiceResul
     }
   }
 
-  protected resolveMiniMaxConfig(): MiniMaxResolvedConfig {
+  protected async resolveMiniMaxConfig(): Promise<MiniMaxResolvedConfig> {
     if (this.isUsageProviderDisabled('minimax')) {
       return {
         config: {
@@ -250,7 +262,7 @@ export abstract class RateLimitServiceFetchTargets extends RateLimitServiceResul
     }
     try {
       return {
-        config: this.miniMaxConfigResolver?.() ?? {
+        config: (await this.miniMaxConfigResolver?.()) ?? {
           sessionCookie: '',
           groupId: '',
           models: 'general',
@@ -274,13 +286,13 @@ export abstract class RateLimitServiceFetchTargets extends RateLimitServiceResul
     }
   }
 
-  protected resolveZcodePlanConfig(): ZcodePlanResolvedConfig {
+  protected async resolveZcodePlanConfig(): Promise<ZcodePlanResolvedConfig> {
     if (this.isUsageProviderDisabled('zcode')) {
       return { config: { site: 'zai', apiKey: '' }, error: null }
     }
     try {
       return {
-        config: this.zcodePlanConfigResolver?.() ?? { site: 'zai', apiKey: '' },
+        config: (await this.zcodePlanConfigResolver?.()) ?? { site: 'zai', apiKey: '' },
         error: null
       }
     } catch (error) {
@@ -289,41 +301,41 @@ export abstract class RateLimitServiceFetchTargets extends RateLimitServiceResul
     }
   }
 
-  protected resolveApiKeyProviderConfig<Config>(
+  protected async resolveApiKeyProviderConfig<Config>(
     provider: DisableableUsageProviderId,
-    resolver: (() => Config) | null,
+    resolver: (() => Config | Promise<Config>) | null,
     fallback: Config
-  ): { config: Config; error: string | null } {
+  ): Promise<{ config: Config; error: string | null }> {
     if (this.isUsageProviderDisabled(provider)) {
       return { config: fallback, error: null }
     }
     try {
-      return { config: resolver?.() ?? fallback, error: null }
+      return { config: (await resolver?.()) ?? fallback, error: null }
     } catch (error) {
       return { config: fallback, error: toErrorMessage(error) }
     }
   }
 
-  protected resolveDeepSeekConfig(): DeepSeekResolvedConfig {
+  protected async resolveDeepSeekConfig(): Promise<DeepSeekResolvedConfig> {
     return this.resolveApiKeyProviderConfig('deepseek', this.deepSeekConfigResolver, {
       apiKey: ''
     })
   }
 
-  protected resolveFireworksConfig(): FireworksResolvedConfig {
+  protected async resolveFireworksConfig(): Promise<FireworksResolvedConfig> {
     return this.resolveApiKeyProviderConfig('fireworks', this.fireworksConfigResolver, {
       apiKey: '',
       accountIdOverride: null
     })
   }
 
-  protected resolveDeepInfraConfig(): DeepInfraResolvedConfig {
+  protected async resolveDeepInfraConfig(): Promise<DeepInfraResolvedConfig> {
     return this.resolveApiKeyProviderConfig('deepinfra', this.deepInfraConfigResolver, {
       apiKey: ''
     })
   }
 
-  protected resolveCopilotConfig(): CopilotResolvedConfig {
+  protected async resolveCopilotConfig(): Promise<CopilotResolvedConfig> {
     return this.resolveApiKeyProviderConfig('copilot', this.copilotConfigResolver, {
       token: '',
       enterpriseSlug: ''

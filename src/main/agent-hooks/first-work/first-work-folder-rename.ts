@@ -4,15 +4,19 @@ import {
   getRepoIdFromWorktreeId,
   splitWorktreeIdForFilesystem
 } from '../../../shared/worktree/id'
-import { getRepoExecutionHostId, LOCAL_EXECUTION_HOST_ID } from '../../../shared/execution-host'
-import { planWorktreeFolderRename } from '../../ipc/worktree-folder-rename-target'
-import { getWorktreePathSettings } from '../../ipc/worktree-logic'
+import {
+  getRepoExecutionHostId,
+  LOCAL_EXECUTION_HOST_ID
+} from '../../../shared/execution-host/execution-host'
+import { planWorktreeFolderRename } from '../../ipc/worktrees/creation/worktree-folder-rename-target'
+import { getWorktreePathSettings } from '../../ipc/worktrees/paths/worktree-logic'
 import { hostWorktreeTargetForRepo } from '../../persistence/host-qualified-worktree-meta'
 import type { HostWorktreeTarget } from '../../../shared/worktree/host-qualified-identity'
 
 export type FirstWorkFolderRenameDeps = {
   getRepo: (repoId: string) => Repo | undefined
-  getSettings: () => Parameters<typeof planWorktreeFolderRename>[0]['settings']
+  // Why raw settings: this file resolves them against the repo, because the container name does.
+  getSettings: () => Parameters<typeof getWorktreePathSettings>[1]
   migrateWorktreeIdentity: (target: HostWorktreeTarget, newWorktreeId: string) => void
   /** Re-key renderer state so a folder move is not treated as deletion. */
   notifyWorktreeRenamed: (repoId: string, oldWorktreeId: string, newWorktreeId: string) => void

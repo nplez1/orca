@@ -3,7 +3,7 @@ import {
   REVIEW_REFRESH_COOLDOWN_MS,
   subscribePRAutoRefreshCadence,
   type PRAutoRefreshCadence
-} from '../../../../../../shared/review-refresh-policy'
+} from '../../../../../../shared/source-control/hosted-review/review-refresh-policy'
 import { derivePRCheckStatus } from '../../../../../../shared/source-control/checks/pr-check-status'
 import { installWindowVisibilityTimeoutPoller } from '@/lib/window-activity/window-visibility-timeout-poller'
 import { getPRRefreshOwnerRuntimeEnvironmentId } from '@/store/github/repositories/repository-routing'
@@ -104,6 +104,10 @@ export function useChecksDetailTimer({
     // Under a stretched or stopped cadence the window coming back still reads checks older than
     // Default's delay, never sooner: the cadence slows the timer, not the user's return.
     const returnReadDue = (now: number): boolean => {
+      // Why: GitHub shows a finish at once, so a return while checks run pulls the poll forward.
+      if (!isGitLabReview && policyRef.current.checksRunning()) {
+        return true
+      }
       const defaultDelay = ownerCadence() === 'default' ? null : policyDelay('default')
       return defaultDelay !== null && now - lastAttemptAtRef.current >= defaultDelay
     }

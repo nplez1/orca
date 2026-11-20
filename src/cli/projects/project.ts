@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget (283/300); the fork's +18-line delta rides inside it, and splitting costs a permanent sync hunk. */
 import type {
   Project,
   ProjectHostSetup,
@@ -10,8 +11,11 @@ import type {
   ProjectHostSetupUpdateArgs,
   ProjectHostSetupUpdateResult
 } from '../../shared/project/project-types'
-import { getSshTargetIdForExecutionHost, type ExecutionHostId } from '../../shared/execution-host'
 import { getDefaultRepoRootConvention } from '../../shared/host-repo-root'
+import {
+  getSshTargetIdForExecutionHost,
+  type ExecutionHostId
+} from '../../shared/execution-host/execution-host'
 import type { RuntimeStatus } from '../../shared/remote-runtime/session-graph/runtime-session-contracts'
 import { PROJECT_HOST_SETUP_HOST_TARGET_RUNTIME_CAPABILITY } from '../../shared/remote-runtime/protocol/worktree-runtime-capabilities'
 import type { CommandHandler, HandlerContext } from '../dispatch/dispatch'

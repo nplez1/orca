@@ -10,17 +10,17 @@ import type { HostSettingsCredentialPort } from './host-settings-credential-port
  * and "install, pair, and it works" is the case that has to be right. Deltas exist for everything
  * after that, and they are built from the credential ids the last payload carried.
  */
-export function buildHostSettingsSnapshot(
+export async function buildHostSettingsSnapshot(
   ports: readonly HostSettingsCredentialPort[],
   revision: number,
   previousCredentialIds: readonly string[] = []
-): HostSettingsReplicationPayload {
-  const upserts = ports.flatMap((port) => port.list())
+): Promise<HostSettingsReplicationPayload> {
+  const upserts = (await Promise.all(ports.map((port) => port.list()))).flat()
   // Why unreadable ids count as held: "absent from upserts" otherwise means "deleted", so a keyring
   // this machine cannot open for a moment would read as a deletion on every host. Reported separately
   // and excluded from the removal list, which is the whole difference between a revoked credential and
   // an unreadable one.
-  const unreadable = unreadableCredentialIds(ports)
+  const unreadable = await unreadableCredentialIds(ports)
   const held = new Set([...upserts.map((credential) => credential.id), ...unreadable])
   return {
     version: HOST_SETTINGS_REPLICATION_PAYLOAD_VERSION,
@@ -42,15 +42,15 @@ export function buildHostSettingsSnapshot(
  * notion of an upsert — and comparing values would mean the main reading every secret it holds just
  * to decide nothing changed.
  */
-export function buildHostSettingsDelta(input: {
+export async function buildHostSettingsDelta(input: {
   ports: readonly HostSettingsCredentialPort[]
   /** Credential ids the last payload carried. */
   previousCredentialIds: readonly string[]
   revision: number
   baseRevision: number
-}): HostSettingsReplicationPayload {
-  const upserts = input.ports.flatMap((port) => port.list())
-  const unreadable = unreadableCredentialIds(input.ports)
+}): Promise<HostSettingsReplicationPayload> {
+  const upserts = (await Promise.all(input.ports.map((port) => port.list()))).flat()
+  const unreadable = await unreadableCredentialIds(input.ports)
   const held = new Set([...upserts.map((credential) => credential.id), ...unreadable])
   return {
     version: HOST_SETTINGS_REPLICATION_PAYLOAD_VERSION,

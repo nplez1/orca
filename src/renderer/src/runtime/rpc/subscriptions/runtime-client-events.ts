@@ -2,7 +2,7 @@ import type {
   RuntimeClientEvent,
   RuntimeClientEventStreamMessage
 } from '../../../../../shared/remote-runtime/session-graph/runtime-client-events'
-import { isNotificationAttentionAcknowledgement } from '../../../../../shared/notification-settings-types'
+import { isNotificationAttentionAcknowledgement } from '../../../../../shared/notifications/notification-settings-types'
 import type { RuntimeRpcResponse } from '../../../../../shared/remote-runtime/rpc/runtime-rpc-envelope'
 import { isRuntimeSubscriptionReplayResponse } from '../../../../../shared/remote-runtime/rpc/runtime-subscription-replay'
 import { admitSshConnectionState } from '../../../../../shared/remote-runtime/ssh/ssh-retained-payload-admission'
@@ -123,6 +123,8 @@ function isRuntimeClientEvent(
     message.type === 'worktreeTerminalSleepState' ||
     message.type === 'worktreeSetupRunnerState' ||
     message.type === 'workspaceViewChanged' ||
+    message.type === 'botsChanged' ||
+    message.type === 'orchestrationSessionWorkersChanged' ||
     message.type === 'workspaceCleanupRunFinished'
   )
 }

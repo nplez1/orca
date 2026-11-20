@@ -10,7 +10,7 @@ import type { GitHubRepositoryIdentity as GitHubOwnerRepo } from '../../../../..
 import type { GitHubWorkItem } from '../../../../../shared/github/work-items/work-item-types'
 import type { PRCheckDetail } from '../../../../../shared/github/checks/check-types'
 import type { TaskSourceContext } from '../../../../../shared/work-items/task-source-context'
-import type { GitHubChecksTabState } from '../../github-checks-tab-state'
+import type { GitHubChecksTabState } from '../../github/github-checks-tab-state'
 
 /** The checks tab mints one of these per context; only its reference identity is ever read. */
 type ChecksContextOwner = GitHubChecksTabState['contextOwner']

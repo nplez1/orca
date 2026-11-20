@@ -10,15 +10,15 @@ import { getJiraReadIdentity } from '../store/slices/jira/jira-read-coordination
 import { useJiraIssueComments } from './jira-issue-workspace-comments'
 import { useJiraIssueSideData } from './jira-issue-workspace-side-data'
 import type { JiraIssueWorkspaceDetailState } from './jira-issue-workspace-detail-contract'
-import { jiraIssueRequestScope } from './jira-issue-mutation-queue'
-import { useJiraIssueMutationState } from './use-jira-issue-mutation-state'
+import { jiraIssueRequestScope } from './task-page/jira/issue-workspace/jira-issue-mutation-queue'
+import { useJiraIssueMutationState } from './task-page/jira/issue-workspace/use-jira-issue-mutation-state'
 import { useJiraIssueWorkspaceRefresh } from './use-jira-issue-workspace-refresh'
 import { useJiraIssueWorkspaceMutation } from './use-jira-issue-workspace-mutation'
 import { submitJiraIssueFields } from './jira-issue-workspace-field-submission'
 import {
   mergeJiraIssueHydration,
   type EditableJiraIssueField
-} from './jira-issue-workspace-hydration'
+} from './task-page/jira/issue-workspace/jira-issue-workspace-hydration'
 
 /** Hydrates one Jira issue and owns its mutations, shared by the Task view and
  *  the Issue pane. `fetchKey` hydrates from a bare key; neither input resets state. */

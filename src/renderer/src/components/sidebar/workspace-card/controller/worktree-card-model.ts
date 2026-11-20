@@ -1,8 +1,8 @@
+import type { ExecutionHostId } from '../../../../../../shared/execution-host/execution-host'
 import type { WorktreeLineageSource } from '../../../../../../shared/sidebar-list/worktree-lineage-range'
 import type { DraggedWorktreeCopies } from '../../worktree-list/drag/dragged-worktree-copies'
 import type React from 'react'
 
-import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import type { BranchGroupMember } from '../../../../../../shared/sidebar-list/row-types'
 import type { Repo } from '../../../../../../shared/repository/repo-types'
 import type { WorkspaceStatus, Worktree } from '../../../../../../shared/worktree/types'
@@ -32,6 +32,12 @@ export type WorktreeCardProps = {
   hostContextLabel?: string
   /** Reuse the normal project badge for a nested child owned by another repo. */
   showProjectName?: boolean
+  /** One Compact line whatever the card setting, the project as muted text at its end. */
+  compactLine?: boolean
+  /** A line under a bot: the bot's computer. A line on another paired server names that server. */
+  lineOwnerHostId?: ExecutionHostId
+  /** A line under a bot's chat: a muted note after its name, such as "handed over". */
+  lineNote?: string
   inPinnedSection?: boolean
   activationRowKey?: string
   renameRowKey?: string
@@ -88,6 +94,7 @@ type DefaultedWorktreeCardProp =
   | 'isLineageDropTarget'
   | 'affiliateListMode'
   | 'statusPrDisplay'
+  | 'compactLine'
 
 export type ResolvedWorktreeCardProps = Omit<WorktreeCardProps, DefaultedWorktreeCardProp> & {
   isActiveSurface: boolean
@@ -104,6 +111,7 @@ export type ResolvedWorktreeCardProps = Omit<WorktreeCardProps, DefaultedWorktre
   isLineageDropTarget: boolean
   affiliateListMode: boolean
   statusPrDisplay: WorktreeCardPrDisplay | null
+  compactLine: boolean
 }
 
 export const EMPTY_WORKSPACE_PORTS = []

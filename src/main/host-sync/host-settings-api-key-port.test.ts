@@ -48,17 +48,17 @@ const createPort = (store: HostSettingsApiKeyStore) =>
   createHostSettingsApiKeyPort({ kind: ID, id: ID, label: LABEL, store, canSeal })
 
 describe('the provider-key credential port', () => {
-  it('lists nothing when the host holds no key', () => {
+  it('lists nothing when the host holds no key', async () => {
     const port = createPort(fakeStore())
 
-    expect(port.list()).toEqual([])
-    expect(port.protectionOf(ID)).toBeNull()
+    expect(await port.list()).toEqual([])
+    expect(await port.protectionOf(ID)).toBeNull()
   })
 
-  it('exports the held key with the protection it actually sits at', () => {
+  it('exports the held key with the protection it actually sits at', async () => {
     const port = createPort(fakeStore({ payload: 'sk-live', protection: 'sealed' }))
 
-    expect(port.list()).toEqual([
+    expect(await port.list()).toEqual([
       {
         id: ID,
         kind: ID,
@@ -70,11 +70,11 @@ describe('the provider-key credential port', () => {
     ])
   })
 
-  it('adopts an incoming value through the store it owns', () => {
+  it('adopts an incoming value through the store it owns', async () => {
     const store = fakeStore()
     const port = createPort(store)
 
-    port.apply({
+    await port.apply({
       id: ID,
       kind: ID,
       label: LABEL,
@@ -86,36 +86,36 @@ describe('the provider-key credential port', () => {
     expect(store.currentPayload()).toBe('sk-incoming')
   })
 
-  it('clears the key and then reports no protection, which is what proves a removal', () => {
+  it('clears the key and then reports no protection, which is what proves a removal', async () => {
     const store = fakeStore({ payload: 'sk-live', protection: 'sealed' })
     const port = createPort(store)
 
-    port.remove(ID)
+    await port.remove(ID)
 
     expect(store.currentPayload()).toBeNull()
-    expect(port.protectionOf(ID)).toBeNull()
+    expect(await port.protectionOf(ID)).toBeNull()
   })
 
-  it('ignores a credential that belongs to another provider', () => {
+  it('ignores a credential that belongs to another provider', async () => {
     const store = fakeStore({ payload: 'sk-live', protection: 'sealed' })
     const clear = vi.spyOn(store, 'clear')
     const port = createPort(store)
 
-    port.remove('api-key:minimax')
+    await port.remove('api-key:minimax')
 
     expect(clear).not.toHaveBeenCalled()
-    expect(port.protectionOf('api-key:minimax')).toBeNull()
+    expect(await port.protectionOf('api-key:minimax')).toBeNull()
   })
 
   // Why: "removed" has to mean the bytes are gone. A file that is present but undecodable must
   // still read as held, or revocation reports a success it cannot see.
-  it('still reports a key as held when the file is present but undecodable', () => {
+  it('still reports a key as held when the file is present but undecodable', async () => {
     const port = createPort(
       fakeStore({ payload: 'sk-corrupt', protection: null }, { undecodable: true })
     )
 
-    expect(port.protectionOf(ID)).toBe('plaintext')
-    expect(port.list()).toEqual([])
+    expect(await port.protectionOf(ID)).toBe('plaintext')
+    expect(await port.list()).toEqual([])
   })
 })
 
@@ -131,11 +131,11 @@ function incoming(payload: string): ReplicatedHostCredential {
 }
 
 describe('a provider key the user entered on the host', () => {
-  it('keeps the host key when replication has never written this id', () => {
+  it('keeps the host key when replication has never written this id', async () => {
     const store = fakeStore({ payload: 'sk-mine', protection: 'sealed' })
     const port = createPort(store)
 
-    const { report, state } = applyHostSettingsPayload({
+    const { report, state } = await applyHostSettingsPayload({
       payload: {
         version: 1,
         baseRevision: null,
@@ -155,11 +155,11 @@ describe('a provider key the user entered on the host', () => {
 
   // Why the other half: a value replication did put here is the main's to update, so the guard must
   // not turn into "a host key is never replaced" — that would strand a rotated key forever.
-  it('replaces the host copy once replication owns that id', () => {
+  it('replaces the host copy once replication owns that id', async () => {
     const store = fakeStore({ payload: 'sk-old', protection: 'sealed' })
     const port = createPort(store)
 
-    const { report } = applyHostSettingsPayload({
+    const { report } = await applyHostSettingsPayload({
       payload: {
         version: 1,
         baseRevision: null,

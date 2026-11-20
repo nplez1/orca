@@ -41,11 +41,9 @@ function parseCopilotCredentials(payload: string): CopilotCredentials {
   return { token: parsed.token.trim(), enterpriseSlug: parsed.enterpriseSlug.trim() }
 }
 
-export function hasCopilotCredentials(): boolean {
-  return copilotCredentialsStore.has()
-}
+export const hasCopilotCredentials = copilotCredentialsStore.has
 
-export function saveCopilotCredentials(credentials: CopilotCredentials): void {
+export async function saveCopilotCredentials(credentials: CopilotCredentials): Promise<void> {
   const token = credentials.token.trim()
   const enterpriseSlug = credentials.enterpriseSlug.trim()
   if (!token) {
@@ -54,18 +52,16 @@ export function saveCopilotCredentials(credentials: CopilotCredentials): void {
   if (!enterpriseSlug) {
     throw new Error('GitHub enterprise slug is required')
   }
-  copilotCredentialsStore.save(JSON.stringify({ token, enterpriseSlug }))
+  await copilotCredentialsStore.save(JSON.stringify({ token, enterpriseSlug }))
 }
 
 /**
  * Null only when nothing is stored. A stored-but-unreadable payload throws, so the
  * service reports a Copilot credential error instead of silently polling with none.
  */
-export function readCopilotCredentials(): CopilotCredentials | null {
-  const payload = copilotCredentialsStore.read()
+export async function readCopilotCredentials(): Promise<CopilotCredentials | null> {
+  const payload = await copilotCredentialsStore.read()
   return payload === null ? null : parseCopilotCredentials(payload)
 }
 
-export function clearCopilotCredentials(): void {
-  copilotCredentialsStore.clear()
-}
+export const clearCopilotCredentials = copilotCredentialsStore.clear

@@ -1,0 +1,140 @@
+import type { PreloadApi } from '../../../../../preload/api-types'
+import type { JiraMutationResult } from '../../../../../shared/jira/jira-types'
+import { translate } from '@/i18n/i18n'
+import { assertJiraTransitionFieldsSupported } from '../../../runtime/jira-capability-probe'
+import type { JiraCapabilityProbe } from '../../../runtime/jira-capability-probe'
+import { foldIssueUpdateForCapabilities } from '../../../runtime/runtime-jira-text-fields'
+import { rethrowJiraWriteTimeout } from '../../../runtime/jira-write-deadline'
+import { JIRA_WRITE_RPC_TIMEOUT_MS } from '../../../../../shared/jira/jira-write-deadline'
+import { callRuntimeResult, getRemoteRuntimeStatus } from '../../runtime/client/web-runtime-calls'
+import {
+  assertActiveEnvironment,
+  requireActiveEnvironment
+} from '../../runtime/client/web-runtime-session'
+import { readRuntimeJiraPayload } from '../../../runtime/jira/runtime-jira-payload-stream'
+import { RuntimeRpcCallError } from '../../../runtime/rpc/calls/runtime-rpc-result'
+
+const JIRA_NETWORK_TIMEOUT_MS = 30_000
+const JIRA_SETTINGS_TIMEOUT_MS = 15_000
+
+function jiraCall<TResult>(method: string, params?: unknown, timeoutMs = JIRA_NETWORK_TIMEOUT_MS) {
+  return callRuntimeResult<TResult>(`jira.${method}`, params, timeoutMs)
+}
+
+// Why: issue bodies with inline images exceed the 1 MiB socket frame, so stream them in chunks.
+async function readJiraPayload<TResult>(
+  streamMethod: string,
+  fallbackMethod: string,
+  args: unknown
+): Promise<TResult> {
+  const target = { kind: 'environment', environmentId: requireActiveEnvironment().id } as const
+  try {
+    return await readRuntimeJiraPayload<TResult>(target, `jira.${streamMethod}`, args)
+  } catch (error) {
+    if (!(error instanceof RuntimeRpcCallError) || error.code !== 'method_not_found') {
+      throw error
+    }
+    // Older servers lack payload streaming but return text-only details one-shot.
+    return jiraCall<TResult>(fallbackMethod, args)
+  }
+}
+
+/** The paired server's capabilities, pinned to the host that answered them: the web
+ *  client's only execution target is that host, so its mixed-version checks belong
+ *  here rather than in the renderer's remote-environment branch. */
+async function hostCapabilityProbe(): Promise<(capability: string) => Promise<boolean>> {
+  const environmentId = requireActiveEnvironment().id
+  const status = await getRemoteRuntimeStatus()
+  // Why: the verdict belongs to the probed host; never send to a host switched mid-probe.
+  assertActiveEnvironment(environmentId)
+  const capabilities = status.capabilities ?? []
+  return async (capability) => capabilities.includes(capability)
+}
+
+export function createWebJiraApi(): PreloadApi['jira'] {
+  return {
+    connect: (args) => jiraCall('connect', args),
+    disconnect: async (args) => {
+      await jiraCall('disconnect', args, JIRA_SETTINGS_TIMEOUT_MS)
+    },
+    selectSite: (args) => jiraCall('selectSite', args, JIRA_SETTINGS_TIMEOUT_MS),
+    status: () => jiraCall('status', undefined, JIRA_SETTINGS_TIMEOUT_MS),
+    readStatus: () => jiraCall('readStatus', undefined, JIRA_SETTINGS_TIMEOUT_MS),
+    testConnection: (args) => jiraCall('testConnection', args),
+    // Why: requestId keys desktop-only IPC cancellation; the server has no cancel method.
+    searchIssues: ({ requestId: _requestId, ...args }) => jiraCall('searchIssues', args),
+    cancelSearchIssues: () => Promise.resolve(),
+    searchIssuesPage: ({ requestId: _pageRequestId, ...args }) =>
+      jiraCall('searchIssuesPage', args),
+    listIssues: (args) => jiraCall('listIssues', args),
+    listIssuesPage: (args) => jiraCall('listIssuesPage', args),
+    getIssue: (args) => readJiraPayload('getIssueStream', 'getIssue', args),
+    lookupIssueSummary: ({ requestId: _requestId, ...args }) =>
+      jiraCall('lookupIssueSummary', args),
+    cancelIssueSummary: () => Promise.resolve(),
+    // Why the longer timeout: the host's verdict on a create it aborted says the issue
+    // may exist, and the generic timeout would hide it behind a safe-looking retry.
+    createIssue: (args) => jiraCall('createIssue', args, JIRA_WRITE_RPC_TIMEOUT_MS),
+    generateIssueSummary: async () => ({
+      success: false,
+      error: translate(
+        'components.jiraIssueTitleField.webUnavailable',
+        'Jira title generation is unavailable in the web client.'
+      )
+    }),
+    cancelGenerateIssueSummary: () => Promise.resolve(),
+    // Why the probe: an older server would complete the transition without its
+    // required fields, or reject a plain-text value it cannot shape for its site.
+    // Why the probe only when the payload needs it: a plain title edit gains nothing from
+    // a round trip, and a probe failure must not block a write it cannot shape.
+    updateIssue: async ({ key, updates, siteId }) => {
+      const needsVerdict = Boolean(
+        updates.transitionFields || updates.transitionComment !== undefined
+      )
+      const needsShaping = needsVerdict || Boolean(updates.textFieldKeys?.length)
+      let supports: JiraCapabilityProbe = async () => true
+      if (needsShaping) {
+        try {
+          supports = await hostCapabilityProbe()
+        } catch (error) {
+          // Why: shaping must never fail a write, so an unanswerable probe falls back to
+          // the ADF older hosts handle — but with a transition the verdict decides
+          // whether the write may be sent at all.
+          if (needsVerdict) {
+            throw error
+          }
+          supports = async () => false
+        }
+      }
+      await assertJiraTransitionFieldsSupported(supports, updates)
+      return jiraCall<JiraMutationResult>(
+        'updateIssue',
+        {
+          key,
+          updates: await foldIssueUpdateForCapabilities(supports, updates),
+          siteId
+        },
+        JIRA_WRITE_RPC_TIMEOUT_MS
+      ).catch(rethrowJiraWriteTimeout)
+    },
+    addIssueComment: (args) => jiraCall('addIssueComment', args, JIRA_WRITE_RPC_TIMEOUT_MS),
+    issueComments: (args) => readJiraPayload('issueCommentsStream', 'issueComments', args),
+    listProjects: (args) => jiraCall('listProjects', args),
+    listFavouriteFilters: (args) => jiraCall('listFavouriteFilters', args),
+    listIssueTypes: (args) => jiraCall('listIssueTypes', args),
+    listCreateFields: (args) => jiraCall('listCreateFields', args),
+    listEditFields: (args) => jiraCall('listEditFields', args),
+    listPriorities: (args) => jiraCall('listPriorities', args),
+    listAssignableUsers: (args) => jiraCall('listAssignableUsers', args),
+    // Why: servers expose no project-scoped user search; match the remote-environment fallback.
+    listAssignableUsersForProject: ({ query, siteId }) =>
+      jiraCall('searchUsers', { query, siteId }),
+    searchUsers: (args) => jiraCall('searchUsers', args),
+    listTransitions: (args) => jiraCall('listTransitions', args),
+    getProjectStatusOrder: (args) => jiraCall('getProjectStatusOrder', args),
+    listBoards: (args) => jiraCall('listBoards', args),
+    getBoardOverview: (args) => jiraCall('getBoardOverview', args),
+    listBoardIssues: (args) => jiraCall('listBoardIssues', args),
+    getIssueSprintAssignment: (args) => jiraCall('getIssueSprintAssignment', args)
+  }
+}

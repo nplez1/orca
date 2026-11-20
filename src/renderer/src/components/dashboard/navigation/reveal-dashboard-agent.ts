@@ -6,7 +6,7 @@ import {
   structuredAgentSessionTargetForTab
 } from '@/runtime/native-chat/session-ownership/structured-agent-session-owner'
 import { useAppStore } from '@/store/index'
-import type { DashboardRevealAgentArgs } from '../../../../../shared/dashboard-snapshot'
+import type { DashboardRevealAgentArgs } from '../../../../../shared/agent-status/presentation/dashboard-snapshot'
 
 /**
  * Click-to-focus from the Agent Dashboard (workspace jump or terminal preview).

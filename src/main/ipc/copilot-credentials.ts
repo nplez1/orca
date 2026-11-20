@@ -32,9 +32,9 @@ function ghSetupHintFor(gh: CopilotGhCredentialsResult): string | null {
   return gh.status === 'unauthenticated' ? 'gh auth login' : null
 }
 
-function readStoredEnterpriseSlug(): string | null {
+async function readStoredEnterpriseSlug(): Promise<string | null> {
   try {
-    return readCopilotCredentials()?.enterpriseSlug ?? null
+    return (await readCopilotCredentials())?.enterpriseSlug ?? null
   } catch (error) {
     // Why: an undecryptable file must not break the pane; the form only needs a draft.
     recordSwallowedFailure('copilot', error, 'failed to read stored credentials', 'error')
@@ -43,8 +43,8 @@ function readStoredEnterpriseSlug(): string | null {
 }
 
 async function getCopilotCredentialsStatus(): Promise<CopilotCredentialsStatus> {
-  const storedSlug = readStoredEnterpriseSlug()
-  const storedConfigured = hasCopilotCredentials() && storedSlug !== null
+  const storedSlug = await readStoredEnterpriseSlug()
+  const storedConfigured = (await hasCopilotCredentials()) && storedSlug !== null
   if (storedConfigured) {
     return { configured: true, enterpriseSlug: storedSlug, source: 'stored', ghSetupHint: null }
   }
@@ -95,19 +95,19 @@ export function registerCopilotCredentialsHandlers(rateLimits: RateLimitService 
       // means "keep the stored one" once credentials exist.
       let nextToken = token.trim()
       if (!nextToken) {
-        nextToken = readCopilotCredentials()?.token.trim() ?? ''
+        nextToken = (await readCopilotCredentials())?.token.trim() ?? ''
       }
       if (!nextToken) {
         throw new Error('GitHub token is required')
       }
-      saveCopilotCredentials({ token: nextToken, enterpriseSlug })
+      await saveCopilotCredentials({ token: nextToken, enterpriseSlug })
       noteReplicatedCredentialChanged()
       refreshAfterCopilotCredentialChange(rateLimits, 'save')
       return await getCopilotCredentialsStatus()
     }
   )
   ipcMain.handle('copilotCredentials:clear', async () => {
-    clearCopilotCredentials()
+    await clearCopilotCredentials()
     noteReplicatedCredentialChanged()
     refreshAfterCopilotCredentialChange(rateLimits, 'clear')
     return await getCopilotCredentialsStatus()

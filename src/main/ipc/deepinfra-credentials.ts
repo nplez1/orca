@@ -13,8 +13,8 @@ export type DeepInfraCredentialsStatus = {
   apiKeyConfigured: boolean
 }
 
-function getDeepInfraCredentialsStatus(): DeepInfraCredentialsStatus {
-  const apiKeyConfigured = hasDeepInfraApiKey()
+async function getDeepInfraCredentialsStatus(): Promise<DeepInfraCredentialsStatus> {
+  const apiKeyConfigured = await hasDeepInfraApiKey()
   return { configured: apiKeyConfigured, apiKeyConfigured }
 }
 
@@ -37,20 +37,20 @@ function refreshAfterDeepInfraCredentialChange(
 
 export function registerDeepInfraCredentialsHandlers(rateLimits: RateLimitService | null): void {
   ipcMain.handle('deepinfraCredentials:getStatus', () => getDeepInfraCredentialsStatus())
-  ipcMain.handle('deepinfraCredentials:saveApiKey', (_event, key: string) => {
+  ipcMain.handle('deepinfraCredentials:saveApiKey', async (_event, key: string) => {
     // Why: the renderer-declared type is compile-time only; the value arrives as unknown over IPC.
     if (typeof key !== 'string') {
       throw new Error('DeepInfra API key must be a string')
     }
-    saveDeepInfraApiKey(key)
+    await saveDeepInfraApiKey(key)
     noteReplicatedCredentialChanged()
     refreshAfterDeepInfraCredentialChange(rateLimits, 'save')
-    return getDeepInfraCredentialsStatus()
+    return await getDeepInfraCredentialsStatus()
   })
-  ipcMain.handle('deepinfraCredentials:clearApiKey', () => {
-    clearDeepInfraApiKey()
+  ipcMain.handle('deepinfraCredentials:clearApiKey', async () => {
+    await clearDeepInfraApiKey()
     noteReplicatedCredentialChanged()
     refreshAfterDeepInfraCredentialChange(rateLimits, 'clear')
-    return getDeepInfraCredentialsStatus()
+    return await getDeepInfraCredentialsStatus()
   })
 }

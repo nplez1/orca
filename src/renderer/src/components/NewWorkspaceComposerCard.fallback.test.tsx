@@ -3,7 +3,7 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import NewWorkspaceComposerCard from './NewWorkspaceComposerCard'
+import NewWorkspaceComposerCard from './new-workspace/composer/NewWorkspaceComposerCard'
 import type { NewWorkspaceComposerCardProps } from './new-workspace/composer/new-workspace-composer-card-props'
 import type { NeedsSetupProjectHostOption } from '@/lib/workspace/creation/project-host-setup-options'
 import type { RunTargetAutoClone } from './new-workspace/use-run-target-auto-clone'

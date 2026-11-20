@@ -1,6 +1,9 @@
-import { isCaseInsensitiveRuntimeRoot } from './cross-platform-path'
+import { isCaseInsensitiveRuntimeRoot } from './file-access/cross-platform-path'
 import { joinHostPath, trimHostPathSeparators } from './host-path-join'
-import { layoutNestsPrimaryCheckout, type WorktreeLayoutMode } from './orca-workspace-layout'
+import {
+  layoutNestsPrimaryCheckout,
+  type WorktreeLayoutMode
+} from './worktree/paths/orca-workspace-layout'
 /** Where a host keeps checkouts when nothing is stored. Under a nested layout that is the worktree
  *  root itself, which is why the two settings coincide there and diverge under `flat`. */
 export function getDefaultRepoRootConvention(

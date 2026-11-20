@@ -1,5 +1,5 @@
 import { joinPath } from '@/lib/path'
-import { isWindowsAbsolutePathLike } from '../../../../shared/cross-platform-path'
+import { isWindowsAbsolutePathLike } from '../../../../shared/file-access/cross-platform-path'
 import { getUtf8ByteLength } from '../../../../shared/text/utf8-byte-limits'
 import type { FileExplorerOperationOwner, TreeNode } from './file-explorer/tree/file-explorer-types'
 import type { AcceptedNameFilterPath } from './file-explorer-name-filter-path-acceptance'

@@ -4,7 +4,10 @@ import { runtimeTargetEnvironmentId } from '@/runtime/rpc/targets/runtime-client
 import { getEnvironmentRuntimeContextKey } from '@/runtime/hosts/observations/provider-runtime-context'
 import { jiraGetProjectStatusOrder } from '@/runtime/jira/runtime-jira-client'
 import type { RuntimeJiraSettings } from '@/runtime/jira/runtime-jira-target'
-import { createMetadataRequestStore, loadMetadata } from '@/hooks/metadata-request-cache'
+import {
+  createMetadataRequestStore,
+  loadMetadata
+} from '@/lib/work-items/metadata/metadata-request-cache'
 
 export type TaskPageJiraProjectScope = {
   key: string

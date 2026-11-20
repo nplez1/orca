@@ -7,7 +7,7 @@ import { getFileExplorerOperationOwnerFromState } from '../navigation/file-explo
 import {
   useRuntimeFileListForWorktree,
   type RuntimeFileListState
-} from '@/components/quick-open-file-list'
+} from '@/components/file-actions/quick-open/quick-open-file-list'
 import {
   FILE_EXPLORER_NAME_FILTER_MAX_RESULTS,
   isFileExplorerNameFilterQueryTooLarge,
@@ -20,6 +20,7 @@ type UseFileExplorerNameFilterResult = {
   nameFilterCollapsedPaths: Set<string>
   setNameFilterCollapsedPaths: Dispatch<SetStateAction<Set<string>>>
   hasNameFilter: boolean
+  hasNameFilterQuery: boolean
   nameFilterFiles: RuntimeFileListState
   nameFilterSource: FileExplorerNameFilterProjectionSource | null
   handleClearNameFilter: () => void
@@ -202,6 +203,7 @@ export function useFileExplorerNameFilter({
     nameFilterCollapsedPaths,
     setNameFilterCollapsedPaths,
     hasNameFilter,
+    hasNameFilterQuery,
     nameFilterFiles,
     nameFilterSource,
     handleClearNameFilter,

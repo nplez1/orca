@@ -5,9 +5,12 @@
  * decision to the real filesystem, git, and store, and owns the host-scoped refusals.
  */
 import { mkdir, rename, stat } from 'node:fs/promises'
-import { getRepoExecutionHostId, getRepoRoutingConnectionId } from '../../shared/execution-host'
+import {
+  getRepoExecutionHostId,
+  getRepoRoutingConnectionId
+} from '../../shared/execution-host/execution-host'
 import { hostWorktreeTarget } from '../../shared/worktree/host-qualified-identity'
-import type { GlobalSettings } from '../../shared/global-settings-types'
+import type { GlobalSettings } from '../../shared/settings/global-settings-types'
 import type { Repo } from '../../shared/repository/repo-types'
 import type { RuntimeWorktreePsSummary } from '../../shared/worktree/catalog/runtime-worktree-contracts'
 import type { RuntimeRepoRelocationResult } from '../../shared/repo-relocation-contracts'

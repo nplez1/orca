@@ -1,12 +1,16 @@
 import { useEffect, useRef } from 'react'
 import { restoreAgentTabFocusAfterGesture } from '@/lib/agent-tab-focus-policy'
 import { useAppStore } from '@/store/index'
-import type { ActiveRightSidebarTab } from '../../../../../shared/ui-chrome-types'
+import type { ActiveRightSidebarTab } from '../../../../../shared/ui-chrome/ui-chrome-types'
 import type { PluginPanelsFetchStatus } from '@/store/plugins/catalog/plugin-contribution-catalog'
 import { normalizeRightSidebarRoute } from '@/store/slices/right-sidebar/right-sidebar-route'
 import { resolveRightSidebarEffectiveTab } from './right-sidebar-effective-tab'
 import { useInstalledPluginRouteReconciliation } from '../plugin-panels/use-installed-plugin-route-reconciliation'
 import type { ActivityBarItem } from './activity-bar-buttons'
+
+// The last route request the panel saw, kept across unmounts: Settings unmounts it, and a request
+// made there (open a bot's Connectors) is still new when the panel mounts again.
+let seenRouteRequestId: number | null = null
 
 export type RightSidebarTabRouting = {
   effectiveTab: ActiveRightSidebarTab
@@ -19,9 +23,11 @@ export function useRightSidebarTabRouting({
   activeFolderWorkspaceKey,
   pluginSystemEnabled,
   pluginFetchStatus,
-  installedPluginTabKeys
+  installedPluginTabKeys,
+  isBotPage
 }: {
   visibleItems: ActivityBarItem[]
+  isBotPage: boolean
   activeFolderWorkspaceKey: string | null
   pluginSystemEnabled: boolean
   pluginFetchStatus: PluginPanelsFetchStatus
@@ -34,7 +40,7 @@ export function useRightSidebarTabRouting({
   const setRightSidebarEffectiveTab = useAppStore((s) => s.setRightSidebarEffectiveTab)
 
   const rememberedFolderTabByWorkspaceKeyRef = useRef<Record<string, ActiveRightSidebarTab>>({})
-  const lastRightSidebarRouteRequestIdRef = useRef(rightSidebarRouteRequestId)
+  const lastRightSidebarRouteRequestIdRef = useRef(seenRouteRequestId ?? rightSidebarRouteRequestId)
 
   // Preserve stored routes when hidden; folder effective-tab memory keeps parent overviews, while authoritative installed-panel keys discard uninstalled plugin routes.
   const normalizedActiveTab = normalizeRightSidebarRoute(rightSidebarTab, undefined, {
@@ -53,7 +59,8 @@ export function useRightSidebarTabRouting({
     normalizedActiveTab,
     visibleItems,
     activeFolderWorkspaceKey,
-    rememberedFolderTab: requestedFolderTab ?? rememberedFolderTab
+    rememberedFolderTab: requestedFolderTab ?? rememberedFolderTab,
+    leadWithFirstTab: isBotPage
   })
 
   useInstalledPluginRouteReconciliation({
@@ -72,6 +79,7 @@ export function useRightSidebarTabRouting({
 
   useEffect(() => {
     lastRightSidebarRouteRequestIdRef.current = rightSidebarRouteRequestId
+    seenRouteRequestId = rightSidebarRouteRequestId
   }, [rightSidebarRouteRequestId])
 
   useEffect(() => {

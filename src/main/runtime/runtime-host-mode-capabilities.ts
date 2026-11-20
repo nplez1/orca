@@ -2,7 +2,7 @@ import type { RuntimeCapability } from '../../shared/remote-runtime/protocol/pro
 import { DESKTOP_BROWSER_BRIDGE_RUNTIME_CAPABILITY } from '../../shared/browser/client-hosting/desktop-browser-bridge-protocol'
 import { darkSwitchRuntimeCapabilities } from './construction/dark-switch-runtime-capabilities'
 import { MOBILE_WEB_BUNDLE_CAPABILITY } from '../../shared/mobile-web-bundle/mobile-web-bundle-capability'
-import { ORCA_SIDEBAR_INPUTS_IS_MAIN } from '../../shared/sidebar-inputs-switch'
+import { ORCA_SIDEBAR_INPUTS_IS_MAIN } from '../../shared/sidebar-list/feed/sidebar-inputs-switch'
 import { WORKSPACE_UNREAD_HOST_RAISES_CAPABILITY } from '../../shared/worktree/metadata/workspace-unread-raise-capability'
 import { getBundledMobileWebBundleRoot } from './rpc/methods/mobile-delivery/bundled-mobile-web-bundle'
 import { isDesktopBrowserBridgeHostEnabled } from './desktop-browser-bridge/desktop-browser-bridge-registry'

@@ -52,7 +52,7 @@ import type {
   RuntimeClientEvent
 } from '../../shared/remote-runtime/session-graph/runtime-client-events'
 import { parsePaneKey } from '../../shared/workspace-layout/stable-pane-id'
-import { wakeFolderRepoGitUpgradeWatch } from '../ipc/folder-repo-git-upgrade-wake'
+import { wakeFolderRepoGitUpgradeWatch } from '../ipc/worktrees/listing/folder-repo-git-upgrade-wake'
 import { hostModeRuntimeCapabilities } from './runtime-host-mode-capabilities'
 import { runWorktreeChangeInvalidators } from '../ipc/worktrees/listing/worktree-change-invalidators'
 import { MACHINE_NAME_PUBLISH_WAIT_MS } from './hosts/platform-probe/runtime-machine-name'

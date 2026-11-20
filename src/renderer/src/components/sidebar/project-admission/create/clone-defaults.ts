@@ -1,9 +1,12 @@
-import type { WorktreeLayoutMode } from '../../../../../../shared/orca-workspace-layout'
-import { parseExecutionHostId, type ExecutionHostId } from '../../../../../../shared/execution-host'
+import type { WorktreeLayoutMode } from '../../../../../../shared/worktree/paths/orca-workspace-layout'
+import {
+  parseExecutionHostId,
+  type ExecutionHostId
+} from '../../../../../../shared/execution-host/execution-host'
 import { canonicalHostIdOrder } from '../../../../../../shared/execution-host/managed-orcad-execution-host'
 import { getHostSettingOverrideForIds } from '../../../../../../shared/execution-host/host-setting-overrides'
 import { resolveCheckoutParent } from '../../../../../../shared/host-repo-root'
-import type { GlobalSettings } from '../../../../../../shared/global-settings-types'
+import type { GlobalSettings } from '../../../../../../shared/settings/global-settings-types'
 import { isAbsoluteOrHomeFolderPath } from '@/lib/host-folder-path'
 
 export type CloneParentSettings = {

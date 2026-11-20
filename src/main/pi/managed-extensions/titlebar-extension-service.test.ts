@@ -192,7 +192,6 @@ describe('PiTitlebarExtensionService', () => {
     }
   )
 
-
   it('rebuilding managed extensions for the same ptyId does not corrupt the user Pi dir', () => {
     const svc = new PiTitlebarExtensionService()
     svc.buildPtyEnv('pty-3', piHome, 'pi')
@@ -268,7 +267,6 @@ describe('PiTitlebarExtensionService', () => {
     }
   })
 
-
   it("does not overwrite a user's same-named Orca extension file", () => {
     const userStatusExtension = 'user-owned status extension'
     writeFileSync(join(piHome, 'extensions', 'orca-agent-status.ts'), userStatusExtension, 'utf-8')
@@ -309,6 +307,25 @@ describe('PiTitlebarExtensionService', () => {
           expect.stringContaining('omp-managed-status-extension')
         )
         expect(existsSync(ompEnv.ORCA_OMP_STATUS_EXTENSION!)).toBe(true)
+      } finally {
+        homedirOverride.current = ''
+        rmSync(fakeHome, { recursive: true, force: true })
+      }
+    })
+
+    it('bare-shell prep leaves an existing Pi home alone when Pi is not on PATH (#43445)', () => {
+      const fakeHome = mkdtempSync(join(tmpdir(), 'orca-pi-home-without-cli-'))
+      const piAgentDir = join(fakeHome, '.pi', 'agent')
+      mkdirSync(piAgentDir, { recursive: true })
+      homedirOverride.current = fakeHome
+      try {
+        const env = new PiTitlebarExtensionService().buildPtyEnv('pty-bare-pi', undefined, 'pi', {
+          materializeDefaultHome: false,
+          cliOnPath: false
+        })
+
+        expect(env).toEqual({})
+        expect(existsSync(join(piAgentDir, 'extensions'))).toBe(false)
       } finally {
         homedirOverride.current = ''
         rmSync(fakeHome, { recursive: true, force: true })

@@ -3,12 +3,12 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { getDefaultSettings } from '../../../../../../shared/constants'
+import { getDefaultSettings } from '../../../../../../shared/orca-profiles/constants'
 import {
   LOCAL_EXECUTION_HOST_ID,
   toRuntimeExecutionHostId
-} from '../../../../../../shared/execution-host'
-import type { GlobalSettings } from '../../../../../../shared/global-settings-types'
+} from '../../../../../../shared/execution-host/execution-host'
+import type { GlobalSettings } from '../../../../../../shared/settings/global-settings-types'
 import type { ProjectHostSetup } from '../../../../../../shared/project/project-types'
 import { useAppStore } from '../../../../store/index'
 import { RepositoryHostSetupActions } from './RepositoryHostSetupActions'

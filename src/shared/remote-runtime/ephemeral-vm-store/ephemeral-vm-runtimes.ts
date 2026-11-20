@@ -4,7 +4,10 @@ import {
   EphemeralVmRecipeLegacyResultSchema,
   EphemeralVmRecipeResultSchema
 } from '../ephemeral-vm-recipes/ephemeral-vm-recipes'
-import type { OrcaVmRecipe, OrcaVmRecipeContextMenuItem } from '../../orca-yaml-hook-types'
+import type {
+  OrcaVmRecipe,
+  OrcaVmRecipeContextMenuItem
+} from '../../workspace-setup/orca-yaml-hook-types'
 import type { EphemeralVmFailure } from '../ephemeral-vm-recipes/ephemeral-vm-failure-copy'
 import { toEphemeralVmRuntimeRecipeSnapshot as stripEphemeralVmRecipeTimeouts } from '../ephemeral-vm-recipes/ephemeral-vm-recipe-timeouts'
 

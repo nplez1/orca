@@ -46,7 +46,7 @@ export function decideHostSettingsPayload(
  * host has something, and nobody checked what". The resulting state is `partial` when anything was
  * refused, so a half-replicated host never reports a clean sync.
  */
-export function applyHostSettingsPayload(input: {
+export async function applyHostSettingsPayload(input: {
   payload: HostSettingsReplicationPayload
   registry: HostSettingsCredentialRegistry
   now: number
@@ -62,7 +62,7 @@ export function applyHostSettingsPayload(input: {
    * this list, so a removal naming anything else leaves the host's own value alone.
    */
   replicatedIds?: readonly string[]
-}): { report: HostSettingsApplyReport; state: HostSettingsSyncState } {
+}): Promise<{ report: HostSettingsApplyReport; state: HostSettingsSyncState }> {
   const { payload, registry, now } = input
   const replicated = new Set(input.replicatedIds ?? [])
   const outcomes: Record<string, HostSettingsApplyOutcome> = {}
@@ -73,7 +73,7 @@ export function applyHostSettingsPayload(input: {
       outcomes[credential.id] = 'refusedUnknownKind'
       continue
     }
-    const heldHere = port.protectionOf(credential.id) !== null
+    const heldHere = (await port.protectionOf(credential.id)) !== null
     if (credential.onlyIfEmpty && heldHere) {
       outcomes[credential.id] = 'keptHostValue'
       continue
@@ -95,7 +95,7 @@ export function applyHostSettingsPayload(input: {
       continue
     }
     try {
-      port.apply(credential)
+      await port.apply(credential)
     } catch (error) {
       // Why per item, and why a failure is still recorded as possibly held: an adapter that throws
       // partway through (a malformed payload, a full disk) may already have written the value, and one
@@ -113,9 +113,12 @@ export function applyHostSettingsPayload(input: {
     // write time falls back to plaintext, so an adapter that believes it can seal is not evidence that
     // the value landed sealed. If it did not, the weaker copy is removed rather than left behind — a
     // silent protection downgrade is the one outcome this policy exists to prevent.
-    if (credential.protection === 'sealed' && port.protectionOf(credential.id) !== 'sealed') {
+    if (
+      credential.protection === 'sealed' &&
+      (await port.protectionOf(credential.id)) !== 'sealed'
+    ) {
       try {
-        port.remove(credential.id)
+        await port.remove(credential.id)
       } catch (error) {
         // Why `applyFailed` and not a refusal: the weaker copy is still on disk, so neither side may
         // treat this as "the host does not hold it" — a refusal would take it out of both the host's
@@ -150,14 +153,14 @@ export function applyHostSettingsPayload(input: {
     // under the id is the other half of the same test — the store answering `null` is the proof it is
     // gone, which keeps a stale main record from making an otherwise clean host report `partial`.
     if (!replicated.has(id)) {
-      outcomes[id] = port.protectionOf(id) === null ? 'removed' : 'keptHostValue'
+      outcomes[id] = (await port.protectionOf(id)) === null ? 'removed' : 'keptHostValue'
       continue
     }
     // Why per removal: an unlink can fail for reasons that have nothing to do with us — EBUSY under a
     // Windows antivirus scan, EPERM on a locked file — and an uncaught throw here aborted the whole
     // apply, so later removals never ran and the upserts that had already landed were never recorded.
     try {
-      port.remove(id)
+      await port.remove(id)
     } catch (error) {
       recordSwallowedFailure('orca', error, `could not remove replicated credential ${id}`)
       outcomes[id] = 'removalUnverified'
@@ -165,7 +168,7 @@ export function applyHostSettingsPayload(input: {
     }
     // Why re-read rather than trust the unlink: "the token is gone" is a security claim, and the
     // only honest evidence for it is the store that would still answer with the token.
-    outcomes[id] = port.protectionOf(id) === null ? 'removed' : 'removalUnverified'
+    outcomes[id] = (await port.protectionOf(id)) === null ? 'removed' : 'removalUnverified'
   }
 
   const refusals = Object.entries(outcomes)

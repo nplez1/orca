@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { getDefaultSettings } from '../../../../shared/constants'
+import { getDefaultSettings } from '../../../../shared/orca-profiles/constants'
 import type { RemoteBranchCleanup } from '../../../../shared/worktree/remote-branch-removal'
 import { makeWorktree } from './worktrees/worktree.test-fixture'
 import {

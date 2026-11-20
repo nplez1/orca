@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ComponentProps } from 'react'
 import type { JiraBoardSelection, JiraIssue } from '../../../../../shared/jira/jira-types'
 import { accountBackedDetailSource } from '@/lib/account-backed-detail-source'
-import type JiraIssueWorkspace from '@/components/JiraIssueWorkspace'
+import type JiraIssueWorkspace from '@/components/task-page/jira/issue-workspace/JiraIssueWorkspace'
 import type { TaskPageComposerActionsModel } from '../use-task-page-composer-actions'
 
 type JiraIssueWorkspaceBoardProps = Pick<

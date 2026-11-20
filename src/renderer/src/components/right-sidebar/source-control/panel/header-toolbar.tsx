@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom'
 import { Search, X } from 'lucide-react'
 import type { GitBranchCompareSummary } from '../../../../../../shared/git/diff/git-diff-compare-types'
 import type { GitBranchLineTotal } from '../../../../../../shared/git/status/git-status-types'
-import type { SourceControlViewMode } from '../../../../../../shared/ui-chrome-types'
+import type { SourceControlViewMode } from '../../../../../../shared/ui-chrome/ui-chrome-types'
 import type { HostedReviewInfo } from '../../../../../../shared/source-control/hosted-review/hosted-review-contracts'
 import type { PrimaryAction } from '../review/source-control-primary-action-types'
 import { Button } from '@/components/ui/button'
@@ -285,7 +285,8 @@ export function SourceControlHeaderToolbar({
         {showCollapsedToolbar ? (
           <>
             {reviewControl ?? <span className="min-w-0 flex-1" aria-hidden="true" />}
-            {(visibleCreatePrHeaderAction || suppressedGitHubPRNumber !== null) && !displayedReview ? (
+            {(visibleCreatePrHeaderAction || suppressedGitHubPRNumber !== null) &&
+            !displayedReview ? (
               // Pin filter/overflow right without stretching Create PR.
               <span className="min-w-0 flex-1" aria-hidden="true" />
             ) : null}

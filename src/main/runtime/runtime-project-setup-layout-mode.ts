@@ -4,7 +4,7 @@ import {
   layoutModeNestsWorkspaces,
   resolveWorktreeLayoutMode,
   type WorktreeLayoutMode
-} from '../../shared/orca-workspace-layout'
+} from '../../shared/worktree/paths/orca-workspace-layout'
 import { invalidateAuthorizedRootsCache } from '../ipc/worktrees/removal/registered-worktree-roots-cache'
 import { scheduleCurrentWorktreeBaseDirectoryWatcherSync } from '../ipc/worktrees/creation/worktree-base-directory-watcher'
 import { prepareLocalWorktreeRootForRepo } from '../workspaces/creation/worktree-root-preparation'

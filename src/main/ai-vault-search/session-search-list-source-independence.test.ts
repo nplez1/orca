@@ -6,7 +6,7 @@ import { resetSessionParseCacheForTests } from '../ai-vault/parse-cache/session-
 import { resetTranscriptConsumersForTests } from '../ai-vault/transcripts/session-transcript-consumers'
 import { scanAiVaultSessions } from '../ai-vault/session-scanner'
 import { SessionScannerServiceSearch } from '../ai-vault/scan-service/session-scanner-service-search'
-import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
+import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host/execution-host'
 import { SessionSearchInstance } from './session-search-instance'
 import {
   openSessionSearchIndexerHarness,

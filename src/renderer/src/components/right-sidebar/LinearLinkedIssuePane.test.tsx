@@ -69,7 +69,7 @@ vi.mock('@/runtime/linear/runtime-linear-issue-client', async (importOriginal) =
   linearAddIssueComment: (...args: unknown[]) => mocks.linearAddIssueComment(...args)
 }))
 
-vi.mock('@/hooks/useIssueMetadata', () => ({
+vi.mock('@/lib/work-items/linear/useIssueMetadata', () => ({
   useTeamStates: () => mocks.readTeamStates(),
   useTeamLabels: () => ({ data: [], loading: false, error: null }),
   useTeamMembers: () => ({ data: [], loading: false, error: null }),
@@ -79,7 +79,7 @@ vi.mock('@/hooks/useIssueMetadata', () => ({
   })
 }))
 
-vi.mock('@/components/sidebar/CommentMarkdown', () => ({
+vi.mock('@/components/comment-markdown/CommentMarkdown', () => ({
   default: ({ content }: { content: string }) => <div>{content}</div>
 }))
 vi.mock('@/i18n/i18n', async (importOriginal) => ({

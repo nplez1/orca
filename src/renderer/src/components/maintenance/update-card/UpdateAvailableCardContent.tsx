@@ -107,7 +107,7 @@ export function UpdateAvailableRichContent({
         data-link-url={release.releaseNotesUrl}
         onClick={(event) => openAppHttpLink(release.releaseNotesUrl, { event })}
       >
-        {t('auto.components.UpdateCard.aad383aecc', 'Read the full release notes')}
+        {t('auto.components.UpdateCard.aad383aecc', 'Release notes')}
       </button>
       {externallyManaged ? (
         <ExternallyManagedNote />

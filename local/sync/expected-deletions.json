@@ -156,6 +156,27 @@
       "status": "expected-deletion",
       "reason": "New upstream renderer fixture for the pop-out/drawer delivery this fork rejected (convergence-ledger.md Dashboard delivery: a content-area view, not a drawer or a pop-out). It imports the deleted DashboardPopoutRoot and reads window.api.dashboard, which the deleted preload pair used to publish; nothing in the fork imports either fixture.",
       "upstreamBlob": "bf688a8de9d39bade69d3790a15bc0d9e094d502"
+    },
+    {
+      "path": "src/renderer/src/components/feature-wall/commit-pr-settings/AiCommitPrSettingsFields.tsx",
+      "upstreamBlob": "f25333651430a60e99f9d204e96795e85b44d72b",
+      "class": "fork-refactor",
+      "status": "expected-deletion",
+      "reason": "The fork retired the feature-wall commit/PR settings fields; nothing in the merged tree references the module, and it has been absent since an earlier merge resolution deleted it without a commit of its own. Restoring it re-adds a settings surface with no caller."
+    },
+    {
+      "path": "src/renderer/src/components/onboarding/landing/landing-github-star-state.ts",
+      "upstreamBlob": "5d45e49037c44a66133432e405a2516d78cc8a4c",
+      "class": "fork-refactor",
+      "status": "expected-deletion",
+      "reason": "The fork removed the onboarding landing star-state helper; no module at HEAD references it. Deleted in an earlier merge resolution with no commit of its own, so it was never asserted here."
+    },
+    {
+      "path": "src/renderer/src/components/settings/workspaces/directory/host-scoped-setting-scope.ts",
+      "upstreamBlob": "1684941176ee48c059ee19603650c82b6351998c",
+      "class": "fork-refactor",
+      "status": "expected-deletion",
+      "reason": "The fork replaced the directory host-scope helper with the shared settings host-scope module; no module at HEAD references this path. Deleted in an earlier merge resolution with no commit of its own, so it was never asserted here."
     }
   ],
   "symbols": [
@@ -1761,6 +1782,419 @@
       "status": "expected-deletion",
       "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
       "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/main/agent-hooks/server/server-ingest-normalization.ts",
+      "symbol": "AgentHookServerIngestNormalization.normalizeLocalHookPayloadBody",
+      "status": "expected-deletion",
+      "supersededBy": "the same method renamed to normalizeLocalHookPayloadNow in the same file",
+      "reason": "The 0c6207e3d7 merge kept the fork's body-normalization method but renamed it while folding it into upstream's stop-transcript pipeline: HEAD declares normalizeLocalHookPayloadNow and calls it from normalizeLocalHookPayload inside withStopTranscriptReadsSkipped. The behaviour, including the fork's isReplay threading, is live under the new name. evidence: src/main/agent-hooks/server/server-ingest-normalization.ts:181"
+    },
+    {
+      "path": "src/main/ai-vault/runtime-hosts/runtime-session-scanner.ts",
+      "symbol": "RuntimeAiVaultScanOptions.drainTimeoutMs",
+      "status": "expected-deletion",
+      "supersededBy": "relocated with its type to src/main/ai-vault/runtime-hosts/ai-vault-runtime-scan.ts",
+      "reason": "The merge followed upstream's move of RuntimeAiVaultScanOptions out of the scanner into its own module, where drainTimeoutMs is still declared and documented. The scanner imports the type and reads it in drainBudgetMs, and src/main/ipc/ai-vault/ai-vault.ts still sets it per scan, so the fork budget is live at a new path."
+    },
+    {
+      "path": "src/main/ipc/worktrees-test-runtime-stub.ts",
+      "symbol": "WorktreeRuntimeStub.armWorktreeSetupRunner",
+      "status": "expected-deletion",
+      "supersededBy": "nothing referenced it: the fork test double was retired with the suites that used it",
+      "reason": "This was a fork test double for the runtime's setup-runner arming; the sync deleted the file and upstream's owner-scoped reorganisation moved the worktree IPC suites under src/main/ipc/worktrees/, leaving no importer. The production capability is untouched — armWorktreeSetupRunner is still declared and called on the runtime (src/main/runtime/workspaces/startup/runtime-worktree-terminal-provisioning.ts:48, src/main/ipc/worktrees/worktree-remote.ts:562)."
+    },
+    {
+      "path": "src/main/rate-limits/fork/fork-provider-cycle.ts",
+      "symbol": "ForkProviderCycleInput.resolveConfigs",
+      "status": "expected-deletion",
+      "supersededBy": "ForkProviderCycleInput.configs in the same file",
+      "reason": "The merge followed upstream's change of calling convention: the cycle now receives already-resolved configs instead of a resolver callback, and prepareForkProviderCycle reads input.configs for all four fork providers. The caller resolves them before the call (src/main/rate-limits/service/service-full-cycle-preparation.ts:135), so no fork provider lost its fetch."
+    },
+    {
+      "path": "src/main/runtime/agent-session/environment/runtime-account-controller.ts",
+      "symbol": "RuntimeAccountController.listAccountsWithRateLimits",
+      "status": "expected-deletion",
+      "supersededBy": "upstream's readRuntimeAccountsSnapshot plus the fork's withDisabledUsageProviders",
+      "reason": "Upstream added readRuntimeAccountsSnapshot (src/main/runtime/agent-session/environment/runtime-account-snapshot.ts), which builds the same claude/codex/rateLimits snapshot the fork's private helper did, and the controller keeps the fork's disabled-provider filtering in withDisabledUsageProviders around both snapshot calls. Both fork behaviours survive; only the private helper is gone."
+    },
+    {
+      "path": "src/main/workspaces/creation/worktree-create-first-work-test-harness.ts",
+      "symbol": "LabelOnlyCreateRequest",
+      "status": "expected-deletion",
+      "supersededBy": "nothing referenced it: the harness was retired upstream",
+      "reason": "Upstream retired the first-work rename test harness in this sync and the merge deleted the file. `git grep LabelOnlyCreateRequest 1db15d9ff0 -- src` finds no importer even at the pre-sync tip, so this was dead fixture data rather than a lost capability. evidence: the path is absent at HEAD and at upstream/main."
+    },
+    {
+      "path": "src/main/workspaces/creation/worktree-create-first-work-test-harness.ts",
+      "symbol": "labelOnlyCreateCases",
+      "status": "expected-deletion",
+      "supersededBy": "nothing referenced it: the harness was retired upstream",
+      "reason": "A const of fixture rows in the same retired harness; nothing imported the module or the const at the pre-sync tip. The sync deleted the file with upstream's retirement of the first-work rename harness, so no live test lost its cases. evidence: the path is absent at HEAD and at upstream/main."
+    },
+    {
+      "path": "src/main/workspaces/creation/worktree-create-first-work-test-harness.ts",
+      "symbol": "FirstWorkRenameOutcome",
+      "status": "expected-deletion",
+      "supersededBy": "nothing referenced it: the harness was retired upstream",
+      "reason": "A fixture type in the same retired harness, with no importer at the pre-sync tip and no equivalent needed at HEAD because upstream's worktree-create suites cover the rename outcome against the runtime directly. evidence: the path is absent at HEAD and at upstream/main."
+    },
+    {
+      "path": "src/renderer/src/components/skills/installation/SkillInstallManagementDialogContent.tsx",
+      "symbol": "SkillInstallManagementDialogContentProps.hiddenSshTargetIds",
+      "status": "expected-deletion",
+      "supersededBy": "nothing to filter: upstream 5a28037b3f8 dropped SSH rows from the skill install machine picker",
+      "reason": "Upstream removed SSH targets from the skills install machine picker in this sync (fix(settings): ... drop SSH skill install rows #43815), so SkillInstallMachineSelect no longer takes sshTargets and this prop had no host list left to filter. hiddenSshTargetIds is untouched as a fork feature everywhere a picker still lists SSH hosts (status bar, automations, composer target store)."
+    },
+    {
+      "path": "src/shared/global-settings-types.ts",
+      "symbol": "WorktreeLayoutMode",
+      "status": "expected-deletion",
+      "supersededBy": "the type's own declaration in src/shared/worktree/paths/orca-workspace-layout.ts",
+      "reason": "The fork re-exported WorktreeLayoutMode from the settings types as a convenience while the type itself lived in src/shared/orca-workspace-layout.ts; `git grep WorktreeLayoutMode 1db15d9ff0` shows no importer taking it from global-settings-types even at the pre-sync tip. Upstream moved the layout module to src/shared/worktree/paths/orca-workspace-layout.ts and every consumer imports it from there (src/cli/project-worktree-layout-flag.ts:1-4), so dropping the unused re-export lost nothing."
+    },
+    {
+      "path": "src/renderer/src/store/slices/ui/ui-slice-hydration-status-bar-items.ts",
+      "symbol": "DEFAULT_ON_DEEPSEEK_STATUS_BAR_ITEM",
+      "status": "expected-deletion",
+      "supersededBy": "shared/status-bar/status-bar-defaults.ts (DEFAULT_ON_STATUS_BAR_ITEMS)",
+      "reason": "The fork's four default-on rows for its extra usage providers moved to shared/status-bar/status-bar-defaults.ts in this sync (DEFAULT_ON_STATUS_BAR_ITEMS plus the _…StatusBarDefaultAdded flags), which is where upstream keeps the list and where the main process applies it on profile load. The per-constant form was retired with that move, not dropped: the same providers are default-on."
+    },
+    {
+      "path": "src/renderer/src/store/slices/ui/ui-slice-hydration-status-bar-items.ts",
+      "symbol": "DEFAULT_ON_FIREWORKS_STATUS_BAR_ITEM",
+      "status": "expected-deletion",
+      "supersededBy": "shared/status-bar/status-bar-defaults.ts (DEFAULT_ON_STATUS_BAR_ITEMS)",
+      "reason": "The fork's four default-on rows for its extra usage providers moved to shared/status-bar/status-bar-defaults.ts in this sync (DEFAULT_ON_STATUS_BAR_ITEMS plus the _…StatusBarDefaultAdded flags), which is where upstream keeps the list and where the main process applies it on profile load. The per-constant form was retired with that move, not dropped: the same providers are default-on."
+    },
+    {
+      "path": "src/renderer/src/store/slices/ui/ui-slice-hydration-status-bar-items.ts",
+      "symbol": "DEFAULT_ON_DEEPINFRA_STATUS_BAR_ITEM",
+      "status": "expected-deletion",
+      "supersededBy": "shared/status-bar/status-bar-defaults.ts (DEFAULT_ON_STATUS_BAR_ITEMS)",
+      "reason": "The fork's four default-on rows for its extra usage providers moved to shared/status-bar/status-bar-defaults.ts in this sync (DEFAULT_ON_STATUS_BAR_ITEMS plus the _…StatusBarDefaultAdded flags), which is where upstream keeps the list and where the main process applies it on profile load. The per-constant form was retired with that move, not dropped: the same providers are default-on."
+    },
+    {
+      "path": "src/renderer/src/store/slices/ui/ui-slice-hydration-status-bar-items.ts",
+      "symbol": "DEFAULT_ON_COPILOT_STATUS_BAR_ITEM",
+      "status": "expected-deletion",
+      "supersededBy": "shared/status-bar/status-bar-defaults.ts (DEFAULT_ON_STATUS_BAR_ITEMS)",
+      "reason": "The fork's four default-on rows for its extra usage providers moved to shared/status-bar/status-bar-defaults.ts in this sync (DEFAULT_ON_STATUS_BAR_ITEMS plus the _…StatusBarDefaultAdded flags), which is where upstream keeps the list and where the main process applies it on profile load. The per-constant form was retired with that move, not dropped: the same providers are default-on."
+    },
+    {
+      "path": "src/main/ai-vault/runtime-hosts/runtime-session-scanner.ts",
+      "symbol": "RuntimeAiVaultScanOptions.signal",
+      "status": "expected-deletion",
+      "supersededBy": "src/main/ai-vault/runtime-hosts/ai-vault-runtime-scan.ts",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/main/ai-vault/runtime-hosts/ai-vault-runtime-scan.ts, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/main/ipc/repos-remote-test-harness.ts",
+      "symbol": "createReposIpcMocks.mockStore.getSettings",
+      "status": "expected-deletion",
+      "supersededBy": "a line upstream added in the merged tree",
+      "reason": "The merged file no longer declares this name and no file in the merged tree declares its container either, so the declaration was retired with the file's rewrite. Nothing references it."
+    },
+    {
+      "path": "src/main/ipc/repos-remote-test-harness.ts",
+      "symbol": "createReposIpcMocks.mockStore.getSettings.workspaceDir",
+      "status": "expected-deletion",
+      "supersededBy": "a line upstream added in the merged tree",
+      "reason": "The merged file no longer declares this name and no file in the merged tree declares its container either, so the declaration was retired with the file's rewrite. Nothing references it."
+    },
+    {
+      "path": "src/main/ipc/repos-remote-test-harness.ts",
+      "symbol": "createReposIpcMocks.mockStore.getSettings.nestWorkspaces",
+      "status": "expected-deletion",
+      "supersededBy": "a line upstream added in the merged tree",
+      "reason": "The merged file no longer declares this name and no file in the merged tree declares its container either, so the declaration was retired with the file's rewrite. Nothing references it."
+    },
+    {
+      "path": "src/main/ipc/watched-worktree-catalog-notification.ts",
+      "symbol": "notifyWorktreeCatalogChangedForPairedClients",
+      "status": "expected-deletion",
+      "supersededBy": "src/main/ipc/worktrees/listing/watched-worktree-catalog-notification.ts",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/main/ipc/worktrees/listing/watched-worktree-catalog-notification.ts, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/main/ipc/watched-worktree-catalog-notification.ts",
+      "symbol": "notifyWorktreeCatalogChanged",
+      "status": "expected-deletion",
+      "supersededBy": "src/main/ipc/worktrees/listing/watched-worktree-catalog-notification.ts",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/main/ipc/worktrees/listing/watched-worktree-catalog-notification.ts, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/main/rate-limits/service/service-types.ts",
+      "symbol": "FetchAllCyclePrepared",
+      "status": "expected-deletion",
+      "supersededBy": "src/main/rate-limits/service/full-cycle-prepared.ts",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/main/rate-limits/service/full-cycle-prepared.ts, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/main/rate-limits/service/service-types.ts",
+      "symbol": "FetchAllCyclePrepared.claudeTarget",
+      "status": "expected-deletion",
+      "supersededBy": "src/main/rate-limits/service/full-cycle-prepared.ts",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/main/rate-limits/service/full-cycle-prepared.ts, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/main/rate-limits/service/service-types.ts",
+      "symbol": "FetchAllCyclePrepared.claudeGeneration",
+      "status": "expected-deletion",
+      "supersededBy": "src/main/rate-limits/service/full-cycle-prepared.ts",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/main/rate-limits/service/full-cycle-prepared.ts, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/main/rate-limits/service/service-types.ts",
+      "symbol": "FetchAllCyclePrepared.claudeAuthPreparation",
+      "status": "expected-deletion",
+      "supersededBy": "src/main/rate-limits/service/full-cycle-prepared.ts",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/main/rate-limits/service/full-cycle-prepared.ts, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/main/rate-limits/service/service-types.ts",
+      "symbol": "FetchAllCyclePrepared.claudeProvenance",
+      "status": "expected-deletion",
+      "supersededBy": "src/main/rate-limits/service/full-cycle-prepared.ts",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/main/rate-limits/service/full-cycle-prepared.ts, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/main/rate-limits/service/service-types.ts",
+      "symbol": "FetchAllCyclePrepared.codexTarget",
+      "status": "expected-deletion",
+      "supersededBy": "src/main/rate-limits/service/full-cycle-prepared.ts",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/main/rate-limits/service/full-cycle-prepared.ts, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/main/rate-limits/service/service-types.ts",
+      "symbol": "FetchAllCyclePrepared.previousState",
+      "status": "expected-deletion",
+      "supersededBy": "src/main/rate-limits/service/full-cycle-prepared.ts",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/main/rate-limits/service/full-cycle-prepared.ts, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/main/rate-limits/service/service-types.ts",
+      "symbol": "FetchAllCyclePrepared.codexFetchGated",
+      "status": "expected-deletion",
+      "supersededBy": "src/main/rate-limits/service/full-cycle-prepared.ts",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/main/rate-limits/service/full-cycle-prepared.ts, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/main/rate-limits/service/service-types.ts",
+      "symbol": "FetchAllCyclePrepared.codexStateBeforeFetch",
+      "status": "expected-deletion",
+      "supersededBy": "src/main/rate-limits/service/full-cycle-prepared.ts",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/main/rate-limits/service/full-cycle-prepared.ts, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/main/rate-limits/service/service-types.ts",
+      "symbol": "FetchAllCyclePrepared.codexProvenance",
+      "status": "expected-deletion",
+      "supersededBy": "src/main/rate-limits/service/full-cycle-prepared.ts",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/main/rate-limits/service/full-cycle-prepared.ts, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/main/rate-limits/service/service-types.ts",
+      "symbol": "FetchAllCyclePrepared.codexHomePath",
+      "status": "expected-deletion",
+      "supersededBy": "src/main/rate-limits/service/full-cycle-prepared.ts",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/main/rate-limits/service/full-cycle-prepared.ts, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/main/rate-limits/service/service-types.ts",
+      "symbol": "FetchAllCyclePrepared.codexGeneration",
+      "status": "expected-deletion",
+      "supersededBy": "src/main/rate-limits/service/full-cycle-prepared.ts",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/main/rate-limits/service/full-cycle-prepared.ts, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/main/rate-limits/service/service-types.ts",
+      "symbol": "FetchAllCyclePrepared.opencodeConfigChanged",
+      "status": "expected-deletion",
+      "supersededBy": "src/main/rate-limits/service/full-cycle-prepared.ts",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/main/rate-limits/service/full-cycle-prepared.ts, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/main/rate-limits/service/service-types.ts",
+      "symbol": "FetchAllCyclePrepared.opencodeGeneration",
+      "status": "expected-deletion",
+      "supersededBy": "src/main/rate-limits/service/full-cycle-prepared.ts",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/main/rate-limits/service/full-cycle-prepared.ts, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/main/rate-limits/service/service-types.ts",
+      "symbol": "FetchAllCyclePrepared.miniMaxConfigChanged",
+      "status": "expected-deletion",
+      "supersededBy": "src/main/rate-limits/service/full-cycle-prepared.ts",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/main/rate-limits/service/full-cycle-prepared.ts, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/main/rate-limits/service/service-types.ts",
+      "symbol": "FetchAllCyclePrepared.miniMaxGeneration",
+      "status": "expected-deletion",
+      "supersededBy": "src/main/rate-limits/service/full-cycle-prepared.ts",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/main/rate-limits/service/full-cycle-prepared.ts, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/main/rate-limits/service/service-types.ts",
+      "symbol": "FetchAllCyclePrepared.zcodeConfigChanged",
+      "status": "expected-deletion",
+      "supersededBy": "src/main/rate-limits/service/full-cycle-prepared.ts",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/main/rate-limits/service/full-cycle-prepared.ts, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/main/rate-limits/service/service-types.ts",
+      "symbol": "FetchAllCyclePrepared.zcodeGeneration",
+      "status": "expected-deletion",
+      "supersededBy": "src/main/rate-limits/service/full-cycle-prepared.ts",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/main/rate-limits/service/full-cycle-prepared.ts, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/main/rate-limits/service/service-types.ts",
+      "symbol": "FetchAllCyclePrepared.forkProviderCycle",
+      "status": "expected-deletion",
+      "supersededBy": "src/main/rate-limits/service/full-cycle-prepared.ts",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/main/rate-limits/service/full-cycle-prepared.ts, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/main/rate-limits/service/service-types.ts",
+      "symbol": "FetchAllCyclePrepared.antigravityGeneration",
+      "status": "expected-deletion",
+      "supersededBy": "src/main/rate-limits/service/full-cycle-prepared.ts",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/main/rate-limits/service/full-cycle-prepared.ts, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/main/rate-limits/service/service-types.ts",
+      "symbol": "FetchAllCyclePrepared.claudeFetchGated",
+      "status": "expected-deletion",
+      "supersededBy": "src/main/rate-limits/service/full-cycle-prepared.ts",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/main/rate-limits/service/full-cycle-prepared.ts, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/main/rate-limits/service/service-types.ts",
+      "symbol": "FetchAllCyclePrepared.results",
+      "status": "expected-deletion",
+      "supersededBy": "src/main/rate-limits/service/full-cycle-prepared.ts",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/main/rate-limits/service/full-cycle-prepared.ts, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/main/rate-limits/service/service-types.ts",
+      "symbol": "FetchAllCyclePrepared.grokResultPromise",
+      "status": "expected-deletion",
+      "supersededBy": "src/main/rate-limits/service/full-cycle-prepared.ts",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/main/rate-limits/service/full-cycle-prepared.ts, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/main/rate-limits/service/service-types.ts",
+      "symbol": "FetchAllCyclePrepared.cursorResultPromise",
+      "status": "expected-deletion",
+      "supersededBy": "src/main/rate-limits/service/full-cycle-prepared.ts",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/main/rate-limits/service/full-cycle-prepared.ts, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/main/rate-limits/service/service-types.ts",
+      "symbol": "FetchAllCyclePrepared.zcodeResultPromise",
+      "status": "expected-deletion",
+      "supersededBy": "src/main/rate-limits/service/full-cycle-prepared.ts",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/main/rate-limits/service/full-cycle-prepared.ts, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/main/rate-limits/service/service-types.ts",
+      "symbol": "FetchAllCyclePrepared.antigravityResultPromise",
+      "status": "expected-deletion",
+      "supersededBy": "src/main/rate-limits/service/full-cycle-prepared.ts",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/main/rate-limits/service/full-cycle-prepared.ts, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/main/workspaces/creation/worktree-create-first-work-test-harness.ts",
+      "symbol": "FirstWorkRenameOutcome.worktree",
+      "status": "expected-deletion",
+      "supersededBy": "a line upstream added in the merged tree",
+      "reason": "The merged file no longer declares this name and no file in the merged tree declares its container either, so the declaration was retired with the file's rewrite. Nothing references it."
+    },
+    {
+      "path": "src/main/workspaces/creation/worktree-create-first-work-test-harness.ts",
+      "symbol": "FirstWorkRenameOutcome.renamed",
+      "status": "expected-deletion",
+      "supersededBy": "a line upstream added in the merged tree",
+      "reason": "The merged file no longer declares this name and no file in the merged tree declares its container either, so the declaration was retired with the file's rewrite. Nothing references it."
+    },
+    {
+      "path": "src/main/workspaces/creation/worktree-create-first-work-test-harness.ts",
+      "symbol": "renameCreatedWorktreeOnFirstWork.worktree",
+      "status": "expected-deletion",
+      "supersededBy": "a line upstream added in the merged tree",
+      "reason": "The merged file no longer declares this name and no file in the merged tree declares its container either, so the declaration was retired with the file's rewrite. Nothing references it."
+    },
+    {
+      "path": "src/main/workspaces/creation/worktree-create-first-work-test-harness.ts",
+      "symbol": "renameCreatedWorktreeOnFirstWork.worktree.branch",
+      "status": "expected-deletion",
+      "supersededBy": "a line upstream added in the merged tree",
+      "reason": "The merged file no longer declares this name and no file in the merged tree declares its container either, so the declaration was retired with the file's rewrite. Nothing references it."
+    },
+    {
+      "path": "src/main/workspaces/creation/worktree-create-first-work-test-harness.ts",
+      "symbol": "renameCreatedWorktreeOnFirstWork.renamed",
+      "status": "expected-deletion",
+      "supersededBy": "a line upstream added in the merged tree",
+      "reason": "The merged file no longer declares this name and no file in the merged tree declares its container either, so the declaration was retired with the file's rewrite. Nothing references it."
+    },
+    {
+      "path": "src/renderer/src/components/new-workspace/run-target/RunTargetCombobox.tsx",
+      "symbol": "RunTargetComboboxProps.projectKind",
+      "status": "expected-deletion",
+      "supersededBy": "src/renderer/src/components/new-workspace/run-target/RunTargetCombobox.tsx",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/renderer/src/components/new-workspace/run-target/RunTargetCombobox.tsx, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/renderer/src/components/new-workspace/run-target/RunTargetCombobox.tsx",
+      "symbol": "RunTargetComboboxProps.cloneUrl",
+      "status": "expected-deletion",
+      "supersededBy": "src/renderer/src/components/new-workspace/run-target/RunTargetCombobox.tsx",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/renderer/src/components/new-workspace/run-target/RunTargetCombobox.tsx, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/renderer/src/components/new-workspace/run-target/RunTargetCombobox.tsx",
+      "symbol": "RunTargetComboboxProps.clone",
+      "status": "expected-deletion",
+      "supersededBy": "src/renderer/src/components/new-workspace/run-target/RunTargetCombobox.tsx",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/renderer/src/components/new-workspace/run-target/RunTargetCombobox.tsx, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/renderer/src/components/new-workspace/run-target/RunTargetCombobox.tsx",
+      "symbol": "RunTargetComboboxProps.onStartClone",
+      "status": "expected-deletion",
+      "supersededBy": "src/renderer/src/components/new-workspace/run-target/RunTargetCombobox.tsx",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/renderer/src/components/new-workspace/run-target/RunTargetCombobox.tsx, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/renderer/src/components/new-workspace/run-target/RunTargetCombobox.tsx",
+      "symbol": "RunTargetComboboxProps.onUseExistingFolder",
+      "status": "expected-deletion",
+      "supersededBy": "src/renderer/src/components/new-workspace/run-target/RunTargetCombobox.tsx",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/renderer/src/components/new-workspace/run-target/RunTargetCombobox.tsx, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/renderer/src/components/tab-bar/use-tab-bar-create-menu-controller.ts",
+      "symbol": "TabBarCreateMenuController.queueFocusAfterNewTabMenuClose",
+      "status": "expected-deletion",
+      "supersededBy": "src/renderer/src/components/tab-bar/create-menu/use-tab-bar-create-menu-controller.ts",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/renderer/src/components/tab-bar/create-menu/use-tab-bar-create-menu-controller.ts, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/renderer/src/hooks/composer-state/target-store-model.ts",
+      "symbol": "ComposerTargetStoreModel.initialBranchNameOverride",
+      "status": "expected-deletion",
+      "supersededBy": "src/renderer/src/hooks/composer-state/workspace-target/target-store-model.ts",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/renderer/src/hooks/composer-state/workspace-target/target-store-model.ts, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
+    },
+    {
+      "path": "src/shared/constants.ts",
+      "symbol": "getDefaultUIState.hiddenWorkspaceStatusIds",
+      "status": "expected-deletion",
+      "supersededBy": "src/shared/orca-profiles/constants.ts",
+      "reason": "The merged file no longer declares this name. Its containing declaration now lives in src/shared/orca-profiles/constants.ts, which is upstream's shape for this file after the merge; the fork's declaration was merged into it rather than dropped. Recorded as relocated, not lost."
     }
   ]
 }

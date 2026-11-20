@@ -104,7 +104,11 @@ export function useMobileSourceControlNextStep({
     hostStatusPending: statusPending,
     hostStatusReadable: statusReadable
   })
-  const [mergeMethod, setMergeMethod] = useState<GitHubPRMergeMethod | null>(null)
+  // The confirm keeps the head it opened on, so a push read while it is up is not merged unseen.
+  const [mergeIntent, setMergeIntent] = useState<{
+    method: GitHubPRMergeMethod
+    headSha: string | null
+  } | null>(null)
 
   // Merge and auto-merge apply optimistically, so read the PR through the actions engine.
   const pr = useMemo(
@@ -229,7 +233,9 @@ export function useMobileSourceControlNextStep({
               )
             }
           },
-          merge: onMerge ? () => onMerge() : setMergeMethod,
+          merge: onMerge
+            ? () => onMerge()
+            : (method) => setMergeIntent({ method, headSha: readyPr?.pr.headSha ?? null }),
           setAutoMerge: (enabled) =>
             actions.setAutoMerge(
               enabled,
@@ -274,25 +280,28 @@ export function useMobileSourceControlNextStep({
     ? (state.actionError ?? state.commitFailureRecovery?.error ?? null)
     : null
   const notice = actions.blocked ?? actions.error ?? workflowError
+  const adminBypassRequired = pr ? resolveMobileAdminMergeBypassRequired(pr) : false
 
   const mergeConfirm: MobileMergeConfirm | null =
-    mergeMethod && pr
+    mergeIntent && pr
       ? {
           title: t('pullRequest.prActionsSection.mergeConfirmTitle', 'Merge pull request?'),
-          message: resolveMobileAdminMergeBypassRequired(pr)
+          message: adminBypassRequired
             ? t(
                 'pullRequest.prActionsSection.adminBypassConfirmMessage',
                 'This pull request does not meet its branch protection rules. Merging will skip those rules using your admin privileges.'
               )
-            : presentPrMerge(pr, mergeMethod).confirmMessage,
-          confirmLabel: resolveMobileAdminMergeBypassRequired(pr)
+            : presentPrMerge(pr, mergeIntent.method).confirmMessage,
+          confirmLabel: adminBypassRequired
             ? t('pullRequest.prActionsSection.adminBypassConfirmLabel', 'Merge anyway')
             : t('pullRequest.prActionsSection.mergeButton', 'Merge'),
           onConfirm: () => {
-            setMergeMethod(null)
-            actions.merge(mergeMethod, resolveMobileAdminMergeBypassRequired(pr))
+            setMergeIntent(null)
+            // The engine takes one second argument, so a merge that waives branch protection names the
+            // bypass and every other merge keeps the head fence.
+            actions.merge(mergeIntent.method, adminBypassRequired ? true : mergeIntent.headSha)
           },
-          onCancel: () => setMergeMethod(null)
+          onCancel: () => setMergeIntent(null)
         }
       : null
 

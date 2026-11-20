@@ -5,8 +5,8 @@
  */
 
 import type { Locator, Page } from '@stablyai/playwright-test'
-import { expect, test } from './helpers/orca-app'
-import { ISSUE_TITLE, openFixtureJiraList } from './helpers/jira-fixture'
+import { expect, test } from './desktop/electron-fixtures/orca-app'
+import { ISSUE_TITLE, openFixtureJiraList } from './desktop/electron-fixtures/jira-fixture'
 
 const CARD_MENU_ITEMS = [
   'Start workspace',

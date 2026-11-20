@@ -1,4 +1,4 @@
-import { normalizeRelativePath } from '../../../../../../shared/cross-platform-path'
+import { normalizeRelativePath } from '../../../../../../shared/file-access/cross-platform-path'
 import { pathMatchesFileNameFilterTokens } from '../../../../../../shared/file-listing/file-name-filter-tokens'
 import type { TreeNode } from './file-explorer-types'
 import {

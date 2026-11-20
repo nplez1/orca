@@ -11,7 +11,7 @@ import type { WorkspaceSource as WorkspaceCreateTelemetrySource } from '../../..
 import type { GitPushTarget, WorkspaceStatus } from '../../../../../shared/worktree/types'
 import type { TaskSourceContext } from '../../../../../shared/work-items/task-source-context'
 import type { WorkspaceCreationTargetHint } from '@/lib/workspace/creation/project-host-workspace-target'
-import type { ExecutionHostId } from '../../../../../shared/execution-host'
+import type { ExecutionHostId } from '../../../../../shared/execution-host/execution-host'
 
 /** What an opener hands the new-workspace composer. */
 export type ComposerModalData = {

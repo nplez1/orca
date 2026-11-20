@@ -4,19 +4,19 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/class-names'
-import { getLinearStateMarkerStyle } from '@/components/linear-state-pill-style'
-import { LinearPriorityIcon } from '@/components/linear-priority-icon'
+import { getLinearStateMarkerStyle } from '@/components/task-page/linear/issues/linear-state-pill-style'
+import { LinearPriorityIcon } from '@/components/task-page/linear/issues/linear-priority-icon'
 import { useAppStore } from '@/store'
 import {
   useLinearIssueEditController,
   type LinearIssueEditController
-} from '@/components/linear-item-drawer-edit-controller'
-import type { LinearIssueEditSectionProps } from '@/components/linear-item-drawer-types'
+} from '@/components/task-page/linear/item-drawer/linear-item-drawer-edit-controller'
+import type { LinearIssueEditSectionProps } from '@/components/task-page/linear/item-drawer/linear-item-drawer-types'
 import {
   LINEAR_EDIT_MENU_ITEM_WITH_ICON_CLASS,
   LINEAR_ESTIMATE_PRESETS,
   formatLinearEstimateLabel
-} from '@/components/linear-item-drawer-edit-controls'
+} from '@/components/task-page/linear/item-drawer/linear-item-drawer-edit-controls'
 import { useTranslate } from '@/i18n/use-translate'
 import { getLinearPriorityLabel } from '@/components/task-page/task-page-localized-options'
 import {

@@ -58,25 +58,26 @@ export function createHostSettingsJiraPort(): HostSettingsCredentialPort {
    * sends the main must not understate protection (a host that cannot seal would accept a downgrade), and
    * what this host claims about itself must not overstate it (a plaintext copy would be recorded as sealed).
    */
-  function readSiteToken(
+  async function readSiteToken(
     siteId: string
-  ):
+  ): Promise<
     | { kind: 'absent' }
     | { kind: 'unreadable' }
-    | { kind: 'token'; token: string; protection: SecretAtRestProtection | null } {
-    if (!hasStoredToken(siteId)) {
+    | { kind: 'token'; token: string; protection: SecretAtRestProtection | null }
+  > {
+    if (!(await hasStoredToken(siteId))) {
       return { kind: 'absent' }
     }
     let token: string | null
     try {
-      token = readToken(siteId)
+      token = await readToken(siteId)
     } catch {
       return { kind: 'unreadable' }
     }
     if (token === null) {
       return { kind: 'unreadable' }
     }
-    return { kind: 'token', token, protection: getSiteTokenProtection(siteId) }
+    return { kind: 'token', token, protection: await getSiteTokenProtection(siteId) }
   }
 
   return {
@@ -84,21 +85,21 @@ export function createHostSettingsJiraPort(): HostSettingsCredentialPort {
     // Why always true: a Jira token lands in the same safeStorage-backed store as the provider keys,
     // so a host that can hold one of those sealed can hold these.
     canSeal: canSealReplicatedCredential,
-    unreadableIds: () => {
+    unreadableIds: async () => {
       const unreadable: string[] = []
-      for (const site of getSiteFile().sites) {
-        if (readSiteToken(site.id).kind === 'unreadable') {
+      for (const site of (await getSiteFile()).sites) {
+        if ((await readSiteToken(site.id)).kind === 'unreadable') {
           unreadable.push(`${HOST_SETTINGS_JIRA_KIND}:${site.id}`)
         }
       }
       return unreadable
     },
-    protectionOf: (id) => {
+    protectionOf: async (id) => {
       const siteId = siteIdOf(id)
       if (siteId === null) {
         return null
       }
-      const read = readSiteToken(siteId)
+      const read = await readSiteToken(siteId)
       // Why plaintext rather than null for a present token that cannot be read: null means "this host
       // holds nothing", which is how a failed read becomes a removal the receiver reports as verified.
       return read.kind === 'absent'
@@ -107,10 +108,10 @@ export function createHostSettingsJiraPort(): HostSettingsCredentialPort {
           ? 'plaintext'
           : (read.protection ?? 'plaintext')
     },
-    list: () => {
+    list: async () => {
       const credentials: ReplicatedHostCredential[] = []
-      for (const site of getSiteFile().sites) {
-        const read = readSiteToken(site.id)
+      for (const site of (await getSiteFile()).sites) {
+        const read = await readSiteToken(site.id)
         if (read.kind !== 'token') {
           continue
         }
@@ -127,7 +128,7 @@ export function createHostSettingsJiraPort(): HostSettingsCredentialPort {
       }
       return credentials
     },
-    apply: (credential) => {
+    apply: async (credential) => {
       const decoded = decode(credential.payload)
       if (decoded === null) {
         throw new Error('Jira site payload is malformed')
@@ -140,27 +141,27 @@ export function createHostSettingsJiraPort(): HostSettingsCredentialPort {
       }
       // Why before the token: a sites file this build cannot read would otherwise collect a token for a
       // site that can never be written down, which is the orphan R4 names.
-      assertSiteFileWritable()
-      saveToken(decoded.site.id, decoded.token)
+      await assertSiteFileWritable()
+      await saveToken(decoded.site.id, decoded.token)
       // Why merge rather than replace: the file also records which site this host is looking at, and
       // a replicated site list must not move that.
-      const file = getSiteFile()
-      writeSiteFile({
+      const file = await getSiteFile()
+      await writeSiteFile({
         ...file,
         sites: [...file.sites.filter((site) => site.id !== decoded.site.id), decoded.site]
       })
     },
-    remove: (id) => {
+    remove: async (id) => {
       const siteId = siteIdOf(id)
       if (siteId === null) {
         return
       }
       // Why before the deletion: an unreadable file cannot show this site is gone, so removing the token
       // would leave the record pointing at nothing.
-      assertSiteFileWritable()
-      deleteToken(siteId)
-      const file = getSiteFile()
-      writeSiteFile({ ...file, sites: file.sites.filter((site) => site.id !== siteId) })
+      await assertSiteFileWritable()
+      await deleteToken(siteId)
+      const file = await getSiteFile()
+      await writeSiteFile({ ...file, sites: file.sites.filter((site) => site.id !== siteId) })
     }
   }
 }

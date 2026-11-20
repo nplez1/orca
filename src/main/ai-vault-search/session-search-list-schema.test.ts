@@ -2,14 +2,17 @@ import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
-import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
+import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host/execution-host'
 import { removeTree } from '../../shared/file-write/windows-transient-lock-removal'
 import SyncDatabase from '../sqlite/sync-database'
 import { CacheDatabaseNewerThanBuildError } from '../sqlite/versioned-cache-database'
 import { listIndexedSessions } from './session-search-list'
 import { SESSION_LIST_SCHEMA_VERSION } from './session-search-list-schema'
 import { deleteExpiredSearchFiles } from './storage/session-search-retention-delete'
-import { SESSION_SEARCH_SCHEMA_VERSION, openSessionSearchDatabase } from './storage/session-search-schema'
+import {
+  SESSION_SEARCH_SCHEMA_VERSION,
+  openSessionSearchDatabase
+} from './storage/session-search-schema'
 
 let roots: string[] = []
 

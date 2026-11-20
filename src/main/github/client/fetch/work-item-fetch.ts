@@ -16,6 +16,7 @@ import {
 import { getViewerCanMergeAsAdmin, hasUnmetReviewGate } from './../lookup/pr-viewer-merge-privilege'
 import { resolvePullRequestLookupCandidates } from './../pull-request-lookup-candidates'
 import { detectRepositoryMergeMetadata } from './../detect/repository-merge-metadata'
+import { getCachedGitHubPRStackSummary } from './../lookup/pr-stack-summary-cache'
 import {
   WORK_ITEM_PR_DETAIL_JSON_FIELDS,
   usersFromUnknown,
@@ -205,13 +206,27 @@ export async function fetchPullRequestWorkItem(
       )
       // Why: merge-metadata GraphQL is best-effort — don't fall through to REST, which drops latestReviews and blanks bot-only reviewer lists.
       const baseRefName = typeof item.baseRefName === 'string' ? item.baseRefName : undefined
+      const executionScope = githubPRStackExecutionScope(connectionId, localGitOptions)
       try {
-        const mergeMetadata = await detectRepositoryMergeMetadata(
-          ownerRepo,
-          baseRefName,
-          ghOptions,
-          githubPRStackExecutionScope(connectionId, localGitOptions)
-        )
+        const [mergeMetadata, stack] = await Promise.all([
+          detectRepositoryMergeMetadata(ownerRepo, baseRefName, ghOptions, executionScope),
+          mapped.state === 'open'
+            ? getCachedGitHubPRStackSummary(ownerRepo, number, ghOptions, executionScope).catch(
+                () => undefined
+              )
+            : undefined
+        ])
+        // A stacked PR merges into the stack base, so its rules limit the methods. The queue flag
+        // stays on the immediate base: here it would offer auto-merge, which stacks refuse.
+        const { mergeMethodSettings } =
+          stack && stack.baseRefName !== baseRefName
+            ? await detectRepositoryMergeMetadata(
+                ownerRepo,
+                stack.baseRefName,
+                ghOptions,
+                executionScope
+              )
+            : mergeMetadata
         return {
           ...mapped,
           ...bypass,
@@ -219,9 +234,7 @@ export async function fetchPullRequestWorkItem(
           ...(mergeMetadata.autoMergeAllowed !== null
             ? { autoMergeAllowed: mergeMetadata.autoMergeAllowed }
             : {}),
-          ...(mergeMetadata.mergeMethodSettings
-            ? { mergeMethodSettings: mergeMetadata.mergeMethodSettings }
-            : {})
+          ...(mergeMethodSettings ? { mergeMethodSettings } : {})
         }
       } catch {
         return { ...mapped, ...bypass }

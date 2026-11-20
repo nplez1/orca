@@ -3,7 +3,7 @@ import type { GitHubPRMergeMethod } from '../../../../../../shared/github/pull-r
 import type { Repo } from '../../../../../../shared/repository/repo-types'
 import type { TaskSourceContext } from '../../../../../../shared/work-items/task-source-context'
 import React, { useState } from 'react'
-import { useConfirmationDialog } from '@/components/confirmation-dialog-context'
+import { useConfirmationDialog } from '@/components/dismiss/confirmation/confirmation-dialog-context'
 import { useAppStore } from '@/store/index'
 import { useShallow } from 'zustand/react/shallow'
 import { getGitHubRepoRoutingTarget } from '@/lib/work-items/github/github-source-runtime-context'
@@ -13,7 +13,7 @@ import {
   getPullRequestMergeConfirmationTitle,
   getPullRequestMergeMethodLabel
 } from '@/components/github/pull-request-confirmation-copy'
-import { presentGitHubPRMergeState } from '@/components/github-pr-merge-state'
+import { presentGitHubPRMergeState } from '@/components/github/github-pr-merge-state'
 import { resolveGitHubPRMergeMethods } from '../../../../../../shared/github/pull-requests/merge/pull-request-merge-methods'
 import { callRuntimeRpc } from '@/runtime/rpc/calls/runtime-rpc-call'
 import {
@@ -123,7 +123,8 @@ export function PRMergeCell({
                   prNumber: item.number,
                   method,
                   ...(bypassBranchProtection ? { bypassBranchProtection: true } : {}),
-                  prRepo
+                  prRepo,
+                  expectedHeadSha: item.headSha ?? null
                 },
                 {
                   timeoutMs: 30_000
@@ -136,7 +137,8 @@ export function PRMergeCell({
                 prNumber: item.number,
                 method,
                 ...(bypassBranchProtection ? { bypassBranchProtection: true } : {}),
-                prRepo
+                prRepo,
+                expectedHeadSha: item.headSha ?? null
               })
         }
       })

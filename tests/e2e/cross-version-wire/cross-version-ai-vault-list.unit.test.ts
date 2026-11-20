@@ -13,7 +13,7 @@ import {
   importReleaseCheckoutModule,
   materializeReleaseCheckout,
   resolveBaselineReleaseRef
-} from './release-checkout'
+} from './release-checkouts/release-checkout'
 
 type ListParser = (value: unknown) => {
   sessions: { sessionId: string; resumeCommand: string; executionHostId: string }[]

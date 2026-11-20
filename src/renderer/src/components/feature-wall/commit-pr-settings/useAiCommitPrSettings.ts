@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react'
 import type { CommitMessageAiSettings } from '../../../../../shared/source-control/ai/generation/commit-message-ai-types'
 import {
   getCommitMessageAgentCapability,
+  isNamingOnlyTextAgent,
   listCommitMessageAgentCapabilities,
   resolveCommitMessageAgentChoice
 } from '../../../../../shared/source-control/ai/generation/commit-message-agent-spec'
@@ -76,7 +77,8 @@ export function useAiCommitPrSettings(): AiCommitPrSettingsViewModel {
       discoveredModelsByAgent: legacyModels,
       discoveredModelsByAgentByHost: { [LOCAL_COMMIT_MESSAGE_HOST_KEY]: legacyHostModels }
     }
-    return listCommitMessageAgentCapabilities().map((capability) => ({
+    // This legacy agent choice runs both commit messages and PR details.
+    return listCommitMessageAgentCapabilities('commitMessage').map((capability) => ({
       ...capability,
       models: getTextGenerationModels(
         capability.models,
@@ -113,7 +115,7 @@ export function useAiCommitPrSettings(): AiCommitPrSettingsViewModel {
       settings?.disabledTuiAgents
     )
     writeConfig(
-      seedAgentId
+      seedAgentId && !isNamingOnlyTextAgent(seedAgentId)
         ? seedCommitMessageAiEnablePatch(config, seedAgentId)
         : { enabled: true, agentId: null }
     )

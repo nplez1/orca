@@ -19,8 +19,19 @@ export function agentHookRuntimeDeps(
     // Why: a dialog painted long after the agent's last hook is not caught by a deferred read; the
     // scan that stamps the pane's blocked text is the moment it exists.
     onPaneScreenPromptGained: (paneKey) => server.noteScreenPromptGained(paneKey),
+    getPaneAgentIdentity: (paneKey, savedRecord) => server.paneAgentIdentity(paneKey, savedRecord),
     getAgentStatusSnapshot: () =>
-      server.getStatusSnapshot().filter((entry) => entry.providerSessionOnly !== true),
+      server.getStatusSnapshot().flatMap((row) => {
+        if (row.structuredHost) {
+          return [row]
+        }
+        // Resume-only rows carry identity for recovery, never status.
+        if (row.providerSessionOnly) {
+          return []
+        }
+        const identity = server.paneAgentIdentity(row.paneKey)
+        return identity && !identity.ended ? [identity.status] : []
+      }),
     getAgentStatusSnapshotForPane: (paneKey) => server.getStatusSnapshotForPane(paneKey),
     getPublicAgentStatusSnapshotForPane: (paneKey: string, terminalHandle?: string | null) =>
       server.getPublicStatusSnapshotForPane(paneKey, terminalHandle),
@@ -75,10 +86,12 @@ export function agentHookRuntimeDeps(
       readChildWorkHandles: (subject) => server.getStructuredChildWorkHandles(subject)
     },
     readHookCliWriterObservation: (row) => server.readCliWriterObservation(row),
-    checkHookAgentPresence: (paneKey, exitedSince) =>
-      exitedSince === undefined
-        ? server.checkAgentPresence(paneKey)
-        : server.checkAgentPresenceSince(paneKey, exitedSince),
+    checkHookAgentPresence: (paneKey, exitedSince, options) =>
+      options?.settleForSleep
+        ? server.settleExitProofForSleep(paneKey)
+        : exitedSince === undefined
+          ? server.checkAgentPresence(paneKey)
+          : server.checkAgentPresenceSince(paneKey, exitedSince),
     reconcileAgentStatusForEndedProcess: (paneKeys, sleep) => {
       const keys = [...paneKeys]
       if (sleep) {

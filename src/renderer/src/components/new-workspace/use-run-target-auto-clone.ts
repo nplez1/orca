@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { GlobalSettings } from '../../../../shared/global-settings-types'
-import type { WorktreeLayoutMode } from '../../../../shared/orca-workspace-layout'
+import type { GlobalSettings } from '../../../../shared/settings/global-settings-types'
+import type { WorktreeLayoutMode } from '../../../../shared/worktree/paths/orca-workspace-layout'
 import { joinHostPath } from '../../../../shared/host-path-join'
 import { getProjectHostSetupSelectionKey } from '@/lib/workspace/creation/project-host-setup-options'
 import type { NeedsSetupProjectHostOption } from '@/lib/workspace/creation/project-host-setup-options'

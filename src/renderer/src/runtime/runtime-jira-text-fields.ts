@@ -1,4 +1,4 @@
-import { buildJiraCreateTextAdf } from '@/components/jira-create-adf'
+import { buildJiraCreateTextAdf } from '@/components/task-page/jira/creation/jira-create-adf'
 import { JIRA_TEXT_FIELDS_RUNTIME_CAPABILITY } from '../../../shared/jira-runtime-capabilities'
 import type { JiraIssueUpdate } from '../../../shared/jira/jira-types'
 import type { RuntimeClientTarget } from '../../../shared/remote-runtime/host-catalog/runtime-client-target'

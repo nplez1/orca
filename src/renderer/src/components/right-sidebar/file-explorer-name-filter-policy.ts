@@ -1,4 +1,4 @@
-import { normalizeRelativePath } from '../../../../shared/cross-platform-path'
+import { normalizeRelativePath } from '../../../../shared/file-access/cross-platform-path'
 import {
   FILE_NAME_FILTER_QUERY_MAX_BYTES,
   isFileNameFilterQueryTooLarge,

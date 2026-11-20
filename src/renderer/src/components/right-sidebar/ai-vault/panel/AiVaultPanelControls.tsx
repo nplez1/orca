@@ -28,10 +28,10 @@ import type {
   AiVaultGroup,
   AiVaultScope
 } from '../../../../../../shared/ai-vault/contracts/ai-vault-types'
-import type { ExecutionHostScope } from '../../../../../../shared/execution-host'
+import type { ExecutionHostScope } from '../../../../../../shared/execution-host/execution-host'
 import { agentLabel, type AiVaultSessionGroup } from '../session-list/ai-vault-session-filters'
 import { useTranslate } from '@/i18n/use-translate'
-import { getTranslatedExecutionHostLabel } from '../../../sidebar/execution-host-label'
+import { getTranslatedExecutionHostLabel } from '../../../../runtime/hosts/display/execution-host-label'
 import { aiVaultHostScopeLabel, type AiVaultHostScopeOption } from '../scope/ai-vault-host-scope'
 import { AiVaultSessionLimitMenu } from '../session-list/AiVaultSessionLimitMenu'
 import type { AiVaultSessionLimit } from '../session-list/ai-vault-session-limit'

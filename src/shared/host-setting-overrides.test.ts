@@ -5,7 +5,7 @@ import {
   getHostSettingOverrideForIds,
   setHostSettingOverrideForIds
 } from './execution-host/host-setting-overrides'
-import { LOCAL_EXECUTION_HOST_ID, toRuntimeExecutionHostId } from './execution-host'
+import { LOCAL_EXECUTION_HOST_ID, toRuntimeExecutionHostId } from './execution-host/execution-host'
 
 const LOCAL = LOCAL_EXECUTION_HOST_ID
 const SERVER = toRuntimeExecutionHostId('server-a')

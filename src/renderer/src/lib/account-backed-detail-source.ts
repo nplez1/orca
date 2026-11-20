@@ -4,7 +4,7 @@ import {
   type TaskSourceContext
 } from '../../../shared/work-items/task-source-context'
 import type { TaskProvider } from '../../../shared/work-items/task-providers'
-import type { ExecutionHostId } from '../../../shared/execution-host'
+import type { ExecutionHostId } from '../../../shared/execution-host/execution-host'
 
 /**
  * The account-backed task source for a provider on `hostId`: the owner a caller names when it has

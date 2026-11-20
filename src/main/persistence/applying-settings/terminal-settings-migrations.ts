@@ -1,7 +1,10 @@
 import { homedir } from 'node:os'
-import type { GlobalSettings, OrcaWorkspaceLayout } from '../../../shared/global-settings-types'
-import { resolveWorktreeLayoutMode } from '../../../shared/orca-workspace-layout'
-import { normalizeRuntimePathForComparison } from '../../../shared/cross-platform-path'
+import type { GlobalSettings } from '../../../shared/settings/global-settings-types'
+import {
+  resolveWorktreeLayoutMode,
+  type OrcaWorkspaceLayout
+} from '../../../shared/worktree/paths/orca-workspace-layout'
+import { normalizeRuntimePathForComparison } from '../../../shared/file-access/cross-platform-path'
 import {
   legacyTerminalScrollbackBytesToRows,
   normalizeDesktopTerminalScrollbackRows

@@ -1,5 +1,8 @@
-import type { ProviderRateLimits, RateLimitState } from '../../../../shared/agent-usage/rate-limits/rate-limit-types'
-import type { StatusBarItem } from '../../../../shared/ui-chrome-types'
+import type {
+  ProviderRateLimits,
+  RateLimitState
+} from '../../../../shared/agent-usage/rate-limits/rate-limit-types'
+import type { StatusBarItem } from '../../../../shared/ui-chrome/ui-chrome-types'
 import {
   FORK_USAGE_PROVIDER_IDS,
   USAGE_PROVIDER_MANIFEST

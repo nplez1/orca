@@ -7,7 +7,7 @@ import {
   computeWorkspaceRoot,
   getWorktreeCreationLayout,
   getWorktreePathSettings
-} from './worktree-logic'
+} from './worktrees/paths/worktree-logic'
 
 // Placement for the project-folder mode lives in ./project-folder-placement; these cover it
 // through the public placement API the rest of the app calls.

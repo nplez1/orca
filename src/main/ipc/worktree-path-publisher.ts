@@ -8,10 +8,10 @@ import {
   WorktreeLinkedPathTargetExistsError,
   type ApfsCloneDeps,
   type DarwinFilesystemCache
-} from './worktree-apfs-clone'
+} from './worktrees/linked-paths/worktree-apfs-clone'
 import { materializeWorktreePathThroughStaging } from './worktree-materialization-staging'
 import { recordSwallowedFailure } from '../observability/swallowed-failure'
-import type { WorktreeCopyBudget } from './worktree-include-copy-budget'
+import type { WorktreeCopyBudget } from './worktrees/linked-paths/worktree-include-copy-budget'
 import type { WorktreeSharedDirectoriesMode } from '../../shared/repository/repo-types'
 
 export type WorktreeLinkedPathOptions = {

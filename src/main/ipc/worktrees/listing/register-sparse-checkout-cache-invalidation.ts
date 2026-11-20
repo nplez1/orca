@@ -7,7 +7,7 @@ import {
 } from '../../../git/worktrees/sparse-checkout/worktree-sparse-checkout-cache'
 import { areWorktreePathsEqual } from '../../../git/worktrees/catalog/worktree-path-comparison'
 import { registerWorktreeChangeInvalidator } from './worktree-change-invalidators'
-import { notifyWorktreeCatalogChanged } from '../../watched-worktree-catalog-notification'
+import { notifyWorktreeCatalogChanged } from './watched-worktree-catalog-notification'
 
 /** Invalidate the changed repo, clearing all if unresolved; publish stale-while-revalidate flips as worktree changes. */
 export function registerSparseCheckoutCacheInvalidation(

@@ -84,7 +84,8 @@ export function createProviderAccountServices(
       rateLimits.discardClaudeOAuthUsage()
     } else if (updates.claudeOAuthUsageEnabled === true) {
       void rateLimits
-        .refreshClaudeForTarget(rateLimits.getState().claudeTarget)
+        .getState()
+        .then((state) => rateLimits.refreshClaudeForTarget(state.claudeTarget))
         .catch((error: unknown) => {
           console.warn(
             '[rate-limits] Failed to refresh Claude usage after enabling polling:',
@@ -161,27 +162,29 @@ export function createProviderAccountServices(
       workspaceIdOverride: settings.opencodeWorkspaceId
     }
   }, readOpenCodeGoApiKey)
-  rateLimits.setMiniMaxConfigResolver(() => {
+  rateLimits.setMiniMaxConfigResolver(async () => {
     const settings = store.getSettings()
-    const apiKey = readMiniMaxApiKey() ?? ''
+    const apiKey = (await readMiniMaxApiKey()) ?? ''
     return {
-      sessionCookie: apiKey ? '' : (readMiniMaxSessionCookie() ?? ''),
+      sessionCookie: apiKey ? '' : ((await readMiniMaxSessionCookie()) ?? ''),
       groupId: settings.minimaxGroupId,
       models: settings.minimaxUsageModels,
       endpoint: settings.minimaxEndpoint,
       apiKey
     }
   })
-  rateLimits.setZcodePlanConfigResolver(() => ({
+  rateLimits.setZcodePlanConfigResolver(async () => ({
     site: store.getSettings().zcodePlanSite ?? 'zai',
-    apiKey: readZcodePlanApiKey() ?? ''
+    apiKey: (await readZcodePlanApiKey()) ?? ''
   }))
-  rateLimits.setDeepSeekConfigResolver(() => ({ apiKey: readDeepSeekApiKey() ?? '' }))
-  rateLimits.setDeepInfraConfigResolver(() => ({ apiKey: readDeepInfraApiKey() ?? '' }))
+  rateLimits.setDeepSeekConfigResolver(async () => ({ apiKey: (await readDeepSeekApiKey()) ?? '' }))
+  rateLimits.setDeepInfraConfigResolver(async () => ({
+    apiKey: (await readDeepInfraApiKey()) ?? ''
+  }))
   // Why: readFireworksCredentials throws on an undecryptable file, and letting it
   // throw records a Fireworks-only credential error instead of a silent keyless poll.
-  rateLimits.setFireworksConfigResolver(() => {
-    const credentials = readFireworksCredentials()
+  rateLimits.setFireworksConfigResolver(async () => {
+    const credentials = await readFireworksCredentials()
     return {
       apiKey: credentials?.apiKey ?? '',
       accountIdOverride: credentials?.accountIdOverride ?? null
@@ -189,8 +192,8 @@ export function createProviderAccountServices(
   })
   // Why: readCopilotCredentials throws on an undecryptable payload, and letting it
   // throw records a Copilot-only credential error instead of a silent keyless poll.
-  rateLimits.setCopilotConfigResolver(() => {
-    const credentials = readCopilotCredentials()
+  rateLimits.setCopilotConfigResolver(async () => {
+    const credentials = await readCopilotCredentials()
     return {
       token: credentials?.token ?? '',
       enterpriseSlug: credentials?.enterpriseSlug ?? ''
@@ -249,6 +252,19 @@ export function createProviderAccountServices(
       .filter((account) => !activeIds.has(account.id))
       .map((account) => ({
         id: account.id,
+        ...(account.managedHomeRuntime === 'wsl'
+          ? account.wslDistro
+            ? {
+                readingAccount: {
+                  accountId: account.id,
+                  runtime: 'wsl' as const,
+                  wslDistro: account.wslDistro
+                }
+              }
+            : {}
+          : {
+              readingAccount: { accountId: account.id, runtime: 'host' as const, wslDistro: null }
+            }),
         resolveHome: () =>
           inactiveCodexHomeUnlessStopped(
             codexRuntimeHome.resolveCodexManagedAccountHomeForInactiveFetch(account)

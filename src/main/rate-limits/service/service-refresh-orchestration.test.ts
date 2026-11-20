@@ -3,7 +3,10 @@ import type { ProviderRateLimits } from '../../../shared/agent-usage/rate-limits
 import { RateLimitService } from './rate-limit-service'
 import { fetchActiveClaudeRateLimits } from '../providers/claude/claude-active-usage-fetch'
 import { fetchInactiveClaudeAccountUsage } from '../providers/claude/claude-managed-account-usage'
-import { fetchCodexRateLimits } from '../providers/codex/codex-fetcher'
+import {
+  consumeCodexRateLimitResetCredit,
+  fetchCodexRateLimits
+} from '../providers/codex/codex-fetcher'
 import {
   deferred,
   flushMicrotasks,
@@ -132,7 +135,7 @@ describe('RateLimitService', () => {
     void service.refreshForClaudeAccountChange('acct-b')
     reads[1].resolve(okProvider('claude', 11))
     await flushMicrotasks(60)
-    expect(service.getState().claude?.session?.usedPercent).toBe(55)
+    expect((await service.getState()).claude?.session?.usedPercent).toBe(55)
   })
 
   it('keeps live Claude usage through refreshes without reading OAuth usage when disabled', async () => {
@@ -149,7 +152,7 @@ describe('RateLimitService', () => {
     service.start({ fetchImmediately: false })
     await flushMicrotasks(20)
     service.stop()
-    expect(service.getState().claude).toMatchObject({
+    expect((await service.getState()).claude).toMatchObject({
       session: null,
       weekly: null,
       status: 'unavailable'
@@ -163,13 +166,13 @@ describe('RateLimitService', () => {
     await service.refresh()
     await service.fetchInactiveClaudeAccountsOnOpen()
 
-    expect(service.getState().claude).toMatchObject({
+    expect((await service.getState()).claude).toMatchObject({
       session: { usedPercent: 33 },
       weekly: { usedPercent: 62 },
       status: 'ok',
       usageMetadata: { source: 'live-session' }
     })
-    expect(service.getState().inactiveClaudeAccounts).toEqual([])
+    expect((await service.getState()).inactiveClaudeAccounts).toEqual([])
     expect(service.usageReadingAccount('claude')).toEqual({
       home: '/claude/account-a',
       provenance: '/claude/account-a'
@@ -180,14 +183,14 @@ describe('RateLimitService', () => {
 
     home = '/claude/account-b'
     await service.refreshForClaudeAccountChange('outgoing')
-    expect(service.getState().claude?.session).toBeNull()
-    expect(service.getState().claude?.status).toBe('unavailable')
+    expect((await service.getState()).claude?.session).toBeNull()
+    expect((await service.getState()).claude?.status).toBe('unavailable')
     service.ingestLiveClaudeRateLimits({
       configDir: '/claude/account-b',
       fiveHour: { used_percentage: 12 },
       sevenDay: null
     })
-    expect(service.getState().claude?.session?.usedPercent).toBe(12)
+    expect((await service.getState()).claude?.session?.usedPercent).toBe(12)
     expect(service.usageReadingAccount('claude')).toEqual({
       home: '/claude/account-b',
       provenance: '/claude/account-b'
@@ -220,7 +223,7 @@ describe('RateLimitService', () => {
     reply.resolve(okProvider('claude', 90))
     await refresh
 
-    expect(service.getState().claude).toMatchObject({
+    expect((await service.getState()).claude).toMatchObject({
       session: { usedPercent: 41 },
       status: 'ok',
       usageMetadata: { source: 'live-session' }
@@ -256,21 +259,21 @@ describe('RateLimitService', () => {
       fiveHour: { used_percentage: 35 },
       sevenDay: null
     })
-    expect(service.getState().claude?.weekly?.usedPercent).toBe(50)
+    expect((await service.getState()).claude?.weekly?.usedPercent).toBe(50)
 
     enabled = false
     service.discardClaudeOAuthUsage()
     await service.refresh()
 
-    expect(service.getState().claude).toMatchObject({
+    expect((await service.getState()).claude).toMatchObject({
       session: { usedPercent: 35 },
       weekly: null,
       usageMetadata: { source: 'live-session' }
     })
-    expect(service.getState().claude?.fableWeekly).toBeFalsy()
-    expect(service.getState().claude?.extraUsage).toBeFalsy()
+    expect((await service.getState()).claude?.fableWeekly).toBeFalsy()
+    expect((await service.getState()).claude?.extraUsage).toBeFalsy()
     await service.refreshForClaudeAccountChange('outgoing')
-    expect(service.getState().claude?.session).toBeNull()
+    expect((await service.getState()).claude?.session).toBeNull()
   })
 
   it('discards pending inactive-account usage when polling is disabled', async () => {
@@ -294,8 +297,8 @@ describe('RateLimitService', () => {
     reply.resolve(okProvider('claude', 90))
     await refresh
 
-    expect(service.getState().inactiveClaudeAccounts).toEqual([])
-    expect(service.getState().claude).toMatchObject({
+    expect((await service.getState()).inactiveClaudeAccounts).toEqual([])
+    expect((await service.getState()).claude).toMatchObject({
       session: null,
       weekly: null,
       status: 'unavailable'
@@ -336,11 +339,77 @@ describe('RateLimitService', () => {
         fiveHour: { used_percentage: 15 },
         sevenDay: null
       })
-      expect(service.getState().claude?.session?.usedPercent).toBe(15)
+      expect((await service.getState()).claude?.session?.usedPercent).toBe(15)
       expect(service.usageReadingAccount('claude')).toEqual({
         home: '/claude/current',
         provenance: 'current'
       })
     }
   )
+  it('keeps the read plan and its account on live posts only from that same login', async () => {
+    mockFreshBackgroundProviderFetches()
+    const service = new RateLimitService()
+    let provenance = 'profile:a'
+    service.setClaudeAuthPreparationResolver(async () => ({
+      configDir: '/claude/a',
+      envPatch: { CLAUDE_CONFIG_DIR: '/claude/a' },
+      provenance
+    }))
+    const readingAccount = { accountId: 'a', runtime: 'host', wslDistro: null } as const
+    vi.mocked(fetchActiveClaudeRateLimits).mockResolvedValueOnce({
+      ...okProvider('claude', 10),
+      planType: 'max_20x',
+      usageMetadata: { authProvenance: 'profile:a', readingAccount }
+    })
+    await service.refresh()
+    service.ingestLiveClaudeRateLimits({
+      configDir: '/claude/a',
+      fiveHour: { used_percentage: 30 },
+      sevenDay: null
+    })
+    expect((await service.getState()).claude).toMatchObject({
+      session: { usedPercent: 30 },
+      planType: 'max_20x',
+      usageMetadata: { source: 'live-session', readingAccount }
+    })
+
+    // The same folder now holds another login: its posts must not inherit a's plan.
+    provenance = 'system'
+    vi.mocked(fetchActiveClaudeRateLimits).mockResolvedValueOnce(okProvider('claude', 5))
+    await service.refreshClaudeForTarget()
+    service.ingestLiveClaudeRateLimits({
+      configDir: '/claude/a',
+      fiveHour: { used_percentage: 40 },
+      sevenDay: null
+    })
+    expect((await service.getState()).claude?.session?.usedPercent).toBe(40)
+    expect((await service.getState()).claude?.planType).toBeUndefined()
+    expect((await service.getState()).claude?.usageMetadata?.readingAccount).toBeUndefined()
+  })
+  it('keeps the account on the usage read right after redeeming a Codex reset', async () => {
+    mockFreshBackgroundProviderFetches()
+    const service = new RateLimitService()
+    const readingAccount = { accountId: 'a', runtime: 'host', wslDistro: null } as const
+    service.setCodexHomePathResolver(() => ({
+      kind: 'ready',
+      codexHomePath: '/codex/a',
+      readingAccount
+    }))
+    vi.mocked(fetchCodexRateLimits).mockResolvedValueOnce(okProvider('codex', 50))
+    await service.refresh()
+    vi.mocked(consumeCodexRateLimitResetCredit).mockResolvedValueOnce('reset')
+    vi.mocked(fetchCodexRateLimits).mockResolvedValueOnce({
+      ...okProvider('codex', 0),
+      planType: 'pro'
+    })
+    const { state } = await service.consumeCodexRateLimitResetCredit({
+      idempotencyKey: 'key',
+      target: { runtime: 'host', wslDistro: null },
+      codexHomePath: '/codex/a'
+    })
+    // The reply replaces the renderer's state, so it must name the account as the push does.
+    for (const codex of [(await service.getState()).codex, state.codex]) {
+      expect(codex).toMatchObject({ planType: 'pro', usageMetadata: { readingAccount } })
+    }
+  })
 })

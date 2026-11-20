@@ -1,6 +1,8 @@
-import { lazy, Suspense } from 'react'
-import { AgentHibernationGate } from '../components/AgentHibernationGate'
-import { AiVaultTabTitleSyncGate } from '../components/AiVaultTabTitleSyncGate'
+import { Suspense } from 'react'
+import { lazyWithRetry as lazy } from '@/app-shell/startup/lazy-with-retry'
+import { AgentHibernationGate } from '../lib/agent-session/hibernation/AgentHibernationGate'
+import { AiVaultTabTitleSyncGate } from '../lib/agent-session/history/title-sync/AiVaultTabTitleSyncGate'
+import { TerminalSessionNameSyncGate } from '../lib/agent-session/history/session-names/TerminalSessionNameSyncGate'
 import { WorkspacePortScanner } from '../components/ports/WorkspacePortScanner'
 import { SavedHostScopeWidenGate } from '../components/sidebar/worktree-list/listing/SavedHostScopeWidenGate'
 import { MacosTccPromptNoticeHost } from '../hooks/MacosTccPromptNoticeHost'
@@ -12,14 +14,14 @@ import { StructuredAgentSessionStatusBridge } from '../components/native-chat/se
 import { NativeChatVisualGuestThemePublisher } from '../components/native-chat/media/visuals/NativeChatVisualGuestThemePublisher'
 import { usePairedMobileDevices } from '../components/mobile/paired-mobile-devices'
 
+const AgentListVerdictPublisher = lazy(
+  () => import('../components/activity/paired-clients/agent-list-verdict-publisher')
+)
+
 /**
  * App-level gates that render nothing. Each lives here rather than inside the surface that
  * needs it so its high-churn store subscriptions stay out of the App render tree.
  */
-const AgentListVerdictPublisher = lazy(
-  () => import('../components/activity/agent-list-verdict-publisher')
-)
-
 export function AppBackgroundServices(): React.JSX.Element {
   const workspaceSessionReady = useAppStore((s) => s.workspaceSessionReady)
   const canPublishAgentList = Boolean(window.api.agentStatus?.publishListVerdicts)
@@ -36,6 +38,7 @@ export function AppBackgroundServices(): React.JSX.Element {
       <RemoteHostBrowserControlNoticeHost />
       {/* Keep agent-status retention subscriptions out of the App render tree. */}
       <AiVaultTabTitleSyncGate />
+      <TerminalSessionNameSyncGate />
       <SavedHostScopeWidenGate />
       <AgentHibernationGate />
       {/* Paired phones list agents with the desktop Agents list's verdicts; web clients have no host to tell. */}

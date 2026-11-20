@@ -3,7 +3,7 @@ import {
   getRepoExecutionHostId,
   LOCAL_EXECUTION_HOST_ID,
   type ExecutionHostId
-} from '../../shared/execution-host'
+} from '../../shared/execution-host/execution-host'
 import type { Repo } from '../../shared/repository/repo-types'
 import type { WorkspaceSessionState } from '../../shared/workspace-session/workspace-session-state-types'
 import { composeWorktreeId, splitWorktreeId } from '../../shared/worktree/id'
@@ -235,7 +235,9 @@ export async function reconcileListedWorktreeCaseSplits(
   store: WorktreeCaseSplitStore,
   repo: Pick<Repo, 'id' | 'connectionId' | 'executionHostId'>,
   listed: readonly { path: string; branch: string }[],
-  notifyWorktreeRenamed: ((repoId: string, oldWorktreeId: string, newWorktreeId: string) => void) | undefined,
+  notifyWorktreeRenamed:
+    | ((repoId: string, oldWorktreeId: string, newWorktreeId: string) => void)
+    | undefined,
   /** The caller's already-read rows: a healthy scan must not read persisted metadata twice. */
   metaById: Readonly<Record<string, WorktreeMeta>> | undefined
 ): Promise<void> {

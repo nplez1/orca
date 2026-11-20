@@ -6,7 +6,7 @@ import {
   upsertEphemeralVmRuntime
 } from '../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-store'
 import { resumeEphemeralVmRuntime } from './runtime-service'
-import type { OrcaVmRecipe } from '../../shared/orca-yaml-hook-types'
+import type { OrcaVmRecipe } from '../../shared/workspace-setup/orca-yaml-hook-types'
 import { cleanupTempDirs, makeDir, nodeCommand } from './runtime-service.test-harness'
 
 afterEach(cleanupTempDirs)

@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import type { ExecutionHostId } from '../../../../../shared/execution-host'
+import type { ExecutionHostId } from '../../../../../shared/execution-host/execution-host'
 import { settingsNavigationHostId } from './settings-host-scope'
 import type { SettingsNavigationTarget } from '@/components/settings/navigation/settings-navigation-types'
 

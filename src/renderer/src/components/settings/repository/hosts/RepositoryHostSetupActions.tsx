@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useCloneFolderOverride } from '../../../sidebar/project-admission/clone-folder/use-clone-folder-override'
 import { getProjectCloneCheckTarget } from '../../../../store/projects/project-host-routing'
 import { Plus, X } from 'lucide-react'
-import type { ExecutionHostId } from '../../../../../../shared/execution-host'
+import type { ExecutionHostId } from '../../../../../../shared/execution-host/execution-host'
 import type { ProjectHostAddRequest } from '@/store/slices/fork-ui'
 import type {
   ProjectHostSetup,
@@ -11,7 +11,7 @@ import type {
 } from '../../../../../../shared/project/project-types'
 import { useTranslate } from '@/i18n/use-translate'
 import { useAppStore } from '@/store/index'
-import { resolveWorktreeLayoutMode } from '../../../../../../shared/orca-workspace-layout'
+import { resolveWorktreeLayoutMode } from '../../../../../../shared/worktree/paths/orca-workspace-layout'
 import { useCloneParentDefault } from '../../../sidebar/project-admission/create/use-clone-parent-default'
 import { Button } from '../../../ui/button'
 import { Label } from '../../../ui/label'

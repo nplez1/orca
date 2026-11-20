@@ -20,7 +20,7 @@ import { PI_CLIPBOARD_OSC52_ENV } from '../../../shared/pi-clipboard-osc52-env'
 import {
   REMOTE_VIEWER_CLIPBOARD_ENV,
   CODEX_REMOTE_VIEWER_SSH_CONNECTION
-} from '../../../shared/remote-viewer-clipboard-env'
+} from '../../../shared/clipboard/remote-viewer-clipboard-env'
 import {
   RUNTIME_SOURCE_ID_ENV,
   RUNTIME_SOURCE_INCARNATION_ENV,

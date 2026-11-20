@@ -26,7 +26,10 @@ import { countRepoTerminalsNotKnownExited } from './workspaces/removal/project-r
 export function installOrcaRuntimeOwnedControllers(
   runtime: OrcaRuntimeWithPreservedBranchCleanup
 ): void {
-  runtime.accounts = new RuntimeAccountController(() => runtime.notifier)
+  // Why: upstream hands this controller the Claude-account selection handler, not the notifier.
+  runtime.accounts = new RuntimeAccountController((change) =>
+    runtime.handleClaudeAccountSelected(change)
+  )
 
   runtime.mobileSpeech = new RuntimeMobileSpeechCatalog(() => runtime.store)
 

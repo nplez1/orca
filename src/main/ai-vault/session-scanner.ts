@@ -2,7 +2,7 @@ import type {
   AiVaultListResult,
   AiVaultScanIssue
 } from '../../shared/ai-vault/contracts/ai-vault-types'
-import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
+import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host/execution-host'
 import { withSpan } from '../observability/tracer'
 import { dedupeScannedSessions } from './parsing/session-root-dedup'
 import { sortAiVaultSessionsByRecency } from '../../shared/ai-vault-session-sort'

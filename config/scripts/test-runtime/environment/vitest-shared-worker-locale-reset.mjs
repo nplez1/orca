@@ -6,7 +6,7 @@ import { afterAll, vi } from 'vitest'
 import {
   DEFAULT_UI_LOCALE,
   __resetRendererLanguageDetectionForTests
-} from '../../../../src/shared/ui-locale'
+} from '../../../../src/shared/i18n/ui-locale'
 import { __resetLanguageReadinessForTests } from '../../../../src/renderer/src/i18n/language-readiness'
 import { __orcaI18nInstancesForTests } from '../../../../src/shared/i18n-instance-registry'
 

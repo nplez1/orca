@@ -21,6 +21,9 @@ import type { WorktreeContextMenuModel } from './use-worktree-context-menu-model
 import { WorktreeStatusMenuItems } from '../../workspace-status/presentation/WorktreeStatusMenuItems'
 import { WorktreeWslHostStartMenuItem } from '../../workspace-card/host/WorktreeWslHostStartMenuItem'
 import { WorktreeContextMenuOverlays } from './WorktreeContextMenuOverlays'
+import { WorktreeNotificationMuteMenuItem } from './WorktreeNotificationMuteMenuItem'
+import { WslMovedWorkspaceUseHereMenuItem } from '@/components/wsl-move/WslMovedUseHereMenuItem'
+import { WslMoveFolderWorkspaceMenuItem } from '@/components/wsl-move/WslMoveProjectMenuItem'
 import { WorktreeContextMenuDeleteItems } from './WorktreeContextMenuDeleteItems'
 import {
   WorktreeCopySubMenu,
@@ -34,6 +37,7 @@ import {
   shouldUseNativeContextMenu
 } from './worktree-context-menu-policy'
 import { CLOSE_ALL_CONTEXT_MENUS_EVENT } from '@/lib/overlay-interaction/close-all-context-menus'
+import { WorktreeHandToBotMenuItem } from '@/components/bots/hand-to-bot/WorktreeHandToBotMenuItem'
 
 export default function WorktreeContextMenuView({ model }: { model: WorktreeContextMenuModel }) {
   const {
@@ -45,6 +49,7 @@ export default function WorktreeContextMenuView({ model }: { model: WorktreeCont
     deletingSubtree,
     developerMenuRevealed,
     effectiveSelectedWorktrees,
+    folderWorkspaceId,
     handleAssignWorkspaceStatus,
     handleCloseAutoFocus,
     handleCloseTerminals,
@@ -177,6 +182,9 @@ export default function WorktreeContextMenuView({ model }: { model: WorktreeCont
             <EphemeralVmExtendLifetimeMenu workspaceId={worktree.id} disabled={isDeleting} />
           )}
           <EphemeralVmContextMenuItems model={model} />
+          {!isMultiContext && (
+            <WorktreeNotificationMuteMenuItem worktreeId={worktree.id} disabled={isDeleting} />
+          )}
           <WorktreeContextMenuDeleteItems model={model} />
           <DropdownMenuSeparator />
           {!isMultiContext && (
@@ -198,6 +206,9 @@ export default function WorktreeContextMenuView({ model }: { model: WorktreeCont
             workspaceStatuses={workspaceStatuses}
           />
           {!isMultiContext && (
+            <WorktreeHandToBotMenuItem worktree={worktree} disabled={isDeleting} />
+          )}
+          {!isMultiContext && (
             <>
               <DropdownMenuSeparator />
               <WorktreeRowOpenInSubMenu
@@ -208,6 +219,10 @@ export default function WorktreeContextMenuView({ model }: { model: WorktreeCont
               <WorktreeCopySubMenu model={model} />
               <WorktreeLineageSubMenu model={model} />
               <WorktreeProjectGroupSubMenu model={model} />
+              {folderWorkspaceId ? (
+                <WslMoveFolderWorkspaceMenuItem folderWorkspaceId={folderWorkspaceId} />
+              ) : null}
+              <WslMovedWorkspaceUseHereMenuItem worktree={worktree} />
             </>
           )}
           {isMultiContext && hasAnyContextLineage ? (

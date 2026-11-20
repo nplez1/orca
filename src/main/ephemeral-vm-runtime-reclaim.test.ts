@@ -11,7 +11,10 @@ import {
 } from '../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-store'
 import type { EphemeralVmRuntimeRecord } from '../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 import type { EphemeralVmRuntimeReclaimed } from '../shared/ephemeral-vm-runtime-reclaim'
-import { toRuntimeExecutionHostId, toSshExecutionHostId } from '../shared/execution-host'
+import {
+  toRuntimeExecutionHostId,
+  toSshExecutionHostId
+} from '../shared/execution-host/execution-host'
 
 const mocks = vi.hoisted(() => ({
   getSshConnectionManager: vi.fn(),
@@ -27,7 +30,7 @@ vi.mock('./ssh/targets/ssh-target-registry', () => ({
 vi.mock('./ipc/runtime-environments/connections/runtime-environment-request-connections', () => ({
   getRuntimeEnvironmentStatusSnapshots: mocks.getRuntimeEnvironmentStatusSnapshots
 }))
-vi.mock('./ipc/ephemeral-vm-recipe-context', () => ({
+vi.mock('./ipc/ephemeral-vm/ephemeral-vm-recipe-context', () => ({
   getRuntimeRecipeContext: mocks.getRuntimeRecipeContext
 }))
 vi.mock('./ephemeral-vm/runtime-environment-release', () => ({

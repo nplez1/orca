@@ -13,7 +13,7 @@ vi.mock('electron', () => ({
   dialog: { showOpenDialog: vi.fn() }
 }))
 
-import { registerShellHandlers } from './shell'
+import { registerShellHandlers } from './shell/shell'
 
 type Handler = (event: unknown, ...args: unknown[]) => Promise<unknown>
 

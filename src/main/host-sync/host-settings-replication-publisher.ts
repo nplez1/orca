@@ -98,7 +98,10 @@ export function createHostSettingsReplicationPublisher(input: {
   let ledger = input.ledger ?? EMPTY_HOST_SETTINGS_CREDENTIAL_LEDGER
   let nextRevision = 1
 
-  function buildPayload(environmentId: string, reason: 'attach' | 'changed') {
+  function buildPayload(
+    environmentId: string,
+    reason: 'attach' | 'changed'
+  ): Promise<HostSettingsReplicationPayload> {
     const record = records.get(environmentId)
     const revision = nextRevision
     return reason === 'attach' || record === undefined
@@ -153,14 +156,14 @@ export function createHostSettingsReplicationPublisher(input: {
     },
     publish: async (environmentId, reason) => {
       const epoch = epochs.get(environmentId) ?? 0
-      let payload = buildPayload(environmentId, reason)
+      let payload = await buildPayload(environmentId, reason)
       let result = await input.transport.send(environmentId, payload)
       if (result.kind === 'needsSnapshot') {
         // One retry, with a fresh revision and the same removal list: a host that rejected a delta is
         // not told the same revision twice, or its own revision gate would refuse the snapshot as a
         // replay. The removals come back with the snapshot because this is the last push that names
         // what the host should no longer hold.
-        payload = buildHostSettingsSnapshot(
+        payload = await buildHostSettingsSnapshot(
           input.ports,
           payload.revision + 1,
           records.get(environmentId)?.credentialIds ?? []

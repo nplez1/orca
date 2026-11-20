@@ -10,8 +10,8 @@ import { listEphemeralVmProvisioningAttempts } from '../../shared/ephemeral-vm-p
 import { getEphemeralVmRuntimeFeatureStorePath } from '../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-feature-store'
 import { cleanupEphemeralVmRuntime, provisionEphemeralVmRuntime } from './runtime-service'
 import { stopEphemeralVmRuntimeCleanup } from './runtime-cleanup-control'
-import type { OrcaVmRecipe } from '../../shared/orca-yaml-hook-types'
 import { cleanupTempDirs, makeDir, nodeCommand } from './runtime-service.test-harness'
+import type { OrcaVmRecipe } from '../../shared/workspace-setup/orca-yaml-hook-types'
 
 afterEach(cleanupTempDirs)
 

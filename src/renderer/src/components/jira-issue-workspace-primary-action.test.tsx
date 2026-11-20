@@ -7,8 +7,8 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { JiraIssueWorkspaceHeader } from './jira-issue-workspace-chrome'
-import { JiraIssueWorkspaceContent } from './jira-issue-workspace-content'
+import { JiraIssueWorkspaceHeader } from './task-page/jira/issue-workspace/jira-issue-workspace-chrome'
+import { JiraIssueWorkspaceContent } from './task-page/jira/issue-workspace/jira-issue-workspace-content'
 import type { JiraIssue } from '../../../shared/jira/jira-types'
 
 function issue(): JiraIssue {

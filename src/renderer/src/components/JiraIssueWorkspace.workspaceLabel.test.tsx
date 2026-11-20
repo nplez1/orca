@@ -27,7 +27,7 @@ vi.mock('./jira-issue-workspace-detail-state', () => ({
   useJiraIssueWorkspaceDetail: () => ({ displayed: state.displayed, issueLoading: false })
 }))
 
-vi.mock('./jira-issue-workspace-chrome', () => ({
+vi.mock('./task-page/jira/issue-workspace/jira-issue-workspace-chrome', () => ({
   JiraIssueWorkspaceHeader: (props: { attachedWorkspaceLabel: string | null }) => {
     spies.header(props.attachedWorkspaceLabel)
     return null
@@ -35,7 +35,7 @@ vi.mock('./jira-issue-workspace-chrome', () => ({
   JiraIssueMetadataBar: () => null
 }))
 
-vi.mock('./jira-issue-workspace-content', () => ({
+vi.mock('./task-page/jira/issue-workspace/jira-issue-workspace-content', () => ({
   JiraIssueWorkspaceContent: (props: { attachedWorkspaceLabel: string | null }) => {
     spies.content(props.attachedWorkspaceLabel)
     return null
@@ -43,7 +43,9 @@ vi.mock('./jira-issue-workspace-content', () => ({
   JiraIssueCommentComposer: () => null
 }))
 
-vi.mock('./jira-issue-workspace-actions', () => ({ getJiraIssueWorkspaceActions: () => [] }))
+vi.mock('./task-page/jira/issue-workspace/jira-issue-workspace-actions', () => ({
+  getJiraIssueWorkspaceActions: () => []
+}))
 
 vi.mock('@/components/ui/sheet', () => ({
   Sheet: ({ open, children }: { open: boolean; children: ReactNode }) =>
@@ -53,7 +55,7 @@ vi.mock('@/components/ui/sheet', () => ({
   SheetTitle: ({ children }: { children: ReactNode }) => <div>{children}</div>
 }))
 
-import JiraIssueWorkspace from './JiraIssueWorkspace'
+import JiraIssueWorkspace from './task-page/jira/issue-workspace/JiraIssueWorkspace'
 
 function issue(key: string): JiraIssue {
   return {

@@ -45,7 +45,7 @@ Sign-in and installer links always use the system browser: OAuth providers rejec
 
 Links opened in Orca first reuse an existing page for the exact destination in the same workspace, execution host, and browser profile. Otherwise, they open a new tab in a pane already showing a browser. When several browser panes are visible, the focused one wins, then the most recently used one. Browser tabs hidden behind other tabs do not attract new pages. With no browser visible, the link joins the tab group of the pane it was clicked in — for a sidebar link with no source pane, the focused pane's group — so the terminal or agent it came from stays one tab away instead of sharing the split with it. Explicit **Open in this group** actions use the requested pane instead.
 
-A capability-verified paired runtime can offer the same Orca/system-browser choice for its terminal links. SSH-owned terminal links and links from older runtimes remain system-browser only. See [Terminal → Link actions](/docs/terminal#link-actions).
+A capability-verified paired runtime can offer the same Orca/system-browser choice for its terminal links; links from older runtimes remain system-browser only. SSH links whose host is routed follow link routing. When the host's SSH browsing is set to **This device**, they open in an Orca tab that browses from this device only while links open in Orca; otherwise they stay system-browser only. See [Terminal → Link actions](/docs/terminal#link-actions).
 
 ## Downloads
 
@@ -53,7 +53,7 @@ Browser downloads appear in a shelf under the toolbar while they are active or r
 
 ## Share as artifact
 
-Local HTML files opened in the worktree browser can use **Share as artifact** in the toolbar to mint a public view link through your signed-in Orca account (same opt-in gate and management surface as Markdown). Relative HTML assets are not uploaded — share a self-contained file or use absolute asset URLs. See [Settings → Artifacts](/docs/settings#artifacts) and [CLI reference → Artifacts](/docs/cli/reference#artifacts).
+Local HTML files opened in the worktree browser can use **Share as artifact** in the toolbar to mint a public view link through your signed-in Orca account (same publishing gate and management surface as Markdown). Relative HTML assets are not uploaded — share a self-contained file or use absolute asset URLs. See [Settings → Artifacts](/docs/settings#artifacts) and [CLI reference → Artifacts](/docs/cli/reference#artifacts).
 
 ## Viewport-size emulation
 

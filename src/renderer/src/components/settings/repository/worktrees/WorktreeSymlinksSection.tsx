@@ -10,7 +10,7 @@ import { Label } from '../../../ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '../../../ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../ui/select'
 import { cn } from '@/lib/class-names'
-import { FileTypeIcon, FolderIcon } from '@/components/FileTypeIcon'
+import { FileTypeIcon, FolderIcon } from '@/components/icons/FileTypeIcon'
 import { SearchableSetting } from '../../section-layout/SearchableSetting'
 import {
   getWorktreeSymlinkPathFilterState,
@@ -20,7 +20,7 @@ import { useTranslate } from '@/i18n/use-translate'
 import {
   getRepoExecutionHostId,
   LOCAL_EXECUTION_HOST_ID
-} from '../../../../../../shared/execution-host'
+} from '../../../../../../shared/execution-host/execution-host'
 import { SettingsGroup } from '../../section-layout/SettingsGroup'
 
 type WorktreeSymlinksSectionProps = {

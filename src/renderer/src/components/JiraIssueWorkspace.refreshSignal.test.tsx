@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { JiraConnectionStatus, JiraIssue, JiraUser } from '../../../shared/jira/jira-types'
 import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/work-items/jira/jira-issue-workspace-attachment'
 import type { TaskSourceContext } from '../../../shared/work-items/task-source-context'
-import JiraIssueWorkspace from './JiraIssueWorkspace'
+import JiraIssueWorkspace from './task-page/jira/issue-workspace/JiraIssueWorkspace'
 
 const mocks = vi.hoisted(() => {
   const storeState: { jiraStatus: JiraConnectionStatus | undefined } = { jiraStatus: undefined }
@@ -51,7 +51,7 @@ vi.mock('@/components/ui/sheet', () => ({
   SheetTitle: ({ children }: { children: ReactNode }) => <div>{children}</div>
 }))
 
-vi.mock('./jira-issue-workspace-chrome', () => ({
+vi.mock('./task-page/jira/issue-workspace/jira-issue-workspace-chrome', () => ({
   JiraIssueMetadataBar: ({
     displayed,
     selfUser
@@ -67,12 +67,12 @@ vi.mock('./jira-issue-workspace-chrome', () => ({
   JiraIssueWorkspaceHeader: () => null
 }))
 
-vi.mock('./jira-issue-workspace-content', () => ({
+vi.mock('./task-page/jira/issue-workspace/jira-issue-workspace-content', () => ({
   JiraIssueCommentComposer: () => null,
   JiraIssueWorkspaceContent: () => null
 }))
 
-vi.mock('./jira-issue-workspace-actions', () => ({
+vi.mock('./task-page/jira/issue-workspace/jira-issue-workspace-actions', () => ({
   getJiraIssueWorkspaceActions: () => []
 }))
 

@@ -9,7 +9,7 @@ import {
   applySessionSearchSettingsChange,
   installChildSessionSearchService
 } from '../../ai-vault-search/session-search-enablement'
-import { LOCAL_EXECUTION_HOST_ID } from '../../../shared/execution-host'
+import { LOCAL_EXECUTION_HOST_ID } from '../../../shared/execution-host/execution-host'
 import { sessionSearchScopeCatalogFromStore } from '../../ai-vault-search/scope/session-search-store-scope-catalog'
 import { getCanonicalUserDataPath } from '../../persistence/loading-store/user-data-path'
 import { app } from 'electron'
@@ -43,6 +43,9 @@ import {
 import { resolveHostAgentBaseEnvironment } from '../../runtime/agent-session/environment/structured-agent-shell-environment'
 import type { RuntimeDesktopWindowStatus } from '../../../shared/remote-runtime/session-graph/runtime-session-contracts'
 import { normalizeDisabledUsageProviders } from '../../../shared/usage-provider-enablement'
+import { BotShareClient } from '../../bots/sharing/bot-share-client'
+import { skillPackageDownloadOrigins } from '../../skills/runtime-transfer/skill-client-mediated-transfer'
+import { join } from 'node:path'
 import {
   AgentStatusObservedPaneIdentities,
   recordObservedAgentStatusPaneIdentity
@@ -50,8 +53,9 @@ import {
 import { bindTerminalPaneStatusLifecycle } from '../../ipc/pty/pane/terminal-pane-status-lifecycle'
 import { startAgentStateRulesLiveUpdates } from '../../runtime/agent-state-rules/agent-state-rules-live-update'
 import { recordDurableCrashBreadcrumb } from '../../crash-reporting/breadcrumbs/durable-crash-breadcrumb'
-import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../shared/layout-owner-switch'
+import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../shared/workspace-layout/layout-owner-switch'
 import { openOffscreenBrowserPageLink } from '../../runtime/browser/commands/offscreen-browser-page-link'
+import { providePairedDesktopComputerName } from '../../ipc/runtime-environments/connections/paired-desktop-account-declaration'
 
 export function getDesktopWindowStatus(): RuntimeDesktopWindowStatus {
   const activation = state.desktopActivationGate
@@ -90,14 +94,17 @@ export function initializeMainProcessRuntime(): OrcaRuntimeService {
       }
     },
     getDesktopWindowStatus,
+    servedOrcaProfileId: state.activeOrcaProfile?.profile.id,
     attestAgentHookCompatibilityAuthority: (candidate) =>
       agentHookServer.attestCompatibilityAuthority(candidate),
-    retireAgentHookCompatibilityAuthority: (paneKey) =>
-      agentHookServer.retireProcessAuthority(paneKey),
+    retireAgentHookCompatibilityAuthority: (paneKey, options) =>
+      agentHookServer.retireProcessAuthority(paneKey, options),
     canRecoverPersistentLocalPtys: () => getDaemonProvider() !== null,
     // Resolve per call: the RPC server/device registry is constructed later with this runtime.
     getPairedDeviceName: (pairedDeviceId) =>
       state.runtimeRpc?.getDeviceRegistry()?.getDevice(pairedDeviceId)?.name ?? null,
+    getPairedDeviceAccount: (pairedDeviceId, connectionClaim) =>
+      state.runtimeRpc?.pairedDeviceTypist(pairedDeviceId, connectionClaim) ?? null,
     // Provide managed Codex homes here for desktop and headless session discovery; core IPC registration is window-only.
     getAdditionalAiVaultCodexHomePaths: () =>
       state.codexRuntimeHome?.getHostCodexHomePathsForSessionDiscovery() ?? [],
@@ -140,6 +147,7 @@ export function initializeMainProcessRuntime(): OrcaRuntimeService {
   app.once('will-quit', disposeIssueLinkTitleFill)
   bindTerminalPaneStatusLifecycle(runtime, store)
   state.runtime = runtime
+  providePairedDesktopComputerName(() => runtime.readMachineName())
   installDesktopWorkspaceVmWaker(runtime, () => app.getPath('userData'))
   runtime.attachAgentStatusStore(agentHookServer)
   agentHookServer.subscribeEnrichedStatus((enriched) =>
@@ -181,6 +189,11 @@ export function configureRuntimeServices(runtime: OrcaRuntimeService): void {
     throw new Error('Account services must be initialized before runtime wiring')
   }
   configureDesktopCloudServices(runtime, () => state.store?.getSettings(), app.getPath('userData'))
+  runtime.setBotShareClient(BotShareClient.forProfile(app.getPath('userData')), {
+    temporaryRoot: join(app.getPath('userData'), 'bot-share-downloads'),
+    allowedOrigins: skillPackageDownloadOrigins(!app.isPackaged),
+    requireHttps: app.isPackaged
+  })
   runtime.setAccountServices(
     { claudeAccounts, codexAccounts, rateLimits },
     {

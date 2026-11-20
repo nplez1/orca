@@ -5,7 +5,7 @@ import type {
   AiVaultSession
 } from '../../../shared/ai-vault/contracts/ai-vault-types'
 import { aiVaultScanLimit } from '../../../shared/ai-vault/scanning/ai-vault-session-depth'
-import { LOCAL_EXECUTION_HOST_ID } from '../../../shared/execution-host'
+import { LOCAL_EXECUTION_HOST_ID } from '../../../shared/execution-host/execution-host'
 import { getSessionParseCacheEntry } from '../parse-cache/session-parse-cache-store'
 import { unavailableSessionSearchStatus } from '../../../shared/ai-vault/search/ai-vault-search-client'
 import { AiVaultSearchRequestSchema } from '../../../shared/ai-vault/search/ai-vault-search-contract'

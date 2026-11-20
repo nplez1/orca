@@ -3,7 +3,7 @@ import { createEmptyRateLimitState } from '../agent-usage/rate-limits/rate-limit
 import type { ProviderRateLimits } from '../agent-usage/rate-limits/rate-limit-types'
 import { StatusBarItem } from '../rpc-contract/client-ui/client-ui-params'
 import { DEFAULT_STATUS_BAR_ITEMS } from '../status-bar/status-bar-defaults'
-import type { StatusBarItem as StatusBarItemUnion } from '../ui-chrome-types'
+import type { StatusBarItem as StatusBarItemUnion } from '../ui-chrome/ui-chrome-types'
 import { USAGE_PROVIDER_IDS } from '../usage-provider-enablement'
 import {
   FORK_USAGE_PROVIDER_IDS,

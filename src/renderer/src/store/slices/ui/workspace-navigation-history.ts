@@ -1,10 +1,11 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget (299/300); the fork's +6-line delta rides inside it, and splitting costs a permanent sync hunk. */
 import type { StateCreator } from 'zustand'
 import type { AppState } from '../../types'
 import { findFirstIndexedWorktree } from '../../../lib/workspace/ownership/worktree-runtime-owner-index'
 import type { GitHubWorkItem } from '../../../../../shared/github/work-items/work-item-types'
 import type { JiraIssue } from '../../../../../shared/jira/jira-types'
 import type { LinearIssue } from '../../../../../shared/linear/issue-types'
-import type { GitLabWorkItem } from '../../../../../shared/gitlab-types'
+import type { GitLabWorkItem } from '../../../../../shared/gitlab/gitlab-types'
 import {
   getTaskSourceCacheScope,
   type TaskSourceContext
@@ -157,7 +158,9 @@ function getHistoryEntryKey(entry: WorktreeNavHistoryEntry): string {
   return `view:task-detail:linear:${sourceScope}:${entry.issue.workspaceId ?? 'selected'}:${entry.issue.id}`
 }
 
-function isLiveEntry(entry: WorktreeNavHistoryEntry, state: AppState): boolean {
+type WorkspaceCatalog = Pick<AppState, 'folderWorkspaces' | 'worktreesByRepo'>
+
+export function isLiveEntry(entry: WorktreeNavHistoryEntry, state: WorkspaceCatalog): boolean {
   if (isViewEntry(entry)) {
     return true
   }
@@ -196,6 +199,21 @@ export function appendHistoryEntry(
     worktreeNavHistory: truncated,
     worktreeNavHistoryIndex: nextIndex
   }
+}
+
+/** The most recent still-existing workspace at or before the current history entry, skipping pages. */
+export function findLastVisitedLiveWorkspaceId(
+  history: readonly WorktreeNavHistoryEntry[],
+  index: number,
+  catalog: WorkspaceCatalog
+): string | null {
+  for (let i = index; i >= 0; i--) {
+    const entry = history[i]
+    if (!isViewEntry(entry) && isLiveEntry(entry, catalog)) {
+      return entry
+    }
+  }
+  return null
 }
 
 export function findPrevLiveWorktreeHistoryIndex(state: AppState): number | null {

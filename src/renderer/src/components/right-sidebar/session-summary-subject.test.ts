@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { AgentStatusEntry } from '../../../../shared/agent-status/contracts/agent-status-types'
 import { makePaneKey } from '../../../../shared/workspace-layout/stable-pane-id'
 import type { TerminalTab } from '../../../../shared/workspace-layout/terminal-tab-types'
-import { AcceptedAgentStatuses } from '@/store/slices/agent-status/accepted-agent-statuses'
-import type { AgentPaneConversationIdentity } from '@/store/slices/agent-status/agent-pane-conversation'
+import { AcceptedAgentStatuses } from '@/store/slices/agent-status/status-ownership/accepted-agent-statuses'
+import type { AgentPaneConversationIdentity } from '@/store/slices/agent-status/conversation/agent-pane-conversation'
 import {
   resolveSessionSummarySessionRef,
   selectSessionSummaryPaneKey,

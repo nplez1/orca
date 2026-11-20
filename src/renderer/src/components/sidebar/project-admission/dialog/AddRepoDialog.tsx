@@ -8,12 +8,12 @@ import { AddRepoDialogStepContent } from './AddRepoDialogStepContent'
 import { useAddRepoCloneFlow } from './useAddRepoCloneFlow'
 import { useAddRepoLocalFolderFlow } from './useAddRepoLocalFolderFlow'
 import { useAddRepoServerPathFlow } from './useAddRepoServerPathFlow'
-import { resolveWorktreeLayoutMode } from '../../../../../../shared/orca-workspace-layout'
+import { resolveWorktreeLayoutMode } from '../../../../../../shared/worktree/paths/orca-workspace-layout'
 import {
   indexExecutionHostsById,
   machineHostIds
 } from '../../../../../../shared/execution-host/managed-orcad-execution-host'
-import type { ExecutionHostId } from '../../../../../../shared/execution-host'
+import type { ExecutionHostId } from '../../../../../../shared/execution-host/execution-host'
 import { useAddRepoHostSelection } from '../host-selection/use-add-repo-host-selection'
 import { useCompleteGitRepoAdd } from '../completion/use-complete-git-repo-add'
 import { useCreateProjectDefaults } from '../create/useCreateProjectDefaults'
@@ -46,7 +46,6 @@ export default React.memo(function AddRepoDialog({ hosted }: AddRepoDialogProps)
   const importNestedRepos = useAppStore((s) => s.importNestedRepos)
   const repos = useAppStore((s) => s.repos)
   const fetchWorktrees = useAppStore((s) => s.fetchWorktrees)
-  const setHideDefaultBranchWorkspace = useAppStore((s) => s.setHideDefaultBranchWorkspace)
   const settings = useAppStore((s) => s.settings)
   const { closeModal, closeForFolderHandoff, finishProjectAdd } = useAddRepoHostedController(hosted)
   const [step, setStep] = useAddRepoEntryStepState(isOpen, modalPaths.entryRequest)
@@ -54,7 +53,6 @@ export default React.memo(function AddRepoDialog({ hosted }: AddRepoDialogProps)
   const [addProjectBusyLabel, setAddProjectBusyLabel] = useState<string | null>(null)
   const completeGitRepoAdd = useCompleteGitRepoAdd({
     closeModal,
-    setHideDefaultBranchWorkspace,
     finishProjectAdd
   })
   const hostSelection = useAddRepoHostSelection({

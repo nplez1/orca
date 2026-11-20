@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createGlobalSettingsFixture } from '../../shared/global-settings-test-fixture'
+import { createGlobalSettingsFixture } from '../../shared/settings/global-settings-test-fixture'
 import { registerForkHandlers } from './register-fork-handlers'
 
 const mocks = vi.hoisted(() => ({

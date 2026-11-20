@@ -26,7 +26,8 @@ export function resolveTerminalOrchestrationCliCommand(args: {
   connectionId: string | null
   isWsl: boolean | null | undefined
   worktreeId: string
-  projectRuntime?: ProjectExecutionRuntimeResolution
+  /** Read only when nothing cheaper decides: it searches the project catalog. */
+  getProjectRuntime?: () => ProjectExecutionRuntimeResolution | undefined
   runtimeCliCommand?: OrchestrationCliCommand
 }): OrchestrationCliCommand {
   if (args.connectionId) {
@@ -41,7 +42,8 @@ export function resolveTerminalOrchestrationCliCommand(args: {
   if (args.isWsl !== null && args.isWsl !== undefined) {
     return args.isWsl ? CLI_COMMAND_NAME : 'orca'
   }
-  if (args.projectRuntime?.status === 'resolved' && args.projectRuntime.runtime.kind === 'wsl') {
+  const projectRuntime = args.getProjectRuntime?.()
+  if (projectRuntime?.status === 'resolved' && projectRuntime.runtime.kind === 'wsl') {
     return CLI_COMMAND_NAME
   }
 
@@ -78,6 +80,6 @@ export function resolveRuntimeTerminalOrchestrationCliCommand(
     isWsl: pty.isWsl,
     worktreeId: pty.worktreeId,
     runtimeCliCommand: runtimeOrchestrationCliCommand(),
-    projectRuntime: source.getProjectRuntime(pty)
+    getProjectRuntime: () => source.getProjectRuntime(pty)
   })
 }

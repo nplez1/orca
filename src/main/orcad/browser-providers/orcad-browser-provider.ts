@@ -93,7 +93,7 @@ async function isScriptShim(path: string): Promise<boolean> {
   }
 }
 
-/** Require installer-owned paths; arbitrary AppImage locations cannot establish ownership. */
+/** Require installer-owned paths or the AppImage serve runs from; never guess other AppImage locations. */
 export async function resolveInstalledElectronExecutable(
   candidates: string[] = installedElectronCandidates(process.platform, homedir(), process.env)
 ): Promise<string | null> {

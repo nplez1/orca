@@ -2,7 +2,7 @@
 import { act, render } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { useAppStore } from '@/store'
-import { createGlobalSettingsFixture } from '../../../../../shared/global-settings-test-fixture'
+import { createGlobalSettingsFixture } from '../../../../../shared/settings/global-settings-test-fixture'
 import {
   Q1,
   Q2,

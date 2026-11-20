@@ -16,6 +16,7 @@ import {
   deleteToken,
   getSiteFile,
   getSiteFileProblem,
+  inSiteRegistryOrder,
   hasStoredToken,
   readToken,
   saveToken,
@@ -38,53 +39,73 @@ import {
 } from './site-identity'
 import { verifyJiraCredentials } from './credential-verification'
 
-export function getClients(selection?: JiraSiteSelection | null): JiraClientForSite[] {
-  const file = getSiteFile()
+export async function getClients(
+  selection?: JiraSiteSelection | null
+): Promise<JiraClientForSite[]> {
+  // Reconnect saves the token before the site record; the registry queue keeps each client's pair from one generation.
+  return inSiteRegistryOrder(() => readClients(selection))
+}
+
+async function readClients(
+  selection: JiraSiteSelection | null | undefined
+): Promise<JiraClientForSite[]> {
+  const file = await getSiteFile()
   const selected = selection ?? file.selectedSiteId ?? file.activeSiteId
   const isAllSelection = selected === 'all'
   const sites = isAllSelection
     ? file.sites
     : file.sites.filter((site) => site.id === (selected ?? file.activeSiteId))
 
-  return sites.flatMap((site) => {
-    let token: string | null
-    try {
-      token = readToken(site.id)
-    } catch (error) {
-      // For all-sites reads, skip unreadable credentials; explicit site reads still throw and status retains the error.
-      if (isAllSelection && error instanceof CredentialDecryptionError) {
-        return []
+  const clients = await Promise.all(
+    sites.map(async (site) => {
+      let token: string | null
+      try {
+        token = await readToken(site.id)
+      } catch (error) {
+        // For all-sites reads, skip unreadable credentials; explicit site reads still throw and status retains the error.
+        if (isAllSelection && error instanceof CredentialDecryptionError) {
+          return []
+        }
+        throw error
       }
-      throw error
-    }
-    return token ? [{ site, authorization: authHeader(site.email, token, site.authType) }] : []
-  })
+      return token ? [{ site, authorization: authHeader(site.email, token, site.authType) }] : []
+    })
+  )
+  return clients.flat()
 }
 
 /** Resolves the one site a board- or sprint-scoped Jira read needs. */
-export function getSingleClient(selection?: JiraSiteSelection | null): JiraClientForSite {
-  const entries = getClients(selection)
+export async function getSingleClient(
+  selection?: JiraSiteSelection | null
+): Promise<JiraClientForSite> {
+  const entries = await getClients(selection)
   if (entries.length !== 1) {
     throw new Error('A single Jira site is required for board data.')
   }
   return entries[0]
 }
 
-export function getStatus(): JiraConnectionStatus {
-  const file = getSiteFile()
-  const sites = file.sites.filter((site) => hasStoredToken(site.id))
+export async function getStatus(): Promise<JiraConnectionStatus> {
+  const file = await getSiteFile()
+  const presence = await Promise.all(file.sites.map((site) => hasStoredToken(site.id)))
+  const sites = file.sites.filter((_, index) => presence[index])
   const activeSite = sites.find((site) => site.id === file.activeSiteId) ?? sites[0] ?? null
   // Why the site-file problem joins this field: an unreadable or un-imported
   // `jira-sites.json` shows as configured-nothing, which is the same silent dead end a credential
   // this build cannot decrypt produces, and this is the channel that already carries that.
   const credentialError =
-    sites.map((site) => getCredentialError(site.id)).find((message) => message !== undefined) ??
-    getSiteFileProblem() ??
+    (await Promise.all(sites.map((site) => getCredentialError(site.id)))).find(
+      (message) => message !== undefined
+    ) ??
+    (await getSiteFileProblem()) ??
     undefined
-  // Protection is host-wide: inactive sites with plaintext credentials still matter.
-  const credentialProtection = sites.some((site) => getSiteTokenProtection(site.id) === 'plaintext')
-    ? 'plaintext'
-    : null
+  let credentialProtection: 'plaintext' | null = null
+  for (const site of sites) {
+    if ((await getSiteTokenProtection(site.id)) === 'plaintext') {
+      credentialProtection = 'plaintext'
+      break
+    }
+  }
   return {
     connected: sites.length > 0,
     viewer: siteToViewer(activeSite),
@@ -126,7 +147,7 @@ export async function connect(
   try {
     // Before the network call and before saveToken: a file this build cannot read would otherwise
     // collect an orphan token for a site that can never be written down.
-    assertSiteFileWritable()
+    await assertSiteFileWritable()
     const { viewer, apiBaseUrl } = await verifyJiraCredentials(siteUrl, email, apiToken, authType)
     // PAT sites lack email; verified viewer identity prevents same-host account collisions.
     const id = getSiteId(siteUrl, email || viewer.accountId)
@@ -139,16 +160,18 @@ export async function connect(
       authType,
       ...(apiBaseUrl ? { apiBaseUrl } : {})
     }
-    clearAttachmentImagesForSite(id)
-    saveToken(id, apiToken)
-    noteReplicatedCredentialChanged()
-    const file = getSiteFile()
-    writeSiteFile({
-      version: 1,
-      activeSiteId: id,
-      selectedSiteId: id,
-      sites: [site, ...file.sites.filter((entry) => entry.id !== id)]
+    await inSiteRegistryOrder(async () => {
+      clearAttachmentImagesForSite(id)
+      await saveToken(id, apiToken)
+      const file = await getSiteFile()
+      await writeSiteFile({
+        version: 1,
+        activeSiteId: id,
+        selectedSiteId: id,
+        sites: [site, ...file.sites.filter((entry) => entry.id !== id)]
+      })
     })
+    noteReplicatedCredentialChanged()
     return { ok: true, viewer }
   } catch (error) {
     return error instanceof Error
@@ -159,38 +182,42 @@ export async function connect(
   }
 }
 
-export function disconnect(siteId?: string): void {
-  // Why before the tokens go: an unreadable sites file cannot record the removal, so deleting the tokens
-  // first would leave site rows pointing at credentials that no longer exist.
-  assertSiteFileWritable()
-  const file = getSiteFile()
-  const ids = siteId ? [siteId] : file.sites.map((site) => site.id)
-  for (const id of ids) {
-    deleteToken(id)
-  }
-  noteReplicatedCredentialChanged()
-  // Why: drop cached attachment data URLs for disconnected sites so main does
-  // not retain multi-MB strings after logout.
-  clearAttachmentImagesForSite(siteId)
-  writeSiteFile({
-    version: 1,
-    activeSiteId: file.activeSiteId,
-    selectedSiteId: file.selectedSiteId,
-    sites: file.sites.filter((site) => !ids.includes(site.id))
+export async function disconnect(siteId?: string): Promise<void> {
+  await inSiteRegistryOrder(async () => {
+    // Why before the tokens go: an unreadable sites file cannot record the removal, so deleting the tokens
+    // first would leave site rows pointing at credentials that no longer exist.
+    await assertSiteFileWritable()
+    const file = await getSiteFile()
+    const ids = siteId ? [siteId] : file.sites.map((site) => site.id)
+    for (const id of ids) {
+      await deleteToken(id)
+    }
+    noteReplicatedCredentialChanged()
+    // Why: drop cached attachment data URLs for disconnected sites so main does
+    // not retain multi-MB strings after logout.
+    clearAttachmentImagesForSite(siteId)
+    await writeSiteFile({
+      version: 1,
+      activeSiteId: file.activeSiteId,
+      selectedSiteId: file.selectedSiteId,
+      sites: file.sites.filter((site) => !ids.includes(site.id))
+    })
   })
 }
 
-export function selectSite(siteId: JiraSiteSelection): JiraConnectionStatus {
-  const file = getSiteFile()
-  if (siteId !== 'all' && !file.sites.some((site) => site.id === siteId)) {
+export async function selectSite(siteId: JiraSiteSelection): Promise<JiraConnectionStatus> {
+  return inSiteRegistryOrder(async () => {
+    const file = await getSiteFile()
+    if (siteId !== 'all' && !file.sites.some((site) => site.id === siteId)) {
+      return getStatus()
+    }
+    await writeSiteFile({
+      ...file,
+      activeSiteId: siteId === 'all' ? file.activeSiteId : siteId,
+      selectedSiteId: siteId
+    })
     return getStatus()
-  }
-  writeSiteFile({
-    ...file,
-    activeSiteId: siteId === 'all' ? file.activeSiteId : siteId,
-    selectedSiteId: siteId
   })
-  return getStatus()
 }
 
 export async function testConnection(
@@ -198,7 +225,7 @@ export async function testConnection(
 ): Promise<{ ok: true; viewer: JiraViewer } | { ok: false; error: string }> {
   let client: JiraClientForSite | undefined
   try {
-    client = getClients(siteId)[0]
+    client = (await getClients(siteId))[0]
   } catch (error) {
     return error instanceof Error
       ? { ok: false, error: error.message }
@@ -223,15 +250,30 @@ export async function testConnection(
   }
 }
 
-export function clearToken(siteId: string): void {
-  // Why before the deletion: see `disconnect`.
-  assertSiteFileWritable()
-  deleteToken(siteId)
-  noteReplicatedCredentialChanged()
-  // Why: auth failure removes the site; drop cached attachment data URLs too.
-  clearAttachmentImagesForSite(siteId)
-  const file = getSiteFile()
-  writeSiteFile({ ...file, sites: file.sites.filter((site) => site.id !== siteId) })
+export async function clearToken(failedClient: JiraClientForSite): Promise<void> {
+  await inSiteRegistryOrder(async () => {
+    const siteId = failedClient.site.id
+    let currentClient: JiraClientForSite | undefined
+    try {
+      currentClient = (await readClients(siteId))[0]
+    } catch (error) {
+      if (error instanceof CredentialDecryptionError) {
+        return
+      }
+      throw error
+    }
+    if (!currentClient || currentClient.authorization !== failedClient.authorization) {
+      return
+    }
+    // Why before the deletion: see `disconnect`.
+    await assertSiteFileWritable()
+    await deleteToken(siteId)
+    noteReplicatedCredentialChanged()
+    // Why: auth failure removes the site; drop cached attachment data URLs too.
+    clearAttachmentImagesForSite(siteId)
+    const file = await getSiteFile()
+    await writeSiteFile({ ...file, sites: file.sites.filter((site) => site.id !== siteId) })
+  })
 }
 
 export function isAuthError(error: unknown): boolean {

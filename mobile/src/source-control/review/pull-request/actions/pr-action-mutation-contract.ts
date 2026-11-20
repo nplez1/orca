@@ -8,6 +8,8 @@ export type PrActionMutations = {
     method?: GitHubPRMergeMethod
     bypassBranchProtection?: boolean
     prRepo?: GitHubPrRepoSlug | null
+    /** The PR head on screen; the host refuses the merge if GitHub's head moved past it. */
+    expectedHeadSha?: string | null
   }) => Promise<GitHubPrMutationOutcome>
   setPRAutoMerge: (args: {
     prNumber: number

@@ -3,13 +3,13 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { getDefaultSettings } from '../../../../../shared/constants'
-import type { GlobalSettings } from '../../../../../shared/global-settings-types'
+import { getDefaultSettings } from '../../../../../shared/orca-profiles/constants'
+import type { GlobalSettings } from '../../../../../shared/settings/global-settings-types'
 import {
   LOCAL_EXECUTION_HOST_ID,
   toRuntimeExecutionHostId,
   toSshExecutionHostId
-} from '../../../../../shared/execution-host'
+} from '../../../../../shared/execution-host/execution-host'
 import type { SettingsHostScope } from '../host-scope/settings-host-scope'
 import { WorkspaceDirectorySetting } from './WorkspaceDirectorySetting'
 

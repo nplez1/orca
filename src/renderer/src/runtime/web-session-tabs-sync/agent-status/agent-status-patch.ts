@@ -1,0 +1,368 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's agent-status attention fields ride upstream's patch reducer, and splitting costs a permanent sync hunk. */
+import { recordDraft } from '@/store/record-transitions/keyed-record-transitions'
+import { conversationSessionStartedAt } from '../../../store/slices/agent-status/conversation/agent-conversation-acceptance'
+import { toRuntimeExecutionHostId } from '../../../../../shared/execution-host/execution-host'
+import {
+  classifyAgentPaneConversation,
+  projectAgentPaneConversation
+} from '../../../store/slices/agent-status/conversation/agent-pane-conversation'
+import { agentProviderSessionsEqual } from '../../../../../shared/agent-session/lifecycle/resume/agent-provider-session-equality'
+import type { AgentStatusEntry } from '../../../../../shared/agent-status/contracts/agent-status-types'
+import {
+  withMirroredEvidenceReceipt,
+  agentStatusAuthorityObservedAt
+} from '../../../../../shared/agent-status/contracts/agent-status-freshness'
+import { agentEntryCompletionAt } from '../../../../../shared/agent-status/lifecycle/agent-completion-time'
+import { agentMainAgentVerdict } from '../../../../../shared/agent-status/lifecycle/agent-main-agent-verdict'
+import { normalizeCompatibleAgentStatusEntryForOwner } from '../../../../../shared/agent-status/title/agent-title-owner'
+import {
+  isWebTerminalSurfaceTabId,
+  toWebTerminalSurfaceTabId
+} from '../../../../../shared/workspace-layout/terminal-surface-id'
+import type { TerminalTab } from '../../../../../shared/workspace-layout/terminal-tab-types'
+import type {
+  MirroredTerminalTab,
+  WebSessionTabsBatchContext,
+  WebSessionTabsSyncState
+} from '../state'
+import type { RuntimeMobileSessionTerminalClientTab } from '../../../../../shared/remote-runtime/session-graph/runtime-mobile-session-tab-contracts'
+import {
+  isClientOwnedAgentStatus,
+  isMirroredAgentStatusOwnedBy,
+  clientAgentStatusFencesHost,
+  hostAgentStatusPiercesClientAuthority,
+  isMirroredAgentPaneKeyForTabs,
+  agentPaneKeysForTabs,
+  remapHostAgentStatus
+} from './agent-status-primitives'
+import {
+  retirePaneLaunchNote,
+  retiresLaunch
+} from '../../../store/slices/agent-status/launch-config/agent-status-launch-config'
+import {
+  agentStatusEntryEqual,
+  isAgentStatusFresh,
+  isMirroredCommandCodeTurnBump
+} from '../snapshots/state-equality-core'
+
+type MirroredAgentStatusPatch = Pick<
+  WebSessionTabsSyncState,
+  'agentStatusByPaneKey' | 'agentStatusEpoch' | 'sortEpoch'
+> &
+  Partial<
+    Pick<
+      WebSessionTabsSyncState,
+      | 'agentLaunchConfigByPaneKey'
+      | 'sleepingAgentSessionsByPaneKey'
+      | 'agentConversationsByPaneKey'
+    >
+  >
+
+/** Host dialog observations already granted the fence, per mirrored pane. A republish of the same
+ *  observation is not new evidence; see the `hostDialogIsNew` guard in the patch builder. */
+const lastHostDialogObservationByPaneKey = new Map<string, number>()
+
+/** Bounded the way the authority registries are: a pane that dies with a dialog up never reports a
+ *  clear, and a pane key is never reused. */
+const MAX_TRACKED_HOST_DIALOGS = 512
+
+function noteHostDialogObservation(paneKey: string, observation: number): void {
+  if (
+    !lastHostDialogObservationByPaneKey.has(paneKey) &&
+    lastHostDialogObservationByPaneKey.size >= MAX_TRACKED_HOST_DIALOGS
+  ) {
+    const oldest = lastHostDialogObservationByPaneKey.keys().next().value
+    if (oldest !== undefined) {
+      lastHostDialogObservationByPaneKey.delete(oldest)
+    }
+  }
+  lastHostDialogObservationByPaneKey.set(paneKey, observation)
+}
+
+export function resetHostDialogObservationsForTests(): void {
+  lastHostDialogObservationByPaneKey.clear()
+}
+
+export function buildMirroredAgentStatusPatch(
+  state: WebSessionTabsSyncState,
+  currentTerminalTabs: readonly TerminalTab[],
+  terminalSurfaceTabs: readonly RuntimeMobileSessionTerminalClientTab[],
+  mirroredTerminalTabs: readonly MirroredTerminalTab[],
+  environmentId: string,
+  worktreeId: string,
+  retractedTabIds: ReadonlySet<string>,
+  now: number,
+  batchContext?: WebSessionTabsBatchContext
+): MirroredAgentStatusPatch | null {
+  const mirroredTabIds = new Set<string>()
+  for (const tab of currentTerminalTabs) {
+    if (isWebTerminalSurfaceTabId(tab.id)) {
+      mirroredTabIds.add(tab.id)
+    }
+  }
+  for (const surface of terminalSurfaceTabs) {
+    mirroredTabIds.add(toWebTerminalSurfaceTabId(surface.parentTabId))
+  }
+
+  if (mirroredTabIds.size === 0) {
+    return null
+  }
+
+  const survivingSleepingPaneKeys = new Set(
+    terminalSurfaceTabs.map(
+      (surface) => `${toWebTerminalSurfaceTabId(surface.parentTabId)}:${surface.leafId}`
+    )
+  )
+  let retainedSurfaceByHostTabAndPrunedLeafId:
+    | Map<string, ReadonlyMap<string, RuntimeMobileSessionTerminalClientTab>>
+    | undefined
+  for (const entry of mirroredTerminalTabs) {
+    if (entry.retainedSurfaceByPrunedLeafId) {
+      retainedSurfaceByHostTabAndPrunedLeafId ??= new Map()
+      retainedSurfaceByHostTabAndPrunedLeafId.set(
+        entry.hostTabId,
+        entry.retainedSurfaceByPrunedLeafId
+      )
+    }
+  }
+  const nextByPaneKey = new Map<string, AgentStatusEntry>()
+  for (const surface of terminalSurfaceTabs) {
+    const retainedSurface = retainedSurfaceByHostTabAndPrunedLeafId
+      ?.get(surface.parentTabId)
+      ?.get(surface.leafId)
+    const hostEntry = remapHostAgentStatus(surface, worktreeId, retainedSurface)
+    if (!hostEntry) {
+      continue
+    }
+    const existing =
+      nextByPaneKey.get(hostEntry.paneKey) ?? state.agentStatusByPaneKey.get(hostEntry.paneKey)
+    const entry = withMirroredEvidenceReceipt(
+      {
+        ...hostEntry,
+        ...(hostEntry.connectionId === undefined ? { connectionId: environmentId } : {}),
+        // Why: the sweep keys on worktreeId, so a host projection that omits it (the synthetic
+        // done, an idle title) left a row no snapshot could retire — it outlived the agent until
+        // the store reset on restart. Stamp the mirror's own worktree, as connectionId is stamped.
+        ...(hostEntry.worktreeId === undefined ? { worktreeId } : {})
+      },
+      existing,
+      now
+    )
+    // Retain fresher OSC state while remapping authoritative host identity.
+    const hostIdentityPredatesCurrentTurn =
+      existing !== undefined &&
+      entry.state === 'done' &&
+      existing.state !== 'done' &&
+      existing.stateStartedAt > entry.stateStartedAt
+    // Why: cross-machine wall clocks are not comparable, so the host frame could
+    // outrank live client status forever; a proven client writer keeps its own
+    // state (still adopting the host's identity fields below) unless the host
+    // carries a state class the client's bytes can never see.
+    const hostPiercesFence = hostAgentStatusPiercesClientAuthority(entry)
+    // Why: a row the host mirrored here IS the host's statement, so the fence has nothing left to
+    // protect — the host's next frame, including the release of a wait it opened, must land. Without
+    // this the fenced branch re-spread the host's own `waiting` over the host's `working`/`done`,
+    // and only the client's next byte write (or the 30-minute stale boundary) released a dialog that
+    // had already been answered.
+    const existingIsHostRow = existing?.mirroredEvidenceReceivedAt !== undefined
+    // Why the observation and not the frame: a host that republishes a row it already sent is not
+    // new evidence, and re-piercing on it would reopen a wait the client's bytes have since moved
+    // past — a host dying with a dialog open would pin the client on Needs You for good, since every
+    // unrelated republish carries that frozen row. Only a wait the host is still observing anew wins.
+    const hostObservation = hostPiercesFence ? agentStatusAuthorityObservedAt(entry) : undefined
+    const hostDialogIsNew =
+      hostObservation !== lastHostDialogObservationByPaneKey.get(entry.paneKey)
+    // Why outright rather than on a clock comparison: pi re-posts `ui_prompt_active` on every tool
+    // event while the dialog is open, so a wait that loses once and wins once more IS the
+    // working/waiting oscillation this fence exists to stop — and `updatedAt` is the client's clock
+    // against the host's, which skew alone can invert.
+    const hostDialogOutranksClient = hostPiercesFence && !existingIsHostRow && hostDialogIsNew
+    if (hostObservation !== undefined) {
+      noteHostDialogObservation(entry.paneKey, hostObservation)
+    }
+    const clientOwnsEntry =
+      !existingIsHostRow && clientAgentStatusFencesHost(entry.paneKey, existing, entry, now)
+    const nextEntry =
+      existing &&
+      !hostDialogOutranksClient &&
+      // Why the fallback is not gated on the fence: a republished dialog pierces, and gating here
+      // handed it the win on every republish — the stale-wait pin this fence exists to prevent. A
+      // genuinely new dialog already wins through `hostDialogOutranksClient` above.
+      (clientOwnsEntry ||
+        (isAgentStatusFresh(existing, now) && existing.updatedAt > entry.updatedAt))
+        ? {
+            ...normalizeCompatibleAgentStatusEntryForOwner(existing, entry.agentType),
+            ...(clientOwnsEntry && existing.state === 'working' && entry.state === 'working'
+              ? { workingMode: entry.workingMode }
+              : {}),
+            paneKey: entry.paneKey,
+            worktreeId: entry.worktreeId ?? existing.worktreeId,
+            tabId: entry.tabId,
+            providerSession:
+              existing.providerSession ??
+              (hostIdentityPredatesCurrentTurn ? undefined : entry.providerSession),
+            // Only hooks mint message content and OSC blanks it; take host-first even behind the client fence (#12906), unlike providerSession.
+            lastAssistantMessage:
+              (hostIdentityPredatesCurrentTurn ? undefined : entry.lastAssistantMessage) ??
+              existing.lastAssistantMessage,
+            lastAssistantMessageIsToolOutput:
+              hostIdentityPredatesCurrentTurn || entry.lastAssistantMessage === undefined
+                ? existing.lastAssistantMessageIsToolOutput
+                : entry.lastAssistantMessageIsToolOutput
+          }
+        : entry
+    // The host owns the launch fact whichever writer wins presentation.
+    const accepted =
+      nextEntry === entry
+        ? entry
+        : withHostOrcaSessionId(
+            {
+              ...withHostProgramStatus(nextEntry, entry.programStatus),
+              ...(entry.launchAttested !== undefined
+                ? { launchAttested: entry.launchAttested }
+                : {})
+            },
+            entry
+          )
+    const source = { ...accepted, isReplay: true }
+    const conversation = classifyAgentPaneConversation(
+      state,
+      accepted,
+      source,
+      toRuntimeExecutionHostId(environmentId)
+    )
+    nextByPaneKey.set(entry.paneKey, {
+      ...accepted,
+      firstStateStartedAt: conversationSessionStartedAt(accepted, existing, conversation, source)
+    })
+  }
+
+  let nextAgentStatusByPaneKey = state.agentStatusByPaneKey
+  let changed = false
+  let aggregateRelevantChange = false
+  let sortRelevantChange = false
+
+  for (const paneKey of agentPaneKeysForTabs(state, mirroredTabIds)) {
+    if (!isMirroredAgentPaneKeyForTabs(paneKey, mirroredTabIds)) {
+      continue
+    }
+    const existing = state.agentStatusByPaneKey.get(paneKey)
+    if (!existing || !isMirroredAgentStatusOwnedBy(existing, environmentId, worktreeId)) {
+      continue
+    }
+    // Explicit retraction retires pane authority after the live-row patch.
+    if (isMirroredAgentPaneKeyForTabs(paneKey, retractedTabIds)) {
+      continue
+    }
+    if (nextByPaneKey.has(paneKey)) {
+      continue
+    }
+    if (
+      state.agentStatusByPaneKey.get(paneKey)?.paneSleep &&
+      survivingSleepingPaneKeys.has(paneKey)
+    ) {
+      continue
+    }
+    // Host omission cannot prove OSC-driven exit. Retain owned rows through staleness so wake decays them like local panes instead of erasing them (STA-3107).
+    if (isClientOwnedAgentStatus(paneKey, state.agentStatusByPaneKey.get(paneKey))) {
+      continue
+    }
+    nextAgentStatusByPaneKey = nextAgentStatusByPaneKey.replace([[paneKey, null]])
+    batchContext?.changedAgentPaneKeys?.add(paneKey)
+    changed = true
+    aggregateRelevantChange = true
+    sortRelevantChange = true
+  }
+
+  let retirement: ReturnType<typeof retirePaneLaunchNote> = {}
+  let nextConversations = state.agentConversationsByPaneKey ?? {}
+  const originalConversations = nextConversations
+  const conversationDraft = recordDraft(nextConversations)
+  for (const [paneKey, entry] of nextByPaneKey) {
+    nextConversations = projectAgentPaneConversation(
+      { tabsByWorktree: state.tabsByWorktree, agentConversationsByPaneKey: nextConversations },
+      entry,
+      (_entries, key, value) => {
+        conversationDraft.set(key, value)
+        return conversationDraft.view()
+      },
+      toRuntimeExecutionHostId(environmentId),
+      { ...entry, isReplay: true }
+    )
+    const existing = nextAgentStatusByPaneKey.get(paneKey)
+    // The host's retirement of this pane's launch ends the client's copies of its note.
+    if (retiresLaunch(existing, entry)) {
+      retirement = { ...retirement, ...retirePaneLaunchNote({ ...state, ...retirement }, paneKey) }
+    }
+    if (
+      agentStatusEntryEqual(existing, entry) &&
+      existing?.firstStateStartedAt === entry.firstStateStartedAt
+    ) {
+      continue
+    }
+    nextAgentStatusByPaneKey = nextAgentStatusByPaneKey.replace([[paneKey, entry]])
+    batchContext?.changedAgentPaneKeys?.add(paneKey)
+    changed = true
+    const entryAttributionChanged =
+      existing?.worktreeId !== entry.worktreeId || existing?.tabId !== entry.tabId
+    const entryFreshnessChanged =
+      !!existing && isAgentStatusFresh(existing, now) !== isAgentStatusFresh(entry, now)
+    const doneAttentionChanged =
+      existing?.state === 'done' &&
+      entry.state === 'done' &&
+      agentEntryCompletionAt(existing) !== agentEntryCompletionAt(entry)
+    const workingModeChanged = existing?.workingMode !== entry.workingMode
+    // A verdict moves no clock, including a main agent failing while its subagents keep the row working.
+    const verdictChanged =
+      !!existing && agentMainAgentVerdict(existing) !== agentMainAgentVerdict(entry)
+    const entrySortRelevantChange =
+      !existing ||
+      existing.firstStateStartedAt !== entry.firstStateStartedAt ||
+      existing.state !== entry.state ||
+      !isAgentStatusFresh(existing, now) ||
+      entryFreshnessChanged ||
+      entryAttributionChanged ||
+      doneAttentionChanged ||
+      isMirroredCommandCodeTurnBump(existing, entry)
+    aggregateRelevantChange =
+      aggregateRelevantChange || entrySortRelevantChange || workingModeChanged || verdictChanged
+    sortRelevantChange = sortRelevantChange || entrySortRelevantChange
+  }
+
+  nextConversations = conversationDraft.finish()
+  if (!changed && nextConversations === originalConversations) {
+    return null
+  }
+
+  return {
+    agentStatusByPaneKey: nextAgentStatusByPaneKey,
+    agentStatusEpoch: aggregateRelevantChange ? state.agentStatusEpoch + 1 : state.agentStatusEpoch,
+    sortEpoch: sortRelevantChange ? state.sortEpoch + 1 : state.sortEpoch,
+    ...(nextConversations !== originalConversations
+      ? { agentConversationsByPaneKey: nextConversations }
+      : {}),
+    ...retirement
+  }
+}
+
+// Why host-only: client OSC writes have no facet channel, so the host's facet is the current one.
+function withHostProgramStatus(
+  entry: AgentStatusEntry,
+  programStatus: AgentStatusEntry['programStatus']
+): AgentStatusEntry {
+  const { programStatus: _clientFacet, ...rest } = entry
+  return programStatus ? { ...rest, programStatus } : rest
+}
+
+/** Only the host names its agents: for the same conversation its stamp wins, including no stamp
+ *  (a settled miss clearing a pending null); the client never mints or keeps one across keys. */
+function withHostOrcaSessionId(next: AgentStatusEntry, host: AgentStatusEntry): AgentStatusEntry {
+  if (
+    !host.providerSession ||
+    !agentProviderSessionsEqual(host.agentType, host.providerSession, next.providerSession)
+  ) {
+    return next
+  }
+  const { orcaSessionId: _client, ...rest } = next
+  return host.orcaSessionId !== undefined ? { ...rest, orcaSessionId: host.orcaSessionId } : rest
+}

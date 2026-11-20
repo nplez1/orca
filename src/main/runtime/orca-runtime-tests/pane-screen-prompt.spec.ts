@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import './runtime-test-module-registration.spec'
+import '../construction/test-context/runtime-test-module-registration.spec'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -13,7 +13,7 @@ import {
   TEST_WORKTREE_PATH,
   expectStablePaneKeyEnv,
   store
-} from './orca-runtime-test-fixtures.spec'
+} from '../construction/test-context/orca-runtime-test-fixtures.spec'
 
 /** The visible lines of Copilot's approval dialog from `__fixtures__/copilot-command-prompt`, which
  *  prefixes each captured row with the box's `│` gutter. */

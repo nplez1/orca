@@ -6,7 +6,7 @@ import {
   defaultJiraListColumnIds,
   resolveJiraListColumnIds,
   visibleJiraListColumns
-} from './jira-list-columns'
+} from './task-page/jira/listing/jira-list-columns'
 
 describe('Jira list column defaults (fork)', () => {
   // Why this diverges from upstream, which hides every planning column: a scrum

@@ -4,23 +4,23 @@ import {
   LOCAL_EXECUTION_HOST_ID,
   parseExecutionHostId,
   type ExecutionHostId
-} from '../../../../../shared/execution-host'
+} from '../../../../../shared/execution-host/execution-host'
 import type { ExecutionHostRegistryEntry } from '../../../../../shared/execution-host/execution-host-registry-entry'
+import { getNeedsSetupDetail } from './project-host-needs-setup-detail'
+import { isHostLocalProjectId } from '../../../../../shared/project/host-setup/project-host-setup-projection'
 import { isEphemeralVmRuntimeEnvironment } from '../../../../../shared/remote-runtime/host-catalog/runtime-environments'
 import {
   isMergedAwayExecutionHost,
   machineHostIds
 } from '../../../../../shared/execution-host/managed-orcad-execution-host'
 import type { ProjectHostSetup } from '../../../../../shared/project/project-types'
-import type { Repo } from '../../../../../shared/repository/repo-types'
-import { translate } from '@/i18n/i18n'
-import { translateHostDisplayLabel } from '@/components/sidebar/execution-host-label'
-
+import type { Repo, RepoKind } from '../../../../../shared/repository/repo-types'
+import { getRepoKind } from '../../../../../shared/repository/repo-kind'
+import { translateHostDisplayLabel } from '@/runtime/hosts/display/execution-host-label'
 import {
   canSetProjectLocation,
   getHostHealthUnavailableDetail,
   getHostSetupUnavailableDetail,
-  getPendingSetupDetail,
   getProjectLocationUnavailableDetail
 } from '../../project-host-setup-availability'
 import {
@@ -82,6 +82,7 @@ type BuildReadySetupOptionsInput = {
 
 type BuildNeedsSetupOptionsInput = {
   projectId: string
+  hostLocalKind: RepoKind | null
   hosts: readonly ExecutionHostRegistryEntry[]
   readySetupByHost: ReadonlyMap<ExecutionHostId, ReadyProjectHostSetupOption>
   pendingSetupByHost: ReadonlyMap<ExecutionHostId, ProjectHostSetup>
@@ -119,11 +120,23 @@ export function buildProjectHostSetupOptions({
     ...readyOptions,
     ...buildNeedsSetupOptions({
       projectId,
+      hostLocalKind: getHostLocalProjectKind(projectId, projectHostSetups),
       hosts,
       readySetupByHost,
       pendingSetupByHost
     })
   ].sort((a, b) => compareProjectHostSetupOptions(a, b))
+}
+
+function getHostLocalProjectKind(
+  projectId: string,
+  projectHostSetups: readonly ProjectHostSetup[]
+): RepoKind | null {
+  if (!isHostLocalProjectId(projectId)) {
+    return null
+  }
+  const setup = projectHostSetups.find((candidate) => candidate.projectId === projectId)
+  return setup ? getRepoKind(setup) : 'git'
 }
 
 function getPendingSetupByHost(
@@ -180,6 +193,7 @@ function buildReadySetupOptions({
 
 function buildNeedsSetupOptions({
   projectId,
+  hostLocalKind,
   hosts,
   readySetupByHost,
   pendingSetupByHost
@@ -210,12 +224,7 @@ function buildNeedsSetupOptions({
         detail:
           unavailableDetail ??
           getProjectLocationUnavailableDetail(projectId, host.id) ??
-          (pendingSetup
-            ? getPendingSetupDetail(pendingSetup)
-            : translate(
-                'auto.lib.projectHostSetupOptions.locationNotSet',
-                'Project location not set'
-              )),
+          getNeedsSetupDetail(hostLocalKind, pendingSetup),
         isAvailable,
         attention: host.health === 'error',
         canSetLocation: canSetProjectLocation(projectId, isAvailable, pendingSetup, host.id),

@@ -94,7 +94,7 @@ export async function listBoards(
   siteId?: JiraSiteSelection | null,
   name?: string
 ): Promise<JiraBoard[]> {
-  const entries = getClients(siteId)
+  const entries = await getClients(siteId)
   if (entries.length === 0) {
     return []
   }
@@ -120,7 +120,7 @@ export async function listBoards(
             .filter((board): board is JiraBoard => board !== null)
         } catch (error) {
           if (isAuthError(error)) {
-            clearToken(entry.site.id)
+            await clearToken(entry)
           }
           throw error
         }
@@ -134,7 +134,7 @@ export async function getBoardOverview(
   boardId: string,
   siteId: string
 ): Promise<JiraBoardOverview> {
-  const entry = getSingleClient(siteId)
+  const entry = await getSingleClient(siteId)
   const encodedBoardId = encodeURIComponent(boardId)
   // Why one deadline over the whole read: three round trips each bounded on their own
   // still add up, and a stalled board is what leaves the board pane loading.
@@ -166,7 +166,7 @@ export async function getBoardOverview(
       }
     } catch (error) {
       if (isAuthError(error)) {
-        clearToken(entry.site.id)
+        await clearToken(entry)
       }
       throw error
     }
@@ -176,7 +176,7 @@ export async function getBoardOverview(
 export async function listBoardIssues(
   request: JiraBoardIssuePageRequest
 ): Promise<JiraBoardIssuePage> {
-  const entry = getSingleClient(request.siteId)
+  const entry = await getSingleClient(request.siteId)
   const startAt = Math.max(0, Math.floor(request.startAt ?? 0))
   const maxResults = Math.min(
     Math.max(1, Math.floor(request.maxResults ?? BOARD_ISSUE_PAGE_SIZE)),
@@ -246,7 +246,7 @@ export async function listBoardIssues(
     }
   } catch (error) {
     if (isAuthError(error)) {
-      clearToken(entry.site.id)
+      await clearToken(entry)
     }
     throw error
   } finally {

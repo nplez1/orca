@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { WorktreeBranchHostSelect } from './WorktreeBranchHostSelect'
 import type { BranchGroupMember } from '../../../../shared/sidebar-list/row-types'
-import { LOCAL_EXECUTION_HOST_ID } from '../../../../shared/execution-host'
+import { LOCAL_EXECUTION_HOST_ID } from '../../../../shared/execution-host/execution-host'
 import {
   remoteWorktree,
   worktree

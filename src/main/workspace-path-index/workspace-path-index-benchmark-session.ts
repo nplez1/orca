@@ -82,6 +82,7 @@ export async function createWorkspacePathIndexBenchmarkSession(args: {
   const worker = new WorkspacePathIndexWorkerClient({
     workerFactory: () => {
       spawnedWorker = spawnWorkerThread(args.workerPath, {
+        name: 'orca-workspace-path-index',
         workerData: { memoryPort: memoryChannel.port2 },
         transferList: [memoryChannel.port2]
       })

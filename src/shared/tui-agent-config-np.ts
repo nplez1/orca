@@ -1,5 +1,5 @@
 import type { TuiAgent } from './agent-launch/catalog/tui-agent'
-import { getRelayCliCommandNameForPlatform } from './orca-cli-command-name'
+import { getRelayCliCommandNameForPlatform } from './cli/orca-cli-command-name'
 import type { TuiAgentConfigSource } from './agent-launch/catalog/tui-agent-config-types'
 
 // Why: Orca NP's own entries over upstream's table, so upstream table edits still merge in place.

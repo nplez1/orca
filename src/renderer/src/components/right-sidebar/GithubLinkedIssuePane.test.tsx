@@ -44,7 +44,7 @@ vi.mock('@/components/github-item-dialog/edit-item-fields/gh-edit-section', () =
 vi.mock('@/components/github-item-dialog/discuss-item/gh-comment-composer', () => ({
   GHCommentComposer: () => null
 }))
-vi.mock('@/components/sidebar/CommentMarkdown', () => ({ default: () => null }))
+vi.mock('@/components/comment-markdown/CommentMarkdown', () => ({ default: () => null }))
 vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback?: string) => fallback ?? _key
 }))

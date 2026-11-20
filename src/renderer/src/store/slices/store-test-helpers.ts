@@ -17,7 +17,7 @@ import { createJiraSlice } from './jira/jira'
 import { createEditorSlice } from './editor/create-editor-slice'
 import { createStatsSlice } from './process-stats/stats'
 import { createMemorySlice } from './process-stats/memory'
-import { createStructuredChatCompanionWritesSlice } from './agent-status/structured-chat-companion-writes'
+import { createStructuredChatCompanionWritesSlice } from './agent-status/structured-sessions/structured-chat-companion-writes'
 import { createEphemeralVmLifecycleSlice } from './ephemeral-vm/ephemeral-vm-lifecycle'
 import { createWorkspaceSpaceSlice } from './workspace-cleanup/workspace-space'
 import {
@@ -32,7 +32,7 @@ import { createSshSlice } from './ssh/create-ssh-slice'
 import { createRuntimeEnvironmentSshSlice } from './ssh/runtime-environment-ssh'
 import { createWslHostsSlice } from './wsl/wsl-hosts'
 import { createAgentStatusSlice } from './agent-status/agent-status'
-import { createPaneForegroundAgentSlice } from './agent-status/pane-foreground-agent'
+import { createPaneForegroundAgentSlice } from './agent-status/pane-authority/pane-foreground-agent'
 import { createDiffCommentsSlice } from './diff-comments/create-diff-comments-slice'
 import { createDetectedAgentsSlice } from './agent-inventory/create-detected-agents-slice'
 import { createRuntimeDetectedAgentsSlice } from './agent-inventory/runtime-detected-agents'
@@ -51,16 +51,17 @@ import { createNewIssueDraftSlice } from './task-creation/new-issue-draft'
 import { createFeedbackDraftSlice } from './feedback/feedback-draft'
 import { createTaskCreationDraftsSlice } from './task-creation/task-creation-drafts'
 import { createRemoteServerUpdatesSlice } from './runtime-host-updates/remote-server-updates'
+import { createAgentCliUpdatesSlice } from './runtime-host-updates/agent-cli-updates'
 import { createTerminalQuickCommandHostsSlice } from '../terminals/quick-commands/terminal-quick-command-hosts'
-import { createStructuredSessionLaunchDirectorySlice } from './agent-status/structured-session-launch-directories'
+import { createStructuredSessionLaunchDirectorySlice } from './agent-status/structured-sessions/structured-session-launch-directories'
 import { createWorktreeSetupRunnerSlice } from './worktree-setup-runner'
-import { createStructuredChatSleptAtSlice } from './agent-status/structured-chat-slept-at'
+import { createStructuredChatSleptAtSlice } from './agent-status/structured-sessions/structured-chat-slept-at'
 import { createWorkspaceAttentionSlice } from './workspace-attention/workspace-attention-slice'
 import { createForkUiSlice } from './fork-ui'
 import '@/i18n/i18n'
 import { withEditorBufferRecords } from './editor/buffers/editor-buffer-record-lifecycle'
-import { withAgentStatusOwnership } from './agent-status/agent-status-ownership-boundary'
-import { withAgentConversationRetention } from './agent-status/agent-conversation-retention'
+import { withAgentStatusOwnership } from './agent-status/status-ownership/agent-status-ownership-boundary'
+import { withAgentConversationRetention } from './agent-status/conversation/agent-conversation-retention'
 import { makeWorktree } from './worktrees/worktree.test-fixture'
 import { TEST_REPO } from '../repos/repo.test-fixture'
 export { makeWorktree } from './worktrees/worktree.test-fixture'
@@ -127,6 +128,7 @@ export function createTestStore() {
         ...createFeedbackDraftSlice(...a),
         ...createTaskCreationDraftsSlice(...a),
         ...createRemoteServerUpdatesSlice(...a),
+        ...createAgentCliUpdatesSlice(...a),
         ...createTerminalQuickCommandHostsSlice(...a),
         ...createStructuredSessionLaunchDirectorySlice(...a),
         ...createWorktreeSetupRunnerSlice(...a),

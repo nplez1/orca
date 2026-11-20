@@ -23,15 +23,15 @@ const MAX_LABEL_LENGTH = 60
 const MAX_USERNAME_LENGTH = 120
 const MAX_TOKEN_LENGTH = 500
 
-function summarize(profile: JenkinsServerProfile): JenkinsServerSummary {
-  return { ...profile, hasToken: hasJenkinsServerToken(profile.id) }
+async function summarize(profile: JenkinsServerProfile): Promise<JenkinsServerSummary> {
+  return { ...profile, hasToken: await hasJenkinsServerToken(profile.id) }
 }
 
-export function listJenkinsServerSummaries(): JenkinsServerSummary[] {
+export async function listJenkinsServerSummaries(): Promise<JenkinsServerSummary[]> {
   // Throws when the profiles file cannot be read or a pre-rename copy could not be imported: the
   // settings card renders a failure instead of an empty list that means "nothing configured".
   assertJenkinsServersReportable()
-  return listJenkinsServers().map(summarize)
+  return Promise.all(listJenkinsServers().map(summarize))
 }
 
 function hostLabel(baseUrl: string): string {
@@ -42,7 +42,9 @@ function hostLabel(baseUrl: string): string {
   }
 }
 
-export function saveJenkinsServerFromArgs(args: JenkinsSaveServerArgs): JenkinsSaveServerResult {
+export async function saveJenkinsServerFromArgs(
+  args: JenkinsSaveServerArgs
+): Promise<JenkinsSaveServerResult> {
   const baseUrl = normalizeJenkinsBaseUrl(args.baseUrl)
   if (!baseUrl) {
     return { ok: false, error: 'Enter a valid http or https Jenkins URL.' }
@@ -70,13 +72,13 @@ export function saveJenkinsServerFromArgs(args: JenkinsSaveServerArgs): JenkinsS
   // Why: an empty token on an edit means "leave the stored one alone"; a server may also be
   // readable anonymously, which is a legitimate configuration.
   try {
-    saveJenkinsServer(profile, apiToken.length > 0 ? apiToken : null)
+    await saveJenkinsServer(profile, apiToken.length > 0 ? apiToken : null)
   } catch (error) {
     // The dialog has a place to show this, and a refusal has to read as one rather than as a save.
     return { ok: false, error: error instanceof Error ? error.message : String(error) }
   }
   noteReplicatedCredentialChanged()
-  return { ok: true, server: summarize(profile) }
+  return { ok: true, server: await summarize(profile) }
 }
 
 export function removeJenkinsServerById(serverId: string): boolean {

@@ -151,7 +151,8 @@ export const FILE_METHODS = [
         params.implicitRootRelativePath,
         params.authorizedRootRelativePaths,
         params.offset,
-        params.length
+        params.length,
+        params.media === true
       )
   }),
   defineMethod({

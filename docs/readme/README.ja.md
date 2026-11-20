@@ -115,7 +115,7 @@ Orca NP は [stablyai/orca](https://github.com/stablyai/orca) に、フォーク
 
 スマートフォンからエージェントを監視・操作 — エージェントの完了を通知で受け取り、どこからでもフォローアップを送信できます。
 
-[iOS App Store](https://apps.apple.com/us/app/orca-ide/id6766130217) · [Android APK](https://orca.dev/download/android) · [ドキュメント →](https://orca.dev/docs/mobile)
+[iOS App Store](https://apps.apple.com/us/app/orca-ide/id6766130217) · [Google Play](https://play.google.com/store/apps/details?id=dev.orca.app) · [Android APK](https://orca.dev/download/android) · [ドキュメント →](https://orca.dev/docs/mobile)
 
 </td>
 <td width="50%">
@@ -302,7 +302,7 @@ Orca NP は公式の Orca と並べてインストールでき、このリポジ
 Orca のモバイルアプリを Orca NP とペアリングして、スマートフォンからエージェントを監視・操作できます。アプリはアップストリームの Orca が公開しており、Orca NP でも動作します。
 
 - **iOS:** [App Store からダウンロード](https://apps.apple.com/us/app/orca-ide/id6766130217)
-- **Android:** [APK をダウンロード](https://orca.dev/download/android)
+- **Android:** [Google Play](https://play.google.com/store/apps/details?id=dev.orca.app) · [APK をダウンロード](https://orca.dev/download/android)
 
 ---
 

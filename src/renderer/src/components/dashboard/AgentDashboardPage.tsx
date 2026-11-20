@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import { useAppStore } from '@/store'
 import { AgentKanbanBoard } from './board/AgentKanbanBoard'
-import type { DashboardRevealAgentArgs as AgentRevealArgs } from '../../../../shared/dashboard-snapshot'
+import type { DashboardRevealAgentArgs as AgentRevealArgs } from '../../../../shared/agent-status/presentation/dashboard-snapshot'
 import { AgentDashboardSettingsMenu } from './settings/AgentDashboardSettingsMenu'
 import { revealDashboardAgent } from './navigation/reveal-dashboard-agent'
 import { useAgentDashboardPageEscape } from './use-agent-dashboard-page-escape'

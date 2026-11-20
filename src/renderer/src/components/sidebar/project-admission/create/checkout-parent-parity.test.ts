@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { getDefaultSettings } from '../../../../../../shared/constants'
+import { getDefaultSettings } from '../../../../../../shared/orca-profiles/constants'
 import {
   LOCAL_EXECUTION_HOST_ID,
   toRuntimeExecutionHostId
-} from '../../../../../../shared/execution-host'
-import type { GlobalSettings } from '../../../../../../shared/global-settings-types'
-import type { WorktreeLayoutMode } from '../../../../../../shared/orca-workspace-layout'
+} from '../../../../../../shared/execution-host/execution-host'
+import type { GlobalSettings } from '../../../../../../shared/settings/global-settings-types'
+import type { WorktreeLayoutMode } from '../../../../../../shared/worktree/paths/orca-workspace-layout'
 import { resolveDefaultCreateProjectParent } from '../../../../../../main/ipc/repos/default-create-project-parent'
 import { getCloneParentForHost } from './clone-defaults'
 import { resolveRuntimeCreateParent } from './runtime-create-parent'

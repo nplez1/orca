@@ -97,17 +97,19 @@ describe('Claude usage polling', () => {
       service.start({ fetchImmediately: false })
       await vi.advanceTimersByTimeAsync(1000)
 
-      expect(service.getState().claude?.status).toBe('error')
-      expect(service.getState().claude?.usageMetadata?.retryAtMs).toBeGreaterThan(Date.now())
+      expect((await service.getState()).claude?.status).toBe('error')
+      expect((await service.getState()).claude?.usageMetadata?.retryAtMs).toBeGreaterThan(
+        Date.now()
+      )
 
       window.emit('focus')
       await vi.advanceTimersByTimeAsync(0)
 
       // Why: the probe answers without the endpoint, so its Retry-After cannot freeze the lane.
       expect(fetchActiveClaudeRateLimits).toHaveBeenCalledTimes(2)
-      expect(service.getState().claude?.status).toBe('ok')
-      expect(service.getState().claude?.session?.usedPercent).toBe(31)
-      expect(service.getState().claude?.usageMetadata?.source).toBe('cli')
+      expect((await service.getState()).claude?.status).toBe('ok')
+      expect((await service.getState()).claude?.session?.usedPercent).toBe(31)
+      expect((await service.getState()).claude?.usageMetadata?.source).toBe('cli')
 
       service.stop()
     } finally {
@@ -161,7 +163,7 @@ describe('Claude usage polling', () => {
 
       const service = new RateLimitService()
       await service.refresh()
-      expect(service.getState().claude?.usageMetadata?.retryAtMs).toBe(retryAtMs)
+      expect((await service.getState()).claude?.usageMetadata?.retryAtMs).toBe(retryAtMs)
 
       await service.refresh()
       expect(vi.mocked(fetchActiveClaudeRateLimits).mock.calls[1]?.[0]).toEqual(
@@ -185,13 +187,13 @@ describe('Claude usage polling', () => {
       service.attach(asRateLimitWindow(new FakeRateLimitWindow()))
       service.start({ fetchImmediately: false })
       await vi.advanceTimersByTimeAsync(1000)
-      expect(service.getState().claude?.status).toBe('error')
+      expect((await service.getState()).claude?.status).toBe('error')
 
       await vi.advanceTimersByTimeAsync(15 * 60 * 1000)
 
       expect(fetchActiveClaudeRateLimits).toHaveBeenCalledTimes(2)
-      expect(service.getState().claude?.status).toBe('ok')
-      expect(service.getState().claude?.session?.usedPercent).toBe(27)
+      expect((await service.getState()).claude?.status).toBe('ok')
+      expect((await service.getState()).claude?.session?.usedPercent).toBe(27)
 
       service.stop()
     } finally {
@@ -211,14 +213,14 @@ describe('Claude usage polling', () => {
       service.attach(asRateLimitWindow(new FakeRateLimitWindow()))
       service.start({ fetchImmediately: false })
       await vi.advanceTimersByTimeAsync(1000)
-      expect(service.getState().claude?.session?.usedPercent).toBe(10)
+      expect((await service.getState()).claude?.session?.usedPercent).toBe(10)
 
       await vi.advanceTimersByTimeAsync(15 * 60 * 1000)
       expect(fetchActiveClaudeRateLimits).toHaveBeenCalledTimes(2)
-      expect(service.getState().claude?.session?.usedPercent).toBe(20)
+      expect((await service.getState()).claude?.session?.usedPercent).toBe(20)
 
       await vi.advanceTimersByTimeAsync(15 * 60 * 1000)
-      expect(service.getState().claude?.session?.usedPercent).toBe(30)
+      expect((await service.getState()).claude?.session?.usedPercent).toBe(30)
 
       service.stop()
     } finally {

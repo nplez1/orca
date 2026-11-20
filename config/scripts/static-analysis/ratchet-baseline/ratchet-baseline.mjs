@@ -194,31 +194,67 @@ function pruneCountOverlay(root, baselinePath, overlayPath, current) {
   return totalCount(pruned)
 }
 
-/**
- * Lowers baseline rows to `current` and keeps their notes; growth still has to be fixed in code.
- * With an existing overlay only the overlay is written; the base file is left as it is.
- */
+/** Files renamed since the change's base (ORCA_CODE_QUALITY_BASE, else the merge base with origin/main). */
+function renamedSinceBase(root) {
+  try {
+    const base =
+      process.env.ORCA_CODE_QUALITY_BASE ||
+      execFileSync('git', ['merge-base', 'HEAD', 'origin/main'], {
+        cwd: root,
+        encoding: 'utf8'
+      }).trim()
+    const fields = execFileSync(
+      'git',
+      ['diff', '-M', '--name-status', '-z', '--diff-filter=R', base],
+      {
+        cwd: root,
+        encoding: 'utf8'
+      }
+    )
+      .split('\0')
+      .filter(Boolean)
+    const renames = []
+    for (let index = 0; index + 2 < fields.length; index += 3) {
+      renames.push([fields[index + 1], fields[index + 2]])
+    }
+    return renames
+  } catch {
+    return []
+  }
+}
+
+/** Lowers baseline rows to `current` and keeps their notes; a renamed file keeps its row. Growth still needs a code fix.
+ *  With an existing overlay only the overlay is written; the base file is left as it is. */
 export function pruneCountBaseline(root, baselinePath, header, current, overlayPath = undefined) {
   if (overlayPath && fs.existsSync(path.join(root, overlayPath))) {
     return pruneCountOverlay(root, baselinePath, overlayPath, current)
   }
   const file = path.join(root, baselinePath)
   const text = readIfExists(file)
+  const baseline = parseCountBaseline(text)
+  const notes = parseCountNotes(text)
+  for (const [fromFile, toFile] of renamedSinceBase(root)) {
+    // Rows keyed `file:detail` move with their file too.
+    for (const from of [...baseline.keys()].filter(
+      (key) => key === fromFile || key.startsWith(`${fromFile}:`)
+    )) {
+      const to = `${toFile}${from.slice(fromFile.length)}`
+      if (!baseline.has(to) && !current.get(from)) {
+        baseline.set(to, baseline.get(from))
+        if (notes.has(from)) {
+          notes.set(to, notes.get(from))
+        }
+      }
+    }
+  }
   const pruned = new Map(
-    [...parseCountBaseline(text)].map(([rel, allowed]) => [
-      rel,
-      Math.min(allowed, current.get(rel) ?? 0)
-    ])
+    [...baseline].map(([rel, allowed]) => [rel, Math.min(allowed, current.get(rel) ?? 0)])
   )
-  fs.writeFileSync(file, formatCountBaseline(pruned, header, parseCountNotes(text)))
+  fs.writeFileSync(file, formatCountBaseline(pruned, header, notes))
   return totalCount(pruned)
 }
 
-/**
- * Gate for a count ratchet `{ name, baselinePath, overlayPath?, header, collect(root), fix, unit }`:
- * a file above its baseline fails with `fix`, one below it fails until pruned. `--prune` lowers
- * rows only.
- */
+// Count ratchet fails growth/shrinkage; --prune only lowers allowances, while growth needs a code fix.
 export function runCountRatchet(ratchet, root, arg) {
   const current = ratchet.collect(root)
   if (arg === '--prune') {
@@ -237,10 +273,18 @@ export function runCountRatchet(ratchet, root, arg) {
   const keep = (counts) => (inScope ? new Map([...counts].filter(([key]) => inScope(key))) : counts)
   const { grown, shrunk } = diffCounts(keep(current), keep(baseline))
   for (const { file, now, allowed } of grown) {
-    console.error(`${file}: ${now} ${ratchet.unit}, baseline allows ${allowed}.`)
+    const detail = ratchet.detail?.(file)
+    console.error(
+      `${file}: ${now} ${ratchet.unit}, baseline allows ${allowed}.${detail ? ` ${detail}` : ''}`
+    )
   }
   if (grown.length > 0) {
     console.error(ratchet.fix.join('\n'))
+    if (grown.some(({ allowed }) => allowed === 0) && shrunk.length > 0) {
+      console.error(
+        `A moved or renamed file keeps its allowance: ${ratchet.pruneCommand ?? `pnpm check:${ratchet.name}-ratchet --prune`} carries its row to the new path.`
+      )
+    }
   }
   for (const { file, now, allowed } of shrunk) {
     console.error(`${file}: now ${now}, baseline ${allowed}.`)

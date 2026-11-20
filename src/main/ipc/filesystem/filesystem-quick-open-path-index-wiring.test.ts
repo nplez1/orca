@@ -1,15 +1,15 @@
 import { EventEmitter } from 'node:events'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { handlers, resetFilesystemIpcMocks, store } from './filesystem-test-harness'
+import { handlers, resetFilesystemIpcMocks, store } from './testing/filesystem-test-harness'
 import type * as FilesystemAuth from './access/filesystem-auth'
 import type * as WorkspacePathIndexRuntime from '../../workspace-path-index/workspace-path-index-runtime'
 import { createCompleteWorkspacePathSearchResponse } from '../../../shared/workspace-path-search-response'
 import type { WorkspacePathIndexEnsureArgs } from '../../workspace-path-index/workspace-path-index-ensure'
 import { WorkspacePathIndexService } from '../../workspace-path-index/workspace-path-index-service'
-import { createSenderScopedRequestCancellations } from '../sender-scoped-request-cancellation'
+import { createSenderScopedRequestCancellations } from '../renderer-requests/sender-scoped-request-cancellation'
 import { WORKSPACE_PATH_INDEX_DISABLE_ENV } from '../../workspace-path-index/workspace-path-index-feature-switch'
 import { createFilesystemHandlerContext } from './filesystem-handler-context'
-import { registerFilesystemSearchHandlers } from './filesystem-search-handlers'
+import { registerFilesystemSearchHandlers } from './search/filesystem-search-handlers'
 
 const listFilesMock = vi.hoisted(() => ({ listQuickOpenFiles: vi.fn(async () => ['src/app.ts']) }))
 const pathSearchMock = vi.hoisted(() => ({
@@ -42,9 +42,9 @@ const pathIndexMock = vi.hoisted(() => {
   }
 })
 
-vi.mock('electron', async () => (await import('./filesystem-test-harness')).electronMock)
-vi.mock('./filesystem-list-files', () => listFilesMock)
-vi.mock('./filesystem-search-file-paths', () => pathSearchMock)
+vi.mock('electron', async () => (await import('./testing/filesystem-test-harness')).electronMock)
+vi.mock('./search/filesystem-list-files', () => listFilesMock)
+vi.mock('./search/filesystem-search-file-paths', () => pathSearchMock)
 vi.mock('./access/filesystem-auth.ts', async (importOriginal) => ({
   ...(await importOriginal<typeof FilesystemAuth>()),
   resolveAuthorizedPath: authMock.resolveAuthorizedPath
