@@ -1,0 +1,95 @@
+import { LayoutDashboard } from 'lucide-react'
+import { useAppStore } from '@/store/index'
+import { cn } from '@/lib/class-names'
+import { AgentQuestionIcon } from '@/components/agent/status/AgentQuestionIcon'
+import {
+  DASHBOARD_BUCKET_ORDER,
+  type DashboardBucket
+} from '../../../../../shared/agent-status/presentation/dashboard-snapshot'
+import { useAgentBucketCounts } from '@/components/dashboard/bucket-counts/useAgentBucketCounts'
+import { translate } from '@/i18n/i18n'
+import { useTranslate, type Translate } from '@/i18n/use-translate'
+
+const DASHBOARD_BUCKET_DOT_CLASS: Record<'working' | 'done' | 'idle', string> = {
+  working: 'bg-yellow-500',
+  done: 'bg-emerald-500',
+  idle: 'bg-neutral-500/50'
+}
+
+function dashboardBucketLabel(bucket: DashboardBucket, t: Translate = translate): string {
+  switch (bucket) {
+    case 'attention':
+      return t('dashboardPopout.bucket.attention', 'Needs You')
+    case 'working':
+      return t('dashboardPopout.bucket.working', 'Working')
+    case 'done':
+      return t('dashboardPopout.bucket.done', 'Done')
+    case 'idle':
+      return t('dashboardPopout.bucket.idle', 'Idle')
+  }
+}
+
+function DashboardBucketCounts({
+  counts,
+  showIdle
+}: {
+  counts: Record<DashboardBucket, number>
+  showIdle: boolean
+}): React.JSX.Element | null {
+  const t = useTranslate()
+  const active = DASHBOARD_BUCKET_ORDER.filter(
+    (bucket) => counts[bucket] > 0 && (bucket !== 'idle' || showIdle)
+  )
+  if (active.length === 0) {
+    return null
+  }
+  return (
+    <span className="flex items-center gap-1.5">
+      {active.map((bucket) => (
+        <span
+          key={bucket}
+          aria-label={`${dashboardBucketLabel(bucket, t)}: ${counts[bucket]}`}
+          className="inline-flex items-center gap-1 text-[10px] tabular-nums text-worktree-sidebar-foreground/55"
+        >
+          {bucket === 'attention' ? (
+            <AgentQuestionIcon className="size-2.5" />
+          ) : (
+            <span className={cn('size-1.5 rounded-full', DASHBOARD_BUCKET_DOT_CLASS[bucket])} />
+          )}
+          {counts[bucket]}
+        </span>
+      ))}
+    </span>
+  )
+}
+
+export default function AgentDashboardSidebarEntry(): React.JSX.Element {
+  const t = useTranslate()
+  const dashboardBucketCounts = useAgentBucketCounts()
+  const showIdle = useAppStore((s) => s.settings?.experimentalAgentDashboardShowIdle === true)
+  const openAgentDashboardPage = useAppStore((s) => s.openAgentDashboardPage)
+  const active = useAppStore((s) => s.activeView === 'dashboard')
+
+  return (
+    <button
+      type="button"
+      data-contextual-tour-target="agents-sidebar"
+      aria-current={active ? 'page' : undefined}
+      data-current={active ? 'true' : undefined}
+      onClick={openAgentDashboardPage}
+      className={cn(
+        'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] font-medium tracking-tight transition-colors',
+        active
+          ? 'bg-worktree-sidebar-accent text-worktree-sidebar-accent-foreground'
+          : 'text-worktree-sidebar-foreground/60 hover:bg-worktree-sidebar-foreground/8'
+      )}
+    >
+      <LayoutDashboard
+        className={cn('size-4 shrink-0', !active && 'text-worktree-sidebar-foreground/30')}
+        strokeWidth={active ? 2.25 : 1.75}
+      />
+      <span className="flex-1">{t('dashboard.sidebar.dashboardLabel', 'Agent Dashboard')}</span>
+      <DashboardBucketCounts counts={dashboardBucketCounts} showIdle={showIdle} />
+    </button>
+  )
+}

@@ -15,11 +15,11 @@ export type FireworksCredentialsStatus = {
   accountIdOverride: string | null
 }
 
-function getFireworksCredentialsStatus(): FireworksCredentialsStatus {
-  const apiKeyConfigured = hasFireworksCredentials()
+async function getFireworksCredentialsStatus(): Promise<FireworksCredentialsStatus> {
+  const apiKeyConfigured = await hasFireworksCredentials()
   let accountIdOverride: string | null = null
   try {
-    accountIdOverride = readFireworksCredentials()?.accountIdOverride ?? null
+    accountIdOverride = (await readFireworksCredentials())?.accountIdOverride ?? null
   } catch (error) {
     // Why: an undecryptable file must not break the whole Accounts pane; the
     // status call only exists to seed the form's draft fields.
@@ -49,7 +49,7 @@ export function registerFireworksCredentialsHandlers(rateLimits: RateLimitServic
   ipcMain.handle('fireworksCredentials:getStatus', () => getFireworksCredentialsStatus())
   ipcMain.handle(
     'fireworksCredentials:save',
-    (_event, apiKey: string, accountIdOverride: unknown) => {
+    async (_event, apiKey: string, accountIdOverride: unknown) => {
       if (
         typeof apiKey !== 'string' ||
         (accountIdOverride !== null &&
@@ -64,21 +64,24 @@ export function registerFireworksCredentialsHandlers(rateLimits: RateLimitServic
       // therefore means "keep the stored one" once credentials exist.
       let nextApiKey = apiKey.trim()
       if (!nextApiKey) {
-        nextApiKey = readFireworksCredentials()?.apiKey.trim() ?? ''
+        nextApiKey = (await readFireworksCredentials())?.apiKey.trim() ?? ''
       }
       if (!nextApiKey) {
         throw new Error('Fireworks API key is required')
       }
-      saveFireworksCredentials({ apiKey: nextApiKey, accountIdOverride: trimmedOverride || null })
+      await saveFireworksCredentials({
+        apiKey: nextApiKey,
+        accountIdOverride: trimmedOverride || null
+      })
       noteReplicatedCredentialChanged()
       refreshAfterFireworksCredentialChange(rateLimits, 'save')
-      return getFireworksCredentialsStatus()
+      return await getFireworksCredentialsStatus()
     }
   )
-  ipcMain.handle('fireworksCredentials:clear', () => {
-    clearFireworksCredentials()
+  ipcMain.handle('fireworksCredentials:clear', async () => {
+    await clearFireworksCredentials()
     noteReplicatedCredentialChanged()
     refreshAfterFireworksCredentialChange(rateLimits, 'clear')
-    return getFireworksCredentialsStatus()
+    return await getFireworksCredentialsStatus()
   })
 }

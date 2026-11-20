@@ -76,7 +76,9 @@ export async function openSessionSearchIndexerHarness(
     claudeProjectDir: join(roots.claudeProjectsDir, 'project'),
     read: (query) => withConnection(databasePath, true, query),
     write: (query) => withConnection(databasePath, false, query),
-    cleanup: () => rm(root, { recursive: true, force: true })
+    // Why retries: a spawned scanner child can still be writing under `root` when teardown runs, and
+    // Node reports that race as ENOTEMPTY rather than a busy directory.
+    cleanup: () => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }
 }
 

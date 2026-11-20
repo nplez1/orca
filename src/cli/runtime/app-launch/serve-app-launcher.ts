@@ -3,7 +3,7 @@ import { delimiter, dirname, isAbsolute, join, relative } from 'node:path'
 import {
   getOrcaCliCommandNameForPlatform,
   getRelayCliCommandNameForPlatform
-} from '../../../shared/orca-cli-command-name'
+} from '../../../shared/cli/orca-cli-command-name'
 import { RuntimeClientError } from '../connection/types'
 import { resolveLaunchUserDataPath } from '../profile/launch-user-data-path'
 import { appImageEphemeralRootOf } from '../../../shared/desktop-distribution/appimage/appimage-ephemeral-root'

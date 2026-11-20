@@ -1,4 +1,7 @@
-import { parseExecutionHostId, type ExecutionHostId } from '../../../shared/execution-host'
+import {
+  parseExecutionHostId,
+  type ExecutionHostId
+} from '../../../shared/execution-host/execution-host'
 import type { ExecutionHostRegistryEntry } from '../../../shared/execution-host/execution-host-registry-entry'
 import { isHostLocalProjectId } from '../../../shared/project/host-setup/project-host-setup-projection'
 import {

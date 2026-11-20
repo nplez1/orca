@@ -1,5 +1,6 @@
 import type { Page } from '@stablyai/playwright-test'
-import { test, expect } from './helpers/orca-app'
+import { expect } from '@stablyai/playwright-test'
+import { test } from './desktop/electron-fixtures/orca-app'
 
 // Why mirrors FLOATING_TERMINAL_WORKTREE_ID in src/shared/constants.ts.
 // E2E specs avoid importing renderer/shared modules into the Playwright runner.

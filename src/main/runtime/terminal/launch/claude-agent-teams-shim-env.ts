@@ -13,7 +13,7 @@ import {
   hasAppEnvironment
 } from '../../../../shared/app-lifecycle/app-environment'
 import { HOME_DIRECTORY_NAME } from '../../../../shared/app-directory-names'
-import { getOrcaCliCommandNameForPlatform } from '../../../../shared/orca-cli-command-name'
+import { getOrcaCliCommandNameForPlatform } from '../../../../shared/cli/orca-cli-command-name'
 import { getBundledLauncherPath } from '../../../cli/packaged-assets/bundled-cli-launcher-path'
 import { resolvePathEnvKey } from '../../../pty/environment/windows-path-segment-merge'
 

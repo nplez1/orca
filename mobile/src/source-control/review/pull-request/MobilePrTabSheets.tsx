@@ -95,6 +95,8 @@ function PrMergeSheet({ tab, request }: { tab: MobilePrTab; request: PrTabSheetR
   const settings = data?.pr.mergeMethodSettings ?? null
   const { defaultMethod, methods } = resolveGitHubPRMergeMethods(settings)
   const [method, setMethod] = useState<GitHubPRMergeMethod>(defaultMethod)
+  // Merge the head the sheet opened on; a push read while it is up must not be merged unseen.
+  const [reviewedHeadSha] = useState(data?.pr.headSha ?? null)
   const [submitted, setSubmitted] = useState(false)
   const [bypassConfirmed, setBypassConfirmed] = useState(false)
   if (!data) {
@@ -118,7 +120,9 @@ function PrMergeSheet({ tab, request }: { tab: MobilePrTab; request: PrTabSheetR
       return
     }
     setSubmitted(true)
-    if (await tab.actions.merge(method, adminBypassRequired)) {
+    // The engine takes one second argument, so a merge that waives branch protection names the bypass
+    // and every other merge keeps the head fence.
+    if (await tab.actions.merge(method, adminBypassRequired ? true : reviewedHeadSha)) {
       tab.closeSheetIf(request)
     }
   }

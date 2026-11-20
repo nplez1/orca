@@ -1,7 +1,7 @@
-import { normalizeRelativePath } from '../../../../shared/cross-platform-path'
+import { normalizeRelativePath } from '../../../../shared/file-access/cross-platform-path'
 import { pathMatchesFileNameFilterTokens } from '../../../../shared/file-listing/file-name-filter-tokens'
 import { isDotfileRelativePath } from './file-explorer/tree/file-explorer-entries'
-import { isPathIgnored } from '../../lib/source-control/paths/git-path-decoration'
+import { isPathIgnored } from '../../../../shared/git/status/git-path-decoration'
 import type { FileExplorerNameFilterProjectionSource } from './file-explorer-name-filter-policy'
 
 export type AcceptedNameFilterPath = {

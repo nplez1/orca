@@ -139,7 +139,7 @@ describe('RateLimitService Fireworks usage', () => {
       apiKey: 'fw-api-key-1234',
       accountIdOverride: null
     }))
-    vi.mocked(hasFireworksCredentials).mockReturnValue(true)
+    vi.mocked(hasFireworksCredentials).mockResolvedValue(true)
     vi.mocked(fetchFireworksRateLimits).mockResolvedValueOnce(creditsProvider('fireworks', 'spend'))
 
     await service.refresh()
@@ -151,7 +151,7 @@ describe('RateLimitService Fireworks usage', () => {
       signal: expect.any(AbortSignal)
     })
 
-    const state = service.getState()
+    const state = await service.getState()
     expect(state.fireworks?.status).toBe('ok')
     expect(state.fireworks?.provider).toBe('fireworks')
     expect(state.fireworks?.credits).toEqual({
@@ -162,12 +162,12 @@ describe('RateLimitService Fireworks usage', () => {
     expect(state.fireworksApiKeyConfigured).toBe(true)
   })
 
-  it('reports fireworksApiKeyConfigured from the credentials store even without a resolver', () => {
+  it('reports fireworksApiKeyConfigured from the credentials store even without a resolver', async () => {
     const service = new RateLimitService()
-    vi.mocked(hasFireworksCredentials).mockReturnValue(true)
+    vi.mocked(hasFireworksCredentials).mockResolvedValue(true)
 
-    expect(service.getState().fireworksApiKeyConfigured).toBe(true)
-    expect(service.getState().fireworks).toBeNull()
+    expect((await service.getState()).fireworksApiKeyConfigured).toBe(true)
+    expect((await service.getState()).fireworks).toBeNull()
   })
 
   it('keeps the credits-only spend visible through a transient failure', async () => {
@@ -181,11 +181,11 @@ describe('RateLimitService Fireworks usage', () => {
       .mockRejectedValueOnce(new Error('Fireworks billing request failed: network timeout'))
 
     await service.refresh()
-    expect(service.getState().fireworks?.credits?.amount.units).toBe('42')
+    expect((await service.getState()).fireworks?.credits?.amount.units).toBe('42')
 
     await service.refresh()
 
-    const state = service.getState()
+    const state = await service.getState()
     // Why: billed spend has no quota window for the stale policy to test, so a
     // regression here blanks the status bar on any single transient error.
     expect(state.fireworks?.status).toBe('error')
@@ -206,7 +206,7 @@ describe('RateLimitService Fireworks usage', () => {
 
     await service.refresh()
 
-    const state = service.getState()
+    const state = await service.getState()
     expect(fetchFireworksRateLimits).not.toHaveBeenCalled()
     expect(state.fireworks?.status).toBe('error')
     expect(state.fireworks?.error).toBe('Fireworks credentials could not be decrypted')
@@ -226,14 +226,15 @@ describe('RateLimitService Fireworks usage', () => {
       .mockImplementationOnce(() => pending.promise)
 
     await service.refresh()
-    expect(service.getState().fireworks?.credits?.amount.units).toBe('42')
+    expect((await service.getState()).fireworks?.credits?.amount.units).toBe('42')
 
     apiKey = 'fw-api-key-account-b'
     const secondRefresh = service.refresh()
-    await flushMicrotasks()
+    // Why 12: the fork resolvers are async, so a cycle needs more ticks to reach its generation stamps.
+    await flushMicrotasks(12)
 
     // Why: a new key must not keep showing the previous account's spend while its fetch is in flight.
-    const pendingState = service.getState()
+    const pendingState = await service.getState()
     expect(pendingState.fireworks?.status).toBe('fetching')
     expect(pendingState.fireworks?.credits).toBeUndefined()
     expect(fetchFireworksRateLimits).toHaveBeenLastCalledWith({
@@ -245,7 +246,7 @@ describe('RateLimitService Fireworks usage', () => {
     pending.resolve(creditsProvider('fireworks', 'spend'))
     await secondRefresh
 
-    const state = service.getState()
+    const state = await service.getState()
     expect(fetchFireworksRateLimits).toHaveBeenCalledTimes(2)
     expect(state.fireworks?.status).toBe('ok')
     expect(state.fireworks?.credits?.amount.units).toBe('42')
@@ -261,14 +262,14 @@ describe('RateLimitService Fireworks usage', () => {
       .mockImplementationOnce(() => pending.promise)
 
     await service.refresh()
-    expect(service.getState().fireworks?.credits?.amount.units).toBe('42')
+    expect((await service.getState()).fireworks?.credits?.amount.units).toBe('42')
 
     // Why: same API key, but the config hash covers the override, so the old account's spend must not linger.
     accountIdOverride = 'acct-42'
     const secondRefresh = service.refresh()
-    await flushMicrotasks()
+    await flushMicrotasks(12)
 
-    const pendingState = service.getState()
+    const pendingState = await service.getState()
     expect(pendingState.fireworks?.status).toBe('fetching')
     expect(pendingState.fireworks?.credits).toBeUndefined()
     expect(fetchFireworksRateLimits).toHaveBeenLastCalledWith({
@@ -281,7 +282,7 @@ describe('RateLimitService Fireworks usage', () => {
     await secondRefresh
 
     expect(fetchFireworksRateLimits).toHaveBeenCalledTimes(2)
-    expect(service.getState().fireworks?.status).toBe('ok')
+    expect((await service.getState()).fireworks?.status).toBe('ok')
   })
 
   it('does not apply an in-flight Fireworks result after credential invalidation', async () => {
@@ -297,16 +298,16 @@ describe('RateLimitService Fireworks usage', () => {
       .mockImplementationOnce(() => secondFireworks.promise)
 
     const firstRefresh = service.refresh()
-    await flushMicrotasks()
+    await flushMicrotasks(12)
 
     service.invalidateFireworksCredentialState()
     const queuedRefresh = service.refresh()
-    await flushMicrotasks()
+    await flushMicrotasks(12)
 
     firstFireworks.resolve(creditsWithAmount('42'))
-    await flushMicrotasks()
+    await flushMicrotasks(12)
 
-    const staleState = service.getState()
+    const staleState = await service.getState()
     expect(staleState.fireworks?.status).toBe('fetching')
     expect(staleState.fireworks?.credits).toBeUndefined()
 
@@ -314,7 +315,7 @@ describe('RateLimitService Fireworks usage', () => {
     await firstRefresh
     await queuedRefresh
 
-    const state = service.getState()
+    const state = await service.getState()
     expect(fetchFireworksRateLimits).toHaveBeenCalledTimes(2)
     expect(state.fireworks?.status).toBe('ok')
     expect(state.fireworks?.credits?.amount.units).toBe('7')
@@ -329,11 +330,11 @@ describe('RateLimitService Fireworks usage', () => {
     vi.mocked(fetchFireworksRateLimits).mockResolvedValueOnce(creditsProvider('fireworks', 'spend'))
 
     await service.refresh()
-    expect(service.getState().fireworks?.status).toBe('ok')
+    expect((await service.getState()).fireworks?.status).toBe('ok')
 
     service.invalidateFireworksCredentialState()
 
-    const state = service.getState()
+    const state = await service.getState()
     expect(state.fireworks?.status).toBe('fetching')
     expect(state.fireworks?.session).toBeNull()
     expect(state.fireworks?.weekly).toBeNull()

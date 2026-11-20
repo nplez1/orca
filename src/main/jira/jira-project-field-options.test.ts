@@ -129,7 +129,7 @@ describe('readIssueProjectKey', () => {
     const { readIssueProjectKey } = await import('./jira-project-field-options')
 
     await expect(readIssueProjectKey(entry, 'APP-1')).rejects.toThrow('401')
-    expect(clearTokenMock).toHaveBeenCalledWith('site-1')
+    expect(clearTokenMock).toHaveBeenCalledWith(entry)
   })
 })
 
@@ -216,7 +216,7 @@ describe('readProjectFieldOptions', () => {
     const { readProjectFieldOptions } = await import('./jira-project-field-options')
 
     await expect(readProjectFieldOptions(entry, 'APP', [COMPONENTS])).rejects.toThrow('401')
-    expect(clearTokenMock).toHaveBeenCalledWith('site-1')
+    expect(clearTokenMock).toHaveBeenCalledWith(entry)
   })
 
   it('encodes a project key that came from an issue key', async () => {

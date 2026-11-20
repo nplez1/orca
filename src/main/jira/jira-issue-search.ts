@@ -59,7 +59,7 @@ async function runPerSite<T>(
           }
           const authFailure = isAuthError(error)
           if (authFailure) {
-            clearToken(entry.site.id)
+            await clearToken(entry)
           }
           if (surfaceSiteFailure) {
             throw toIssueSearchFailureError(error)
@@ -83,11 +83,11 @@ async function runPerSite<T>(
   return results
 }
 
-function resolveEntries(
+async function resolveEntries(
   siteId: JiraSiteSelection | null | undefined,
   strict: boolean
-): JiraClientForSite[] {
-  const entries = getClients(siteId)
+): Promise<JiraClientForSite[]> {
+  const entries = await getClients(siteId)
   requireStrictJiraSite(entries, siteId, strict)
   return entries
 }
@@ -141,7 +141,7 @@ async function runIssueSearch(
   signal?: AbortSignal,
   strict = false
 ): Promise<JiraIssue[]> {
-  const entries = resolveEntries(siteId, strict)
+  const entries = await resolveEntries(siteId, strict)
   if (entries.length === 0 || ('jql' in query && !query.jql)) {
     return []
   }
@@ -168,7 +168,7 @@ async function runIssuePageSearch(
   cursor?: JiraIssuePageCursor
 ): Promise<JiraIssueSearchPage> {
   const empty: JiraIssueSearchPage = { issues: [], hasMore: false, total: null, continuation: null }
-  const entries = resolveEntries(siteId, strict)
+  const entries = await resolveEntries(siteId, strict)
   if (entries.length === 0 || ('jql' in query && !query.jql)) {
     return empty
   }

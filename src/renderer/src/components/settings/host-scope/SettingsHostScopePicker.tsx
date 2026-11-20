@@ -4,8 +4,8 @@ import {
   getLocalExecutionHostLabel,
   parseExecutionHostId,
   type ExecutionHostId
-} from '../../../../../shared/execution-host'
-import { translateLocalExecutionHostLabel } from '../../sidebar/execution-host-label'
+} from '../../../../../shared/execution-host/execution-host'
+import { translateLocalExecutionHostLabel } from '../../../runtime/hosts/display/execution-host-label'
 import {
   SettingsSearchableSelect,
   type SettingsSearchableSelectGroup,

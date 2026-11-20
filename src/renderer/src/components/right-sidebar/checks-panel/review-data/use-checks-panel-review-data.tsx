@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react'
-import { getRepoExecutionHostId } from '../../../../../../shared/execution-host'
+import { getRepoExecutionHostId } from '../../../../../../shared/execution-host/execution-host'
 import { checksPanelAsyncResultKey } from '../refresh/checks-panel-async-result-key'
 import { loadGitLabJobLogDetails } from '@/runtime/repository-gitlab/gitlab-job-trace-client'
 import { checksPanelLoadErrorMessage } from './checks-panel-forge-owner'

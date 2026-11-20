@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAppStore } from '@/store'
-import { useNow } from '@/hooks/use-now'
+import { useNow } from '@/lib/window-activity/use-now'
 import { isFolderRepo } from '../../../../../../shared/repository/repo-kind'
 import { getGitHubPRCacheKey } from '../../../../../../shared/github/cache/github-cache-key'
 import { getHostedReviewCacheKey } from '@/store/slices/hosted-review/hosted-review-cache-identity'

@@ -66,12 +66,8 @@ node -e 'console.log(JSON.stringify({
         )
 
         const result = await execFileAsync(launcherPath, ['--help', 'two words'], {
-          env: {
-            ...process.env,
-            ELECTRON_RUN_AS_NODE: '0',
-            NODE_OPTIONS: '--trace-warnings',
-            NODE_REPL_EXTERNAL_MODULE: 'external-loader'
-          }
+          // A session's own CLI hands off first (its own suite covers that hop); this asserts argv.
+          env: launcherChildEnv()
         })
         const payload = JSON.parse(result.stdout) as {
           argv: string[]
@@ -95,3 +91,17 @@ node -e 'console.log(JSON.stringify({
     }
   )
 })
+
+function launcherChildEnv(): NodeJS.ProcessEnv {
+  const env = Object.fromEntries(
+    Object.entries(process.env).filter(
+      ([key]) => key !== 'ORCA_CLI_COMMAND' && key !== 'ORCA_CLI_HANDOFF'
+    )
+  )
+  return {
+    ...env,
+    ELECTRON_RUN_AS_NODE: '0',
+    NODE_OPTIONS: '--trace-warnings',
+    NODE_REPL_EXTERNAL_MODULE: 'external-loader'
+  }
+}

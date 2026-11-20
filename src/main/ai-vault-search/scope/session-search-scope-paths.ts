@@ -4,18 +4,21 @@ import {
   isRuntimePathAbsolute,
   normalizeRuntimePathForComparison,
   resolveRuntimePath
-} from '../../../shared/cross-platform-path'
+} from '../../../shared/file-access/cross-platform-path'
 import { isFolderRepo } from '../../../shared/repository/repo-kind'
 import {
   isProjectFolderLayout,
   resolveWorktreeLayoutMode
-} from '../../../shared/orca-workspace-layout'
+} from '../../../shared/worktree/paths/orca-workspace-layout'
 import {
   isRuntimePathAbsoluteForRepo,
   resolveConfiguredWorktreeBasePaths
 } from '../../../shared/worktree/paths/configured-worktree-base-path'
 import { buildKnownOrcaWorkspaceLayouts } from '../../../shared/worktree/visibility/ownership'
-import { resolveNestedRepoContainerName, resolveProjectFolderName } from '../../ipc/worktree-logic'
+import {
+  resolveNestedRepoContainerName,
+  resolveProjectFolderName
+} from '../../ipc/worktrees/paths/worktree-logic'
 import type { SessionSearchScopeCatalog } from './session-search-scope-catalog'
 
 type ScopeRepo = SessionSearchScopeCatalog['repos'][number]

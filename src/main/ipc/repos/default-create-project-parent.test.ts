@@ -1,8 +1,8 @@
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { getDefaultSettings, getDefaultWorkspaceDir } from '../../../shared/constants'
-import type { GlobalSettings } from '../../../shared/global-settings-types'
-import { LOCAL_EXECUTION_HOST_ID } from '../../../shared/execution-host'
+import { getDefaultSettings, getDefaultWorkspaceDir } from '../../../shared/orca-profiles/constants'
+import type { GlobalSettings } from '../../../shared/settings/global-settings-types'
+import { LOCAL_EXECUTION_HOST_ID } from '../../../shared/execution-host/execution-host'
 import { resolveDefaultCreateProjectParent } from './default-create-project-parent'
 
 const HOME = '/home/me'

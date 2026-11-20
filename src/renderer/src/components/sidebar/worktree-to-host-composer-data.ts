@@ -1,11 +1,11 @@
-import { getWorktreeExecutionHostId } from '../../../../shared/execution-host'
+import { getWorktreeExecutionHostId } from '../../../../shared/execution-host/execution-host'
 import type { Repo } from '../../../../shared/repository/repo-types'
 import { isGitRepoKind } from '../../../../shared/repository/repo-kind'
 import { isHostLocalProjectId } from '../../../../shared/project/host-setup/project-host-setup-projection'
 import type { GitPushTarget, Worktree } from '../../../../shared/worktree/types'
 import { branchName } from '@/lib/source-control/branches/branch-name'
 import { resolveWorktreeBranchLabel } from '@/lib/workspace/display/worktree-default-display-name'
-import type { ComposerModalData } from '@/components/NewWorkspaceComposerModal'
+import type { ComposerModalData } from '@/components/new-workspace/composer/NewWorkspaceComposerModal'
 
 /** Where a branch is expected to live on a host that has not created a local copy of it. */
 const DEFAULT_BASE_REMOTE = 'origin'

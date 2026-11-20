@@ -4,6 +4,7 @@ import { act, cloneElement, isValidElement, type ReactElement, type ReactNode } 
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SetupHostOption } from '@/components/settings/repository/hosts/repository-host-setup-options'
+import { ConfirmationDialogContext } from '@/components/dismiss/confirmation/confirmation-dialog-context'
 import type { Repo } from '../../../../../../shared/repository/repo-types'
 import {
   RepoHeaderProjectActionsMenu,
@@ -91,16 +92,21 @@ function makeActions(): RepoHeaderProjectActions {
   }
 }
 
+// Why: the moved-project undo item needs the app's confirm, and no case here confirms anything.
+const declineConfirm = async (): Promise<boolean> => false
+
 function renderMenu(hostOptions: readonly SetupHostOption[]): void {
   addToHost.getAddToHostOptions.mockReturnValue(hostOptions)
   act(() => {
     root.render(
-      <RepoHeaderProjectActionsMenu
-        repo={repo}
-        label="Orca"
-        projectGroups={[]}
-        actions={makeActions()}
-      />
+      <ConfirmationDialogContext.Provider value={declineConfirm}>
+        <RepoHeaderProjectActionsMenu
+          repo={repo}
+          label="Orca"
+          projectGroups={[]}
+          actions={makeActions()}
+        />
+      </ConfirmationDialogContext.Provider>
     )
   })
 }

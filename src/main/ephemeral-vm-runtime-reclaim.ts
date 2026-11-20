@@ -3,8 +3,11 @@ import {
   decideEphemeralVmRuntimeReclaim,
   type EphemeralVmRuntimeReclaimed
 } from '../shared/ephemeral-vm-runtime-reclaim'
-import { toRuntimeExecutionHostId, toSshExecutionHostId } from '../shared/execution-host'
-import type { ExecutionHostId } from '../shared/execution-host'
+import {
+  toRuntimeExecutionHostId,
+  toSshExecutionHostId
+} from '../shared/execution-host/execution-host'
+import type { ExecutionHostId } from '../shared/execution-host/execution-host'
 import {
   listEphemeralVmRuntimes,
   updateEphemeralVmRuntimeStatus

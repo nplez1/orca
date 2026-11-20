@@ -2,8 +2,8 @@
 // visual proof. Same shape as tests/tools/omp-source-control-ui/fixture.tsx.
 import React from 'react'
 import { createRoot } from 'react-dom/client'
-import { getDefaultSettings } from '../../../src/shared/constants'
-import type { GlobalSettings } from '../../../src/shared/global-settings-types'
+import { getDefaultSettings } from '../../../src/shared/orca-profiles/constants'
+import type { GlobalSettings } from '../../../src/shared/settings/global-settings-types'
 import { AdvancedPane } from '../../../src/renderer/src/components/settings/advanced/AdvancedPane.tsx'
 import { TooltipProvider } from '../../../src/renderer/src/components/ui/tooltip'
 import { useAppStore } from '../../../src/renderer/src/store'

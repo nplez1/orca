@@ -1,7 +1,10 @@
 /* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's relocation-aware repo update rules ride upstream's update body, and splitting costs a permanent sync hunk. */
-import type { PersistedState } from '../../../shared/persisted-state-types'
+import type { PersistedState } from '../../../shared/orca-profiles/persisted-state-types'
 import type { Repo } from '../../../shared/repository/repo-types'
-import { type ExecutionHostId, getRepoExecutionHostId } from '../../../shared/execution-host'
+import {
+  type ExecutionHostId,
+  getRepoExecutionHostId
+} from '../../../shared/execution-host/execution-host'
 import type { RepoHostTarget } from '../../../shared/repository/repo-host-identity'
 
 import { isLegacyRepoForExternalWorktreeVisibility } from '../../../shared/worktree/visibility/external-worktree-visibility'
@@ -11,7 +14,7 @@ import { normalizeWorktreeVisibilitySourcePreferences } from '../../../shared/wo
 import type { GhAccountBinding } from '../../../shared/github/accounts/account-binding'
 import { invalidateGhAccountTokenCache } from '../../github/accounts/gh-account-token'
 import { sanitizeRepoUpdatesForPersistence } from './repo-sanitization'
-import { normalizeRuntimePathForComparison } from '../../../shared/cross-platform-path'
+import { normalizeRuntimePathForComparison } from '../../../shared/file-access/cross-platform-path'
 import { isFolderRepo } from '../../../shared/repository/repo-kind'
 import { findExtraFolderWorkspaceIds } from '../../workspaces/catalog/folder-workspace-meta-presence'
 

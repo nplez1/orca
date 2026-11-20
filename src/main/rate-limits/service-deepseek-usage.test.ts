@@ -136,7 +136,7 @@ describe('RateLimitService DeepSeek usage', () => {
   it('fetches the DeepSeek balance and stores it under the deepseek key', async () => {
     const service = new RateLimitService()
     service.setDeepSeekConfigResolver(() => ({ apiKey: 'sk-deepseek-balance-key' }))
-    vi.mocked(hasDeepSeekApiKey).mockReturnValue(true)
+    vi.mocked(hasDeepSeekApiKey).mockResolvedValue(true)
     vi.mocked(fetchDeepSeekRateLimits).mockResolvedValueOnce(creditsProvider('deepseek', 'balance'))
 
     await service.refresh()
@@ -147,7 +147,7 @@ describe('RateLimitService DeepSeek usage', () => {
       signal: expect.any(AbortSignal)
     })
 
-    const state = service.getState()
+    const state = await service.getState()
     expect(state.deepseek?.status).toBe('ok')
     expect(state.deepseek?.provider).toBe('deepseek')
     expect(state.deepseek?.credits).toEqual({
@@ -157,12 +157,12 @@ describe('RateLimitService DeepSeek usage', () => {
     expect(state.deepseekApiKeyConfigured).toBe(true)
   })
 
-  it('reports deepseekApiKeyConfigured from the key store even without a resolver', () => {
+  it('reports deepseekApiKeyConfigured from the key store even without a resolver', async () => {
     const service = new RateLimitService()
-    vi.mocked(hasDeepSeekApiKey).mockReturnValue(true)
+    vi.mocked(hasDeepSeekApiKey).mockResolvedValue(true)
 
-    expect(service.getState().deepseekApiKeyConfigured).toBe(true)
-    expect(service.getState().deepseek).toBeNull()
+    expect((await service.getState()).deepseekApiKeyConfigured).toBe(true)
+    expect((await service.getState()).deepseek).toBeNull()
   })
 
   it('keeps the credits-only balance visible through a transient failure', async () => {
@@ -173,11 +173,11 @@ describe('RateLimitService DeepSeek usage', () => {
       .mockRejectedValueOnce(new Error('DeepSeek balance request failed: network timeout'))
 
     await service.refresh()
-    expect(service.getState().deepseek?.credits?.amount.units).toBe('42')
+    expect((await service.getState()).deepseek?.credits?.amount.units).toBe('42')
 
     await service.refresh()
 
-    const state = service.getState()
+    const state = await service.getState()
     // Why: a balance has no quota window for the stale policy to test, so a
     // regression here blanks the status bar on any single transient error.
     expect(state.deepseek?.status).toBe('error')
@@ -197,7 +197,7 @@ describe('RateLimitService DeepSeek usage', () => {
 
     await service.refresh()
 
-    const state = service.getState()
+    const state = await service.getState()
     expect(fetchDeepSeekRateLimits).not.toHaveBeenCalled()
     expect(state.deepseek?.status).toBe('error')
     expect(state.deepseek?.error).toBe('DeepSeek API key could not be decrypted')
@@ -217,14 +217,15 @@ describe('RateLimitService DeepSeek usage', () => {
       .mockImplementationOnce(() => pending.promise)
 
     await service.refresh()
-    expect(service.getState().deepseek?.credits?.amount.units).toBe('42')
+    expect((await service.getState()).deepseek?.credits?.amount.units).toBe('42')
 
     apiKey = 'sk-deepseek-account-b'
     const secondRefresh = service.refresh()
-    await flushMicrotasks()
+    // Why 12: the fork resolvers are async, so a cycle needs more ticks to reach its generation stamps.
+    await flushMicrotasks(12)
 
     // Why: a new key must not keep showing the previous account's balance while its fetch is in flight.
-    const pendingState = service.getState()
+    const pendingState = await service.getState()
     expect(pendingState.deepseek?.status).toBe('fetching')
     expect(pendingState.deepseek?.credits).toBeUndefined()
     expect(fetchDeepSeekRateLimits).toHaveBeenLastCalledWith({
@@ -235,7 +236,7 @@ describe('RateLimitService DeepSeek usage', () => {
     pending.resolve(creditsProvider('deepseek', 'balance'))
     await secondRefresh
 
-    const state = service.getState()
+    const state = await service.getState()
     expect(fetchDeepSeekRateLimits).toHaveBeenCalledTimes(2)
     expect(state.deepseek?.status).toBe('ok')
     expect(state.deepseek?.credits?.amount.units).toBe('42')
@@ -251,16 +252,16 @@ describe('RateLimitService DeepSeek usage', () => {
       .mockImplementationOnce(() => secondDeepSeek.promise)
 
     const firstRefresh = service.refresh()
-    await flushMicrotasks()
+    await flushMicrotasks(12)
 
     service.invalidateDeepSeekCredentialState()
     const queuedRefresh = service.refresh()
-    await flushMicrotasks()
+    await flushMicrotasks(12)
 
     firstDeepSeek.resolve(creditsWithAmount('42'))
-    await flushMicrotasks()
+    await flushMicrotasks(12)
 
-    const staleState = service.getState()
+    const staleState = await service.getState()
     expect(staleState.deepseek?.status).toBe('fetching')
     expect(staleState.deepseek?.credits).toBeUndefined()
 
@@ -268,7 +269,7 @@ describe('RateLimitService DeepSeek usage', () => {
     await firstRefresh
     await queuedRefresh
 
-    const state = service.getState()
+    const state = await service.getState()
     expect(fetchDeepSeekRateLimits).toHaveBeenCalledTimes(2)
     expect(state.deepseek?.status).toBe('ok')
     expect(state.deepseek?.credits?.amount.units).toBe('7')
@@ -280,11 +281,11 @@ describe('RateLimitService DeepSeek usage', () => {
     vi.mocked(fetchDeepSeekRateLimits).mockResolvedValueOnce(creditsProvider('deepseek', 'balance'))
 
     await service.refresh()
-    expect(service.getState().deepseek?.status).toBe('ok')
+    expect((await service.getState()).deepseek?.status).toBe('ok')
 
     service.invalidateDeepSeekCredentialState()
 
-    const state = service.getState()
+    const state = await service.getState()
     expect(state.deepseek?.status).toBe('fetching')
     expect(state.deepseek?.session).toBeNull()
     expect(state.deepseek?.weekly).toBeNull()

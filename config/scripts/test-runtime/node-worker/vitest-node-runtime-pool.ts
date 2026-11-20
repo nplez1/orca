@@ -73,10 +73,11 @@ class NodeRuntimeWorker implements PoolWorker {
   }
 
   deserialize(data: unknown): unknown {
-    if (typeof data !== 'string') {
-      throw new Error('Invalid Node Vitest worker message')
-    }
-    return decodeNodeRuntimeMessage(data)
+    // Why pass-through instead of throwing: a suite that doubles `process.send` (the scanner-service
+    // parent exchange does) also intercepts Vitest's own console RPC on that channel, so a message this
+    // pool never encoded can arrive. Rejecting it killed the worker at teardown for a reason the test
+    // could not report; handing it back unchanged lets Vitest route the message it sent.
+    return typeof data === 'string' ? decodeNodeRuntimeMessage(data) : data
   }
 
   async stop(): Promise<void> {

@@ -5,7 +5,7 @@ import {
   type WindowsTreeKillTarget
 } from './windows-pty-root-identity'
 import type { ProcessTableRow } from './pty-process-table-parser'
-import { parseUtcLstart } from '../../../shared/ps-lstart-time'
+import { parsePsStartTime } from '../../../shared/ps-lstart-time'
 import {
   DESCENDANT_SNAPSHOT_TIMEOUT_MS,
   readFreshProcessTable,
@@ -122,6 +122,10 @@ export function collectDescendantRows(
   // After root exit, descendants reparent; remaining rows with its old PID as parent may reflect PID reuse.
   if (!rootRow || duplicateRoot) {
     return { rootPgid: null, descendants: [], capturedAtMs }
+  }
+  if (rootRow.zombie) {
+    // Its PID still reserves the group, but an exited root cannot authorize ancestry.
+    return { rootPgid: rootRow.pgid, descendants: [], capturedAtMs }
   }
   const descendants: ProcessTableRow[] = []
   const queue = [rootPid]
@@ -263,7 +267,7 @@ export function hasUnambiguousStartIdentity(row: ProcessTableRow, capturedAtMs: 
 }
 
 export function hasUnambiguousStartTime(startedAt: string, capturedAtMs: number): boolean {
-  const startedAtMs = parseUtcLstart(startedAt)
+  const startedAtMs = parsePsStartTime(startedAt)
   if (!Number.isFinite(startedAtMs)) {
     return false
   }

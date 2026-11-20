@@ -2,11 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AiVaultSession } from '../../../../shared/ai-vault/contracts/ai-vault-types'
 
 const callRuntimeResult = vi.hoisted(() => vi.fn())
-vi.mock('./web-runtime-calls', () => ({ callRuntimeResult }))
-vi.mock('./web-runtime-session', () => ({
+vi.mock('../runtime/client/web-runtime-calls', () => ({ callRuntimeResult }))
+vi.mock('../runtime/client/web-runtime-session', () => ({
   requireActiveEnvironment: () => ({ id: 'owning-host' })
 }))
-import { createWebAiVaultApi } from './web-ai-vault-api'
+import { createWebAiVaultApi } from './agents/web-ai-vault-api'
 import { resetBrowserAiVaultListSyncForTests } from './web-ai-vault-list-sync'
 
 const SCANNED_AT = '2026-07-27T00:00:00.000Z'

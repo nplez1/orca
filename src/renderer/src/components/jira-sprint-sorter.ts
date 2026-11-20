@@ -1,5 +1,5 @@
 import type { JiraSprint } from '../../../shared/jira/jira-types'
-import { compareNumericLocaleText } from '../../../shared/locale-text-collators'
+import { compareNumericLocaleText } from '../../../shared/i18n/locale-text-collators'
 
 /**
  * Orders sprints for a picker: the issue's current sprint, then active ones, then the

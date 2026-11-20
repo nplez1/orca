@@ -1,13 +1,16 @@
 import React, { useEffect, useId, useRef, useState } from 'react'
 import { FolderOpen, RotateCcw } from 'lucide-react'
-import type { GlobalSettings } from '../../../../../shared/global-settings-types'
+import type { GlobalSettings } from '../../../../../shared/settings/global-settings-types'
 import {
   clearHostSettingOverrideForIds,
   getHostSettingOverrideForIds,
   setHostSettingOverrideForIds,
   type HostSettingOverrideKey
 } from '../../../../../shared/execution-host/host-setting-overrides'
-import { LOCAL_EXECUTION_HOST_ID, parseExecutionHostId } from '../../../../../shared/execution-host'
+import {
+  LOCAL_EXECUTION_HOST_ID,
+  parseExecutionHostId
+} from '../../../../../shared/execution-host/execution-host'
 import { normalizeWorkspaceDirInput } from '../../../../../shared/worktree/paths/workspace-dir-input'
 import { isAbsoluteOrHomeFolderPath } from '@/lib/host-folder-path'
 import { isWindowsUserAgent } from '@/app-shell/platform/user-agent-platform'

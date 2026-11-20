@@ -1,6 +1,6 @@
 import type { StateCreator } from 'zustand'
 import type { AppState } from '../../types'
-import type { GlobalSettings } from '../../../../../shared/global-settings-types'
+import type { GlobalSettings } from '../../../../../shared/settings/global-settings-types'
 import { toast } from 'sonner'
 import {
   clearRuntimeCompatibilityCache,
@@ -23,8 +23,8 @@ import {
 } from './worktree-visibility-owner-settings'
 import * as ownerHydration from './settings-owner-hydration-publication'
 import { persistVisibilityAwareSettings } from './worktree-visibility-settings-write'
-import { getSettingsFocusedExecutionHostId } from '../../../../../shared/execution-host'
-import type { ExecutionHostId } from '../../../../../shared/execution-host'
+import { getSettingsFocusedExecutionHostId } from '../../../../../shared/execution-host/execution-host'
+import type { ExecutionHostId } from '../../../../../shared/execution-host/execution-host'
 import { handleSettingsWriteFailure, settingsWriteFailureHostName } from './settings-write-failure'
 import { normalizeSettingsUpdates } from './settings-update-normalization'
 
@@ -134,7 +134,8 @@ async function verifyRuntimeEnvironmentReachable(environmentId: string | null): 
   }
   const response = await window.api.runtimeEnvironments.getStatus({
     selector: environmentId,
-    timeoutMs: 15_000
+    timeoutMs: 15_000,
+    force: true
   })
   const status = unwrapRuntimeRpcResult<RuntimeStatus>(response)
   assertRuntimeStatusCompatible(status)

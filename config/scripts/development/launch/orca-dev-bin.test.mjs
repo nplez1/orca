@@ -30,12 +30,7 @@ describe('orca-dev package bin', () => {
         [path.join(root, 'config/scripts/development/launch/orca-dev.mjs'), '--help'],
         {
           cwd: path.dirname(root),
-          env: {
-            ...process.env,
-            ORCA_DEV_CLI_ENTRY_PATH: undefined,
-            ORCA_DEV_USER_DATA_PATH: userDataPath,
-            ORCA_APP_EXECUTABLE: path.join(root, 'Electron')
-          },
+          env: installedLocationEnv(root, userDataPath),
           encoding: 'utf8'
         }
       )
@@ -45,3 +40,18 @@ describe('orca-dev package bin', () => {
     }
   })
 })
+
+/** The launcher hands off to a session's own CLI first; that hop has its own suite, so clear it here. */
+function installedLocationEnv(root, userDataPath) {
+  const env = Object.fromEntries(
+    Object.entries(process.env).filter(
+      ([key]) => key !== 'ORCA_CLI_COMMAND' && key !== 'ORCA_CLI_HANDOFF'
+    )
+  )
+  delete env.ORCA_DEV_CLI_ENTRY_PATH
+  return {
+    ...env,
+    ORCA_DEV_USER_DATA_PATH: userDataPath,
+    ORCA_APP_EXECUTABLE: path.join(root, 'Electron')
+  }
+}

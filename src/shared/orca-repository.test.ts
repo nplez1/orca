@@ -35,11 +35,11 @@ describe('ORCA repository identity', () => {
 const PROJECT_LINK_SURFACES = [
   '../main/github/client/fetch/orca-star.ts',
   '../renderer/src/components/GitHubStarButton.tsx',
-  '../renderer/src/components/StarNagCard.tsx',
+  '../renderer/src/components/sidebar/chrome/help-menu-controller.tsx',
+  '../renderer/src/components/star-nag/StarNagCard.tsx',
   '../renderer/src/components/github-project/view/ProjectViewStates.tsx',
   '../renderer/src/components/settings/general/GeneralSupportSection.tsx',
   '../renderer/src/components/sidebar/sidebar-feedback/SidebarFeedbackDialog.tsx',
-  '../renderer/src/components/sidebar/SidebarSettingsHelpMenu.tsx',
   '../renderer/src/components/star-nag/StarNagToastHost.tsx',
   '../renderer/src/components/stats/ShareUsageButton.tsx',
   '../renderer/src/components/stats/share-card-utils.tsx',

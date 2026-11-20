@@ -1,14 +1,14 @@
 import { useMemo } from 'react'
 import { useAppStore } from '@/store'
 import type { AppState } from '@/store/types'
-import type { ExecutionHostId } from '../../../../shared/execution-host'
+import type { ExecutionHostId } from '../../../../shared/execution-host/execution-host'
 import { isSessionSummaryHostSupported } from '../../../../shared/session-summary-host'
 import type { SessionSummarySessionRef } from '../../../../shared/session-summary-types'
 import { getFocusedAgentPaneKeyForWorktree } from '../sidebar/workspace-card/activity/focused-agent-row-highlight'
 import { getExecutionHostIdForWorktree } from '../../lib/workspace/ownership/worktree-runtime-owner'
 import type { AgentStatusEntry } from '../../../../shared/agent-status/contracts/agent-status-types'
 import type { SleepingAgentSessionRecord } from '../../../../shared/agent-session/lifecycle/agent-session-resume'
-import type { AgentPaneConversationIdentity } from '@/store/slices/agent-status/agent-pane-conversation'
+import type { AgentPaneConversationIdentity } from '@/store/slices/agent-status/conversation/agent-pane-conversation'
 
 /** Exactly what resolving the pane's subject reads, so tests can build a partial state. */
 export type SessionSummarySubjectState = Pick<

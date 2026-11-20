@@ -12,16 +12,6 @@
       "match": "^DaemonConnectionLostError: Disconnected$"
     },
     {
-      "file": "src/main/browser/backends/offscreen-browser-backend-frame-rate.electron.test.ts",
-      "test": "offscreen browser page frame rate ticks unwatched pages slowly and leased pages at full rate",
-      "class": "linux-headless-offscreen-no-frames",
-      "owner": "upstream",
-      "firstSeen": "2026-11-15",
-      "evidence": "Failed on GitHub's ubuntu-latest runner in the release dispatch run 43815938893 (nplez1/orca @6e334224aaf, shard 9/12) with `unwatched: +0` — the offscreen page painted no frame at all in the two-second sample, where the test allows up to 15 at ~5 fps. The suite launches a real Electron process through runElectronFixture and counts painted frames; a headless Linux runner has no compositor to paint into, so the number is a property of the runner rather than of the code. The same file is in UNIT_EXCLUDE on this Mac, so the local gate never runs it: it passed here only because it does not run here. Every file in the stack is upstream-owned (the test is upstream #42660 and the fixture is `testing/offscreen-page-frame-rate-electron-fixture.ts`), with no fork hunk, so it cannot be repaired inside the fork without divergence the next sync re-resolves.",
-      "exit": "Remove when the fixture paints frames on a headless ubuntu runner (or the test asserts a capability probe instead of a frame count), or when it passes on Linux in three consecutive dispatches.",
-      "match": "unwatched: \\+0"
-    },
-    {
       "file": "src/main/browser/backends/offscreen-browser-backend-free.electron.test.ts",
       "test": "freeing idle offscreen browser pages frees an idle saved page and wakes it under the same id with its history",
       "class": "linux-headless-offscreen-no-frames",
@@ -41,6 +31,26 @@
       "evidence": "Failed once on GitHub's ubuntu-latest runner in release dispatch 43825294639 (nplez1/orca @5930d4964cc, shard 8/12) with `expected undefined to be '1800000000000-…'` while the same run's journal logged `AgentSessionJournalError: journal SQL reader is closed` from the fixture teardown. Passed 3/3 in isolation on this Mac and passed in the two adjacent dispatches (43816871557 shard 10 was green for it, 43817868949 rerun green). The shard runs four workers against a real SQLite journal, so this is a delivery race under load rather than an environment property — hence flaky rather than deterministic. Upstream-owned file with no fork hunk.",
       "exit": "Remove when it passes on Linux in five consecutive dispatches, or when the journal teardown is ordered against in-flight deliveries upstream.",
       "match": "expected undefined to be '1800000000000"
+    },
+    {
+      "file": "src/main/updater/releases/updater-prerelease-feed.test.ts",
+      "test": "fetchNewerReleaseTagsWithReadiness update delay offers an aged-out release despite a recent older-line release in the Atom feed",
+      "class": "fork-update-delay-rest-first",
+      "owner": "fork",
+      "firstSeen": "2026-11-20",
+      "evidence": "Failed in the 2026-11-20 early Linux lane (run 44726647361, ubuntu-24.04-arm, candidate 13e64f32a5a2) with \"AssertionError: expected [] to deeply equal [ 'v1.4.250' ]\" — the fork's REST-list-first resolver returned no qualifying release where the case expects one. Both cases pass on this Mac (14/14 in the file, 2026-11-20), and the test pins its own clock (NOW = 2026-11-02T12:00:00Z, dates built with toISOString), so the difference is the platform, not a zone-pinned expectation. They live in the fork's own describe block, kept by this sync because upstream deleted the suite wholesale.",
+      "exit": "Remove when both cases pass in three consecutive Linux lane runs, or when the REST-first paging is re-measured on a UTC runner and whatever makes it return nothing is fixed.",
+      "match": "expected \\[\\] to deeply equal \\[ 'v1\\.4\\.250' \\]"
+    },
+    {
+      "file": "src/main/updater/releases/updater-prerelease-feed.test.ts",
+      "test": "fetchNewerReleaseTagsWithReadiness update delay keeps paging when only REST, not the Atom feed, dates a release past the delay",
+      "class": "fork-update-delay-rest-first",
+      "owner": "fork",
+      "firstSeen": "2026-11-20",
+      "evidence": "Failed in the 2026-11-20 early Linux lane (run 44726647361, ubuntu-24.04-arm, candidate 13e64f32a5a2) with \"AssertionError: expected [] to deeply equal [ 'v1.4.250' ]\" — the fork's REST-list-first resolver returned no qualifying release where the case expects one. Both cases pass on this Mac (14/14 in the file, 2026-11-20), and the test pins its own clock (NOW = 2026-11-02T12:00:00Z, dates built with toISOString), so the difference is the platform, not a zone-pinned expectation. They live in the fork's own describe block, kept by this sync because upstream deleted the suite wholesale.",
+      "exit": "Remove when both cases pass in three consecutive Linux lane runs, or when the REST-first paging is re-measured on a UTC runner and whatever makes it return nothing is fixed.",
+      "match": "expected \\[\\] to deeply equal \\[ 'v1\\.4\\.250' \\]"
     }
   ],
   "prunedSince": [

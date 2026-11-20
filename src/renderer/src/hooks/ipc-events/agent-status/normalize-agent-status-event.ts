@@ -1,0 +1,78 @@
+import type {
+  AgentStatusMetadata,
+  AgentStatusPayload
+} from '../../../store/slices/agent-status/contracts/agent-status-contract'
+import {
+  normalizeAgentStatusPayload,
+  type ParsedAgentStatusPayload
+} from '../../../../../shared/agent-status/contracts/agent-status-types'
+import type { AgentStatusIpcPayload } from '../../../../../shared/agent-status/contracts/agent-status-ipc-payload'
+
+export function normalizeAgentStatusEvent(
+  data: AgentStatusIpcPayload
+): ParsedAgentStatusPayload | null {
+  return normalizeAgentStatusPayload({
+    state: data.state,
+    workingMode: data.workingMode,
+    prompt: data.prompt,
+    agentType: data.agentType,
+    model: data.model,
+    toolName: data.toolName,
+    toolInput: data.toolInput,
+    interactivePrompt: data.interactivePrompt,
+    lastAssistantMessage: data.lastAssistantMessage,
+    lastAssistantMessageIsToolOutput: data.lastAssistantMessageIsToolOutput,
+    interrupted: data.interrupted,
+    sessionBoundary: data.sessionBoundary,
+    turnCompletedAt: data.turnCompletedAt,
+    subagents: data.subagents,
+    mainAgent: data.mainAgent
+  })
+}
+
+export function normalizeAgentStatusMetadata(
+  data: AgentStatusIpcPayload,
+  authorityRestartId?: string
+): AgentStatusMetadata | undefined {
+  if (
+    !data.providerSession &&
+    !data.launchToken &&
+    data.launchConfig === undefined &&
+    !authorityRestartId &&
+    !data.paneOwner &&
+    data.executionHost !== 'shared' &&
+    data.orcaSessionId === undefined
+  ) {
+    return undefined
+  }
+  return {
+    ...(authorityRestartId ? { authorityRestartId } : {}),
+    ...(data.providerSession ? { providerSession: data.providerSession } : {}),
+    ...(data.orcaSessionId !== undefined ? { orcaSessionId: data.orcaSessionId } : {}),
+    ...(data.launchToken ? { launchToken: data.launchToken } : {}),
+    ...(data.launchConfig !== undefined ? { launchConfig: data.launchConfig } : {}),
+    ...(data.paneOwner ? { paneOwner: data.paneOwner } : {}),
+    ...(data.executionHost === 'shared' ? { executionHost: 'shared' as const } : {})
+  }
+}
+
+/**
+ * Fold the fields the IPC envelope carries — turn boundary, restored marker and
+ * observation provenance — onto an already-resolved status payload.
+ *
+ * Order is load-bearing only in that each field is optional; a field absent from
+ * the envelope leaves the payload untouched rather than clearing it.
+ */
+export function withAgentStatusEnvelopeFields(
+  payload: AgentStatusPayload,
+  data: AgentStatusIpcPayload
+): AgentStatusPayload {
+  const withTurnBoundary = data.promptInteractionKey
+    ? { ...payload, promptInteractionKey: data.promptInteractionKey }
+    : payload
+  const withRestored =
+    data.restoredUnconfirmed === true
+      ? { ...withTurnBoundary, restoredUnconfirmed: true }
+      : withTurnBoundary
+  return data.observation ? { ...withRestored, observation: data.observation } : withRestored
+}

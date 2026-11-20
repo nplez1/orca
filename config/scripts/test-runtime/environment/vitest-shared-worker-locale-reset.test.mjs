@@ -6,7 +6,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import {
   getRendererLanguageDetection,
   setRendererLanguageDetection
-} from '../../../../src/shared/ui-locale'
+} from '../../../../src/shared/i18n/ui-locale'
 import { restoreSharedWorkerLocale } from './vitest-shared-worker-locale-reset.mjs'
 import { resolvePinnedBunExecutable } from '../../tool-invocation/pinned-bun-executable.mjs'
 
@@ -83,7 +83,7 @@ it('restores the locale a previous shared file left behind', async () => {
       `import { writeFileSync } from 'node:fs'
        import { expect, it } from 'vitest'
        import { registerOrcaI18nInstance } from '${specifier('src/shared/i18n-instance-registry')}'
-       import { getRendererLanguageDetection, setRendererLanguageDetection } from '${specifier('src/shared/ui-locale')}'
+       import { getRendererLanguageDetection, setRendererLanguageDetection } from '${specifier('src/shared/i18n/ui-locale')}'
 
        const SPANISH = { detectedTag: 'es-ES', status: 'supported', locale: 'es', source: 'browser' }
 
@@ -111,7 +111,7 @@ it('restores the locale a previous shared file left behind', async () => {
        import { fileURLToPath } from 'node:url'
        import { expect, it } from 'vitest'
        import { __orcaI18nInstancesForTests } from '${specifier('src/shared/i18n-instance-registry')}'
-       import { getBrowserLanguageDetection, getRendererLanguageDetection } from '${specifier('src/shared/ui-locale')}'
+       import { getBrowserLanguageDetection, getRendererLanguageDetection } from '${specifier('src/shared/i18n/ui-locale')}'
 
        it('starts with no locale planted by a file before it', () => {
          const marker = fileURLToPath(new URL('./planted.json', import.meta.url))

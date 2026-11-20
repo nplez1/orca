@@ -18,7 +18,7 @@ import { getWorktreeSharedLinkPaths } from '../../../git/worktrees/content-paths
 import { getConfiguredWorktreeIncludePaths } from '../../../git/worktrees/content-paths/worktree-include-file'
 import { runHook, getEffectiveHooks } from '../../../workspace-hooks/hooks'
 import { findExistingWorktreeSymlinkPaths } from '../../../git/worktrees/content-paths/worktree-symlink-detection'
-import { removeWorktreeLinkedPaths } from '../../../ipc/worktree-symlinks'
+import { removeWorktreeLinkedPaths } from '../../../ipc/worktrees/linked-paths/worktree-symlinks'
 import { cleanupRemovedWorktreePushTarget } from './runtime-worktree-push-target-cleanup'
 export { cleanupRemovedWorktreePushTarget } from './runtime-worktree-push-target-cleanup'
 import { removeStaleWorktreeMaterializationStagingDirectories } from '../../../ipc/worktree-materialization-staging'
@@ -27,7 +27,7 @@ import {
   formatWorktreeRemovalError,
   isOrphanCompatiblePreflightError,
   isOrphanedWorktreeError
-} from '../../../ipc/worktree-logic'
+} from '../../../ipc/worktrees/paths/worktree-logic'
 import { cleanupLocalOrphanedWorktreeDirectory } from '../../../workspaces/removal/local-orphaned-worktree-cleanup'
 import { recoverPartialLocalWorktreeRemoval } from '../../../workspaces/removal/local-worktree-removal-recovery'
 import { findRegisteredDeletableWorktree } from '../../../workspaces/removal/worktree-removal-safety'
@@ -222,8 +222,7 @@ async function acceptRuntimeRegisteredLocalWorktreeRemoval(args: {
         return result
       },
       publish: () => args.publish(),
-      admissionFailed: () => gate.finish(false),
-      cleanupPushTargetRemote: () => cleanupRemovedWorktreePushTarget(args)
+      admissionFailed: () => gate.finish(false)
     })
     await waitForWorktreeRemovalAcceptance(args.target.id)
     return { removing: true, ...acceptedFields }

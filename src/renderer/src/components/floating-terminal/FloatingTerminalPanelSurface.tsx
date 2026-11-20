@@ -1,11 +1,11 @@
 import TabBar from '@/components/tab-bar/TabBar'
 import { TabGroupSplitNodeTree } from '@/components/tab-group/TabGroupSplitNodeTree'
 import { WorkspaceTabDragLayer } from '@/components/tab-group/WorkspaceTabDragLayer'
-import { WorkspacePaneOverlayLayers } from '@/components/WorkspacePaneOverlayLayers'
+import { WorkspacePaneOverlayLayers } from '@/components/terminal/workbench/WorkspacePaneOverlayLayers'
 import { isTerminalImeInputContextRefreshing } from '@/components/terminal-pane/input/ime/terminal-ime-input-context-refresh'
 import { keepKeyboardFocusOptOut } from '@/lib/agent-tab-focus-policy'
 import { buildDuplicatedBrowserTabOptions } from '@/lib/browser/workspace/duplicate-browser-tab-options'
-import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../shared/constants'
+import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../shared/workspace/identity/floating-workspace-id'
 import { FloatingTerminalEmptyState } from './FloatingTerminalEmptyState'
 import { FloatingTerminalTitlebarGrabHandle } from './FloatingTerminalTitlebarGrabHandle'
 import { renderFloatingTerminalOrchestrationCard } from './orchestration/FloatingTerminalOrchestrationCard'
@@ -151,7 +151,7 @@ export function renderFloatingTerminalPanelSurface(
                   onNewBrowserTab={createFloatingBrowserTab}
                   onNewFileTab={createFloatingMarkdownTab}
                   onOpenFileTab={openFloatingMarkdownTab}
-                  newTabMenuOrder="markdown-first"
+                  newTabMenuSurface="floating-panel"
                   onSetCustomTitle={setTabCustomTitle}
                   onSetTabColor={setTabColor}
                   onTogglePaneExpand={(tabId) =>

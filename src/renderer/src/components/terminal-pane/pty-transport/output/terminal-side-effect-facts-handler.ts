@@ -2,7 +2,7 @@
 import { clearWorkingIndicators } from '../../../../../../shared/agent-status/title/agent-title-working-indicators'
 import { detectAgentStatusFromTitle } from '../../../../../../shared/agent-status/title/agent-title-status'
 import type { AgentIdleEdgeMeta } from '../../../../../../shared/terminal/output/terminal-output-side-effects'
-import type { GlobalSettings } from '../../../../../../shared/global-settings-types'
+import type { GlobalSettings } from '../../../../../../shared/settings/global-settings-types'
 import type { ParsedAgentStatusPayload } from '../../../../../../shared/agent-status/contracts/agent-status-types'
 import type { TerminalGitHubPRLink } from '../../../../../../shared/terminal/links/terminal-github-pr-link-detector'
 import type {

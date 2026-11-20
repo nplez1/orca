@@ -6,11 +6,11 @@ import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import userEvent from '@testing-library/user-event'
 
-import { createGlobalSettingsFixture } from '../../../../../shared/global-settings-test-fixture'
+import { createGlobalSettingsFixture } from '../../../../../shared/settings/global-settings-test-fixture'
 import type { JiraBoardIssuePageRequest, JiraIssue } from '../../../../../shared/jira/jira-types'
 import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/work-items/jira/jira-issue-workspace-attachment'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { defaultJiraListColumnIds, visibleJiraListColumns } from '../../jira-list-columns'
+import { defaultJiraListColumnIds, visibleJiraListColumns } from './listing/jira-list-columns'
 import type { TaskPageComposerActionsModel } from '../use-task-page-composer-actions'
 import { clearTaskPageJiraBoardCache } from '../../task-page-jira-board-cache'
 import { TaskPageJiraContent } from './Content'
@@ -35,7 +35,7 @@ const sheet = vi.hoisted(() => {
   const holder: { onSprintChange?: () => void } = {}
   return holder
 })
-vi.mock('@/components/JiraIssueWorkspace', () => ({
+vi.mock('@/components/task-page/jira/issue-workspace/JiraIssueWorkspace', () => ({
   default: (props: { onSprintChange?: () => void }) => {
     sheet.onSprintChange = props.onSprintChange
     return null

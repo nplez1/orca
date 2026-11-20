@@ -1,4 +1,4 @@
-import type { StatusBarItem } from '../../../../shared/ui-chrome-types'
+import type { StatusBarItem } from '../../../../shared/ui-chrome/ui-chrome-types'
 import { translate } from '@/i18n/i18n'
 import { translateSearchKeyword } from './search/settings-search-keywords'
 import { getAntigravityStatusBarToggleSearchEntry } from './appearance/appearance-status-bar-antigravity-toggle-search'

@@ -1,8 +1,9 @@
 import { ipcMain } from 'electron'
 import type { GitHubRepositoryIdentity as GitHubOwnerRepo } from '../../../shared/github/repositories/repository-identity'
-import type { GitHubPullRequestStateUpdate } from '../../../shared/issue-mutation-types'
+import type { GitHubPullRequestStateUpdate } from '../../../shared/work-items/issue-mutation-types'
 import { markPRReadyForReview } from '../../github/client/update/pr-ready'
 import { mergePR } from '../../github/client/merge/merge-pr'
+import { normalizePRCheckHeadSha } from '../../../shared/github/checks/pr-check-head'
 import { removePRReviewers, requestPRReviewers } from '../../github/client/update/pr-reviewers'
 import { rerunPRChecks } from '../../github/client/check/rerun-pr-checks'
 import { setPRAutoMerge } from '../../github/client/merge/pr-auto-merge'
@@ -59,6 +60,7 @@ export function registerGitHubPRMutationHandlers(store: Store): void {
         method?: 'merge' | 'squash' | 'rebase'
         bypassBranchProtection?: boolean
         prRepo?: GitHubOwnerRepo | null
+        expectedHeadSha?: string | null
       }
     ) => {
       const repo = assertRegisteredGitHubRepo(args, store)
@@ -70,6 +72,7 @@ export function registerGitHubPRMutationHandlers(store: Store): void {
         args.method,
         getGitHubRepoConnectionId(repo),
         args.prRepo ?? null,
+        normalizePRCheckHeadSha(args.expectedHeadSha) ?? null,
         localGitOptions,
         { bypassBranchProtection: args.bypassBranchProtection === true }
       )

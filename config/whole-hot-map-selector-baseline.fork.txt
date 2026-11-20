@@ -1,0 +1,8 @@
+# Fork-owned rows for config/whole-hot-map-selector-baseline.txt, which upstream owns and this fork
+# keeps byte-identical. Rows here replace the base's, 0 included, so a withdrawn allowance is a 0 row.
+# Why each row exists: LOCAL-PATCHES.md § local(lint): the 2026-11-20 sync's lint gate.
+# This is a RATCHET: counts may only go DOWN. Prune: pnpm check:whole-hot-map-selector-ratchet --prune
+1 src/renderer/src/components/sidebar/workspace-actions/sleep/use-worktree-sleep-state.ts:browserTabsByWorktree # the empty-surface sweep scans every workspace, so it needs the whole map
+1 src/renderer/src/components/sidebar/workspace-actions/sleep/use-worktree-sleep-state.ts:tabsByWorktree # the empty-surface sweep scans every workspace, so it needs the whole map
+1 src/renderer/src/components/sidebar/workspace-actions/sleep/use-worktree-sleep-state.ts:unifiedTabsByWorktree # the empty-surface sweep scans every workspace, so it needs the whole map
+1 src/renderer/src/hooks/use-configured-execution-host-options.ts:runtimeStatusByEnvironmentId # builds the registry of every configured host, so it needs every host's status

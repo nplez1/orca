@@ -1,6 +1,6 @@
-import { sortByUpdatedAtDescending } from '../../shared/updated-at-order'
+import { sortByUpdatedAtDescending } from '../../shared/collections/updated-at-order'
 import type { JiraIssue, JiraIssueFilter, JiraIssueListFilters } from '../../shared/jira/jira-types'
-import { buildJiraPresetJql } from '../../shared/jira/jira-preset-jql'
+import { buildJiraPresetJql, searchJiraPreset } from '../../shared/jira/jira-preset-jql'
 import { apiBasePath, jiraRequest, type JiraClientForSite } from './authenticated-request'
 import { ISSUE_LIST_FIELDS, mapJiraIssue, type JiraAgileFieldIds } from './jira-issue-mapping'
 import { agileFieldIdList } from './jira-agile-fields'
@@ -163,6 +163,14 @@ export async function readIssuePageForClient(
       jql: single ? single.jql : '',
       cursor: single ? single.cursor : null
     }
+  }
+  // Why: older Jira Server has no statusCategory JQL field and rejects the preset outright, so the
+  // first page of a preset read retries once with the resolution clause. A continuation carries the
+  // resolved JQL that produced its page, which is already past that retry.
+  if (!cursor && !('jql' in query) && entry.site.authType === 'server') {
+    return searchJiraPreset(query.filter, query.filters, (presetJql) =>
+      searchIssuePageForClient(entry, presetJql, limit, agileFields, signal, undefined, requirePage)
+    )
   }
   const jql = 'jql' in query ? query.jql : buildJiraPresetJql(query.filter, query.filters)
   return searchIssuePageForClient(entry, jql, limit, agileFields, signal, cursor, requirePage)

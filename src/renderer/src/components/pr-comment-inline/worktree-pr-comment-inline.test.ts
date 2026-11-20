@@ -3,7 +3,7 @@ import type { Worktree } from '../../../../shared/worktree/types'
 import type { Repo } from '../../../../shared/repository/repo-types'
 import type { PRComment } from '../../../../shared/github/comments/comment-types'
 import type { PRInfo } from '../../../../shared/github/pull-requests/pull-request-types'
-import { createGlobalSettingsFixture } from '../../../../shared/global-settings-test-fixture'
+import { createGlobalSettingsFixture } from '../../../../shared/settings/global-settings-test-fixture'
 import {
   getGitHubPRCacheKey,
   getGitHubRepoCacheKey

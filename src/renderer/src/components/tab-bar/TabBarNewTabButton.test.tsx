@@ -36,11 +36,11 @@ vi.mock('@/store', () => ({
     selector({ settings: harness.settings })
 }))
 
-vi.mock('@/hooks/useAgentDetectionTarget', () => ({
+vi.mock('@/lib/agent-session/launch/inventory/useAgentDetectionTarget', () => ({
   useAgentDetectionTargetForWorktree: vi.fn(() => ({ kind: 'local' }))
 }))
 
-vi.mock('@/hooks/useDetectedAgents', () => ({
+vi.mock('@/lib/agent-session/launch/inventory/useDetectedAgents', () => ({
   useDetectedAgents: vi.fn(() => ({ detectedIds: harness.detectedIds }))
 }))
 

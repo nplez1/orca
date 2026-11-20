@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import type { OrcaVmRecipe, OrcaVmRecipeContextMenuItem } from './orca-yaml-hook-types'
+import type {
+  OrcaVmRecipe,
+  OrcaVmRecipeContextMenuItem
+} from './workspace-setup/orca-yaml-hook-types'
 import {
   EphemeralVmRuntimeRecordSchema,
   isEphemeralVmHostActionable,

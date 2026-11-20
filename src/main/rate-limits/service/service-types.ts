@@ -1,18 +1,13 @@
-import type { ProviderRateLimits } from '../../../shared/agent-usage/rate-limits/rate-limit-types'
+import type {
+  ProviderRateLimits,
+  UsageReadingAccount
+} from '../../../shared/agent-usage/rate-limits/rate-limit-types'
 import type { ZcodePlanSite } from '../../../shared/agent-accounts/usage-credentials/zcode-plan-sites'
 import type { ClaudeRuntimeAuthPreparation } from '../../claude-accounts/runtime-auth/runtime-auth-types'
-import type {
-  ClaudeAccountSelectionTarget,
-  NormalizedClaudeAccountSelectionTarget
-} from '../../claude-accounts/selection/runtime-selection'
+import type { ClaudeAccountSelectionTarget } from '../../claude-accounts/selection/runtime-selection'
 import type { KimiHomeResolution } from '../../kimi/kimi-runtime-home'
-import type {
-  CodexAccountSelectionTarget,
-  NormalizedCodexAccountSelectionTarget
-} from '../../../shared/agent-accounts/codex/codex-selection-lane'
+import type { CodexAccountSelectionTarget } from '../../../shared/agent-accounts/codex/codex-selection-lane'
 import type { CodexRateLimitHomeResolution } from '../../codex-accounts/runtime-home/runtime-home-service-types'
-import type { SettledProviderResult } from './service-sibling-provider-result'
-import type { ForkProviderCyclePrepared } from '../fork/fork-provider-cycle'
 
 export type {
   CodexRateLimitResetResult,
@@ -22,7 +17,7 @@ export type {
   RateLimitRuntimeTarget
 } from '../../../shared/agent-usage/rate-limits/rate-limit-types'
 export type { ClaudeStatusLineRateLimits } from '../../../shared/agent-usage/rate-limits/claude-statusline-rate-limits'
-export type { NetworkProxySettings } from '../../../shared/network-proxy'
+export type { NetworkProxySettings } from '../../../shared/network/network-proxy'
 export type { ClaudeRuntimeAuthPreparation } from '../../claude-accounts/runtime-auth/runtime-auth-types'
 export type {
   ClaudeAccountSelectionTarget,
@@ -40,6 +35,8 @@ export type InactiveCodexHome = { kind: 'ready'; managedHomePath: string } | { k
 
 export type InactiveCodexAccountInfo = {
   id: string
+  /** Absent when the saved account cannot name its runtime slot, e.g. a WSL account without a distro. */
+  readingAccount?: UsageReadingAccount
   /** May be async: a WSL home is checked before a preview reads it. */
   resolveHome: () => InactiveCodexHome | Promise<InactiveCodexHome>
 }
@@ -170,43 +167,6 @@ export const INACTIVE_FETCH_DEBOUNCE_MS = 60 * 1000
 // Pace real Codex probes in live credential homes instead of bursting when the switcher opens.
 export const INACTIVE_CODEX_PROBE_STAGGER_MS = 2_000
 export const DEFERRED_STARTUP_ACTIVE_REFRESH_MS = 1000
-
-// Why: the snapshot one fetch-all cycle hands to its apply step; lives with the other
-// service contracts so the cycle module holds execution, not shape.
-export type FetchAllCyclePrepared = {
-  claudeTarget: NormalizedClaudeAccountSelectionTarget
-  claudeGeneration: number
-  claudeAuthPreparation: ClaudeRuntimeAuthPreparation | undefined
-  claudeProvenance: string
-  codexTarget: NormalizedCodexAccountSelectionTarget
-  previousState: InternalRateLimitState
-  codexFetchGated: boolean
-  codexStateBeforeFetch: ProviderRateLimits | null
-  codexProvenance: string | null
-  codexHomePath: string | null
-  codexGeneration: number
-  opencodeConfigChanged: boolean
-  opencodeGeneration: number
-  miniMaxConfigChanged: boolean
-  miniMaxGeneration: number
-  zcodeConfigChanged: boolean
-  zcodeGeneration: number
-  forkProviderCycle: ForkProviderCyclePrepared
-  antigravityGeneration: number
-  claudeFetchGated: boolean
-  results: [
-    PromiseSettledResult<ProviderRateLimits>,
-    PromiseSettledResult<ProviderRateLimits>,
-    PromiseSettledResult<ProviderRateLimits>,
-    PromiseSettledResult<ProviderRateLimits>,
-    PromiseSettledResult<ProviderRateLimits>,
-    PromiseSettledResult<ProviderRateLimits>
-  ]
-  grokResultPromise: Promise<SettledProviderResult>
-  cursorResultPromise: Promise<SettledProviderResult>
-  zcodeResultPromise: Promise<SettledProviderResult>
-  antigravityResultPromise: Promise<SettledProviderResult>
-}
 
 // Why: inactive account arrays are derived from provider caches on demand in getState()/pushToRenderer().
 export type InternalRateLimitState = {

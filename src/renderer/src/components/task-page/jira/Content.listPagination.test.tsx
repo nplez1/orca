@@ -6,16 +6,18 @@ import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import userEvent from '@testing-library/user-event'
 
-import { createGlobalSettingsFixture } from '../../../../../shared/global-settings-test-fixture'
+import { createGlobalSettingsFixture } from '../../../../../shared/settings/global-settings-test-fixture'
 import type { JiraIssue } from '../../../../../shared/jira/jira-types'
 import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/work-items/jira/jira-issue-workspace-attachment'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { defaultJiraListColumnIds, visibleJiraListColumns } from '../../jira-list-columns'
+import { defaultJiraListColumnIds, visibleJiraListColumns } from './listing/jira-list-columns'
 import type { TaskPageComposerActionsModel } from '../use-task-page-composer-actions'
 import type { TaskPageJiraListPage } from './task-page-jira-list-pagination'
 import { TaskPageJiraContent } from './Content'
 
-vi.mock('@/components/JiraIssueWorkspace', () => ({ default: () => null }))
+vi.mock('@/components/task-page/jira/issue-workspace/JiraIssueWorkspace', () => ({
+  default: () => null
+}))
 vi.mock('@/components/task-page/linear/Content', () => ({ TaskPageLinearContent: () => null }))
 
 function issue(index: number): JiraIssue {

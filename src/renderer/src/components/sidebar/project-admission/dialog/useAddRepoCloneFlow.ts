@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { toast } from 'sonner'
-import type { WorktreeLayoutMode } from '../../../../../../shared/orca-workspace-layout'
+import type { WorktreeLayoutMode } from '../../../../../../shared/worktree/paths/orca-workspace-layout'
 import { callRuntimeRpc } from '@/runtime/rpc/calls/runtime-rpc-call'
 import type { AddRepoExistingWorkspaceSource } from '../../../../../../shared/telemetry/schemas/telemetry-property-schemas'
 import type { Repo } from '../../../../../../shared/repository/repo-types'
@@ -9,8 +9,8 @@ import { useCloneParentDefault } from '../create/use-clone-parent-default'
 import {
   LOCAL_EXECUTION_HOST_ID,
   toRuntimeExecutionHostId
-} from '../../../../../../shared/execution-host'
-import type { GlobalSettings } from '../../../../../../shared/global-settings-types'
+} from '../../../../../../shared/execution-host/execution-host'
+import type { GlobalSettings } from '../../../../../../shared/settings/global-settings-types'
 import type { AddRepoDialogStep } from './add-repo-dialog-types'
 import { translate } from '@/i18n/i18n'
 import { extractIpcErrorMessage } from '@/runtime/errors/ipc-error'
@@ -19,7 +19,7 @@ import {
   resolveAddRepoRuntimeTarget,
   worktreeRefreshOptions
 } from '../host-selection/add-repo-runtime-owner'
-import type { ExecutionHostId } from '../../../../../../shared/execution-host'
+import type { ExecutionHostId } from '../../../../../../shared/execution-host/execution-host'
 import {
   useCloneFolderOverride,
   type CloneFolderOverride

@@ -120,11 +120,11 @@ describe('the host-settings RPC surface', () => {
 })
 
 describe('applying a payload on the host', () => {
-  it('refuses a version it does not know, by name, and records nothing', () => {
+  it('refuses a version it does not know, by name, and records nothing', async () => {
     const holdings = createInMemoryHostSettingsReplicationHoldings()
     const port = fakePort()
 
-    const result = applyHostSettingsReplication(
+    const result = await applyHostSettingsReplication(
       { ...snapshot(1), version: 2 },
       { registry: registry(port), holdings, now: NOW }
     )
@@ -134,16 +134,16 @@ describe('applying a payload on the host', () => {
     expect(port.held.size).toBe(0)
   })
 
-  it('pins the first main that pushes a snapshot, and refuses a different one', () => {
+  it('pins the first main that pushes a snapshot, and refuses a different one', async () => {
     const holdings = createInMemoryHostSettingsReplicationHoldings()
 
-    const first = applyHostSettingsReplication(snapshot(1), {
+    const first = await applyHostSettingsReplication(snapshot(1), {
       registry: registry(fakePort()),
       holdings,
       now: NOW,
       callerFingerprint: 'main-a'
     })
-    const second = applyHostSettingsReplication(
+    const second = await applyHostSettingsReplication(
       { ...snapshot(2), baseRevision: 1 },
       { registry: registry(fakePort()), holdings, now: NOW, callerFingerprint: 'main-b' }
     )
@@ -155,16 +155,16 @@ describe('applying a payload on the host', () => {
     expect(holdings.read().mainFingerprint).toBe('main-a')
   })
 
-  it('always allows a local owner, which is the user at this machine', () => {
+  it('always allows a local owner, which is the user at this machine', async () => {
     const holdings = createInMemoryHostSettingsReplicationHoldings()
 
-    applyHostSettingsReplication(snapshot(1), {
+    await applyHostSettingsReplication(snapshot(1), {
       registry: registry(fakePort()),
       holdings,
       now: NOW,
       callerFingerprint: 'main-a'
     })
-    const owned = applyHostSettingsReplication(
+    const owned = await applyHostSettingsReplication(
       { ...snapshot(2), baseRevision: 1 },
       { registry: registry(fakePort()), holdings, now: NOW }
     )
@@ -172,14 +172,18 @@ describe('applying a payload on the host', () => {
     expect(owned).toMatchObject({ decision: 'applied' })
   })
 
-  it('withdraws a credential the main no longer holds when a snapshot arrives', () => {
+  it('withdraws a credential the main no longer holds when a snapshot arrives', async () => {
     const holdings = createInMemoryHostSettingsReplicationHoldings()
     const port = fakePort()
 
-    applyHostSettingsReplication(snapshot(1), { registry: registry(port), holdings, now: NOW })
+    await applyHostSettingsReplication(snapshot(1), {
+      registry: registry(port),
+      holdings,
+      now: NOW
+    })
     // The main lost the credential, and this host restarted, so the push is a snapshot with no mention
     // of it — which is the only place a removal can travel.
-    const result = applyHostSettingsReplication(snapshot(9, []), {
+    const result = await applyHostSettingsReplication(snapshot(9, []), {
       registry: registry(port),
       holdings,
       now: NOW
@@ -190,16 +194,16 @@ describe('applying a payload on the host', () => {
     expect(holdings.read().ids).toEqual([])
   })
 
-  it('keeps its own revision across a restart, so the next push can be a delta', () => {
+  it('keeps its own revision across a restart, so the next push can be a delta', async () => {
     const holdings = createInMemoryHostSettingsReplicationHoldings()
 
-    applyHostSettingsReplication(snapshot(4), {
+    await applyHostSettingsReplication(snapshot(4), {
       registry: registry(fakePort()),
       holdings,
       now: NOW
     })
     // A fresh process reads the same record; the in-memory state above is gone.
-    const result = applyHostSettingsReplication(
+    const result = await applyHostSettingsReplication(
       { ...snapshot(5), baseRevision: 4 },
       { registry: registry(fakePort()), holdings, now: NOW + 1 }
     )
@@ -208,10 +212,10 @@ describe('applying a payload on the host', () => {
     expect(holdings.read().revision).toBe(5)
   })
 
-  it('withdraws a value that did not land sealed, rather than leaving the weaker copy', () => {
+  it('withdraws a value that did not land sealed, rather than leaving the weaker copy', async () => {
     const port = fakePort({ canSeal: true, writeProtection: 'plaintext' })
 
-    const result = applyHostSettingsReplication(snapshot(1), {
+    const result = await applyHostSettingsReplication(snapshot(1), {
       registry: registry(port),
       holdings: createInMemoryHostSettingsReplicationHoldings(),
       now: NOW
@@ -224,12 +228,12 @@ describe('applying a payload on the host', () => {
     expect(port.held.size).toBe(0)
   })
 
-  it('hands the host over once the pairing the pin names has been removed', () => {
+  it('hands the host over once the pairing the pin names has been removed', async () => {
     const holdings = createInMemoryHostSettingsReplicationHoldings()
     const live = new Set(['device-a', 'device-b'])
     const isPairedDeviceAlive = (deviceId: string) => live.has(deviceId)
 
-    applyHostSettingsReplication(snapshot(1), {
+    await applyHostSettingsReplication(snapshot(1), {
       registry: registry(fakePort()),
       holdings,
       now: NOW,
@@ -242,7 +246,7 @@ describe('applying a payload on the host', () => {
     // paired-device list, and it is the only signal that distinguishes "this machine is gone" from
     // "another machine is claiming the host".
     live.delete('device-a')
-    const handedOver = applyHostSettingsReplication(snapshot(2), {
+    const handedOver = await applyHostSettingsReplication(snapshot(2), {
       registry: registry(fakePort()),
       holdings,
       now: NOW,
@@ -256,7 +260,7 @@ describe('applying a payload on the host', () => {
     expect(holdings.read().mainDeviceId).toBe('device-b')
   })
 
-  it('takes a device id from the pinned caller, so a record written before it existed is enforced next push', () => {
+  it('takes a device id from the pinned caller, so a record written before it existed is enforced next push', async () => {
     // A host configured by an older build: the pin has no device id, so nothing can be verified yet.
     const holdings = createInMemoryHostSettingsReplicationHoldings({
       ids: [CREDENTIAL_ID],
@@ -267,7 +271,7 @@ describe('applying a payload on the host', () => {
     })
     const alive = () => true
 
-    applyHostSettingsReplication(snapshot(2), {
+    await applyHostSettingsReplication(snapshot(2), {
       registry: registry(fakePort()),
       holdings,
       now: NOW,
@@ -283,7 +287,7 @@ describe('applying a payload on the host', () => {
       [4, null]
     ] as const) {
       expect(
-        applyHostSettingsReplication(
+        await applyHostSettingsReplication(
           { ...snapshot(revision), baseRevision },
           {
             registry: registry(fakePort()),
@@ -298,11 +302,11 @@ describe('applying a payload on the host', () => {
     }
   })
 
-  it('does not let a second desktop take the host by reconnecting with a snapshot', () => {
+  it('does not let a second desktop take the host by reconnecting with a snapshot', async () => {
     const holdings = createInMemoryHostSettingsReplicationHoldings()
     const port = fakePort()
 
-    applyHostSettingsReplication(snapshot(1), {
+    await applyHostSettingsReplication(snapshot(1), {
       registry: registry(port),
       holdings,
       now: NOW,
@@ -312,7 +316,7 @@ describe('applying a payload on the host', () => {
 
     // Desktop B holds no DeepSeek key of its own, so its snapshot names none: the takeover used to move
     // the pin, delete A's key from this host, and leave every agent here on B's account.
-    const takeover = applyHostSettingsReplication(snapshot(2, []), {
+    const takeover = await applyHostSettingsReplication(snapshot(2, []), {
       registry: registry(port),
       holdings,
       now: NOW,
@@ -325,10 +329,10 @@ describe('applying a payload on the host', () => {
     expect(holdings.read().ids).toEqual([CREDENTIAL_ID])
   })
 
-  it('lets the host owner take the host back, so a lost desktop does not strand it', () => {
+  it('lets the host owner take the host back, so a lost desktop does not strand it', async () => {
     const holdings = createInMemoryHostSettingsReplicationHoldings()
 
-    applyHostSettingsReplication(snapshot(1), {
+    await applyHostSettingsReplication(snapshot(1), {
       registry: registry(fakePort()),
       holdings,
       now: NOW,
@@ -338,7 +342,7 @@ describe('applying a payload on the host', () => {
 
     // No fingerprint is the user at this machine, and configuring the host locally is the escape hatch
     // left when the pinned device no longer exists to re-pair.
-    const owner = applyHostSettingsReplication(snapshot(2), {
+    const owner = await applyHostSettingsReplication(snapshot(2), {
       registry: registry(fakePort()),
       holdings,
       now: NOW
@@ -348,7 +352,7 @@ describe('applying a payload on the host', () => {
     expect(holdings.read().mainDeviceId).toBeNull()
 
     expect(
-      applyHostSettingsReplication(snapshot(3), {
+      await applyHostSettingsReplication(snapshot(3), {
         registry: registry(fakePort()),
         holdings,
         now: NOW,
@@ -359,12 +363,12 @@ describe('applying a payload on the host', () => {
     expect(holdings.read().mainFingerprint).toBe('desktop-b')
   })
 
-  it('keeps a value the user entered on this host, and never records it as a replica', () => {
+  it('keeps a value the user entered on this host, and never records it as a replica', async () => {
     const holdings = createInMemoryHostSettingsReplicationHoldings()
     const port = fakePort()
     port.held.set(CREDENTIAL_ID, 'sk-host-own')
 
-    const result = applyHostSettingsReplication(snapshot(1), {
+    const result = await applyHostSettingsReplication(snapshot(1), {
       registry: registry(port),
       holdings,
       now: NOW,
@@ -381,18 +385,26 @@ describe('applying a payload on the host', () => {
     expect(holdings.read().ids).toEqual([])
 
     // A snapshot that does not mention it must not delete it either — it was never a replica.
-    applyHostSettingsReplication(snapshot(2, []), { registry: registry(port), holdings, now: NOW })
+    await applyHostSettingsReplication(snapshot(2, []), {
+      registry: registry(port),
+      holdings,
+      now: NOW
+    })
     expect(port.held.get(CREDENTIAL_ID)).toBe('sk-host-own')
   })
 
-  it('still deletes a replica it holds when its own record was lost', () => {
+  it('still deletes a replica it holds when its own record was lost', async () => {
     const port = fakePort()
     const holdings = createInMemoryHostSettingsReplicationHoldings()
-    applyHostSettingsReplication(snapshot(1), { registry: registry(port), holdings, now: NOW })
+    await applyHostSettingsReplication(snapshot(1), {
+      registry: registry(port),
+      holdings,
+      now: NOW
+    })
     // A corrupt holdings file reads back empty, so nothing here can be shown to be replication's.
     holdings.write(EMPTY_HOST_SETTINGS_REPLICATION_RECORD)
 
-    const result = applyHostSettingsReplication(snapshot(2, [], [CREDENTIAL_ID]), {
+    const result = await applyHostSettingsReplication(snapshot(2, [], [CREDENTIAL_ID]), {
       registry: registry(port),
       holdings,
       now: NOW
@@ -407,18 +419,18 @@ describe('applying a payload on the host', () => {
     })
   })
 
-  it('recognises its own replicated copy when the holdings record was lost', () => {
+  it('recognises its own replicated copy when the holdings record was lost', async () => {
     const port = fakePort()
     // A corrupt or unwritten holdings file reads back empty, so nothing on the host looks replicated.
     const holdings = createInMemoryHostSettingsReplicationHoldings()
-    applyHostSettingsReplication(snapshot(1), {
+    await applyHostSettingsReplication(snapshot(1), {
       registry: { forCredentialId: () => port },
       holdings,
       now: NOW
     })
     holdings.write(EMPTY_HOST_SETTINGS_REPLICATION_RECORD)
 
-    const result = applyHostSettingsReplication(snapshot(2), {
+    const result = await applyHostSettingsReplication(snapshot(2), {
       registry: { forCredentialId: () => port },
       holdings,
       now: NOW
@@ -433,13 +445,17 @@ describe('applying a payload on the host', () => {
     expect(holdings.read().ids).toEqual([CREDENTIAL_ID])
   })
 
-  it('does not strand a credential the main holds but could not read', () => {
+  it('does not strand a credential the main holds but could not read', async () => {
     const holdings = createInMemoryHostSettingsReplicationHoldings()
     const port = fakePort()
 
-    applyHostSettingsReplication(snapshot(1), { registry: registry(port), holdings, now: NOW })
+    await applyHostSettingsReplication(snapshot(1), {
+      registry: registry(port),
+      holdings,
+      now: NOW
+    })
     // The main's keyring was locked, so it named the credential as unreadable rather than absent.
-    const result = applyHostSettingsReplication(
+    const result = await applyHostSettingsReplication(
       { ...snapshot(2, []), unreadable: [CREDENTIAL_ID] },
       { registry: registry(port), holdings, now: NOW }
     )
@@ -449,7 +465,7 @@ describe('applying a payload on the host', () => {
     expect(holdings.read().ids).toEqual([CREDENTIAL_ID])
   })
 
-  it('leaves a key the user entered here when a delta names it for removal', () => {
+  it('leaves a key the user entered here when a delta names it for removal', async () => {
     const holdings = createInMemoryHostSettingsReplicationHoldings({
       ids: [],
       revision: 1,
@@ -462,7 +478,7 @@ describe('applying a payload on the host', () => {
 
     // The main's copy of this id went unreadable during an earlier push, so its record named the id and
     // the delta that follows its deletion lists it for removal — but this host's value was never its.
-    const result = applyHostSettingsReplication(
+    const result = await applyHostSettingsReplication(
       { ...snapshot(2, [], [CREDENTIAL_ID]), baseRevision: 1 },
       { registry: registry(port), holdings, now: NOW }
     )
@@ -475,7 +491,7 @@ describe('applying a payload on the host', () => {
     expect(holdings.read().ids).toEqual([])
   })
 
-  it('keeps going when one removal fails, and does not claim it is gone', () => {
+  it('keeps going when one removal fails, and does not claim it is gone', async () => {
     // A delta on a host that holds both, which is what a real sender produces: a snapshot would name the
     // same id twice — once from the sweep, once from the removal — and lean on the receiver's dedupe.
     const holdings = createInMemoryHostSettingsReplicationHoldings({
@@ -496,7 +512,7 @@ describe('applying a payload on the host', () => {
       port.held.delete(id)
     }
 
-    const result = applyHostSettingsReplication(
+    const result = await applyHostSettingsReplication(
       { ...snapshot(2, [], [CREDENTIAL_ID, 'api-key:other']), baseRevision: 1 },
       { registry: registry(port), holdings, now: NOW }
     )
@@ -514,12 +530,12 @@ describe('applying a payload on the host', () => {
     expect(holdings.read().ids).toEqual(['api-key:other'])
   })
 
-  it('reports an adapter that throws without losing the rest of the payload', () => {
+  it('reports an adapter that throws without losing the rest of the payload', async () => {
     const port = fakePort()
     const second = credential({ id: 'api-key:other' })
     const spy = vi.spyOn(port, 'apply')
 
-    const result = applyHostSettingsReplication(
+    const result = await applyHostSettingsReplication(
       snapshot(1, [credential({ payload: 'explodes' }), second]),
       {
         registry: { forCredentialId: () => port },

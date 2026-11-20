@@ -1,7 +1,7 @@
 import { toRuntimeWorktreeSelector } from '../../runtime/rpc/targets/runtime-worktree-selector'
 import type { WorkspacePathSearchApi } from '../../../../preload/api/workspace-path-search-api-types'
-import { callRuntimeResult } from './web-runtime-calls'
-import { resolveRuntimeFilePath } from './web-runtime-worktree-catalog'
+import { callRuntimeResult } from '../runtime/client/web-runtime-calls'
+import { resolveRuntimeFilePath } from './workspaces/web-runtime-worktree-catalog'
 import { searchWebWorkspaceNameFilter } from './web-workspace-path-search'
 
 // A web client's searches are host round-trips with no host-side cancellation, so the fork aborts them.

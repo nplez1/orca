@@ -3,7 +3,7 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import NewWorkspaceComposerCard from './NewWorkspaceComposerCard'
+import NewWorkspaceComposerCard from './new-workspace/composer/NewWorkspaceComposerCard'
 import type { NewWorkspaceComposerCardProps } from './new-workspace/composer/new-workspace-composer-card-props'
 import type { NewWorkspaceProjectOption } from '@/lib/workspace/creation/new-workspace-project-options'
 import type { ProjectHostSetupOption } from '@/lib/workspace/creation/project-host-setup-options'

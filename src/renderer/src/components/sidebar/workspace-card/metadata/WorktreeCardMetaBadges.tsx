@@ -16,8 +16,9 @@ import type {
 } from './worktree-card-meta-types'
 import { useTranslate } from '@/i18n/use-translate'
 import { WorktreeReferenceStack } from '../review/WorktreeReferenceStack'
+import { BotAvatar } from '@/components/bots/BotAvatar'
 
-function hasComment(comment: string | null): boolean {
+export function hasComment(comment: string | null): boolean {
   return (comment ?? '').trim().length > 0
 }
 
@@ -35,7 +36,8 @@ export function hasWorktreeCardDetails({
   review,
   comment,
   automationProvenance,
-  cliProvenance
+  cliProvenance,
+  bot
 }: WorktreeCardMetaBadgesProps): boolean {
   return Boolean(
     linkedItemCount > 0 ||
@@ -45,7 +47,8 @@ export function hasWorktreeCardDetails({
     review ||
     hasComment(comment) ||
     automationProvenance ||
-    cliProvenance
+    cliProvenance ||
+    bot
   )
 }
 
@@ -64,6 +67,7 @@ export const WorktreeCardMetaBadges = React.forwardRef<
     comment,
     automationProvenance,
     cliProvenance,
+    bot,
     className,
     ...props
   },
@@ -79,7 +83,8 @@ export const WorktreeCardMetaBadges = React.forwardRef<
       review,
       comment,
       automationProvenance,
-      cliProvenance
+      cliProvenance,
+      bot
     })
   ) {
     return null
@@ -133,7 +138,13 @@ export const WorktreeCardMetaBadges = React.forwardRef<
           <CalendarClock className="text-muted-foreground" />
         </MetaIconBadge>
       )}
-      {cliProvenance && (
+      {bot && (
+        <MetaIconBadge label={t('bots.workspaces.madeBy', 'Made by {{name}}', { name: bot.name })}>
+          <BotAvatar bot={bot} className="size-3.5 rounded-sm border-0 text-[9px]" />
+        </MetaIconBadge>
+      )}
+      {/* A bot's worker makes its workspaces through the CLI, so the bot is the origin worth showing. */}
+      {cliProvenance && !bot && (
         <MetaIconBadge
           label={t('auto.components.sidebar.WorktreeCardMeta.cliCreated', 'Created by Orca CLI')}
         >

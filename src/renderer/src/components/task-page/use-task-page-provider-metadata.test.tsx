@@ -3,7 +3,7 @@ import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { JiraProject } from '../../../../shared/jira/jira-types'
 import type { TaskPageResumeRestorationModel } from './use-task-page-resume-restoration'
-import { toRuntimeExecutionHostId } from '../../../../shared/execution-host'
+import { toRuntimeExecutionHostId } from '../../../../shared/execution-host/execution-host'
 import { useTaskPageProviderMetadata } from './use-task-page-provider-metadata'
 
 const transport = vi.hoisted(() => ({ jiraListProjects: vi.fn() }))

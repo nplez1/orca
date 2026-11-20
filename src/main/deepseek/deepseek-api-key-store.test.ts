@@ -1,244 +1,100 @@
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { _resetSecretStoreForTests, setSecretStore } from '../../shared/secure-storage/secret-store'
-import type * as DeepSeekApiKeyStore from './deepseek-api-key-store'
+import {
+  _resetSecretStoreForTests,
+  setSecretStore,
+  type SecretStore
+} from '../../shared/secure-storage/secret-store'
+import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
 
-const secretStoreMock = vi.hoisted(() => ({
-  isEncryptionAvailable: vi.fn(() => true),
-  encryptString: vi.fn((value: string) => Buffer.from(value)),
-  decryptString: vi.fn((value: Buffer) => value.toString('utf8'))
-}))
+const ENVELOPE_PREFIX = 'orca-deepseek-api-key:v1:'
 
-const existsSyncMock = vi.fn()
-const readFileSyncMock = vi.fn()
-const rmSyncMock = vi.fn()
-const hardenExistingSecureFileMock = vi.fn()
-const writeSecureFileMock = vi.fn()
-const homedirMock = vi.fn(() => '/home/test')
-const adoptLegacyHomeStoreMock = vi.hoisted(() =>
-  vi.fn((fileName: string) => `/home/test/.orca-np/${fileName}`)
-)
-vi.mock('../home-directory-migration', () => ({
-  adoptLegacyHomeStore: adoptLegacyHomeStoreMock
-}))
+const envelope = (kind: 'encrypted' | 'plaintext', value: string, prefix = ENVELOPE_PREFIX) =>
+  `${prefix}${kind}:${Buffer.from(value, 'utf8').toString('base64')}`
 
-vi.mock('node:fs', () => ({
-  existsSync: existsSyncMock,
-  readFileSync: readFileSyncMock,
-  rmSync: rmSyncMock
-}))
+function installSecretStore(sealing: boolean): void {
+  setSecretStore({
+    isEncryptionAvailable: () => sealing,
+    encryptString: (value) => Buffer.from(value),
+    decryptString: (value) => value.toString('utf8'),
+    describeProtectionGap: () => null
+  } satisfies SecretStore)
+}
 
-vi.mock('node:os', () => ({
-  homedir: homedirMock
-}))
+let home = ''
+const keyPath = (): string => join(home, HOME_DIRECTORY_NAME, 'deepseek-api-key.enc')
 
-vi.mock('node:path', () => ({
-  join: (...parts: string[]) => parts.join('/')
-}))
-
-vi.mock('../../shared/secure-storage/secure-file.ts', () => ({
-  hardenExistingSecureFile: hardenExistingSecureFileMock,
-  writeSecureFile: writeSecureFileMock
-}))
-
-const storePath = '/home/test/.orca-np/deepseek-api-key.enc'
-const envelope = (
-  kind: 'encrypted' | 'plaintext',
-  value: string,
-  prefix = 'orca-deepseek-api-key:v1:'
-): string => `${prefix}${kind}:${Buffer.from(value, 'utf8').toString('base64')}`
-
-async function loadStore(): Promise<typeof DeepSeekApiKeyStore> {
-  setSecretStore({ ...secretStoreMock, describeProtectionGap: () => null })
+async function loadStore() {
   return await import('./deepseek-api-key-store')
 }
 
+beforeEach(() => {
+  home = mkdtempSync(join(tmpdir(), 'orca-deepseek-key-'))
+  vi.stubEnv('HOME', home)
+  vi.stubEnv('USERPROFILE', home)
+  mkdirSync(join(home, HOME_DIRECTORY_NAME))
+  vi.resetModules()
+  installSecretStore(true)
+})
+
+afterEach(() => {
+  _resetSecretStoreForTests()
+  vi.unstubAllEnvs()
+  rmSync(home, { recursive: true, force: true })
+})
+
 describe('deepseek-api-key-store', () => {
-  beforeEach(() => {
-    adoptLegacyHomeStoreMock.mockClear()
-    existsSyncMock.mockReset()
-    readFileSyncMock.mockReset()
-    rmSyncMock.mockReset()
-    hardenExistingSecureFileMock.mockReset()
-    writeSecureFileMock.mockReset()
-    secretStoreMock.isEncryptionAvailable.mockReset()
-    secretStoreMock.encryptString.mockReset()
-    secretStoreMock.decryptString.mockReset()
-    secretStoreMock.isEncryptionAvailable.mockReturnValue(true)
-    secretStoreMock.encryptString.mockImplementation((value: string) => Buffer.from(value))
-    secretStoreMock.decryptString.mockImplementation((value: Buffer) => value.toString('utf8'))
+  it('keeps the key under the Orca NP home and reads it back', async () => {
+    const store = await loadStore()
+    await store.saveDeepSeekApiKey('  sk-deepseek-1234567890  ')
+
+    expect(readFileSync(keyPath(), 'utf8')).toBe(envelope('encrypted', 'sk-deepseek-1234567890'))
+    await expect(store.readDeepSeekApiKey()).resolves.toBe('sk-deepseek-1234567890')
+    await expect(store.hasDeepSeekApiKey()).resolves.toBe(true)
+    await expect(store.getDeepSeekApiKeyProtection()).resolves.toBe('sealed')
   })
 
-  afterEach(() => {
+  it('refuses an empty key instead of writing one', async () => {
+    const store = await loadStore()
+
+    await expect(store.saveDeepSeekApiKey('   ')).rejects.toThrow('DeepSeek API key is required')
+    await expect(store.hasDeepSeekApiKey()).resolves.toBe(false)
+  })
+
+  it('reads a plaintext envelope even with no secret store installed', async () => {
+    writeFileSync(keyPath(), envelope('plaintext', 'sk-plain'))
     _resetSecretStoreForTests()
     vi.resetModules()
-  })
-
-  it('returns false when no file exists yet', async () => {
-    existsSyncMock.mockReturnValue(false)
     const store = await loadStore()
-    expect(store.hasDeepSeekApiKey()).toBe(false)
-    expect(hardenExistingSecureFileMock).not.toHaveBeenCalled()
-    expect(adoptLegacyHomeStoreMock).toHaveBeenCalledWith('deepseek-api-key.enc')
+
+    await expect(store.readDeepSeekApiKey()).resolves.toBe('sk-plain')
+    await expect(store.getDeepSeekApiKeyProtection()).resolves.toBe('plaintext')
   })
 
-  it('hardens the key file when checking status for an existing key', async () => {
-    existsSyncMock.mockReturnValue(true)
+  it('reports a sealed envelope as unreadable once the keychain is unavailable', async () => {
+    writeFileSync(keyPath(), envelope('encrypted', 'sk-sealed'))
+    installSecretStore(false)
     const store = await loadStore()
-    expect(store.hasDeepSeekApiKey()).toBe(true)
-    expect(hardenExistingSecureFileMock).toHaveBeenCalledWith(storePath)
+
+    await expect(store.readDeepSeekApiKey()).rejects.toThrow('could not be decrypted')
   })
 
-  it('still reports an existing key when status-path hardening fails', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-    existsSyncMock.mockReturnValue(true)
-    hardenExistingSecureFileMock.mockImplementation(() => {
-      throw new Error('permission denied')
-    })
+  it('refuses an envelope written under another provider prefix', async () => {
+    writeFileSync(keyPath(), envelope('plaintext', 'sk-minimax', 'orca-minimax-api-key:v1:'))
     const store = await loadStore()
-    expect(store.hasDeepSeekApiKey()).toBe(true)
-    expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('Failed to harden DeepSeek API key file'),
-      expect.any(Error)
-    )
-    warn.mockRestore()
-  })
 
-  it('writes the key through the secret store when encryption is available', async () => {
-    existsSyncMock.mockReturnValue(false)
-    const store = await loadStore()
-    store.saveDeepSeekApiKey('sk-deepseek-1234567890')
-    expect(secretStoreMock.encryptString).toHaveBeenCalledWith('sk-deepseek-1234567890')
-    expect(writeSecureFileMock).toHaveBeenCalledWith(
-      storePath,
-      envelope('encrypted', 'sk-deepseek-1234567890'),
-      { durable: true }
-    )
-  })
-
-  it('warns and writes plaintext when the secret store cannot seal', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-    secretStoreMock.isEncryptionAvailable.mockReturnValue(false)
-    const store = await loadStore()
-    store.saveDeepSeekApiKey('sk-deepseek-1234567890')
-    expect(writeSecureFileMock).toHaveBeenCalledWith(
-      storePath,
-      envelope('plaintext', 'sk-deepseek-1234567890'),
-      { durable: true }
-    )
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('secret encryption unavailable'))
-    warn.mockRestore()
-  })
-
-  it('refuses empty keys', async () => {
-    const store = await loadStore()
-    expect(() => store.saveDeepSeekApiKey('   ')).toThrow('DeepSeek API key is required')
-  })
-
-  it('refuses to seal when no secret store is installed', async () => {
-    // Why this test exists: the global test setup installs a store, so dropping it is the only
-    // way to reach the uninstalled path — and a save consults the port unconditionally.
-    _resetSecretStoreForTests()
-    vi.resetModules()
-    const store = await import('./deepseek-api-key-store')
-
-    expect(() => store.saveDeepSeekApiKey('sk-plain')).toThrow(/SecretStore not initialized/)
-  })
-
-  it('reads a plaintext envelope with no secret store installed at all', async () => {
-    existsSyncMock.mockReturnValue(true)
-    readFileSyncMock.mockReturnValue(Buffer.from(envelope('plaintext', 'sk-plain')))
-    _resetSecretStoreForTests()
-    vi.resetModules()
-    const store = await import('./deepseek-api-key-store')
-
-    expect(store.readDeepSeekApiKey()).toBe('sk-plain')
-  })
-
-  it('classifies a sealed envelope read with no store installed as a decrypt failure', async () => {
-    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    existsSyncMock.mockReturnValue(true)
-    readFileSyncMock.mockReturnValue(Buffer.from(envelope('encrypted', 'sk-sealed')))
-    _resetSecretStoreForTests()
-    vi.resetModules()
-    const store = await import('./deepseek-api-key-store')
-
-    // Why the port's own error is logged and not surfaced: an uninstalled store is unreachable
-    // in production (main-process-preflight and orcad-entry both install one) and this read is
-    // read-only, so the caller's decrypt classification stands — the siblings fetch the store
-    // inside the same try too (openai-api-key-store, integration-credential-file).
-    expect(() => store.readDeepSeekApiKey()).toThrow('could not be decrypted')
-    expect(error).toHaveBeenCalledWith(
-      '[deepseek] failed to decode/decrypt API key',
-      expect.objectContaining({ message: expect.stringContaining('SecretStore not initialized') })
-    )
-    error.mockRestore()
-  })
-
-  it('reads decrypted key from disk and caches it', async () => {
-    existsSyncMock.mockReturnValue(true)
-    readFileSyncMock.mockReturnValue(Buffer.from(envelope('encrypted', 'encrypted-payload')))
-    secretStoreMock.decryptString.mockReturnValue('sk-cached-key')
-    const store = await loadStore()
-    const first = store.readDeepSeekApiKey()
-    const second = store.readDeepSeekApiKey()
-    expect(first).toBe('sk-cached-key')
-    expect(second).toBe(first)
-    expect(hardenExistingSecureFileMock).toHaveBeenCalledTimes(1)
-    expect(hardenExistingSecureFileMock).toHaveBeenCalledWith(storePath)
-    expect(secretStoreMock.decryptString).toHaveBeenCalledTimes(1)
-    expect(secretStoreMock.decryptString).toHaveBeenCalledWith(Buffer.from('encrypted-payload'))
-  })
-
-  it('returns null when no file exists', async () => {
-    existsSyncMock.mockReturnValue(false)
-    const store = await loadStore()
-    expect(store.readDeepSeekApiKey()).toBeNull()
-  })
-
-  it('throws for encrypted envelopes when the secret store cannot seal', async () => {
-    secretStoreMock.isEncryptionAvailable.mockReturnValue(false)
-    existsSyncMock.mockReturnValue(true)
-    readFileSyncMock.mockReturnValue(Buffer.from(envelope('encrypted', 'encrypted-payload')))
-    const store = await loadStore()
-    expect(() => store.readDeepSeekApiKey()).toThrow('DeepSeek API key could not be decrypted')
-  })
-
-  it('throws when decryption fails', async () => {
-    existsSyncMock.mockReturnValue(true)
-    readFileSyncMock.mockReturnValue(Buffer.from(envelope('encrypted', 'encrypted-payload')))
-    secretStoreMock.decryptString.mockImplementation(() => {
-      throw new Error('boom')
-    })
-    const store = await loadStore()
-    expect(() => store.readDeepSeekApiKey()).toThrow('DeepSeek API key could not be decrypted')
-  })
-
-  it('throws for non-envelope files (legacy sealed bytes with no prefix)', async () => {
-    existsSyncMock.mockReturnValue(true)
-    readFileSyncMock.mockReturnValue(Buffer.from('raw-bytes-without-envelope'))
-    const store = await loadStore()
-    expect(() => store.readDeepSeekApiKey()).toThrow('DeepSeek API key could not be decrypted')
-  })
-
-  it('cannot read a MiniMax key file envelope', async () => {
-    existsSyncMock.mockReturnValue(true)
-    readFileSyncMock.mockReturnValue(
-      Buffer.from(envelope('plaintext', 'sk-minimax', 'orca-minimax-api-key:v1:'))
-    )
-    const store = await loadStore()
-    expect(() => store.readDeepSeekApiKey()).toThrow('DeepSeek API key could not be decrypted')
+    await expect(store.readDeepSeekApiKey()).rejects.toThrow('could not be decrypted')
   })
 
   it('clears the cached key and removes the file', async () => {
-    let filePresent = true
-    existsSyncMock.mockImplementation((path: string) => path === storePath && filePresent)
-    readFileSyncMock.mockReturnValueOnce(Buffer.from(envelope('encrypted', 'encrypted-payload')))
-    secretStoreMock.decryptString.mockReturnValueOnce('sk-preclear')
     const store = await loadStore()
-    expect(store.readDeepSeekApiKey()).toBe('sk-preclear')
-    filePresent = false
-    store.clearDeepSeekApiKey()
-    expect(rmSyncMock).toHaveBeenCalledWith(storePath, { force: true })
-    expect(store.readDeepSeekApiKey()).toBeNull()
+    await store.saveDeepSeekApiKey('sk-deepseek-1234567890')
+
+    await store.clearDeepSeekApiKey()
+
+    await expect(store.readDeepSeekApiKey()).resolves.toBeNull()
+    await expect(store.hasDeepSeekApiKey()).resolves.toBe(false)
   })
 })

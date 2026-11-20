@@ -1,10 +1,11 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget (300/300); the fork's +8-line delta rides inside it, and splitting costs a permanent sync hunk. */
 import { shouldAcceptMergedFallbackPR } from '../../../../shared/github/pull-requests/refresh/pr-branch-fallback-rule'
 import {
   settledForegroundAgeMs,
   reviewRefreshIntervalMs,
   scaleReviewRefreshInterval,
   type PRAutoRefreshCadence
-} from '../../../../shared/review-refresh-policy'
+} from '../../../../shared/source-control/hosted-review/review-refresh-policy'
 import type {
   GitHubPRRefreshAlias,
   GitHubPRRefreshCandidate,
@@ -25,7 +26,12 @@ export const POST_PUSH_DELAY_MS = 2_500
 
 type PRBranchLookupCandidate = Pick<
   GitHubPRRefreshCandidate,
-  'localGitOptions' | 'linkedPRNumber' | 'fallbackPRNumber' | 'fallbackPRSource' | 'currentHeadOid'
+  | 'localGitOptions'
+  | 'linkedPRNumber'
+  | 'linkedPRUrl'
+  | 'fallbackPRNumber'
+  | 'fallbackPRSource'
+  | 'currentHeadOid'
 >
 
 export function hostedReviewOptionArgs(
@@ -51,6 +57,9 @@ export function hostedReviewOptionArgs(
   }
   if (shouldAcceptMergedFallbackPR(candidate)) {
     options.acceptMergedFallbackPR = true
+  }
+  if (candidate.linkedPRUrl) {
+    options.linkedPRUrl = candidate.linkedPRUrl
   }
   if (reason === 'watch') {
     options.includeDerivedData = false
@@ -108,7 +117,9 @@ export function refreshKey(candidate: PRBranchReadRequest): string {
     : `runtime:${candidate.localGitOptions?.wslDistro ? `wsl:${candidate.localGitOptions.wslDistro}` : 'host'}`
   const accountScope = ghAccountScope(candidate)
   if (typeof candidate.linkedPRNumber === 'number') {
-    return `${connectionScope}::${runtimeScope}${accountScope}::${candidate.repoPath}::pr::${candidate.linkedPRNumber}`
+    // The same number names different PRs in a fork and its parent.
+    const url = candidate.linkedPRUrl ? `::${candidate.linkedPRUrl}` : ''
+    return `${connectionScope}::${runtimeScope}${accountScope}::${candidate.repoPath}::pr::${candidate.linkedPRNumber}${url}`
   }
   return `${connectionScope}::${runtimeScope}${accountScope}::${candidate.repoPath}::branch::${candidate.branch}`
 }
@@ -213,6 +224,7 @@ export function aliasFromCandidate(candidate: GitHubPRRefreshCandidate): GitHubP
     connectionId: candidate.connectionId ?? null,
     currentHeadOid: candidate.currentHeadOid ?? null,
     linkedPRNumber: candidate.linkedPRNumber ?? null,
+    ...(candidate.linkedPRUrl ? { linkedPRUrl: candidate.linkedPRUrl } : {}),
     fallbackPRNumber:
       candidate.linkedPRNumber == null ? (candidate.fallbackPRNumber ?? null) : null,
     fallbackPRSource: candidate.linkedPRNumber == null ? (candidate.fallbackPRSource ?? null) : null
@@ -338,6 +350,7 @@ export function sameAliasRequestIdentity(
     left.connectionId === right.connectionId &&
     left.executionHostId === right.executionHostId &&
     left.linkedPRNumber === right.linkedPRNumber &&
+    left.linkedPRUrl === right.linkedPRUrl &&
     left.fallbackPRNumber === right.fallbackPRNumber &&
     left.fallbackPRSource === right.fallbackPRSource &&
     left.currentHeadOid === right.currentHeadOid

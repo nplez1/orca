@@ -14,7 +14,7 @@ import {
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createWorktreeSharedPaths } from './worktree-symlinks'
+import { createWorktreeSharedPaths } from './worktrees/linked-paths/worktree-symlinks'
 
 const posixIt = process.platform === 'win32' ? it.skip : it
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import type { WorktreeLayoutMode } from '../../../../../../shared/orca-workspace-layout'
-import type { ExecutionHostId } from '../../../../../../shared/execution-host'
+import type { WorktreeLayoutMode } from '../../../../../../shared/worktree/paths/orca-workspace-layout'
+import type { ExecutionHostId } from '../../../../../../shared/execution-host/execution-host'
 import { browseRuntimeServerDirectory } from '@/runtime/files/reads/runtime-server-directory-browser'
 import {
   getCloneParentForHost,

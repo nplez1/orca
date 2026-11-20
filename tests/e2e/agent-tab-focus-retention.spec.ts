@@ -1,13 +1,14 @@
 import type { Page } from '@playwright/test'
-import { expect, test } from './helpers/orca-app'
+import { expect } from '@stablyai/playwright-test'
+import { test } from './desktop/electron-fixtures/orca-app'
 import {
   ensureTerminalVisible,
   getAllWorktreeIds,
   switchToWorktree,
   waitForActiveWorktree,
   waitForSessionReady
-} from './helpers/store'
-import { waitForActiveTerminalManager } from './helpers/terminal'
+} from './desktop/renderer-probes/store'
+import { waitForActiveTerminalManager } from './terminal/layout/terminal-pane-operations'
 
 /**
  * Keyboard focus is the shortcut context (`getKeybindingContext` reports

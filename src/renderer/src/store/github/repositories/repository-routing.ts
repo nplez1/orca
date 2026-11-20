@@ -14,7 +14,7 @@ import {
   normalizeExecutionHostId,
   parseExecutionHostId,
   toRuntimeExecutionHostId
-} from '../../../../../shared/execution-host'
+} from '../../../../../shared/execution-host/execution-host'
 
 /** The repo row at this path/id on this server. A path or an id can name another machine's
  *  row — two checkouts can sit at the same path — and the bare first-wins lookups would then hand

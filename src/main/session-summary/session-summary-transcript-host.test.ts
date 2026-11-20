@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { toSshExecutionHostId } from '../../shared/execution-host'
+import { toSshExecutionHostId } from '../../shared/execution-host/execution-host'
 import { isSessionSummaryHostSupported } from '../../shared/session-summary-host'
 import { resolveSessionSummaryTranscriptHost } from './session-summary-transcript-host'
 

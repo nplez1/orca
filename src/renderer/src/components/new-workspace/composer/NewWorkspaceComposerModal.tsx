@@ -1,0 +1,558 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 75-code-line delta rides inside it, and splitting costs a permanent sync hunk. */
+import type { ComposerModalData } from './composer-modal-data'
+import { toast } from 'sonner'
+import {
+  formatWorkspaceCreateError,
+  getWorkspaceCreateErrorToastMessage
+} from '@/lib/workspace/creation/workspace-create-error-format'
+import type {
+  AgentPickerDraft,
+  AgentPickerEntry
+} from '../../../../../shared/agent-launch/picker/agent-launch-picker'
+import { DirectWorkItemSetupDialog } from '../setup/DirectWorkItemSetupDialog'
+import { agentChoicePending } from '@/lib/agent-session/launch/inventory/host-chat-program'
+import type { AgentLaunchSurface } from '@/lib/agent-session/launch/routing/agent-session-launch-plan'
+import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { useAppStore } from '@/store/index'
+import { lazyWithRetry } from '@/app-shell/startup/lazy-with-retry'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog'
+import NewWorkspaceComposerCard from '@/components/new-workspace/composer/NewWorkspaceComposerCard'
+import AgentSettingsDialog, {
+  restoreAgentSettingsInvoker
+} from '@/components/agent/AgentSettingsDialog'
+import { useComposerHostedAddProject } from '../project-selection/use-composer-hosted-add-project'
+import { useComposerState } from '@/hooks/useComposerState'
+import {
+  composerLaunchWorkspace,
+  quickWorkspacePickerInputs
+} from '@/lib/workspace/creation/quick-workspace-agent-selection'
+import {
+  pickQuickWorkspaceAgent,
+  resolveQuickWorkspaceAgentSelection
+} from '../../../../../shared/agent-launch/catalog/quick-workspace-agent-selection'
+import { useAgentsOfferedForLaunch } from '@/lib/agent-session/launch/inventory/host-chat-program-acquisition'
+import { shouldAllowComposerEnterSubmitTarget } from '@/lib/workspace/creation/new-workspace-enter-guard'
+import { isScreenSubmitShortcut } from '@/lib/keyboard/screen-submit-shortcut'
+import type { TuiAgent } from '../../../../../shared/agent-launch/catalog/tui-agent'
+import {
+  useWorkspaceCopyTarget,
+  type ProjectHostSetupProvisioning
+} from '@/components/new-workspace/use-workspace-copy-target'
+import { useRunTargetAutoClone } from '@/components/new-workspace/use-run-target-auto-clone'
+import { resolveComposerProjectName } from '@/components/new-workspace/composer-project-name'
+import { resolveProjectCloneUrlPrefill } from '@/lib/workspace/creation/project-clone-url-prefill'
+import { resolveWorktreeLayoutMode } from '../../../../../shared/worktree/paths/orca-workspace-layout'
+import { branchName } from '@/lib/source-control/branches/branch-name'
+import { activateAndRevealWorktree } from '@/lib/workspace/activation/worktree-activation'
+import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
+import { getWorkspaceComposerInitialFocusTarget } from '@/lib/workspace/creation/workspace-composer-initial-focus'
+import '@/components/sidebar/workspace-creation/folder/folder-workspace-source-repos'
+import { getFolderWorkspacePrimaryActionLabel } from '@/components/sidebar/workspace-creation/folder/folder-workspace-source-selection'
+import { useAgentMenuObservation } from '@/components/agent/launch-menu/use-new-tab-agent-menu-rows'
+import { addAppKeyListener, removeAppKeyListener } from '@/lib/keyboard/app-keyboard-router'
+export type { ComposerModalData }
+
+// Keep Add Project’s clone/SSH machinery outside the composer entry render, matching App loading.
+const HostedAddRepoDialog = lazyWithRetry(
+  () => import('@/components/sidebar/project-admission/dialog/AddRepoDialog'),
+  {
+    reloadKey: 'composer-add-repo'
+  }
+)
+
+export default function NewWorkspaceComposerModal(): React.JSX.Element | null {
+  const visible = useAppStore((s) => s.activeModal === 'new-workspace-composer')
+  const modalData = useAppStore((s) => s.modalData as ComposerModalData | undefined)
+  const closeModal = useAppStore((s) => s.closeModal)
+
+  if (!visible) {
+    return null
+  }
+
+  if (modalData?.directSetup) {
+    return (
+      <DirectWorkItemSetupDialog key={modalData.directSetup.id} request={modalData.directSetup} />
+    )
+  }
+
+  return <ComposerModalBody modalData={modalData ?? {}} onClose={closeModal} />
+}
+
+function ComposerModalBody({
+  modalData,
+  onClose
+}: {
+  modalData: ComposerModalData
+  onClose: () => void
+}): React.JSX.Element {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const submitCancelledRef = useRef(false)
+  const handleDismiss = useCallback(() => {
+    submitCancelledRef.current = true
+    onClose()
+  }, [onClose])
+  const isSubmissionCancelled = useCallback(() => submitCancelledRef.current, [])
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && handleDismiss()}>
+      <DialogContent
+        ref={dialogRef}
+        className="flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden sm:max-w-lg"
+        onEscapeKeyDown={(event) => {
+          if (dialogRef.current?.querySelector('[data-sparse-preset-editor]')) {
+            event.preventDefault()
+          }
+        }}
+        onOpenAutoFocus={(event) => {
+          // Override Radix’s first-tabbable close button with the name/source field for immediate typing.
+          event.preventDefault()
+          const content = event.currentTarget as HTMLElement
+          getWorkspaceComposerInitialFocusTarget(content)?.focus({ preventScroll: true })
+        }}
+      >
+        <QuickTabBody
+          modalData={modalData}
+          onClose={onClose}
+          isSubmissionCancelled={isSubmissionCancelled}
+          active
+        />
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function QuickTabBody({
+  modalData,
+  onClose,
+  isSubmissionCancelled,
+  active
+}: {
+  modalData: ComposerModalData
+  onClose: () => void
+  isSubmissionCancelled: () => boolean
+  active: boolean
+}): React.JSX.Element {
+  const t = useTranslate()
+  const settings = useAppStore((s) => s.settings)
+  const projects = useAppStore((s) => s.projects)
+  const repos = useAppStore((s) => s.repos)
+  // Why: copying an existing workspace fixes the branch; the base ref follows it so the checkout
+  // starts from that branch instead of whatever the target host defaults to.
+  const lockedWorkspaceBranch = modalData.lockedWorkspaceBranch
+  const lockedWorkspacePushTarget = modalData.lockedWorkspacePushTarget
+  const initialBaseBranch = modalData.initialBaseBranch ?? lockedWorkspaceBranch
+  const {
+    cardProps,
+    composerRef,
+    onComposerNodeChange,
+    nameInputRef,
+    submitQuick,
+    createDisabled: formDisabled,
+    selectAddedProjectRepo,
+    selectAddedProjectGroup
+  } = useComposerState({
+    initialName: modalData.prefilledName ?? lockedWorkspaceBranch ?? '',
+    // Why: the modal is quick-create only now, so prompt-prefill state is
+    // intentionally ignored even if older callers still send it.
+    initialPrompt: '',
+    initialNote: modalData.recovery?.note,
+    initialLinkedWorkItem: modalData.linkedWorkItem ?? null,
+    initialGitHubWorkItem: modalData.initialGitHubWorkItem ?? null,
+    initialTaskSourceContext: modalData.taskSourceContext ?? null,
+    initialWorkspaceTarget: modalData.initialWorkspaceTarget ?? null,
+    initialRepoId: modalData.initialRepoId,
+    initialEphemeralVmRecipeId: modalData.initialEphemeralVmRecipeId,
+    initialProjectGroupId: modalData.initialProjectGroupId,
+    initialWorkspaceStatus: modalData.initialWorkspaceStatus,
+    initialParentWorktreeId: modalData.initialParentWorktreeId,
+    ...(lockedWorkspaceBranch ? { initialBranchNameOverride: lockedWorkspaceBranch } : {}),
+    ...(initialBaseBranch ? { initialBaseBranch } : {}),
+    persistDraft: false,
+    onCreated: onClose,
+    isSubmissionCancelled,
+    ...(modalData.telemetrySource ? { telemetrySource: modalData.telemetrySource } : {}),
+    enableIssueAutomation: modalData.enableIssueAutomation === true
+  })
+  // Why: the same branch cannot be checked out twice on one host, so git would silently
+  // rename the copy instead of copying it — the target host is the whole point of the flow.
+  const {
+    lockedTargetIsSourceHost,
+    onlySourceHostAvailable,
+    recordProvisionedSetup,
+    resolveCloneLandedCopy,
+    selectedTargetHostLabel
+  } = useWorkspaceCopyTarget({
+    ...(lockedWorkspaceBranch ? { lockedWorkspaceBranch } : {}),
+    ...(modalData.lockedWorkspaceSourceHostId
+      ? { sourceHostId: modalData.lockedWorkspaceSourceHostId }
+      : {}),
+    ...(modalData.lockedWorkspaceSourceRuntimeOwnerEnvironmentId
+      ? {
+          sourceRuntimeOwnerEnvironmentId: modalData.lockedWorkspaceSourceRuntimeOwnerEnvironmentId
+        }
+      : {}),
+    projectHostSetupOptions: cardProps.projectHostSetupOptions ?? [],
+    selectedProjectHostSetupId: cardProps.selectedProjectHostSetupId ?? null,
+    selectedRepoExecutionHostId: cardProps.selectedRepoExecutionHostId,
+    selectedEphemeralVmRecipeId: cardProps.selectedEphemeralVmRecipeId,
+    hasLockedPushTarget: Boolean(lockedWorkspacePushTarget),
+    lockedWorkspaceIsPrimary: modalData.lockedWorkspaceIsPrimary === true
+  })
+  const handleProjectHostSetupProvisioned = useCallback(
+    (setupId: string, provisioning?: ProjectHostSetupProvisioning): void => {
+      if (provisioning) {
+        recordProvisionedSetup(setupId, provisioning)
+      }
+      cardProps.onProjectHostSetupChange?.(setupId)
+    },
+    [cardProps, recordProvisionedSetup]
+  )
+  const runTargetClone = useRunTargetAutoClone({
+    projectId: cardProps.selectedProjectId ?? null,
+    projectName: resolveComposerProjectName({
+      projectOptions: cardProps.projectOptions ?? [],
+      selectedProjectId: cardProps.selectedProjectId ?? null,
+      eligibleRepos: cardProps.eligibleRepos ?? [],
+      repoId: cardProps.repoId
+    }),
+    defaultCloneUrl: resolveProjectCloneUrlPrefill(
+      projects,
+      repos,
+      cardProps.selectedProjectId ?? null
+    ),
+    settings,
+    layoutMode: settings ? resolveWorktreeLayoutMode(settings) : undefined,
+    onProvisioned: handleProjectHostSetupProvisioned
+  })
+  // fork-comment-ok: a clone belongs to the project that started it — a URL, a destination and the
+  // setup it lands on all name that project, so switching project must drop the whole request.
+  const selectedProjectId = cardProps.selectedProjectId ?? null
+  const clearRunTargetClone = runTargetClone.clear
+  const setRunTargetCloneOverrides = runTargetClone.setOverrides
+  useEffect(() => {
+    clearRunTargetClone()
+    setRunTargetCloneOverrides({ url: '', destination: '' })
+  }, [clearRunTargetClone, selectedProjectId, setRunTargetCloneOverrides])
+  // Why: the composer's built-in `onOpenAgentSettings` handler navigates to
+  // the settings page and closes the modal. For the quick-create flow we want
+  // a less disruptive affordance — a nested dialog layered over the composer
+  // so the user can tweak agents without losing their in-progress workspace
+  // name/repo selection.
+  const [agentSettingsOpen, setAgentSettingsOpen] = useState(false)
+  const agentSettingsInvoker = useRef<HTMLButtonElement | null>(null)
+  // User picks outrank newly detected preferences. Derive from an override so detection stays current without an effect-driven extra commit.
+  const [quickAgentOverride, setQuickAgentOverride] = useState<TuiAgent | null | undefined>(
+    modalData.recovery?.agent
+  )
+  // The picker rows' workspace when known, so the offered list and the rows read one host.
+  const launchWorkspace =
+    cardProps.agentRows?.target.workspace ?? composerLaunchWorkspace(cardProps)
+  const offeredAgentIds = useAgentsOfferedForLaunch(launchWorkspace, cardProps.detectedAgentIds)
+  const detected = cardProps.detectedAgentIds ? [...cardProps.detectedAgentIds] : null
+  const choicePending = (agent: TuiAgent): boolean =>
+    agentChoicePending(useAppStore.getState(), agent, launchWorkspace, detected)
+  // Pending discovery preserves the existing catalog fallback; current facts settle the default.
+  const preferredQuickAgent = pickQuickWorkspaceAgent(
+    settings?.defaultTuiAgent,
+    cardProps.detectedAgentIds,
+    settings?.disabledTuiAgents,
+    offeredAgentIds,
+    choicePending
+  )
+  // An explicit pick stays valid where it opens as a chat without its CLI.
+  const resolvedQuickAgentSelection = resolveQuickWorkspaceAgentSelection({
+    quickAgentOverride,
+    preferredQuickAgent,
+    detectedAgentIds: cardProps.detectedAgentIds,
+    offeredAgentIds,
+    selectedChoiceUnresolved: Boolean(quickAgentOverride && choicePending(quickAgentOverride)),
+    disabledTuiAgents: settings?.disabledTuiAgents
+  })
+  if (resolvedQuickAgentSelection.quickAgentOverride !== quickAgentOverride) {
+    // Repair invalid picks before children render an unavailable option.
+    setQuickAgentOverride(resolvedQuickAgentSelection.quickAgentOverride)
+  }
+  const quickAgent = resolvedQuickAgentSelection.quickAgent
+  const chipAgentIds =
+    offeredAgentIds &&
+    new Set([...offeredAgentIds, ...(quickAgent && choicePending(quickAgent) ? [quickAgent] : [])])
+  // Why keyed by agent: a pick repaired to another agent must not carry the old one's surface.
+  const [quickAgentPick, setQuickAgentPick] = useState<
+    Omit<NonNullable<ComposerModalData['recovery']>, 'note'>
+  >(modalData.recovery ?? { agent: null })
+  const observation = useAgentMenuObservation(
+    cardProps.agentRows?.target ?? null,
+    active && Boolean(cardProps.agentRows),
+    cardProps.agentRows?.detectionTarget,
+    { wakeOnOpen: true }
+  )
+  const pickerDraft =
+    quickAgentPick.agent === quickAgent && quickAgentPick.contextKey === observation.contextKey
+      ? quickAgentPick.draft
+      : undefined
+  const quickAgentSurface = quickAgentPick.agent === quickAgent ? quickAgentPick.surface : undefined
+  const launchSelection = observation.selectionFor(quickAgent, quickAgentSurface)
+  const createDisabled = formDisabled || !launchSelection.ready
+  // Why one value: the button, the Cmd/Ctrl+Enter guard and the effect deps must agree, or a
+  // keyboard submit slips past a disabled button.
+  const effectiveCreateDisabled =
+    createDisabled || lockedTargetIsSourceHost || runTargetClone.blocksCreate
+
+  const handleQuickAgentChange = useCallback(
+    (
+      agent: TuiAgent | null,
+      surface?: AgentLaunchSurface,
+      draft?: AgentPickerDraft,
+      entry?: AgentPickerEntry
+    ) => {
+      setQuickAgentOverride(agent)
+      setQuickAgentPick({ agent, surface, draft, entry, contextKey: observation.contextKey })
+    },
+    [observation.contextKey]
+  )
+
+  const handleCreate = useCallback(async (): Promise<void> => {
+    if (effectiveCreateDisabled) {
+      return
+    }
+    // Why before create: when our own clone already checked the copied branch out, the clone is
+    // the copy, so asking the host for it again could only collide and report a false failure.
+    const landedCopy = await resolveCloneLandedCopy()
+    if (landedCopy) {
+      toast.success(
+        landedCopy.kind === 'primary-copy'
+          ? translate(
+              'auto.components.NewWorkspaceComposerModal.copyAlreadyLanded',
+              'This project is now on {{host}} on {{branch}}.',
+              {
+                host: selectedTargetHostLabel,
+                branch: branchName(lockedWorkspaceBranch ?? '')
+              }
+            )
+          : translate(
+              'auto.components.NewWorkspaceComposerModal.copyBranchHeldByPrimary',
+              '{{branch}} is checked out by the main checkout of this project on {{host}}. Git keeps one checkout per branch, so that is the workspace there.',
+              {
+                host: selectedTargetHostLabel,
+                branch: branchName(lockedWorkspaceBranch ?? '')
+              }
+            )
+      )
+      activateAndRevealWorktree(landedCopy.worktree.id, { navigationIntent: 'user-open' })
+      onClose()
+      return
+    }
+    await submitQuick(quickAgent, {
+      // Blank Terminal is the setup-only create: no agent, and no extra shell beside setup.
+      setupOnly: quickAgent === null,
+      // Why: a copied workspace keeps its branch, so a collision must fail instead of suffixing.
+      exactBranchName: Boolean(lockedWorkspaceBranch),
+      ...(lockedWorkspacePushTarget ? { lockedPushTarget: lockedWorkspacePushTarget } : {}),
+      launchChoice: launchSelection.choice,
+      onLegacyPreparationFailure: (error) => {
+        if (isSubmissionCancelled()) {
+          return
+        }
+        const snapshot = {
+          ...modalData,
+          prefilledName: cardProps.name,
+          initialRepoId: cardProps.repoId,
+          initialBaseBranch: cardProps.baseBranch,
+          initialWorkspaceTarget:
+            cardProps.selectedProjectId && cardProps.selectedRepoExecutionHostId
+              ? {
+                  projectId: cardProps.selectedProjectId,
+                  hostId: cardProps.selectedRepoExecutionHostId,
+                  projectHostSetupId: cardProps.selectedProjectHostSetupId ?? null
+                }
+              : modalData.initialWorkspaceTarget,
+          linkedWorkItem: cardProps.linkedWorkItem,
+          recovery: { ...quickAgentPick, agent: quickAgent, note: cardProps.note }
+        }
+        toast.error(getWorkspaceCreateErrorToastMessage(formatWorkspaceCreateError(error)), {
+          action: {
+            label: translate('auto.lib.composerCreateHandoff.reopen', 'Reopen'),
+            onClick: () => {
+              if (!isSubmissionCancelled() && useAppStore.getState().activeModal === 'none') {
+                useAppStore.getState().openModal('new-workspace-composer', snapshot)
+              }
+            }
+          }
+        })
+      },
+      ...quickWorkspacePickerInputs(
+        pickerDraft,
+        quickAgentPick.entry,
+        launchSelection.choice?.executionHostId
+      )
+    })
+  }, [
+    effectiveCreateDisabled,
+    lockedWorkspaceBranch,
+    lockedWorkspacePushTarget,
+    onClose,
+    quickAgent,
+    launchSelection.choice,
+    resolveCloneLandedCopy,
+    selectedTargetHostLabel,
+    submitQuick,
+    pickerDraft,
+    quickAgentPick,
+    isSubmissionCancelled,
+    modalData,
+    cardProps
+  ])
+  // Why: Add Project layers over the composer as a nested dialog instead of
+  // replacing it in the activeModal slot — closing the composer mid-flow (and
+  // losing the typed name/prompt) was the old, abrupt behavior. Once opened it
+  // stays mounted so cancel/complete plays the close animation and the
+  // dialog's close effects can abort in-flight clone/scan work. (Folder/non-git
+  // outcomes still navigate away and tear the whole modal down.)
+  // The hosted hook also counts the fork's Set-location and remote-host dialogs, which the
+  // composer card reports through the same nested-dialog callback.
+  const {
+    addProjectOpen,
+    addProjectMounted,
+    nestedDialogCount,
+    addProjectController,
+    handleNestedDialogOpenChange,
+    handleOpenAddProject,
+    handleOpenAddProjectEntryRequest
+  } = useComposerHostedAddProject({
+    nameInputRef,
+    selectAddedProjectRepo,
+    selectAddedProjectGroup
+  })
+  const selectedProjectOption = cardProps.projectOptions.find(
+    (option) => option.id === cardProps.selectedProjectId
+  )
+  const isFolderWorkspaceTarget = selectedProjectOption?.kind === 'project-group'
+  // Why: a composer opened from a task already carries that task as the link, so
+  // its source is settled before the dialog renders — the user only names it.
+  const impliedTaskSourceUrl = modalData.linkedWorkItem?.url ?? null
+  const primaryActionLabel = isFolderWorkspaceTarget
+    ? getFolderWorkspacePrimaryActionLabel(t)
+    : cardProps.selectedRepoIsGit
+      ? t('auto.components.NewWorkspaceComposerModal.createWorktree', 'Create worktree')
+      : t('auto.components.NewWorkspaceComposerModal.createWorkspace', 'Create workspace')
+
+  // Let Radix own Escape for the topmost layer. This dialog auto-focuses input, so page-style blur-first handling swallowed its first Escape.
+  const nestedDialogOpen = agentSettingsOpen || addProjectOpen || nestedDialogCount > 0
+  useEffect(() => {
+    if (!active || nestedDialogOpen) {
+      // Nested dialogs own input; never submit the underlying composer through this capture handler.
+      return
+    }
+    const onKeyDown = (event: KeyboardEvent): void => {
+      // Creation uses the screen submit chord, outside configurable app commands.
+      if (!isScreenSubmitShortcut(event)) {
+        return
+      }
+      const target = event.target
+      if (!(target instanceof HTMLElement)) {
+        return
+      }
+      if (!shouldAllowComposerEnterSubmitTarget(target, composerRef.current)) {
+        return
+      }
+      if (
+        effectiveCreateDisabled ||
+        composerRef.current?.hasAttribute('data-sparse-preset-editing')
+      ) {
+        return
+      }
+      event.preventDefault()
+      void handleCreate()
+    }
+    addAppKeyListener('keydown', onKeyDown)
+    return () => removeAppKeyListener('keydown', onKeyDown)
+  }, [active, composerRef, effectiveCreateDisabled, handleCreate, nestedDialogOpen])
+
+  return (
+    <>
+      <DialogHeader className="gap-1">
+        <DialogTitle className="text-base font-semibold">
+          {isFolderWorkspaceTarget
+            ? t(
+                'auto.components.sidebar.FolderWorkspaceComposerDialog.title',
+                'Create Folder Workspace'
+              )
+            : primaryActionLabel}
+        </DialogTitle>
+        <DialogDescription className="sr-only">
+          {t(
+            'components.newWorkspace.createDescription',
+            'Choose the project and workspace name. Select an agent if you want to start one.'
+          )}
+        </DialogDescription>
+      </DialogHeader>
+      <NewWorkspaceComposerCard
+        contextualTourSource={modalData.contextualTourSource}
+        // Keep focus rings and the Advanced hover highlight inside the scroll padding.
+        containerClassName="px-2"
+        contentClassName="-mx-2 flex-1 overflow-y-auto px-2 pb-1 scrollbar-sleek"
+        composerRef={composerRef}
+        onComposerNodeChange={onComposerNodeChange}
+        nameInputRef={nameInputRef}
+        quickAgent={quickAgent}
+        agentPickerDraft={pickerDraft}
+        agentSetupDisabled={
+          observation.model.state !== 'settled' ||
+          observation.model.pickerContext?.executionHostId !== 'local'
+        }
+        onQuickAgentChange={handleQuickAgentChange}
+        {...cardProps}
+        identityLocked={Boolean(lockedWorkspaceBranch)}
+        lockedTargetIsSourceHost={lockedTargetIsSourceHost}
+        onlySourceHostAvailable={onlySourceHostAvailable}
+        onProjectHostSetupChange={handleProjectHostSetupProvisioned}
+        runTargetClone={runTargetClone}
+        createDisabled={effectiveCreateDisabled}
+        impliedTaskSourceUrl={impliedTaskSourceUrl}
+        // Chips list offered agents, keeping a pick whose chat is still being learned.
+        detectedAgentIds={chipAgentIds}
+        agentSurfaceRows={
+          cardProps.agentRows
+            ? {
+                model: observation.model,
+                selection: launchSelection,
+                surface: quickAgentSurface,
+                contextKey: observation.contextKey,
+                onPick: handleQuickAgentChange
+              }
+            : undefined
+        }
+        primaryActionLabel={primaryActionLabel}
+        onOpenAgentSettings={(invoker) => {
+          agentSettingsInvoker.current = invoker
+          setAgentSettingsOpen(true)
+        }}
+        onCreate={() => void handleCreate()}
+        onAddProjectOverride={handleOpenAddProject}
+        onAddProjectEntryRequest={handleOpenAddProjectEntryRequest}
+        onNestedDialogOpenChange={handleNestedDialogOpenChange}
+      />
+      <AgentSettingsDialog
+        open={agentSettingsOpen}
+        onOpenChange={setAgentSettingsOpen}
+        onCloseAutoFocus={(event) => {
+          const invoker = agentSettingsInvoker.current
+          agentSettingsInvoker.current = null
+          restoreAgentSettingsInvoker(event, invoker)
+        }}
+      />
+      {addProjectMounted ? (
+        <Suspense fallback={null}>
+          <HostedAddRepoDialog hosted={addProjectController} />
+        </Suspense>
+      ) : null}
+    </>
+  )
+}

@@ -1,5 +1,5 @@
 // @ts-nocheck -- mechanically split from OrcaRuntimeService; behavior is covered by AST equivalence and characterization tests.
-import { ALL_EXECUTION_HOSTS_SCOPE } from '../../shared/execution-host'
+import { ALL_EXECUTION_HOSTS_SCOPE } from '../../shared/execution-host/execution-host'
 // Why this path: upstream moved the mixin into the construction module, and this is a
 // type-only import, so the cycle with host-services' value import of this file is erased.
 import type { OrcaRuntimeWithPreservedBranchCleanup } from './construction/runtime-host-services'
@@ -26,7 +26,10 @@ import { countRepoTerminalsNotKnownExited } from './workspaces/removal/project-r
 export function installOrcaRuntimeOwnedControllers(
   runtime: OrcaRuntimeWithPreservedBranchCleanup
 ): void {
-  runtime.accounts = new RuntimeAccountController(() => runtime.notifier)
+  // Why: upstream hands this controller the Claude-account selection handler, not the notifier.
+  runtime.accounts = new RuntimeAccountController((change) =>
+    runtime.handleClaudeAccountSelected(change)
+  )
 
   runtime.mobileSpeech = new RuntimeMobileSpeechCatalog(() => runtime.store)
 

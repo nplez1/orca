@@ -4,11 +4,11 @@ import { mapSettledWithConcurrency } from '../../shared/concurrency/map-with-con
 import {
   WorktreeLinkedPathTargetExistsError,
   type DarwinFilesystemCache
-} from './worktree-apfs-clone'
+} from './worktrees/linked-paths/worktree-apfs-clone'
 import {
   createWorktreeCopyBudgetTracker,
   type SkippedWorktreeCopyPath
-} from './worktree-include-copy-budget'
+} from './worktrees/linked-paths/worktree-include-copy-budget'
 import {
   copyIsCopyOnWrite,
   createWorktreeLinkedPath,

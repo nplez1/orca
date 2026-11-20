@@ -2706,3 +2706,94 @@ next reader does not re-derive it.
   cannot tell a reviewed deletion from a merge accident, so a deletion reds the sync gate. Weakening
   that gate to clean up one file is the wrong trade: the check is what catches a module the merge
   silently dropped, and an orphan costs nothing.
+
+---
+
+## 2026-11-20 sync (upstream `0c6207e3d7`, 1425 commits)
+
+477 conflicted paths from base `1ce376b27e`; merge `2ed6a05ce78`. Classes: both-rewrote 248, union 126,
+modify/delete 81, rename-replay 12, duplicate-tail 7, duplicate-members 2, add/add 1. Tiers: 54 paths
+proved by `conflicts.mjs --apply-proven`, 77 modify/delete settled as deletions, 4 moved paths ported by
+hand, 241 hand-resolved in 18 area batches of ≤20.
+
+### Test inventories retired upstream, at four times the 2026-11-01 scale
+
+**Paths:** the 67 UD paths — every file upstream deleted under `test: remove N low-value suites`
+(#42831, #42851, #42858, #42866, #42874, #42883, #42888, #42931, #42951, #43662) or in the ownership
+refactors (#43120, #43339). No production source in the set.
+
+**Decision:** the fork takes the deletion, including where it had extended the file. Same rule as the
+2026-11-01 entry, applied again. 83 fork-modified test files and 182 fork-added cases were recorded in
+`local/sync/upstream-deleted-fork-tests-baseline.json` with the reason.
+
+**What it cost, named:** the fork's whole `src/main/updater/*.test.ts` set went in #43339 —
+`updater.build-channel-selection`, `updater.prerelease-fallback`, `updater.publishing-window-feed`,
+`updater.check-preflight` and `updater.check-failure` among them — and the updater is one of the fork's
+heaviest patch areas. Also gone: the zcode secret-store refusal/adoption assertions, and the three
+fork-only suites whose harnesses upstream deleted (`worktrees-local-create-base-prefetch`,
+`updater.window-lifecycle`, `runtime-workspace-path-search`), which could not compile once
+`worktrees-test-{module-mocks,harness,runtime-stub}.ts` and `updater-test-{harness,module-loader}.ts`
+were retired.
+
+**Do not:** restore a retired file to carry the fork's cases. Re-home the case into a fork-owned suite
+beside the module it now tests — that follow-up is owed for the updater first.
+
+### The fork's dashboard delivery deletion, asserted again
+
+Seven of the 10 DU paths are the preload bridges and the drawer/pop-out family already recorded in
+`expected-deletions.json`; the merge re-applied them. Three more were added to the manifest this sync —
+`AiCommitPrSettingsFields.tsx`, `landing-github-star-state.ts`,
+`host-scoped-setting-scope.ts` — each absent at the fork tip, present upstream, referenced by nothing at
+HEAD. They had been deleted in an earlier merge resolution **with no commit of their own**, which is the
+trap the manifest's own header describes.
+
+### Breaks no conflict marker showed
+
+- **`RuntimeAccountController` was wired to the notifier.** Upstream's constructor takes the
+  Claude-account selection handler; the fork's mechanically split `orca-runtime-owned-controllers.ts`
+  (`@ts-nocheck`) still passed `() => runtime.notifier`, so selecting a Claude account would have
+  stopped moving running panes. Fixed by keeping the fork's transcript-split and giving the abstract
+  class a `handleClaudeAccountSelected` seam instead of calling the protected member from outside it.
+- **A sync wrapper over an async credential write left a floating promise**, so a saved Jenkins token
+  missed the next request. Found by the typecheck, not by a marker.
+- **`BROWSER` semantics changed** in upstream #43232 (new this sync): it now points at the CLI itself
+  rather than a `open-url --url %s` template. The fork's invariant test pinned the old shape; it now
+  pins the basename, which is the part that matters (never a bare `orca`, which is GNOME's screen
+  reader on Linux and an official install's CLI elsewhere).
+
+### Convergence calls
+
+- **`FetchAllCyclePrepared` had two definitions** after the merge: upstream moved it to
+  `rate-limits/service/full-cycle-prepared.ts`, and the fork's copy in `service-types.ts` added one
+  field, `forkProviderCycle`. Converged on upstream's file carrying the fork's field; the duplicate and
+  its three now-unused imports are gone, so the next sync does not re-decide it.
+- **Run-target clone action.** Upstream replaced the run-target row model with `RunTargetHostOption`
+  (`trailing`/`onSelect`), which orphaned the fork's per-row clone integration in `RunTargetCombobox`.
+  The fork's routing (`getRunTargetCloneAvailability` → `resolveRunTargetRowAction` → start-clone /
+  retry-clone / use-existing-folder) now lives in `WorkspaceRunTargetCombobox`, where the option objects
+  are built, and upstream's generic picker is untouched. A row that cannot clone renders the reason as
+  its `detail`. No trailing "set project location" affordance: the fork's rows commit on choose.
+  Per-row clone _status_ UI is not restored — the fork already consolidated Retry / Use existing folder
+  / Clone as into `RunTargetCloneStatus.tsx`, which the composer still renders.
+- **Hidden SSH hosts have no surface in skill installs.** The fork's `hiddenSshTargetIds` filter (fork
+  only; upstream has no such identifier) dropped out when upstream replaced the SSH-target picker with
+  a `runtimeEnvironments` picker, whose `source` is `manual`/`ephemeral-vm` — remote orcad environments,
+  not SSH worktree hosts. Not a regression; the filter still applies on the four surfaces that do list
+  SSH hosts.
+- **`SidebarSettingsHelpMenu`'s identity patch re-homed** to `sidebar/chrome/help-menu-controller.tsx`,
+  where upstream moved the GitHub menu row; the fork's `ORCA_REPOSITORY_URL` constant replaces upstream's
+  hard-coded `stablyai/orca` there.
+- **The link-routing dialog's copy stays upstream's.** The fork had reworded "terminal links" to "links";
+  upstream renamed the keys (`keepInOrcaTitle`/`openInOrcaTitle`), and the fork overlay's `auto.`-prefixed
+  entries no longer address them. Keeping upstream's wording avoids a second overlay mapping for a
+  cosmetic difference.
+
+### max-lines: 25 upstream-owned files exempted, not split
+
+The fork's delta tipped 25 upstream-owned files past the budget (`pnpm tc` clean, oxlint red). Each was
+verified twice: present in upstream's tree, and upstream itself at or under its limit — so the overage is
+the fork's. Per `LOCAL-PATCHES.md` § `local(lint)`, an upstream-owned file is exempted rather than split,
+because splitting one costs a permanent hunk on every sync. The comment records upstream's count, the
+limit and the fork's delta per file. The ratchet grew by 31 entries (25 new, 6 path moves) and the review
+gate should see it; the largest deltas are `jira/client.test.ts` +233, `service-state.ts` +102,
+`updater-prerelease-feed.ts` +72 and `service/service-fetch-targets.ts` +65.

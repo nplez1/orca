@@ -5,7 +5,7 @@
  * inside the one catch that wraps the destructive call. Keeping them in the slice pushed that file
  * past its line budget and hid the shape of the recovery next to 200 lines of teardown.
  */
-import type { ExecutionHostId } from '../../../../../../shared/execution-host'
+import type { ExecutionHostId } from '../../../../../../shared/execution-host/execution-host'
 import type { RuntimeClientTarget } from '../../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
 import type { RemoveWorktreeResult } from '../../../../../../shared/worktree/create-types'
 import type { WorktreeOperationGenerationGuard } from '@/lib/workspace/ownership/worktree-operation-generation'

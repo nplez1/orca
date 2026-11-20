@@ -2,7 +2,7 @@ import { translate } from '@/i18n/i18n'
 import {
   toRuntimeExecutionHostId,
   type ExecutionHostId
-} from '../../../../../../shared/execution-host'
+} from '../../../../../../shared/execution-host/execution-host'
 import type { WorktreeMeta } from '../../../../../../shared/worktree/meta-types'
 import type { RuntimeClientTarget } from '../../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
 import { getRepoIdFromWorktreeId } from '../../../../../../shared/worktree/id'

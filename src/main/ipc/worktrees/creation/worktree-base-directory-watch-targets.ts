@@ -3,16 +3,19 @@ import { realpath, stat } from 'node:fs/promises'
 import {
   isProjectFolderLayout,
   resolveWorktreeLayoutMode
-} from '../../../../shared/orca-workspace-layout'
+} from '../../../../shared/worktree/paths/orca-workspace-layout'
 import type { Store } from '../../../persistence/loading-store/store'
-import type { GlobalSettings } from '../../../../shared/global-settings-types'
+import type { GlobalSettings } from '../../../../shared/settings/global-settings-types'
 import type { Repo } from '../../../../shared/repository/repo-types'
-import { getRepoExecutionHostId, LOCAL_EXECUTION_HOST_ID } from '../../../../shared/execution-host'
+import {
+  getRepoExecutionHostId,
+  LOCAL_EXECUTION_HOST_ID
+} from '../../../../shared/execution-host/execution-host'
 import { isFolderRepo } from '../../../../shared/repository/repo-kind'
 import {
   getRuntimePathBasename,
   normalizeRuntimePathForComparison
-} from '../../../../shared/cross-platform-path'
+} from '../../../../shared/file-access/cross-platform-path'
 import { isWslUncPath } from '../../../../shared/file-access/wsl-paths'
 import { mapWithConcurrency } from '../../../../shared/concurrency/map-with-concurrency'
 import { getWorktreeMirrorDistro } from '../../../workspaces/execution-host/project-runtime-git-options'
@@ -20,8 +23,8 @@ import {
   computeWorkspaceRoot,
   getWorktreePathSettings,
   workspaceRootMirrorsIntoWsl
-} from '../../worktree-logic'
-import { shouldEmitBoundedWarning } from '../../bounded-warning-dedupe'
+} from '../paths/worktree-logic'
+import { shouldEmitBoundedWarning } from '../bounded-warning-dedupe'
 import { resolveWorktreeCommonGitDirectory } from './worktree-common-git-directory'
 import type {
   WorktreeBaseRepoWatchConfig,
@@ -95,7 +98,9 @@ async function maybeAddBaseTarget(
     // is a direct child — exactly the shape the flat matcher handles. Only repo-nested interposes a
     // container (the project folder) between the root and the worktrees.
     nestWorkspaces:
-      pathSettings.nestWorkspaces && !isProjectFolderLayout(resolveWorktreeLayoutMode(pathSettings))
+      pathSettings.nestWorkspaces &&
+      !isProjectFolderLayout(resolveWorktreeLayoutMode(pathSettings)),
+    headMovesNeedListing: mirrorDistro !== undefined
   }
   // A root mirrored into WSL is a UNC path either way; probing the distro's home (which can kill a
   // booting distro) would only lead to the same skip, so keep just the Git-common watch.

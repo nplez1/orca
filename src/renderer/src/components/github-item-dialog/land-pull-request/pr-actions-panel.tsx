@@ -3,7 +3,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { CircleDot, GitPullRequest, GitPullRequestClosed, LoaderCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { useConfirmationDialog } from '@/components/confirmation-dialog-context'
+import { useConfirmationDialog } from '@/components/dismiss/confirmation/confirmation-dialog-context'
 import { cn } from '@/lib/class-names'
 import { useAppStore } from '@/store/index'
 import { callRuntimeRpc } from '@/runtime/rpc/calls/runtime-rpc-call'
@@ -11,7 +11,7 @@ import {
   getGitHubRepoRoutingTarget,
   getGitHubRuntimeRepoId
 } from '@/lib/work-items/github/github-source-runtime-context'
-import { presentGitHubPRMergeState } from '@/components/github-pr-merge-state'
+import { presentGitHubPRMergeState } from '@/components/github/github-pr-merge-state'
 import { startPostMergeReviewRefresh } from '@/components/github/post-merge-review-refresh'
 import { buildGitHubPRAdminBypassConfirmation } from '@/components/github-pr-admin-bypass-confirmation'
 import { resolveGitHubPRMergeMethods } from '../../../../../shared/github/pull-requests/merge/pull-request-merge-methods'
@@ -35,6 +35,7 @@ import { codeHostErrorText } from '@/lib/source-control/remote/code-host-error-c
 
 export function PRActionsPanel({
   item,
+  headSha,
   repoPath,
   repoId,
   sourceContext,
@@ -44,6 +45,8 @@ export function PRActionsPanel({
   onMutated
 }: {
   item: GitHubWorkItem
+  /** Head from the loaded details; falls back to the list item's head. */
+  headSha: string | undefined
   repoPath: string | null
   repoId: string | null
   sourceContext?: TaskSourceContext | null
@@ -167,6 +170,7 @@ export function PRActionsPanel({
     if (mergeDisabled) {
       return
     }
+    const expectedHeadSha = headSha ?? item.headSha ?? null
     const label = getPullRequestMergeMethodLabel(method)
     const bypassBranchProtection = mergePresentation.adminBypassRequired
     const confirmed = await confirm(
@@ -196,7 +200,8 @@ export function PRActionsPanel({
                 prNumber: item.number,
                 method,
                 ...(bypassBranchProtection ? { bypassBranchProtection: true } : {}),
-                prRepo
+                prRepo,
+                expectedHeadSha
               },
               { timeoutMs: 30_000 }
             )
@@ -207,7 +212,8 @@ export function PRActionsPanel({
               prNumber: item.number,
               method,
               ...(bypassBranchProtection ? { bypassBranchProtection: true } : {}),
-              prRepo
+              prRepo,
+              expectedHeadSha
             })
       if (!result.ok) {
         toast.error(

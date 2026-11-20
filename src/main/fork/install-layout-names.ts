@@ -29,6 +29,7 @@ import {
   DEV_APP_DATA_DIRECTORY_NAME
 } from '../../shared/app-directory-names'
 import { APP_DISPLAY_NAME } from '../../shared/app-display-name'
+import { ORCA_SERVE_APPIMAGE_ENV } from '../../shared/remote-runtime/serve-supervisor/orcad-server-launch-env'
 import { LOCAL_BUILD_COMPATIBILITY_CONTRACT } from '../../shared/remote-runtime/orcad-distribution/local-build-compatibility-contract'
 import { CLI_COMMAND_NAME } from '../cli/installation/cli-install-constants'
 
@@ -156,8 +157,13 @@ export function installedAppExecutableCandidates(
         : [])
     ]
   }
+  // Why last and why absolute-only: the AppImage a serve supervisor runs from is this build's own
+  // copy, but an installer copy that already works should win, and a relative or empty value is not
+  // a path (upstream's rule for the same list).
+  const servedAppImage = environment[ORCA_SERVE_APPIMAGE_ENV]
   return [
     joinPath('/opt', LINUX_INSTALL_DIRECTORY_NAME, LINUX_APP_EXECUTABLE_NAME),
-    joinPath('/opt', CLI_COMMAND_NAME, LINUX_APP_EXECUTABLE_NAME)
+    joinPath('/opt', CLI_COMMAND_NAME, LINUX_APP_EXECUTABLE_NAME),
+    ...(servedAppImage && posix.isAbsolute(servedAppImage) ? [servedAppImage] : [])
   ]
 }

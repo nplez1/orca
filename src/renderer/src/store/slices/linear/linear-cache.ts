@@ -1,6 +1,6 @@
 import type { LinearIssueData } from './linear-issue-read'
-import { isIntegrationCredentialDecryptionError } from '../../../../../shared/integration-credential-errors'
 import { ownedSourceTarget, type OwnedSource } from '@/lib/provider-source-target'
+import { isIntegrationCredentialDecryptionError } from '../../../../../shared/secure-storage/integration-credential-errors'
 import { RuntimeRpcCallError } from '@/runtime/rpc/calls/runtime-rpc-result'
 import type { CacheEntry } from '../../github/cache/cache-model'
 import type { LinearIssue } from '../../../../../shared/linear/issue-types'

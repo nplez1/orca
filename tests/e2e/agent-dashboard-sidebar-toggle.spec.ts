@@ -1,5 +1,6 @@
-import { expect, test } from './helpers/orca-app'
-import { waitForActiveWorktree, waitForSessionReady } from './helpers/store'
+import { expect } from '@stablyai/playwright-test'
+import { test } from './desktop/electron-fixtures/orca-app'
+import { waitForActiveWorktree, waitForSessionReady } from './desktop/renderer-probes/store'
 import type { Page } from '@stablyai/playwright-test'
 
 // Why: every window here stays hidden and Playwright drives the renderers over

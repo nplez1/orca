@@ -240,7 +240,9 @@ describe('getIssueSprintAssignment', () => {
     await expect(
       getIssueSprintAssignment({ key: 'ABC-1', siteId: 'site-1', boardId: '77' })
     ).rejects.toThrow('Unauthorized')
-    expect(clearTokenMock).toHaveBeenCalledWith('site-1')
+    expect(clearTokenMock).toHaveBeenCalledWith(
+      expect.objectContaining({ site: expect.objectContaining({ id: 'site-1' }) })
+    )
   })
 
   it('never offers a closed sprint, even when the board lists one', async () => {
@@ -295,7 +297,9 @@ describe('getIssueSprintAssignment', () => {
     await expect(getIssueSprintAssignment({ key: 'ABC-1', siteId: 'site-1' })).rejects.toThrow(
       'Unauthorized'
     )
-    expect(clearTokenMock).toHaveBeenCalledWith('site-1')
+    expect(clearTokenMock).toHaveBeenCalledWith(
+      expect.objectContaining({ site: expect.objectContaining({ id: 'site-1' }) })
+    )
     expect(releaseMock).toHaveBeenCalledTimes(1)
   })
 

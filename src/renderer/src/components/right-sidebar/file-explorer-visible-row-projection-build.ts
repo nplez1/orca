@@ -5,7 +5,7 @@ import {
   createFileExplorerRowProjectionFromParts,
   type FileExplorerRowProjection
 } from './file-explorer/tree/file-explorer-row-projection'
-import { isPathIgnored } from '../../lib/source-control/paths/git-path-decoration'
+import { isPathIgnored } from '../../../../shared/git/status/git-path-decoration'
 import {
   createNameFilteredFileExplorerProjection,
   type FileExplorerNameFilterProjectionSource

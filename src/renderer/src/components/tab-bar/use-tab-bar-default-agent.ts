@@ -1,5 +1,5 @@
-import { useAgentDetectionTargetForWorktree } from '@/hooks/useAgentDetectionTarget'
-import { useDetectedAgents } from '@/hooks/useDetectedAgents'
+import { useAgentDetectionTargetForWorktree } from '@/lib/agent-session/launch/inventory/useAgentDetectionTarget'
+import { useDetectedAgents } from '@/lib/agent-session/launch/inventory/useDetectedAgents'
 import { useStructuredAgentLaunchStatus } from '@/lib/agent-session/launch/structured-agent-session-launch-status'
 import { useAppStore } from '@/store'
 import { isAgentSessionHandleProvider } from '../../../../shared/agent-session/lifecycle/provider-handles/agent-session-provider-handle'

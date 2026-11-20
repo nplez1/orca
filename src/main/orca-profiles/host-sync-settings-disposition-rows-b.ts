@@ -200,5 +200,27 @@ export const HOST_SYNC_DISPOSITION_ROWS_B = {
   claudeCodeThemeSyncOffer: 'replicated',
   nativeChatAutoContinueAfterUsageLimit: 'replicated',
   nativeChatOpenedPullRequests: 'replicated',
-  experimentalOrchestrationPanel: 'replicated'
+  experimentalOrchestrationPanel: 'replicated',
+  automaticUpdates: 'replicated',
+  avatarGenerationAgent: 'replicated',
+  botsEnabled: 'replicated',
+  deleteChatHistoryWithWorkspace: 'replicated',
+  editorEndOfLine: 'replicated',
+  editorInlineBlame: 'replicated',
+  experimentalAppRail: 'replicated',
+  floatingTerminalNewTabMenuLayout: 'replicated',
+  linuxTilingWindowMode: 'replicated',
+  nativeChatComposerSpellcheck: 'replicated',
+  nativeChatPromptSuggestions: 'replicated',
+  newTabMenuLayout: 'replicated',
+  skipNewHomeChatConfirm: 'replicated',
+  terminalDroppedImagesPreview: 'replicated',
+  // Why hostLocal: the names label accounts that are themselves host-local.
+  managedAccountDisplayNames: 'hostLocal',
+  // Why hostLocal: a perf notice is about this machine, so its dismissal says nothing about another.
+  perfNoticesOff: 'hostLocal',
+  // Why hostLocal: a one-shot "already offered" marker; a host that inherited it never sees its own offer.
+  languagePackSuggestionShown: 'hostLocal',
+  // Why hostLocal: records what the language was before a plugin set it, which is this install's history.
+  uiLanguageBeforePlugin: 'hostLocal'
 } as const

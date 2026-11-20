@@ -86,7 +86,7 @@ export function resetHostSettingsReplication(): void {
  * not do". It refuses an accidental second writer, not a malicious paired desktop — pairing already
  * implies command execution on this host, so nothing here can be the boundary.
  */
-export function applyHostSettingsReplication(
+export async function applyHostSettingsReplication(
   payload: HostSettingsIncomingPayload,
   options: {
     registry?: HostSettingsCredentialRegistry
@@ -99,7 +99,7 @@ export function applyHostSettingsReplication(
     /** From the RPC context: whether a pairing row this host recorded still exists. */
     isPairedDeviceAlive?: (deviceId: string) => boolean
   } = {}
-): HostSettingsReplicationApplyResult {
+): Promise<HostSettingsReplicationApplyResult> {
   const holdings = options.holdings ?? defaultHoldings
   const record = holdings.read()
   const { callerFingerprint, callerDeviceId } = options
@@ -177,7 +177,7 @@ export function applyHostSettingsReplication(
   // shown to be replication's, so the main's own record is the only evidence there is.
   const recordProvenanceUnknown = record.ids.length === 0 && record.revision === null
 
-  const { report, state } = applyHostSettingsPayload({
+  const { report, state } = await applyHostSettingsPayload({
     payload:
       stranded.length === 0
         ? contractPayload
@@ -193,7 +193,7 @@ export function applyHostSettingsReplication(
     // it never sent, because it records a holding only for what this host reported taking.
     replicatedIds: [
       ...record.ids,
-      ...recoverReplicatedIds(registry, contractPayload, record),
+      ...(await recoverReplicatedIds(registry, contractPayload, record)),
       ...(recordProvenanceUnknown ? contractPayload.removals : [])
     ],
     now: options.now ?? Date.now()
@@ -264,11 +264,11 @@ export { EMPTY_HOST_SETTINGS_REPLICATION_RECORD }
  * the host keeps a credential the main can no longer rotate or revoke — silently and for good. An
  * identical value is the one piece of evidence that this is replication's copy rather than the user's.
  */
-function recoverReplicatedIds(
+async function recoverReplicatedIds(
   registry: HostSettingsCredentialRegistry,
   payload: HostSettingsReplicationPayload,
   record: { ids: readonly string[]; revision: number | null }
-): string[] {
+): Promise<string[]> {
   if (record.ids.length > 0 || record.revision !== null) {
     return []
   }
@@ -283,7 +283,7 @@ function recoverReplicatedIds(
     if (!listed.has(port)) {
       listed.add(port)
       try {
-        for (const held of port.list()) {
+        for (const held of await port.list()) {
           heldById.set(held.id, held.payload)
         }
       } catch {

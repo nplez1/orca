@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import { observeTabGroupBodyGridSize } from '@/runtime/sync-runtime-graph/graph-sync-scheduler'
-import { registerTabGroupBody } from './tab-group-body-geometry'
+import { registerTabGroupBody } from './retained-pane/tab-group-body-geometry'
 
 /** Body ref: registers the drop target and the geometry observers that read the same node. */
 export function useTabGroupBodyRef(

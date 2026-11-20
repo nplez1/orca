@@ -1,6 +1,55 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { parseUtcLstart } from '../../shared/ps-lstart-time'
 import { parseLinuxProcStat, readPosixProcessRow } from './provider-process-row-read'
+import { setLibprocAddonForTests } from '../../shared/process-observation/darwin/libproc-addon'
+import { resetNativeReadsForTests } from '../../shared/process-observation/darwin/libproc-native-reads'
+
+// Pin the exact-birth helper fallback to a failed read so fail-closed results are deterministic.
+vi.mock('./provider-exec-process-row', () => ({
+  readProviderExecProcessRow: vi.fn(async () => 'unverifiable')
+}))
+
+afterEach(() => {
+  setLibprocAddonForTests(undefined)
+  resetNativeReadsForTests()
+  vi.unstubAllEnvs()
+})
+
+it('keeps recorded UTC seconds after native recovery without discarding precise identity', async () => {
+  vi.stubEnv('TZ', 'Pacific/Honolulu')
+  const row = {
+    pid: 4242,
+    ppid: 777,
+    pgid: 4242,
+    tpgid: 0,
+    tdev: -1,
+    status: 2,
+    flags: 0,
+    sessionLeader: true,
+    startSec: 1700000000,
+    startUsec: 123456,
+    comm: 'node'
+  }
+  setLibprocAddonForTests({ readProcessTable: async () => [row] })
+  await expect(readPosixProcessRow(4242, 'second', 'darwin')).resolves.toEqual({
+    pid: 4242,
+    ppid: 777,
+    pgid: 4242,
+    startedAt: '2023-11-14T22:13:20.000Z',
+    startResolution: 'second'
+  })
+  await expect(readPosixProcessRow(4242, 'microsecond', 'darwin')).resolves.toEqual({
+    pid: 4242,
+    ppid: 777,
+    pgid: 4242,
+    startedAt: 'microsecond:1700000000:123456',
+    startResolution: 'microsecond'
+  })
+  resetNativeReadsForTests()
+  setLibprocAddonForTests({ readProcessTable: async () => [{ ...row, startUsec: undefined }] })
+  await expect(readPosixProcessRow(4242, 'microsecond', 'darwin')).resolves.toBe('unverifiable')
+  setLibprocAddonForTests(null)
+  await expect(readPosixProcessRow(4242, 'microsecond', 'darwin')).resolves.toBe('unverifiable')
+})
 
 describe('parseLinuxProcStat', () => {
   it('reads parent, group and start ticks past a comm with spaces and parentheses', () => {
@@ -13,27 +62,4 @@ describe('parseLinuxProcStat', () => {
       startResolution: 'clock-tick'
     })
   })
-})
-
-// Why only this case survives: upstream retired the "read my own pid" cases as low value, but this
-// one is the regression guard for the fork's macOS UTC start-marker fix (#272).
-describe.runIf(process.platform !== 'win32')('readPosixProcessRow', () => {
-  afterEach(() => {
-    vi.unstubAllEnvs()
-  })
-
-  it.runIf(process.platform === 'darwin')(
-    'reads a start marker in the zone the second-boundary proof parses',
-    async () => {
-      vi.stubEnv('TZ', 'America/Los_Angeles')
-      const row = await readPosixProcessRow(process.pid)
-      if (row === null || row === 'unverifiable') {
-        throw new Error('this process could not be read')
-      }
-
-      const startedAtMs = parseUtcLstart(row.startedAt)
-      // ast-grep-ignore: test-no-wall-clock -- the real clock is the point: the assertion checks the row's start time against this process's actual uptime.
-      expect(Math.abs(startedAtMs - (Date.now() - process.uptime() * 1_000))).toBeLessThan(60_000)
-    }
-  )
 })

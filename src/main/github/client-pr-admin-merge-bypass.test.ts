@@ -130,6 +130,7 @@ describe('GitHub admin merge bypass', () => {
         'squash',
         undefined,
         REPOSITORY,
+        null,
         {},
         {
           bypassBranchProtection: true
@@ -152,6 +153,7 @@ describe('GitHub admin merge bypass', () => {
       'squash',
       undefined,
       REPOSITORY,
+      null,
       {},
       {
         bypassBranchProtection: true
@@ -187,6 +189,7 @@ describe('GitHub admin merge bypass', () => {
         'squash',
         undefined,
         REPOSITORY,
+        null,
         {},
         {
           bypassBranchProtection: true
@@ -227,6 +230,7 @@ describe('GitHub admin merge bypass', () => {
         'squash',
         undefined,
         REPOSITORY,
+        null,
         {},
         {
           bypassBranchProtection: true
@@ -256,6 +260,7 @@ describe('GitHub admin merge bypass', () => {
         'squash',
         undefined,
         REPOSITORY,
+        null,
         {},
         {
           bypassBranchProtection: true
@@ -284,6 +289,7 @@ describe('GitHub admin merge bypass', () => {
         'squash',
         undefined,
         REPOSITORY,
+        null,
         {},
         {
           bypassBranchProtection: true

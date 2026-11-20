@@ -1,16 +1,16 @@
 /* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 21-code-line delta rides inside it, and splitting costs a permanent sync hunk. */
 import type { Repo } from '../../../../shared/repository/repo-types'
-import type { WorktreeLayoutMode } from '../../../../shared/orca-workspace-layout'
+import type { WorktreeLayoutMode } from '../../../../shared/worktree/paths/orca-workspace-layout'
 import { WorktreeCreateCollisionError } from '../../../../shared/new-workspace/worktree-create-collision'
-import type { CreateWorktreeArgs } from '../../../../shared/worktree/create-types'
 import type { getPRForBranch } from '../../../github/client/lookup/get-pr-for-branch'
 import {
   computeWorktreePath,
   ensurePathWithinWorkspace,
   sanitizeWorktreeName,
+  sanitizeWorktreeBranchName,
   type getWorktreePathSettings
-} from '../../../ipc/worktree-logic'
-import { resolveWorktreeCreateDisplayNameRequest } from '../../../ipc/worktree-display-name'
+} from '../../../ipc/worktrees/paths/worktree-logic'
+import { resolveWorktreeCreateDisplayNameRequest } from '../../../ipc/worktrees/creation/worktree-display-name'
 import {
   getBranchConflictKind,
   getBranchConflictKindStrict
@@ -28,7 +28,10 @@ import {
 import { isGeneratedWorktreeCreateName } from '../../../../shared/new-workspace/worktree-create-retry-policy'
 import { createRetiredNameLookup } from '../../../../shared/worktree/naming/retired-name-registry'
 import { getRetiredNameRegistryForRepo } from '../../../workspaces/removal/retirement/worktree-name-retirement'
-import type { RuntimeManagedWorktreeCreateArgs } from './runtime-managed-worktree-create-types'
+import type {
+  RuntimeManagedWorktreeCreateArgs,
+  RuntimeLocalWorktreeCreateCandidate
+} from './runtime-managed-worktree-create-types'
 import {
   getSelectedReviewBranch,
   isAllowedPushTargetRemoteConflict,
@@ -50,16 +53,6 @@ import { getLocalProjectGhExecOptions } from '../../../workspaces/execution-host
 import type { RemoteTrackingBase } from '../../repositories/runtime-remote-fetch-controller'
 import { resolveLegacyRemoteBranch } from './runtime-local-worktree-create-legacy-branch'
 import { resolveExplicitReuseBranch } from './runtime-local-worktree-create-explicit-reuse'
-
-export type RuntimeLocalWorktreeCreateCandidate = {
-  effectiveRequestedName: string
-  requestedDisplayName?: string
-  displayNameKind: CreateWorktreeArgs['displayNameKind']
-  effectiveSanitizedName: string
-  branchName: string
-  checkoutExistingBranch: boolean
-  worktreePath: string
-}
 
 export async function resolveRuntimeLocalWorktreeCreateCandidate(args: {
   request: RuntimeManagedWorktreeCreateArgs
@@ -88,6 +81,7 @@ export async function resolveRuntimeLocalWorktreeCreateCandidate(args: {
     throw new Error('An exact-branch create needs the branch it must keep.')
   }
   const sanitizedName = sanitizeWorktreeName(args.request.name)
+  const branchSafeName = sanitizeWorktreeBranchName(args.request.name)
   // Why: the branch→PR probes are gh calls; run them as the repo's pinned account, not the
   // ambient login the caller may not have threaded through.
   const ghLookupOptions =
@@ -133,7 +127,7 @@ export async function resolveRuntimeLocalWorktreeCreateCandidate(args: {
         (await resolveCreateBranchName(
           args.repo.path,
           undefined,
-          sanitizedName,
+          branchSafeName,
           args.settings,
           args.username,
           args.localWorktreeGitOptions
@@ -197,7 +191,9 @@ export async function resolveRuntimeLocalWorktreeCreateCandidate(args: {
           // Why: an exact branch keeps its name; only the worktree directory may take the suffix.
           args.request.exactBranchName ? 1 : suffix
         ),
-      effectiveSanitizedName,
+      shouldRetireGeneratedName
+        ? effectiveSanitizedName
+        : getWorktreeCreateCandidate(branchSafeName, suffix),
       args.settings,
       args.username,
       args.localWorktreeGitOptions

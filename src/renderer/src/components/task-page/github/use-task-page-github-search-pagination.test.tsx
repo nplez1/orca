@@ -74,7 +74,8 @@ function harness(fetchWorkItemsNextPage: FetchNextPage) {
       setProvenPageLimit,
       countedTotalPagesRef,
       fetchWorkItemsNextPage,
-      activeGithubTaskKind: 'issues'
+      activeGithubTaskKind: 'issues',
+      unreachableTaskSourceHostIds: new Set<string>()
     } as unknown as PaginationInput
     const withPagination = useTaskPageGitHubSearchPagination(model)
     return {

@@ -2,7 +2,7 @@ import { openTranscriptReadStream } from '../../../native-chat/transcript-filesy
 import { createInterface } from 'node:readline'
 import { basename, dirname, extname } from 'node:path'
 import type { AiVaultSession } from '../../../../shared/ai-vault/contracts/ai-vault-types'
-import type { ExecutionHostId } from '../../../../shared/execution-host'
+import type { ExecutionHostId } from '../../../../shared/execution-host/execution-host'
 import type {
   FileWithMtime,
   ResumableSessionParseState,

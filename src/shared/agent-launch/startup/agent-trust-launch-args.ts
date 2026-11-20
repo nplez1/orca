@@ -1,4 +1,7 @@
-import { getCommandTokenPathBasename, getFirstCommandToken } from '../../command-token-scanner'
+import {
+  getCommandTokenPathBasename,
+  getFirstCommandToken
+} from '../../shell/command-resolution/command-token-scanner'
 import { TUI_AGENT_CONFIG, isTuiAgent } from '../catalog/tui-agent-config'
 import type { TuiAgent } from '../catalog/tui-agent'
 import {

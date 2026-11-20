@@ -3,7 +3,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { FileDocument } from '../../../shared/file-listing/file-document'
 import { authorizeExternalPath } from '../../ipc/filesystem/access/filesystem-auth'
-import { ensureFloatingWorkspaceDirectory } from '../../ipc/floating-workspace-directory'
+import { ensureFloatingWorkspaceDirectory } from '../../ipc/worktrees/floating-workspace-directory'
 import {
   fileDocumentFromFilePath,
   isMarkdownDocumentName

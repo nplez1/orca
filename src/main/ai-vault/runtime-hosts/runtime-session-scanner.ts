@@ -12,7 +12,7 @@ import {
   type AiVaultListResult,
   type AiVaultSession
 } from '../../../shared/ai-vault/contracts/ai-vault-types'
-import { toRuntimeExecutionHostId } from '../../../shared/execution-host'
+import { toRuntimeExecutionHostId } from '../../../shared/execution-host/execution-host'
 import {
   listEnvironments,
   resolveEnvironment
@@ -38,16 +38,7 @@ import {
   readRuntimeAiVaultDeleteSessionResponse,
   runtimeAiVaultDeleteSessionParams
 } from '../../../shared/ai-vault/contracts/ai-vault-runtime-session-delete'
-import type { RuntimeAiVaultHostInfo } from './ai-vault-runtime-scan'
-
-export type RuntimeAiVaultScanOptions = {
-  /** One page's request bound. */
-  timeoutMs?: number
-  /** The whole drain's bound, so a paged listing gets more than one reply's worth of time. */
-  drainTimeoutMs?: number
-  /** Stops the page drain when the caller cancels; each page request carries it too. */
-  signal?: AbortSignal
-}
+import type { RuntimeAiVaultHostInfo, RuntimeAiVaultScanOptions } from './ai-vault-runtime-scan'
 
 // Zod strips undeclared keys; keep the repinned home so resume uses the correct account.
 const aiVaultPrepareSessionResumeResultSchema = z.object({
@@ -177,24 +168,21 @@ function callHostListPage(
   params: Record<string, unknown>,
   options: RuntimeAiVaultScanOptions
 ): ReturnType<typeof callRuntimeEnvironment> {
-  return options.signal
-    ? callRuntimeEnvironment(
-        userDataPath,
-        environmentId,
-        'aiVault.listSessions',
-        params,
-        options.timeoutMs,
-        undefined,
-        undefined,
-        { signal: options.signal }
-      )
-    : callRuntimeEnvironment(
-        userDataPath,
-        environmentId,
-        'aiVault.listSessions',
-        params,
-        options.timeoutMs
-      )
+  return callRuntimeEnvironment(
+    userDataPath,
+    environmentId,
+    'aiVault.listSessions',
+    params,
+    options.timeoutMs,
+    undefined,
+    undefined,
+    {
+      ...(options.signal ? { signal: options.signal } : {}),
+      ...(options.responseTimeoutMs !== undefined
+        ? { responseTimeoutMs: options.responseTimeoutMs }
+        : {})
+    }
+  )
 }
 
 function drainBudgetMs(options: RuntimeAiVaultScanOptions): number | undefined {

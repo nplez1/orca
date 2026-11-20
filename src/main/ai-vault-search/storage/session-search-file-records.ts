@@ -5,7 +5,7 @@ import type { SessionFileCandidate } from '../../ai-vault/session-scanner-types'
 import type SyncDatabase from '../../sqlite/sync-database'
 import { EMPTY_CONTENT_HASH, type SessionContentHash } from './session-search-content-hash'
 import { writeSessionListFacts } from '../session-search-list-schema'
-import { normalizeRuntimePathForComparison } from '../../../shared/cross-platform-path'
+import { normalizeRuntimePathForComparison } from '../../../shared/file-access/cross-platform-path'
 
 /** Use the sidebar’s path normalization so indexed cwd keys join its folder groups. */
 export function cwdKey(cwd: string | null): string | null {

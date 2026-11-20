@@ -49,7 +49,7 @@ export type ForkProviderCycleInput = {
   force: boolean
   previous: ForkProviderCyclePrevious
   isRetryAfterActive: (limits: ProviderRateLimits | null) => boolean
-  resolveConfigs: () => ForkProviderCycleResolvedConfigs
+  configs: ForkProviderCycleResolvedConfigs
   syncGenerations: (fingerprints: {
     deepSeek: string
     fireworks: string
@@ -121,13 +121,13 @@ function prepareForkProviderSlot(args: {
   }
 }
 
-/** Resolves the fork's four API-key providers onto the sibling lane: credential
- *  resolution and generation stamps at prepare time, one settled promise each so
- *  the positional tuple stays upstream's. A disabled provider never reaches its
- *  fetch or its gh probe. */
+/** Resolves the fork's four API-key providers onto the sibling lane: the caller hands in
+ *  already-resolved configs (the credential reads are async now), and this stamps generations
+ *  before starting one settled promise each so the positional tuple stays upstream's. A disabled
+ *  provider never reaches its fetch or its gh probe. */
 export function prepareForkProviderCycle(input: ForkProviderCycleInput): ForkProviderCyclePrepared {
   const { disabled, previous, isRetryAfterActive } = input
-  const configs = input.resolveConfigs()
+  const configs = input.configs
   // Why synchronous: the gh probe is refreshed out of band, so a subprocess never sits
   // on the fetch critical path where its latency would stall every other provider.
   const copilotGhResult = disabled.has('copilot') ? null : readCopilotGhCredentialsForCycle()

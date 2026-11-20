@@ -40,7 +40,7 @@ describe('RuntimeGitHubReviewMutationCommands.mergeRepoPR', () => {
   it('passes a confirmed admin bypass when the repo has no local git options', async () => {
     const commands = createCommands(() => [])
 
-    await commands.mergeRepoPR('id:repo-1', 42, 'squash', PR_REPO, true)
+    await commands.mergeRepoPR('id:repo-1', 42, 'squash', PR_REPO, null, true)
 
     expect(mergePRMock).toHaveBeenCalledWith(
       '/workspace/repo',
@@ -48,6 +48,7 @@ describe('RuntimeGitHubReviewMutationCommands.mergeRepoPR', () => {
       'squash',
       null,
       PR_REPO,
+      null,
       {},
       { bypassBranchProtection: true }
     )
@@ -57,7 +58,7 @@ describe('RuntimeGitHubReviewMutationCommands.mergeRepoPR', () => {
     const localGitOptions = { wslDistro: 'Ubuntu' }
     const commands = createCommands(() => [localGitOptions])
 
-    await commands.mergeRepoPR('id:repo-1', 42, 'squash', PR_REPO, true)
+    await commands.mergeRepoPR('id:repo-1', 42, 'squash', PR_REPO, null, true)
 
     expect(mergePRMock).toHaveBeenCalledWith(
       '/workspace/repo',
@@ -65,6 +66,7 @@ describe('RuntimeGitHubReviewMutationCommands.mergeRepoPR', () => {
       'squash',
       null,
       PR_REPO,
+      null,
       localGitOptions,
       { bypassBranchProtection: true }
     )
@@ -81,6 +83,7 @@ describe('RuntimeGitHubReviewMutationCommands.mergeRepoPR', () => {
       'squash',
       null,
       PR_REPO,
+      null,
       {},
       { bypassBranchProtection: false }
     )

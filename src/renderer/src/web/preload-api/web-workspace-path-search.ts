@@ -17,7 +17,7 @@ import { toFilePathSearchResult } from '../../../../shared/workspace-path-search
 import { RELAY_WORKSPACE_PATH_SEARCH_CAPABILITY_DESCRIPTOR } from '../../../../shared/workspace-path-search-capability'
 import { readWebWorkspacePathSearchCapability } from './web-workspace-path-search-capability'
 import type { RuntimeFileListResult } from '../../../../shared/file-listing/runtime-file-list'
-import { callRuntimeResult } from './web-runtime-calls'
+import { callRuntimeResult } from '../runtime/client/web-runtime-calls'
 import { toRuntimeWorktreeSelector } from '../../runtime/rpc/targets/runtime-worktree-selector'
 import { createNonSecureContextUuid as createBrowserUuid } from '../../../../shared/identifiers/non-secure-context-uuid'
 

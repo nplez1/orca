@@ -3,14 +3,14 @@ import {
   normalizeEphemeralVmLifetimeDuration
 } from './ephemeral-vm-lifetime'
 import { asRecord, asTrimmedString } from './orca-yaml-fields'
-import { MAX_ORCA_YAML_COLLECTION_ENTRIES } from './orca-yaml-file-limit'
+import { MAX_ORCA_YAML_COLLECTION_ENTRIES } from './workspace-setup/orca-yaml-file-limit'
 import { parseEphemeralVmRecipeTimeoutSeconds } from './remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-timeouts'
 import { parseRecipePassEnv } from './remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-env'
 import type {
   OrcaVmRecipe,
   OrcaVmRecipeContextMenuItem,
   OrcaVmRecipeDiagnostic
-} from './orca-yaml-hook-types'
+} from './workspace-setup/orca-yaml-hook-types'
 
 /** The `environmentRecipes` half of `orca.yaml`, kept out of the generic hook parser. */
 

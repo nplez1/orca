@@ -220,7 +220,7 @@ export abstract class RateLimitServiceAccountRefresh extends RateLimitServiceIna
     }
     const codexTarget = normalizeCodexAccountSelectionTarget(options.target)
     const codexHomePath = options.codexHomePath
-    const scopedStateBeforeReset = this.getState()
+    const scopedStateBeforeReset = await this.getState()
     const missingWslCodexHome = codexHomePath
       ? null
       : this.getMissingWslCodexHomeResult(codexTarget)

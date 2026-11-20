@@ -5,13 +5,13 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { NewWorkspaceComposerCardProps } from './new-workspace/composer/new-workspace-composer-card-props'
 import type { ReadyProjectHostSetupOption } from '@/lib/workspace/creation/project-host-setup-options'
 import { useAppStore } from '@/store'
-import { getDefaultSettings } from '../../../shared/constants'
+import { getDefaultSettings } from '../../../shared/orca-profiles/constants'
 import { RUNTIME_CAPABILITIES } from '../../../shared/remote-runtime/protocol/protocol-version'
 import { setLocalRuntimeCapabilitiesForTests } from '../runtime/hosts/capabilities/local-runtime-capabilities'
 import type { HostStructuredAgentAvailability } from '../runtime/native-chat/agent-catalogs/host-structured-agent-availability'
 import type { Worktree } from '../../../shared/worktree/types'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import NewWorkspaceComposerModal from './NewWorkspaceComposerModal'
+import NewWorkspaceComposerModal from './new-workspace/composer/NewWorkspaceComposerModal'
 
 const SETUP_KEY = JSON.stringify(['setup-b', 'runtime:env-b'])
 const CLONE_PATH = '/Users/alice/code/orca'
@@ -47,7 +47,7 @@ vi.mock('@/lib/workspace/activation/worktree-activation.ts', () => ({
   activateAndRevealWorktree: mocks.activate
 }))
 vi.mock('sonner', () => ({ toast: { success: mocks.success, error: vi.fn(), info: vi.fn() } }))
-vi.mock('@/hooks/useDetectedAgents', () => ({
+vi.mock('@/lib/agent-session/launch/inventory/useDetectedAgents', () => ({
   useDetectedAgents: () => ({
     detectedIds: ['claude'],
     isLoading: false,
@@ -110,7 +110,7 @@ vi.mock('@/hooks/useComposerState', () => ({
   })
 }))
 
-vi.mock('@/components/NewWorkspaceComposerCard', () => ({
+vi.mock('@/components/new-workspace/composer/NewWorkspaceComposerCard', () => ({
   default: (p: NewWorkspaceComposerCardProps) => (
     <div>
       <button onClick={() => p.onProjectHostSetupChange?.(SETUP_KEY, 'cloned')}>Clone</button>

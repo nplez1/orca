@@ -9,7 +9,7 @@ import {
 import {
   toRuntimeExecutionHostId,
   type ExecutionHostId
-} from '../../../../../../shared/execution-host'
+} from '../../../../../../shared/execution-host/execution-host'
 import { selectExecutionHostDisplayLabel } from '@/runtime/hosts/display/execution-host-display-label'
 import { getWorkspaceStatus } from '../../../../../../shared/workspace/status/workspace-statuses'
 import { translate } from '@/i18n/i18n'

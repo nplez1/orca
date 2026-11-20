@@ -140,7 +140,21 @@ async function readClaudeUsage(
     return claudeUsageEndpointGatedResult(metadata, gatedRetryAtMs)
   }
   try {
-    return await fetchClaudeOAuthUsage(token, options?.signal)
+    const usage = await fetchClaudeOAuthUsage(token, options?.signal)
+    // Name the login a reading came from so its plan never follows another account's reading.
+    return usage.status === 'ok'
+      ? {
+          ...usage,
+          ...(credentials.planType ? { planType: credentials.planType } : {}),
+          usageMetadata: {
+            ...usage.usageMetadata,
+            ...metadata,
+            ...(options?.authPreparation?.readingAccount
+              ? { readingAccount: options.authPreparation.readingAccount }
+              : {})
+          }
+        }
+      : usage
   } catch (error) {
     if (options?.signal?.aborted) {
       return abortedClaudeRateLimitResult()

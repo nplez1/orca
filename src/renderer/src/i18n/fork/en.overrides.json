@@ -1,8 +1,4 @@
 {
-  "auto.components.link.routing.preference.dialog.badge": "Terminal link",
-  "auto.components.link.routing.preference.dialog.description": "Use Orca's browser for terminal links, or keep your system browser.",
-  "auto.components.link.routing.preference.dialog.keep.title": "Keep terminal links in Orca's browser?",
-  "auto.components.link.routing.preference.dialog.title": "Open terminal links in Orca's browser?",
   "auto.components.right.sidebar.ChecksPanel.495b2f8c4b": "Started the agent, but could not resolve or reply on the selected comments.",
   "auto.components.right.sidebar.ChecksPanel.5eb2163b6b": "Review the prompt before starting an agent. After the prompt is delivered, Orca resolves the selected host threads and replies to comments it cannot resolve.",
   "auto.components.right.sidebar.ChecksPanel.7e4b2a19c0": "Could not resolve the GitHub PR to reply on.",

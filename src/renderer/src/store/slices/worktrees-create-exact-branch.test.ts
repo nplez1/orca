@@ -18,9 +18,12 @@ vi.mock('sonner', () => ({
   }
 }))
 
-vi.mock('@/components/worktree-base-fallback-notice', () => ({
-  requestWorktreeBaseFallbackNotice: vi.fn()
-}))
+vi.mock(
+  '@/components/sidebar/workspace-creation/base-ref-update/worktree-base-fallback-notice',
+  () => ({
+    requestWorktreeBaseFallbackNotice: vi.fn()
+  })
+)
 
 beforeEach(resetWorktreeSliceModuleMemory)
 

@@ -1,12 +1,12 @@
 import { mkdir } from 'node:fs/promises'
-import type { GlobalSettings } from '../../../shared/global-settings-types'
+import type { GlobalSettings } from '../../../shared/settings/global-settings-types'
 import {
   layoutNestsPrimaryCheckout,
   resolveWorktreeLayoutMode
-} from '../../../shared/orca-workspace-layout'
+} from '../../../shared/worktree/paths/orca-workspace-layout'
 import { deriveCloneRepoNameFromUrl } from '../../git/repositories/cloning/repo-clone-path'
 import { getRemoteDefaultBranchName } from '../../git/remote-default-branch'
-import { sanitizeWorktreeName } from '../worktree-logic'
+import { sanitizeWorktreeName } from '../worktrees/paths/worktree-logic'
 
 export type CloneTargetPlacement = {
   /** Path for the checkout, relative to the clone destination. Absent means the legacy

@@ -16,3 +16,9 @@
 2 src/main/node-runtime/managed-runtime-release-install.ts # app data: the fork managed runtime folder, not a workspace path
 2 src/main/node-runtime/managed-runtime-release.ts # app data: the fork managed runtime folder, not a workspace path
 2 src/main/lib/hidden-probe-cwd.ts # app data: the user-data directory of the hidden usage PTY, not a workspace path (moved out of hidden-rate-limit-pty-cwd.ts)
+1 src/main/bots/bot-tool-secret-scrub.ts # upstream: probes the CLI sign-in folder before scrubbing a bot secret; adopted at the 2026-11-20 sync (0c6207e3d7)
+1 src/main/bots/bot-tools-host.ts # upstream: existsSync on <folder>/.git to place a bot tool; adopted at the 2026-11-20 sync (0c6207e3d7)
+2 src/main/bots/bot-work-runtime.ts # upstream: existsSync on repo.path and the parsed worktreePath while resolving a bot's work runtime; adopted at the 2026-11-20 sync (0c6207e3d7)
+1 src/main/codex/history/disk-usage/codex-history-disk-usage-worker-entry.ts # upstream: realpathSync of the folder inside the disk-usage worker entry, which shares this source tree; adopted at the 2026-11-20 sync (0c6207e3d7)
+1 src/main/qwen-code/workspace-trust.ts # upstream: realpathSync.native to canonicalize the workspace path before pre-trusting a fresh worktree for Qwen (#44046); adopted at the 2026-11-20 sync (0c6207e3d7)
+1 src/main/runtime/rpc/methods/bots-tools.ts # upstream: probes a managed bot's sign-in folder before answering the RPC; adopted at the 2026-11-20 sync (0c6207e3d7)

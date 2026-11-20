@@ -39,6 +39,16 @@ export type AiVaultSessionListGroup = {
 // Shared instance so a list with no sub-agent rows keeps referential identity
 // across rescans and does not re-render every row.
 const NO_SUBAGENT_CHILDREN: ReadonlyMap<string, readonly AiVaultSession[]> = new Map()
+
+/** Rows that list as one, as a group room's members: placed before filters run, folded after. */
+export type AiVaultRoomRows = {
+  place: (rows: readonly AiVaultSession[]) => readonly AiVaultSession[]
+  fold: (rows: readonly AiVaultSession[]) => readonly AiVaultSession[]
+}
+
+const keepRows = (rows: readonly AiVaultSession[]): readonly AiVaultSession[] => rows
+const KEEP_ROWS: AiVaultRoomRows = { place: keepRows, fold: keepRows }
+
 /** Browse groups title-filtered sessions; search lists hits as given, or title matches until hits arrive. */
 export type AiVaultPanelListMode = 'browse' | 'search-hits' | 'search-titles'
 
@@ -56,14 +66,16 @@ export function useAiVaultPanelSessions(
     sessionProjectById,
     projectLabelByKey,
     hideEmptySessions,
-    showSubagentSessions
-  }: AiVaultSessionFilterState & { showSubagentSessions: boolean }
+    showSubagentSessions,
+    roomRows = KEEP_ROWS
+  }: AiVaultSessionFilterState & { showSubagentSessions: boolean; roomRows?: AiVaultRoomRows }
 ) {
-  const filteredSessions = useMemo(
-    () =>
+  const filteredSessions = useMemo(() => {
+    const placed = roomRows.place(sessions)
+    return roomRows.fold(
       mode === 'search-hits'
-        ? sessions
-        : filterAiVaultSessions(sessions, {
+        ? placed
+        : filterAiVaultSessions(placed, {
             query,
             agents,
             scope,
@@ -73,21 +85,22 @@ export function useAiVaultPanelSessions(
             sessionProjectById,
             projectLabelByKey,
             hideEmptySessions
-          }),
-    [
-      mode,
-      sessions,
-      query,
-      agents,
-      scope,
-      sort,
-      activeWorktreePaths,
-      activeProjectKey,
-      sessionProjectById,
-      projectLabelByKey,
-      hideEmptySessions
-    ]
-  )
+          })
+    )
+  }, [
+    mode,
+    sessions,
+    query,
+    agents,
+    scope,
+    sort,
+    activeWorktreePaths,
+    activeProjectKey,
+    sessionProjectById,
+    projectLabelByKey,
+    hideEmptySessions,
+    roomRows
+  ])
   // Why: a sub-agent row belongs under its parent, so it is not a top-level
   // row and must not be grouped as one. Search stays flat on purpose — a
   // query is a request for the matching transcripts, sub-agents included.
@@ -105,12 +118,15 @@ export function useAiVaultPanelSessions(
   const groups = useMemo<AiVaultSessionListGroup[]>(
     () =>
       mode !== 'browse'
-        ? filteredSessions.length === 0
+        ? nesting.roots.length === 0
           ? []
           : // The results bar above the list carries the count, so this group only holds rows.
-            [{ key: 'search-results', label: null, sessions: [...filteredSessions] }]
-        : groupAiVaultSessions(nesting.roots, group, { sessionProjectById, projectLabelByKey }),
-    [mode, filteredSessions, nesting, group, projectLabelByKey, sessionProjectById]
+            [{ key: 'search-results', label: null, sessions: [...nesting.roots] }]
+        : groupAiVaultSessions(nesting.roots, group, {
+            sessionProjectById,
+            projectLabelByKey
+          }),
+    [mode, nesting, group, projectLabelByKey, sessionProjectById]
   )
   return {
     filteredSessions,

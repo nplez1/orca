@@ -1,12 +1,12 @@
 import { GENERAL_SETTING_ANCHORS } from './general-setting-anchors'
 import { getGeneralSubPageTitle, type GeneralSubPage } from './general-sub-pages'
 import type React from 'react'
-import type { GlobalSettings } from '../../../../../shared/global-settings-types'
+import type { GlobalSettings } from '../../../../../shared/settings/global-settings-types'
 import {
   layoutModeNestsWorkspaces,
   resolveWorktreeLayoutMode,
   type WorktreeLayoutMode
-} from '../../../../../shared/orca-workspace-layout'
+} from '../../../../../shared/worktree/paths/orca-workspace-layout'
 import { OpenInMenuEditor, type useOpenInMenuDraft } from './OpenInMenuSetting'
 import { SearchableSetting } from '../section-layout/SearchableSetting'
 import { SettingsSegmentedControl } from '../form-controls/SettingsFormControls'

@@ -17,7 +17,7 @@ import {
   isRuntimeOwnedSshTargetId,
   parseExecutionHostId,
   type ExecutionHostId
-} from '../../../../../../shared/execution-host'
+} from '../../../../../../shared/execution-host/execution-host'
 import { isRemoteRuntimeUnreachableMessage } from '../../../../../../shared/remote-runtime/remote-runtime-client-error-classification'
 import { isEphemeralVmRuntimeEnvironment } from '../../../../../../shared/remote-runtime/host-catalog/runtime-environments'
 import {

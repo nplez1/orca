@@ -1,5 +1,5 @@
 import { LoaderCircle, RefreshCw } from 'lucide-react'
-import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
+import CommentMarkdown from '@/components/comment-markdown/CommentMarkdown'
 import { Button } from '@/components/ui/button'
 import { formatUiRelativeTimeFromDate } from '@/i18n/relative-time-format'
 import { useTranslate } from '@/i18n/use-translate'

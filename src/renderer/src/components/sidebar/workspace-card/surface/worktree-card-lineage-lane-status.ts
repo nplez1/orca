@@ -1,5 +1,5 @@
 import type { WorktreeStatus } from '@/lib/workspace/activity/worktree-status'
-import type { SlotException } from '../../worktree-card-slot-signal'
+import type { SlotException } from '../slots/worktree-card-slot-signal'
 
 // Only the states loud enough to take over a collapsed parent's lane; unread stays on the bold title.
 const LANE_URGENCY: Partial<Record<WorktreeStatus, number>> = {

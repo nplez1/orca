@@ -9,7 +9,7 @@ import type { SettingsServerScope } from '../../host-scope/settings-host-scope'
 import {
   LOCAL_EXECUTION_HOST_ID,
   toRuntimeExecutionHostId
-} from '../../../../../../shared/execution-host'
+} from '../../../../../../shared/execution-host/execution-host'
 import type { TerminalLimitStatus } from '../../../../../../shared/terminal/runtime-policy/terminal-limit-policy'
 import { useAppStore } from '@/store/index'
 import { i18n } from '@/i18n/i18n'

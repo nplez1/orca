@@ -1,5 +1,5 @@
 import type { BrowserExtensionsBannerAssignmentReply } from '../../../shared/browser/extensions/browser-extensions-banner'
-import type { ResourceViewAdmission } from '../../../shared/resource-view-admission'
+import type { ResourceViewAdmission } from '../../../shared/diagnostics/resource-view-admission'
 import type { TelemetryConsentState } from '../../../shared/telemetry/telemetry-consent-types'
 import type { MemorySnapshot, StatsSummary } from '../../../shared/diagnostics/process-stats-types'
 
@@ -34,6 +34,7 @@ export type DiagnosticsUploadPayload =
 
 export type MemoryApi = {
   getSnapshot: (admission?: ResourceViewAdmission) => Promise<MemorySnapshot>
+  countHiddenBrowserPages: (hiddenForMs: number) => Promise<number>
   resourceWindowVisible: () => Promise<boolean>
   onResourceWindowVisibility: (callback: (visible: boolean) => void) => () => void
 }

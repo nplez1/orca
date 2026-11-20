@@ -10,7 +10,7 @@ vi.mock('@/i18n/i18n', () => ({
 vi.mock('@/i18n/relative-time-format', () => ({
   formatUiRelativeTimeFromDate: () => 'now'
 }))
-vi.mock('@/components/sidebar/CommentMarkdown', () => ({
+vi.mock('@/components/comment-markdown/CommentMarkdown', () => ({
   default: ({ content }: { content: string }) => <div data-testid="comment-body">{content}</div>
 }))
 

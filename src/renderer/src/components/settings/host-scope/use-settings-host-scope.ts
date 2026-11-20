@@ -3,7 +3,7 @@ import { useAppStore } from '@/store'
 import {
   getSettingsFocusedExecutionHostId,
   type ExecutionHostId
-} from '../../../../../shared/execution-host'
+} from '../../../../../shared/execution-host/execution-host'
 import { pickerExecutionHosts } from '../../../../../shared/execution-host/managed-orcad-execution-host'
 import { useSidebarHostScopeOptions } from '../../sidebar/worktree-list/controls/use-sidebar-host-scope-options'
 import {

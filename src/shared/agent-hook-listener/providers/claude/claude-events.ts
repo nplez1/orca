@@ -1,10 +1,5 @@
 /* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's delta rides inside it, and splitting costs a permanent sync hunk. */
 import type { ParsedAgentStatusPayload } from '../../../agent-status/contracts/agent-status-types'
-import { CLAUDE_NEW_SESSION_START_SOURCES } from './lifecycle/claude-session-start-sources'
-import {
-  heldTurnCountsAsFinished,
-  isAgentStatusHeldOpenByChildWork
-} from '../../../agent-status/lifecycle/agent-lead-status-fold'
 import { isAskUserQuestionTool } from '../../../agent-status/lifecycle/agent-question-answered-intent'
 import { readClaudeBackgroundAgentTasks } from './background-tasks/claude-background-task-inventory'
 import {
@@ -15,6 +10,7 @@ import {
   reapUnconfirmedRestoredClaudeSubagents,
   upsertWorkingClaudeSubagent
 } from './lifecycle/claude-subagent-roster'
+import type { ClaudeLeadTurnState } from '../../main-agent-turn-state'
 import type { HookListenerState } from '../../listener-state'
 import { readFirstString } from '../../interactive-tool'
 import { shouldIgnoreCompactContinuationUserPromptSubmit } from '../../prompt-fields'
@@ -31,14 +27,22 @@ import {
   voidClaimsOfReplacedClaudeSession
 } from './lifecycle/claude-roster-state'
 import {
-  resolveClaudePaneStatus,
   claudePaneHasRunningChildWork,
+  resolveClaudePaneStatus,
   claudeRowHasUnlistedLiveWork
 } from './lifecycle/claude-pane-hold-evidence'
 import { buildClaudeStatusPayload } from './lifecycle/claude-status-build'
 import { claudeWaitRequest, settleClaudeToolBatch } from './lifecycle/claude-tool-request-wait'
 import { trackClaudeTaskNotificationDelivery } from './background-tasks/claude-task-notification-delivery'
 import { recordClaudeTeammateSpawn } from './lifecycle/claude-teammate-spawn'
+import { settleLateClaudePromptSubmit } from './lifecycle/claude-late-prompt-submit'
+import {
+  CLAUDE_LATE_PROMPT_SUBMIT_EVENT,
+  isClaudeTurnStartUnclassified
+} from './lifecycle/claude-prompt-turn-order'
+import { claudeHeldTurnEnd } from './lifecycle/claude-held-turn-end'
+import { normalizeClaudeSessionStart } from './lifecycle/claude-session-start-event'
+import { isClaudeToolEvent, restatePluginToolCall } from './lifecycle/claude-tool-events'
 
 const CLAUDE_HOOK_AGENT_ID_PREFIX = 'hook-agent-'
 
@@ -47,7 +51,8 @@ export function normalizeClaudeEvent(
   eventName: unknown,
   promptText: string,
   paneKey: string,
-  hookPayload: Record<string, unknown>
+  hookPayload: Record<string, unknown>,
+  opensTurn = false
 ): ParsedAgentStatusPayload | null {
   const eventAgentId = readString(hookPayload, 'agent_id')
   if (
@@ -59,29 +64,18 @@ export function normalizeClaudeEvent(
   }
   voidClaimsOfReplacedClaudeSession(state, eventName, eventAgentId, paneKey, hookPayload)
   const leadModel = eventAgentId === undefined ? readClaudeLeadModel(hookPayload) : undefined
+  if (eventName === CLAUDE_LATE_PROMPT_SUBMIT_EVENT) {
+    return settleLateClaudePromptSubmit(state, promptText, paneKey, hookPayload)
+  }
   if (eventName === 'SessionStart') {
-    // SessionStart supplies resume identity before prompts; mark idle/sessionBoundary to avoid phantom work/completion notifications (STA-3386).
-    const sessionStartSource = hookPayload['source']
-    if (eventAgentId !== undefined || !CLAUDE_NEW_SESSION_START_SOURCES.has(sessionStartSource)) {
-      // Only known idle sources qualify; compact restarts and child SessionStart cannot settle a live lead.
-      return null
-    }
-    // New sessions must not inherit old child/task/cron gates.
-    state.claudeSubagentRosterByPaneKey.delete(paneKey)
-    state.claudeRunningNonAgentTaskPaneKeys.delete(paneKey)
-    state.claudeActiveSessionCronPaneKeys.delete(paneKey)
-    state.claudeLaunchedBackgroundTasksByPaneKey.delete(paneKey)
-    // New sessions start a new main-agent clock.
-    setClaudeMainAgentTurnState(state, paneKey, {
-      state: 'done',
-      stateStartedAt: Date.now(),
-      model: leadModel
-    })
-    return buildClaudeStatusPayload(state, eventName, promptText, paneKey, hookPayload, {
-      stateName: 'done',
-      updateToolSnapshot: true,
-      sessionBoundary: true
-    })
+    return normalizeClaudeSessionStart(
+      state,
+      promptText,
+      paneKey,
+      hookPayload,
+      eventAgentId,
+      leadModel
+    )
   }
   const previousLead = state.claudeLeadStateByPaneKey.get(paneKey)
   // Only Stop/StopFailure carries a turn verdict; cancellation never retires surviving shell/cron/subagent work.
@@ -90,7 +84,7 @@ export function normalizeClaudeEvent(
   const outcome = !isTurnBoundary
     ? undefined
     : (eventAgentId === undefined && hookPayload['is_interrupt'] === true) ||
-        previousLead?.outcome === 'cancellation'
+        (!opensTurn && previousLead?.outcome === 'cancellation')
       ? ('cancellation' as const)
       : eventName === 'StopFailure'
         ? ('failure' as const)
@@ -116,6 +110,11 @@ export function normalizeClaudeEvent(
     (eventName === 'PreToolUse' || eventName === 'PermissionRequest') &&
     isAskUserQuestionTool(eventToolName)
   const isAskUserQuestion = eventName === 'PreToolUse' && isAskUserQuestionWait
+  // Why: plugins can call tools after Stop (#43998); the event stays accepted for tool hooks but does not change status.
+  const restated = restatePluginToolCall(state, eventName, paneKey, hookPayload, isAskUserQuestion)
+  if (restated) {
+    return restated
+  }
   // Manual PostCompact ends at idle without Stop; auto compaction stays in-turn, and PreCompact alone can be aborted (STA-2915).
   const isManualCompactCompletion = eventName === 'PostCompact' && hookPayload.trigger === 'manual'
   // An answered MCP dialog restores the displaced state; a server can elicit outside any turn.
@@ -182,12 +181,7 @@ export function normalizeClaudeEvent(
   // Child tools update their roster only, except child-induced waits and that child's next activity clearing its wait.
   const isWaitingInducing = reportedStateName === 'waiting'
   const subagentOriginId =
-    !isWaitingInducing &&
-    (eventName === 'PreToolUse' ||
-      eventName === 'PostToolUse' ||
-      eventName === 'PostToolUseFailure')
-      ? eventAgentId
-      : undefined
+    !isWaitingInducing && isClaudeToolEvent(eventName) ? eventAgentId : undefined
   // Why: `"type": "agent"` hook runs emit tool hooks (agent_type only if inherited) but never SubagentStop, so their row would stay working forever; real children may be untyped and start-less.
   const isClaudeHookAgent = eventAgentId?.startsWith(CLAUDE_HOOK_AGENT_ID_PREFIX) === true
   if (eventAgentId && (subagentOriginId || isWaitingInducing) && !isClaudeHookAgent) {
@@ -282,7 +276,10 @@ export function normalizeClaudeEvent(
   const taskWakeupTurn =
     eventName === 'UserPromptSubmit'
       ? isTaskWakeup
-      : !isTurnBoundary && !isManualCompactCompletion && previousLead?.taskWakeupTurn === true
+      : !opensTurn &&
+        !isTurnBoundary &&
+        !isManualCompactCompletion &&
+        previousLead?.taskWakeupTurn === true
   const resolvedStatus = resolveClaudePaneStatus(state, paneKey, {
     state: reportedStateName,
     ...(taskWakeupTurn ? { taskWakeupTurn: true as const } : {})
@@ -290,25 +287,34 @@ export function normalizeClaudeEvent(
   // Reuse resolved state for compact ownership instead of folding twice (#15202).
   const effectiveState = resolvedStatus.stateName
   const ownPreviousLead = previousLead?.waitingAgentId ? previousLead.stateBeforeWait : previousLead
-  const selfStartedTurn = ownPreviousLead?.taskWakeupTurn === true
-  // LOCAL(nplez1): a shell-held turn reads `working`, not monitoring, so restate upstream's verdict.
-  const heldTurnFinished =
-    heldTurnCountsAsFinished(resolvedStatus, outcome, selfStartedTurn) ||
-    (resolvedStatus.claudeMonitoringEquivalentHold === true && !selfStartedTurn)
-  // Stamp (announce now, pair the later all-clear) only a held turn that already counts as finished; cancelled turns earn none.
-  const turnCompletedAt =
+  const heldEnd =
+    eventAgentId === undefined && isTurnBoundary
+      ? claudeHeldTurnEnd(state, paneKey, {
+          resolvedStatus,
+          outcome,
+          selfStarted: ownPreviousLead?.taskWakeupTurn === true
+        })
+      : {}
+  // LOCAL(nplez1): a shell-held turn reads `working`, not monitoring, so upstream's held-finish
+  // verdict is restated for it; cancelled turns and self-started wakeups still earn no stamp.
+  const restatedHeldEnd: Pick<
+    ClaudeLeadTurnState,
+    'turnCompletedAt' | 'unclassifiedTurnCompletedAt'
+  > =
+    // Upstream stamped nothing: its verdict was read off a row the fork's shell hold kept `working`.
+    Object.keys(heldEnd).length === 0 &&
+    resolvedStatus.claudeMonitoringEquivalentHold === true &&
+    ownPreviousLead?.taskWakeupTurn !== true &&
     eventAgentId === undefined &&
     isTurnBoundary &&
     outcome !== 'cancellation' &&
-    isAgentStatusHeldOpenByChildWork({
-      state: resolvedStatus.stateName,
-      mainAgent: { state: reportedStateName }
-    }) &&
-    heldTurnFinished &&
     // Owed notifications wake the lead within ~100ms; announcing first would duplicate completion.
     claudePaneHasRunningChildWork(state, paneKey)
-      ? Date.now()
-      : undefined
+      ? // Same split upstream makes: a turn whose prompt event has not arrived is not yet a person's turn.
+        outcome !== 'failure' && isClaudeTurnStartUnclassified(state, paneKey)
+        ? { unclassifiedTurnCompletedAt: Date.now() }
+        : { turnCompletedAt: Date.now() }
+      : {}
 
   setClaudeMainAgentTurnState(state, paneKey, {
     state: reportedStateName,
@@ -317,7 +323,8 @@ export function normalizeClaudeEvent(
     ...(isWaitingInducing && eventAgentId ? { waitingAgentId: eventAgentId } : {}),
     ...claudeWaitRequest(eventName, isAskUserQuestionWait, eventToolUseId, previousLead),
     ...(stateBeforeWait ? { stateBeforeWait } : {}),
-    ...(turnCompletedAt !== undefined ? { turnCompletedAt } : {}),
+    ...heldEnd,
+    ...restatedHeldEnd,
     model: leadModel
   })
 
@@ -342,6 +349,7 @@ export function normalizeClaudeEvent(
   return buildClaudeStatusPayload(state, eventName, promptText, paneKey, hookPayload, {
     ...resolvedStatus,
     updateToolSnapshot: true,
+    opensTurn,
     // Compact is a session boundary, never work eligible for completion notifications/automation.
     sessionBoundary: isManualCompactCompletion ? true : undefined
   })

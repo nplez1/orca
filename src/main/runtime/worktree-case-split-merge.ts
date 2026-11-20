@@ -1,5 +1,5 @@
 import { basename } from 'node:path'
-import { getDefaultPersistedState } from '../../shared/constants'
+import { getDefaultPersistedState } from '../../shared/orca-profiles/constants'
 import { getWorkspaceAttachmentKey } from '../../shared/workspace-attachments/workspace-attachment-normalization'
 import { worktreeWorkspaceKey } from '../../shared/workspace/identity/workspace-scope'
 import type { WorkspaceSessionState } from '../../shared/workspace-session/workspace-session-state-types'

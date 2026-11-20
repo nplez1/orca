@@ -10,6 +10,8 @@ const sourceScriptPath = fileURLToPath(
   new URL('./native-build/node-addons/ensure-native-runtime.mjs', import.meta.url)
 )
 const SCRIPT_DIR_SEGMENTS = ['config', 'scripts', 'native-build', 'node-addons']
+// ensure-native-runtime builds provider-exec before the node-pty checks; the walk copies modules, not C sources.
+const PROVIDER_EXEC_SOURCES = ['provider-exec.c']
 // Fixture import walk misses createRequire CJS edges; name siblings explicitly or temp project cannot load.
 const REQUIRED_CJS_SIBLINGS = [
   'node-pty-job-ownership.cjs',
@@ -40,6 +42,14 @@ export function runProcessSync(options) {
     copyFileSync(
       fileURLToPath(new URL(`./native-build/node-addons/${name}`, import.meta.url)),
       join(projectDir, ...SCRIPT_DIR_SEGMENTS, name)
+    )
+  }
+  const providerExecDir = join(projectDir, 'native', 'provider-exec')
+  mkdirSync(providerExecDir, { recursive: true })
+  for (const name of PROVIDER_EXEC_SOURCES) {
+    copyFileSync(
+      fileURLToPath(new URL(`../../native/provider-exec/${name}`, import.meta.url)),
+      join(providerExecDir, name)
     )
   }
   return projectDir

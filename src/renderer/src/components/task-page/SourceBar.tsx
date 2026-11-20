@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { shouldShowJiraSiteSelector } from '../task-page-jira-board-model'
 import { TaskPageJiraSettingsLink } from './jira/SettingsLink'
 import { cn } from '@/lib/class-names'
-import { LinearScopeSelector } from '@/components/linear-scope-selector'
+import { LinearScopeSelector } from '@/components/task-page/source-selection/linear-scope-selector'
 import {
   Select,
   SelectTrigger,

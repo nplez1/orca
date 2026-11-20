@@ -9,11 +9,14 @@ import type { TaskSourceContext } from '../../../shared/work-items/task-source-c
 import { translate } from '@/i18n/i18n'
 import { extractIpcErrorMessage } from '@/runtime/errors/ipc-error'
 import { JiraWriteTimeoutError } from '@/runtime/jira-write-deadline'
-import { enqueueJiraIssueMutation, JiraMutationFailure } from './jira-issue-mutation-queue'
+import {
+  enqueueJiraIssueMutation,
+  JiraMutationFailure
+} from './task-page/jira/issue-workspace/jira-issue-mutation-queue'
 import {
   editedJiraIssueFields,
   type EditableJiraIssueField
-} from './jira-issue-workspace-hydration'
+} from './task-page/jira/issue-workspace/jira-issue-workspace-hydration'
 import type { JiraIssueSideDataState } from './jira-issue-workspace-side-data'
 
 /** Runs one Jira issue field mutation through the mutation queue: optimistic

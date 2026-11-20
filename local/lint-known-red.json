@@ -6,13 +6,13 @@
     "",
     "An entry is a claim that a red is not this branch's to fix: it arrives through a merge of someone",
     "else's work, or it is a fork-owned file upstream will rename out from under the fix. Record the",
-    "evidence in LOCAL-PATCHES.md and keep this file the assertion — both change in the same commit.",
+    "evidence in LOCAL-PATCHES.md and keep this file the assertion \u2014 both change in the same commit.",
     "No entry belongs here merely because the fix is inconvenient.",
     "",
     "`step` is the package.json script name (or the literal command, for a bare `oxlint` step).",
     "`match` is an optional regex against one failure line. The ratchets print one `::error::` line or",
     "one `file: N unit(s), baseline allows M.` row per offending entry, so a narrow regex allowlists",
-    "`match` is a regex against one failure line, and every entry needs one. An entry that means to allowlist an entire step says `\"wholeStep\": true` — the only form that can cover a step whose output the parser could not split into lines, and deliberately explicit, because a missing `match` used to mean the same thing by accident and masked every new failure in that step (#317). An entry with neither is reported as a problem and fails the gate.",
+    "`match` is a regex against one failure line, and every entry needs one. An entry that means to allowlist an entire step says `\"wholeStep\": true` \u2014 the only form that can cover a step whose output the parser could not split into lines, and deliberately explicit, because a missing `match` used to mean the same thing by accident and masked every new failure in that step (#317). An entry with neither is reported as a problem and fails the gate.",
     "prefer `match` for a ratchet, because a whole-step entry also masks a NEW failure in that step.",
     "A step that prints `::error file=X::text` is matched as `X: text`, so an entry can name one file;",
     "the text alone is the same for every file those ratchets report.",
@@ -25,18 +25,27 @@
     "2026-10-28 sync: upstream folded `check:flaky-test-pattern-ratchet` into `lint:ast-grep-gates`,",
     "so the two #198 entries follow that step. The bare `oxlint` entry went stale and was pruned.",
     "",
-    "2026-10-29: the two #198 entries were fixed in the tree — fake timers in `check-details-cache`,",
-    "`advanceTimersByTimeAsync` in `checks-list-expanded-details` — and pruned with them. `entries` is",
+    "2026-10-29: the two #198 entries were fixed in the tree \u2014 fake timers in `check-details-cache`,",
+    "`advanceTimersByTimeAsync` in `checks-list-expanded-details` \u2014 and pruned with them. `entries` is",
     "empty on purpose: an empty list is what this mechanism is aiming at.",
     "",
     "2026-11-09: one whole-step entry for `check:code-quality:changed`, which a sync merge cannot pass before",
-    "it is pushed — see LOCAL-PATCHES.md § `local(lint)`: the 2026-11-08 sync's lint gate. It goes stale on",
+    "it is pushed \u2014 see LOCAL-PATCHES.md \u00a7 `local(lint)`: the 2026-11-08 sync's lint gate. It goes stale on",
     "the first run after `git push origin main`; prune it then.",
-    "The `check-upstream-file-comments` entries that sync left were pruned on 2026-11-11, when a branch re-took that baseline; see LOCAL-PATCHES.md § `local(lint)`: the 2026-11-11 fork-comment re-take.",
-    "2026-11-11: three `check:focus-read-ratchet` entries, red at the merge base from #361's per-host settings scope; see LOCAL-PATCHES.md § `local(lint)`: the 2026-11-11 fork-comment re-take.",
-    "2026-11-12: the 16 reds `node local/gate-lint.mjs` reported at 9438d16e892, recorded per owning PR in the commit that puts the gate on the PR and release lines (#399). Why they are recorded and not accepted into the ratchet baseline: see LOCAL-PATCHES.md § local(ci): the lint ratchets run on the PR and on the release line.",
-    "2026-11-15 sync: all 18 entries were pruned. The five `check:focus-read-ratchet` rows went green when that ratchet was re-taken at the merged tree paths — the two #361 rows (Settings.tsx, WorkspaceDirectorySetting.tsx) had shrunk and were pruned, and the three #425 rows (use-settings-host-scope.ts, create-settings-slice.ts, settings-write-failure.ts) are now recorded in config/focus-setting-read-baseline.fork.txt with their why. The thirteen `check-upstream-file-comments` rows went green when that baseline was re-measured at merge base 1ce376b27e3. `entries` is empty on purpose."
+    "The `check-upstream-file-comments` entries that sync left were pruned on 2026-11-11, when a branch re-took that baseline; see LOCAL-PATCHES.md \u00a7 `local(lint)`: the 2026-11-11 fork-comment re-take.",
+    "2026-11-11: three `check:focus-read-ratchet` entries, red at the merge base from #361's per-host settings scope; see LOCAL-PATCHES.md \u00a7 `local(lint)`: the 2026-11-11 fork-comment re-take.",
+    "2026-11-12: the 16 reds `node local/gate-lint.mjs` reported at 9438d16e892, recorded per owning PR in the commit that puts the gate on the PR and release lines (#399). Why they are recorded and not accepted into the ratchet baseline: see LOCAL-PATCHES.md \u00a7 local(ci): the lint ratchets run on the PR and on the release line.",
+    "2026-11-15 sync: all 18 entries were pruned. The five `check:focus-read-ratchet` rows went green when that ratchet was re-taken at the merged tree paths \u2014 the two #361 rows (Settings.tsx, WorkspaceDirectorySetting.tsx) had shrunk and were pruned, and the three #425 rows (use-settings-host-scope.ts, create-settings-slice.ts, settings-write-failure.ts) are now recorded in config/focus-setting-read-baseline.fork.txt with their why. The thirteen `check-upstream-file-comments` rows went green when that baseline was re-measured at merge base 1ce376b27e3. `entries` is empty on purpose.",
+    "2026-11-20 sync (upstream 0c6207e3d7): one whole-step entry for `check:code-quality:changed`, which cannot pass before `main` is pushed \u2014 E2BIG on the 2000-commit diff, see LOCAL-PATCHES.md \u00a7 `local(lint)`: the 2026-11-20 sync's lint gate. It goes stale on the first run after `git push origin main`; prune it then. The three ratchets that arrived with this sync were closed in the tree and in two new `.fork.txt` overlays, not here."
   ],
-  "recordedAt": "2026-11-15",
-  "entries": []
+  "recordedAt": "2026-11-20",
+  "entries": [
+    {
+      "step": "check:code-quality:changed",
+      "wholeStep": true,
+      "class": "sync-sized-diff-not-yet-pushed",
+      "owner": "local(ci)",
+      "evidence": "LOCAL-PATCHES.md \u00a7 local(lint): the 2026-11-20 sync's lint gate. origin/main is still the pre-sync tip, so the changed set is upstream's 1425 commits plus the replayed 579 (25k+ code files) and check-changed-code-quality.mjs spawnSync fails E2BIG before reporting anything (measured 2026-11-20 in /Volumes/Storage/Code/orca/main). The post-merge fix-ups ran clean under ORCA_CODE_QUALITY_BASE=HEAD. Prune on the first run after `git push origin main`."
+    }
+  ]
 }

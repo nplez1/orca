@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import {
   JiraTransitionFieldsForm,
   type JiraTransitionSubmitOutcome
-} from '@/components/jira-transition-fields-form'
+} from '@/components/task-page/jira/issue-workspace/jira-transition-fields-form'
 import { useTranslate } from '@/i18n/use-translate'
 import { cn } from '@/lib/class-names'
 import { openAppHttpLink } from '@/lib/browser/navigation/app-http-link-open'

@@ -2,6 +2,9 @@ import { getSecretStore } from '../../shared/secure-storage/secret-store'
 import type { ReplicatedHostCredential } from '../../shared/host-settings-replication'
 import type { SecretAtRestProtection } from '../../shared/secure-storage/secret-at-rest-protection'
 
+/** A credential store may answer directly or through a promise, as its own file path does. */
+export type Awaitable<T> = T | Promise<T>
+
 /**
  * One credential family as the host holding it sees it.
  *
@@ -13,7 +16,7 @@ export type HostSettingsCredentialPort = {
   /** Matches `ReplicatedHostCredential.kind`. */
   kind: string
   /** Everything this host could send. Empty when it holds none. */
-  list(): ReplicatedHostCredential[]
+  list(): Awaitable<ReplicatedHostCredential[]>
   /**
    * Ids this host holds but cannot read right now, so the main can tell "deleted" from "unreadable".
    *
@@ -21,13 +24,13 @@ export type HostSettingsCredentialPort = {
    * the main read as a deletion everywhere, and the host would throw away a working credential. Making
    * it part of the port means a new adapter has to answer it.
    */
-  unreadableIds(): string[]
+  unreadableIds(): Awaitable<string[]>
   /** Whether this host can store a value sealed at rest at all. */
   canSeal(): boolean
   /** How the value sits on this host, or null when it holds none. */
-  protectionOf(id: string): SecretAtRestProtection | null
-  apply(credential: ReplicatedHostCredential): void
-  remove(id: string): void
+  protectionOf(id: string): Awaitable<SecretAtRestProtection | null>
+  apply(credential: ReplicatedHostCredential): Awaitable<void>
+  remove(id: string): Awaitable<void>
 }
 
 export type HostSettingsCredentialRegistry = {
@@ -72,6 +75,9 @@ export function createHostSettingsCredentialRegistry(
 }
 
 /** Ids any port holds but cannot read, across every adapter. */
-export function unreadableCredentialIds(ports: readonly HostSettingsCredentialPort[]): string[] {
-  return ports.flatMap((port) => port.unreadableIds())
+export async function unreadableCredentialIds(
+  ports: readonly HostSettingsCredentialPort[]
+): Promise<string[]> {
+  const perPort = await Promise.all(ports.map(async (port) => await port.unreadableIds()))
+  return perPort.flat()
 }

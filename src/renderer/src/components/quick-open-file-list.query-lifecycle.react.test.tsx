@@ -10,7 +10,10 @@ import { folderWorkspaceKey } from '../../../shared/workspace/identity/workspace
 import type { FilePathSearchResult } from '../../../shared/file-path-search-result'
 import { useAppStore } from '@/store'
 import type { AppState } from '@/store/types'
-import { useRuntimeFileListForWorktree, type RuntimeFileListState } from './quick-open-file-list'
+import {
+  useRuntimeFileListForWorktree,
+  type RuntimeFileListState
+} from './file-actions/quick-open/quick-open-file-list'
 
 const listRuntimeFilesMock = vi.hoisted(() => vi.fn())
 const cancelRuntimeFileListMock = vi.hoisted(() => vi.fn())

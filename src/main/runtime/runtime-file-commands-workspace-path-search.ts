@@ -13,7 +13,7 @@ import {
   createPartialWorkspacePathSearchResponse
 } from '../../shared/workspace-path-search-response'
 import { limitWorkspacePathSearchResponseBySerializedBytes } from '../../shared/workspace-path-search-transport-budget'
-import { searchQuickOpenFilePaths } from '../ipc/filesystem/filesystem-search-file-paths'
+import { searchQuickOpenFilePaths } from '../ipc/filesystem/search/filesystem-search-file-paths'
 import { parseWslPath } from '../wsl/filesystem/unc-path-access'
 import { runtimeFileRouteForTarget } from './files/file-target'
 import { RuntimeFileSearch } from './files/search/file-search'

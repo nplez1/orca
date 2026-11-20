@@ -114,11 +114,15 @@ channels as such, because it feeds the updater's _reporting_ path — a legacy v
 this fork is cosmetically described as a dev build, which is harmless and unreachable from the UI.
 
 Tests that pin the re-pointed URLs and the single-stream mapping:
-`src/main/updater/updater.check-preflight.test.ts`, `src/main/updater/updater.prerelease-fallback.test.ts` and
-`src/main/updater-stable-feed-fallback.test.ts`. They assert this fork's repo path, so a sync that
-restores upstream's expectations turns them red again. `updater-release-builds` lost its test to
-upstream's bulk test removals in the 2026-11-08 sync (the module itself moved into `updater/releases/`),
-so it is covered only through the three above.
+`tests/tools/fork-invariants.test.mjs` (every channel `getReleaseRepoForChannel` offers resolves to
+`nplez1/orca`), `src/main/updater-stable-feed-fallback.test.ts` and
+`src/main/updater/releases/updater-prerelease-feed-readiness.test.ts`. They assert this fork's repo
+path, so a sync that restores upstream's expectations turns them red again. The updater suites that
+carried the mapping before this sync — `updater.check-preflight` and `updater.prerelease-fallback` —
+went with upstream's bulk test removals and ownership refactors in the 2026-11-20 sync (#43339,
+#43277), and `updater-release-builds` lost its test the same way in the 2026-11-08 sync (the module
+itself moved into `updater/releases/`). The mapping is covered through the three above; re-homing the
+retired updater cases is owed, as `local/sync/convergence-ledger.md` records.
 
 **The project's own links follow the same constant.** `src/shared/orca-repository.ts` derives
 `ORCA_REPOSITORY` / `ORCA_REPOSITORY_URL`, plus the scheme-less `ORCA_REPOSITORY_DISPLAY_URL` that
@@ -192,7 +196,10 @@ Anchors:
   releases/latest resolves to`.
 - `src/main/updater/releases/updater-prerelease-feed-readiness.test.ts` — the fork-feed regression case, which now
   exercises the atom fallback.
-- `src/main/updater/updater.publishing-window-feed.test.ts` — the last-good pin reaching `available`.
+- the last-good pin reaching `available` — the suite that asserted that transition,
+  `updater.publishing-window-feed.test.ts`, was retired upstream in the 2026-11-20 sync's bulk test
+  removals (#43277) and no test re-homes the case yet; `updater-prerelease-feed.test.ts` still pins the
+  `lastGoodTag` the pin is built on.
 - `src/main/updater-release-targets.ts` and `src/main/updater-release-readiness.ts` — the URL and
   probe halves, split out of the resolver so it stays inside the 300-line module limit. A sync that
   restores the single file has to take these two with it.
@@ -895,11 +902,14 @@ Anchors, both on upstream-owned files and marked `LOCAL(nplez1)`:
   `src/shared/agent-hook-listener/normalization/claude-background-task-status.test.ts` (the Claude and Grok lane helpers plus the six
   shell/watcher stories; the `main-agent-status-parity` companion suite was retired in the 2026-11-08
   sync),
-  `src/main/agent-hooks/server/testing/providers/grok/server-grok-background-status.test.ts`, `server-grok-cancel.test.ts`,
-  `server-claude-cancel-captures.test.ts` and `server-relayed-claude-cancel.test.ts`, plus the four
-  upstream helper-settlement suites that assert the badge directly
-  (`claude-helper-kill.test.ts`, `claude-helper-checkpoints.test.ts`,
-  `server-claude-helper-kill.test.ts`, `server-claude-helper-recovery.test.ts`). The
+  `src/shared/agent-hook-listener/normalization/agent-hook-listener-grok-completion.test.ts` (the Grok
+  lane's own `workingMode` assertion — its server-level companion
+  `server-grok-background-status.test.ts` went with upstream's bulk test removals in the 2026-11-20
+  sync, and the Grok/Claude cancel suites became
+  `src/main/agent-hooks/server/testing/interruptions/server-relayed-claude-cancel.test.ts`), plus the
+  helper-settlement suites that assert the badge directly
+  (`src/main/agent-hooks/server/testing/interruptions/server-claude-helper-kill.test.ts` and its
+  upstream-owned companions). The
   structured/native-chat lane is deliberately untouched: it still reads a watch loop as monitoring.
 
 Weigh this before keeping it: `isAgentTimeAccruing` is `state === 'working' && workingMode !== 'monitoring'`,
@@ -1296,8 +1306,11 @@ signature that identifies it. None imports a module this fork changed.
   explicit `undefined` as NULL, so the contract it asserted no longer existed. Neither was something
   "the bundled SQLite" did to this fork alone, and that is what made the first one dangerous: a dead
   entry can never be reported stale.
-- `src/main/daemon/shell-readiness/testing/repro-13767-shell-ready-marker-lost-to-exec.test.ts` — "Timed out waiting for PTY
-  output", the PTY/subprocess class recorded above.
+- the lost shell-ready marker when a startup command execs over the shell (`repro-13767`) — "Timed out
+  waiting for PTY output", the PTY/subprocess class recorded above. The repro file itself,
+  `repro-13767-shell-ready-marker-lost-to-exec.test.ts`, was
+  retired upstream in the 2026-11-20 sync (#43367), so that entry is gone from the allowlist with it and
+  the class is now unasserted here rather than allowlisted.
 - `tests/e2e/cross-version-wire/*` (three files) time out at 30 s inside `materializeReleaseCheckout`
   — a git checkout of a baseline ref — when the machine is loaded. They pass on a quiet machine.
 
@@ -1313,7 +1326,9 @@ Fourteen were already recorded. The last two are the same host-toolchain class a
 
 - `config/scripts/dependency-security/audit-tools/dependency-security-release.test.mjs` — the audit action's bash step uses
   `mapfile`, and this machine's bash is Apple's 3.2 (`bash: mapfile: command not found`). Same
-  signature as `ci-managed-ssh-execution.test.mjs`, which is already recorded.
+  `host-toolchain` signature as the `ci-managed-ssh-execution` entry recorded then — that workflow
+  contract suite has since been retired upstream (2026-11-20 sync, #43278), so this is the surviving
+  member of the class.
 - the cross-version host-model-catalog released-phone suite (retired upstream) — both cases call
   `stripTypeScriptTypes` from `node:module`; the bun 1.4.3 pool's `node:module` does not export it,
   so the file passes only under a Node runtime.
@@ -1389,9 +1404,12 @@ answer, so every transitive importer of the mocked module gets the registry's re
 `undefined`; the session-scanner case passes and was never listed. The merge's own full run
 (@`51f09025ca`) passed 134,537 cases with 35 allowlisted failures and **one** unexpected one, that
 mock. Eight entries whose failures stopped reproducing were pruned, and
-`config/scripts/ci/workflow-contracts/ci-managed-ssh-execution.test.mjs` was added: the workflow step its cases execute calls
+the `ci-managed-ssh-execution` workflow-contract suite
+(`config/scripts/ci/workflow-contracts/`) was added: the workflow step its cases execute calls
 `mapfile`, which macOS's `/bin/bash` 3.2 does not have (the ubuntu runners ship bash 5) — the same
-`host-toolchain` class as the `pr-auxiliary-preflight-admission` entries.
+`host-toolchain` class as the `pr-auxiliary-preflight-admission` entries. That suite was itself retired
+upstream in the 2026-11-20 sync (#43278, with the rest of the low-value CI checks), so the class now
+rides on the drawing step alone.
 
 **Re-diagnosed for fork issue #151 § 4, and the recorded cause was wrong.** Two corrections:
 
@@ -1703,6 +1721,79 @@ keyed by path, so a moved file shows up twice. Each step was handled as follows.
     fork's feed.
   - `audit:code-quality:native`: nine duplicate imports the resolution re-rooted onto one module are
     merged.
+
+### `local(lint)`: the 2026-11-20 sync's lint gate — three upstream ratchets arrive, one inherited red
+
+The merge of upstream `0c6207e3d7` (1425 commits, 579 fork commits replayed) left `gate-lint` at 10
+failing steps and 19 new reds. Nine of the ten steps are green in the tree; the tenth is the
+`check:code-quality:changed` entry this gate carries until `main` is pushed.
+
+- **Three ratchets are new in this sync** — `check:main-blocking-helper-ratchet`,
+  `check:whole-hot-map-selector-ratchet` and `check:workspace-path-sync-fs-ratchet` had no baseline in
+  the pre-sync tree (`config/main-blocking-helper-baseline.txt` and
+  `config/whole-hot-map-selector-baseline.txt` arrive from upstream; the workspace-path script and its
+  baseline are the fork's own). Their reds are therefore not regressions from the resolution: they are
+  fork code and inherited upstream code that no gate has looked at before. Upstream's own tree at
+  `0c6207e3d7` passes the first two (verified by running both collectors in a detached worktree there),
+  so every row below is the fork's.
+- **`config/main-blocking-helper-baseline.fork.txt` — 140 rows.** The charge is not the credential
+  stores themselves: it is the fork's data-path layer. `src/main/home-directory-migration.ts`
+  (`local(identity)`: Orca NP's own home directory) resolves its location with `existsSync`, as do
+  `agent-hooks/official-orca-profile.ts`, `jenkins/jenkins-server-store.ts`,
+  `claude-accounts/claude-oauth-pending-rotations.ts`,
+  `shared/ephemeral-vm-provisioning-attempts.ts` and `ipc/project-folder-placement.ts`, so every store
+  built on them is charged and every second-hop caller is charged again. 79 of the 140 rows reach
+  through the first alone. Fixing it is a refactor of the identity layer (split pure path getters from
+  the sync probe), not a sync fix, and it cannot be verified here without the suite — so the rows are
+  the record, with the class stated in the overlay's header, exactly as `local(ratchets)`: the fourth
+  lint drift recorded its three `workspace-record` rows. The ratchet still ratchets: a new caller of a
+  blocking helper is a new red.
+- **`config/whole-hot-map-selector-baseline.fork.txt` — 4 rows**, both consumers genuinely needing the
+  whole map: `useWorktreeIdsWithEmptySurface` scans every workspace to compute which are empty, and
+  `useConfiguredExecutionHostOptions` builds the registry of every configured host. The rule's own
+  escape (`oxlint-disable-next-line`) would hide the call from the ratchet instead of counting it, so
+  the row is the better record. Both files are fork code that predates the sync.
+- **Two overlays instead of rows in the base files.** Both base baselines are upstream's and this fork
+  keeps them byte-identical; `readCountBaseline` already takes an overlay (`local(ratchets)`, the
+  focus-read rows), so each script gained one `OVERLAY_PATH` constant and one `overlayPath:` line. A
+  row appended to an upstream baseline is a conflict on every sync; a fork-owned file is not.
+- **`check:workspace-path-sync-fs-ratchet` — 6 rows in its own baseline**, all six files byte-identical
+  to upstream's copy: the CLI sign-in folder probe in `bot-tool-secret-scrub.ts` and
+  `rpc/methods/bots-tools.ts`, the `<folder>/.git` probe in `bot-tools-host.ts`, the
+  `repo.path`/`worktreePath` pair in `bot-work-runtime.ts`, the disk-usage worker's `realpathSync`, and
+  `realpathSync.native` in `qwen-code/workspace-trust.ts` (#44046). Fork-only edits to upstream files are
+  a permanent merge cost (`local(ratchets)`: an upstream file the fork only fixes keeps its shape), and
+  none of these is reachable from the fork's own side.
+- **`check:process-host-imports` / `check:import-boundaries`** — four stale rows, dropped. Upstream
+  moved `macos-computer-use-permission-status.ts`, `git-stream-stdout.ts`, `memory/collector.ts` and
+  `macos-tailscale-dns-diagnostic.ts` off the direct `child_process` import. The second step runs the
+  first, so it was the same four reds.
+- **`check-upstream-file-comments`** — re-taken with `--init --accept` at **5115**, after trimming
+  `service-credential-read-account-switch.test.ts` from 7 fork comment lines to 4 (it carries no
+  per-file maximum of its own): the mock block's two-line "why" is one line, the Copilot note is gone,
+  and the Retry-After note keeps its point in two. Nothing else moved — `--init` rewrote only `total`,
+  `base` and `accepted`, and the 341 per-file maxima are unchanged, so the growth the 2026-11-08 sync
+  deliberately kept out of the baseline is still out.
+- **`audit:code-quality:native`** — one duplicate import in `BotHoverDetails.tsx`, merged.
+- **`audit:code-quality:type-aware`** — three `await-thenable` warnings in the fork's host-sync
+  credential ports, where `map((port) => port.list())` hands `Promise.all` a list the type says is not
+  thenable. The ports answer directly or through a promise by design, so the mapper is async; awaiting
+  a plain value is still what the caller wants.
+- **`lint:ast-grep-gates`** — five `link-affordance-declares-url` errors, fixed by declaring
+  `data-link-url` on each element rather than suppressing: `NativeChatConnectorAskerTag`,
+  `GoogleAddServiceDialog` (which now computes its URL once), `AntigravityChatApiKeyField`,
+  `BotUpNextSection` and `BotMemoryList`.
+- **`check:code-quality:changed` — recorded, not fixed.** `origin/main` is still the pre-sync tip, so
+  the changed set is upstream's 1425 commits plus the replayed 579, and
+  `check-changed-code-quality.mjs` `spawnSync` fails `E2BIG` before it reports a single finding
+  (measured 2026-11-20 in `/Volumes/Storage/Code/orca/main`). That is the whole-step entry in
+  `local/lint-known-red.json`; the post-merge fix-ups ran clean under `ORCA_CODE_QUALITY_BASE=HEAD`,
+  and the entry goes stale on the first run after `git push origin main`.
+
+Anchors: `config/main-blocking-helper-baseline.fork.txt`,
+`config/whole-hot-map-selector-baseline.fork.txt`, the two `OVERLAY_PATH` constants,
+`config/workspace-path-sync-fs-baseline.txt` (6 rows), `config/process-host-direct-import-baseline.txt`,
+`local/upstream-file-comments-baseline.json`, `local/lint-known-red.json`.
 
 ### `local(lint)`: two `fork-comment-ok` markers, and why they are not comments to delete
 
@@ -2248,7 +2339,8 @@ Nine are recorded, all `owner: upstream` on code byte-identical to `0571e45107`:
   already green: upstream #33533 (`a886dcd1fe9`, merged with the 10-28 sync) added
   `terminal-topology-profile-fixture` to the harness list `config/scripts/vitest-sqlite-runtime-scan.mjs`
   keys on, so `getNodeRuntimeInclude()` had been routing them to the Node project all along. The other
-  two — `tests/e2e/helpers/persisted-profile-state.unit.test.ts` and
+  two — `tests/e2e/desktop/electron-fixtures/persisted-profile-state.unit.test.ts` (moved there from
+  `tests/e2e/helpers/` when upstream grouped the e2e tree by feature, #43628) and
   `src/main/ai-vault-search/indexing/session-search-indexer.test.ts` — reach `node:sqlite` through modules the
   scan does not follow, so they really were running under Bun; both are now listed in
   `NODE_RUNTIME_INCLUDE` with the reason, and both pass (3/3 and 42/42) where they failed 2/3 and 1/42.
@@ -2890,8 +2982,11 @@ across five files, each creating a temp dir with `mkdtemp(tmpdir())` and compari
 subject had resolved — the darwin launcher's `cd -P`, orcad's deploy root, a spawned child's reported
 cwd. Each now resolves its temp dir first:
 `orcad-forked-child-paths.test.ts` (4), `cli/packaged-cli-assets.test.ts` (1),
-`config/scripts/cli-build/verify-cli-bin.test.mjs` (1), `config/scripts/macos/terminal-host-bundle/macos-terminal-host-bundle.test.mjs` (1).
-The `orca-runtime` pair above is the other two.
+`config/scripts/macos/terminal-host-bundle/macos-terminal-host-bundle.test.mjs` (1).
+The `orca-runtime` pair above is the other two. A fifth site, the `cli-build/verify-cli-bin` suite,
+carried one of these cases and went with upstream's bulk test removals in the 2026-11-20 sync (#43138);
+its subject, `config/scripts/cli-build/verify-cli-bin.mjs`, survives unchanged, and nothing asserts that
+temp-dir spelling for it now.
 
 Every one of those four files is otherwise byte-identical to `upstream/main`, so each is a fork-local
 test fix that will conflict once, benignly, when upstream makes the same change — the same trade
@@ -3209,6 +3304,38 @@ pnpm run sync:localization-runtime-catalog
 [local/sync/sync-log-archive.md](./local/sync/sync-log-archive.md), newest first, so this
 section stays readable. `tests/tools/fork-process-docs.test.mjs` holds the three-entry rule.
 
+- **2026-11-20 — merge of upstream `0c6207e3d7` (1,425 commits) into the release line, from
+  `1db15d9ff0`** (merge base `1ce376b27e`, rollback tag `archive/pre-sync-1db15d9ff0`, merge commit
+  `2ed6a05ce78`). **477 conflicted paths** — `both-rewrote 248, union 126, modify/delete 81,
+  rename-replay 12, duplicate-tail 7, duplicate-members 2, add/add 1`. Resolved in four tiers: **54
+  paths proved** by `conflicts.mjs --apply-proven` (import-only and fork-unchanged unions), **77
+  modify/delete taken as deletions** (upstream's bulk test retirements plus the dashboard delivery
+  family), **4 moved paths ported by hand**, and **241 both-rewrote/union paths in 18 area batches of
+  ≤20**. Decisions are in [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md). What
+  a reviewer will want first:
+
+  - **Renames were the cost again, at 2.5× the last sync**: upstream moved 2,358 paths and deleted
+    2,036. With every marker gone `pnpm tc` opened at **1,083 errors, 544 of them missing modules**. A
+    rename-map pass (upstream's own `--find-renames` output, never a basename guess) fixed 369
+    specifiers across 268 files, then five area passes took it to clean; 62 further `vi.mock` and
+    string references that `tc` cannot see were fixed the same way.
+  - **Three breaks no conflict marker showed.** `RuntimeAccountController` was still wired to the
+    notifier instead of upstream's Claude-account selection handler (a `@ts-nocheck` file, so invisible
+    to `tc`); a sync wrapper over an async credential write left a floating promise, so a saved Jenkins
+    token missed the next request; and a union resolution duplicated a `maxBuffer` key.
+  - **Upstream changed `BROWSER`** (#43232) to point at the CLI itself rather than an
+    `open-url --url %s` template. `tests/tools/fork-invariants.test.mjs` pinned the old shape and now
+    pins the basename — the part that matters, since a bare `orca` is GNOME's screen reader on Linux.
+  - **83 fork-modified test files and 182 fork-added cases went with upstream's retirements**
+    (#42831–#43662, #43120, #43339), recorded in
+    [local/sync/upstream-deleted-fork-tests-baseline.json](./local/sync/upstream-deleted-fork-tests-baseline.json).
+    The heaviest loss is the fork's whole `src/main/updater/*.test.ts` set, in one of its most-patched
+    areas; re-homing those cases into fork-owned suites is owed.
+  - **25 upstream-owned files are exempted from `max-lines`, not split.** Each was verified as
+    upstream-owned _and_ under budget upstream, so the overage is the fork's delta; splitting one costs
+    a permanent hunk on every sync (this file's `local(lint)` rule). The ratchet grew by 31 entries and
+    the review gate should see it.
+
 - **2026-11-15 — merge of upstream `1ce376b27e` (1,180 commits) into the release line, from
   `a992b134ff`** (merge base `86ee16da9ea`). **694 conflicted paths, 824 hunks** —
   `both-rewrote 325, modify/delete 182, union 166, rename-replay 10, duplicate-tail 5, add/add 4,
@@ -3325,45 +3452,6 @@ section stays readable. `tests/tools/fork-process-docs.test.mjs` holds the three
     Deleting the reported orphan keys by hand removed keys the source still generates (the hashes had
     moved, not the keys), so the extraction gate flipped to "extracted keys missing from en.json".
     `pnpm sync:localization-catalog` is what reconciles both directions.
-
-- **2026-11-08 — merge of upstream `51c77320bc` (1537 commits) into the release line, from
-  `3f8bbfb269`** (merge base `0fa5dae2f9`, rollback tag `archive/pre-sync-3f8bbfb269`, merge commit
-  `5a02a4c8406`). **1110 conflicted paths, 1239 hunks** —
-  `modify/delete 645, both-rewrote 263, union 154, rename-replay 27, duplicate-tail 17,
-  duplicate-members 3, add/add 1`. Decisions are in
-  [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md); the ones a reviewer will
-  want first:
-
-  - **Upstream reorganised the tree into owner-scoped directories this sync** — settings, the backend
-    runtime, the renderer runtime, the sidebar and the terminal pane all moved. That makes the
-    dominant cost _re-homing_ rather than merging: 22 source paths upstream deleted were moved rather
-    than dropped, so the fork's delta was re-applied at the new location before the old path was
-    deleted. 9 more upstream deletions have no upstream home and stay fork-only files.
-  - **Resolved in three tiers.** `conflicts.mjs --apply-proven` proved **197 paths** outright
-    (import-only three-way unions, fork-unchanged, upstream-unchanged). **386 modify/delete** were
-    settled by the ledger and the manifest: 345 upstream-retired tests taken as deletions, 4
-    fork-deleted tests and 6 fork-deleted source paths kept deleted, 4 dashboard-popout files
-    restored. The remaining **527 content conflicts** were resolved in 15 disjoint area batches, each
-    gated on "no conflict marker survives in this batch's files".
-  - **`use-terminal-pane-lifecycle.ts` needed no port.** Upstream moved the focus-sampling code to
-    `terminal-pane/input/focus/use-terminal-foreground-agent-sampling.ts`, which already carries the
-    fork's `recordUiHangOperation` timing — the delta moved with the code.
-  - **`runtime-jira-target.ts` moved to `runtime/jira/`** with its 11 importers, matching upstream's
-    renderer-runtime grouping. `fork-english-catalog.mjs` moved beside its consumer in
-    `localization/catalog-validation/` for the same reason.
-  - **The settings/accounts family was ported as a delta, not a copy.** The fork's intent in that
-    family is one thing — it deletes the per-section header because its own settings navigation
-    provides it — so each file is upstream's version minus a ~10-line block, not the old file
-    reverted over upstream's (~360 changed lines). `getMiniMaxConsoleUrl` and
-    `resolveZcodePlanSite` stay exported because the fork-only `provider-accounts-sections.tsx`
-    calls them.
-  - **Two type gaps the merge exposed, both real:** `PROVIDER_DISPLAY_NAMES` was missing
-    `copilot`/`deepinfra`/`deepseek`/`fireworks` and `USAGE_PROVIDER_IDS` was missing `muse`, so a
-    metered provider could have shipped with a status-bar meter and no way to switch it off.
-  - **Committed with `HUSKY=0`, and why.** `pre-commit` runs `lint-staged`, whose five tools were
-    applied to all 39,553 staged files — the whole upstream delta — and were killed. Its oxlint tool
-    set was run over the 524 files this merge authored instead (clean), and `local/gate-lint.mjs` is
-    the gate of record. The reason is in the merge commit body.
 
 ### `local(ci)`: release workflow
 

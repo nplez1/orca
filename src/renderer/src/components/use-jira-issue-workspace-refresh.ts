@@ -8,7 +8,7 @@ import { runAsyncTask } from '../lib/async-task-with-cleanup'
 import {
   mergeJiraIssueHydration,
   type EditableJiraIssueField
-} from './jira-issue-workspace-hydration'
+} from './task-page/jira/issue-workspace/jira-issue-workspace-hydration'
 
 /** Re-reads the selected issue (refresh signal or manual retry) and reloads its
  *  transitions. Kept separate from the detail hook to stay within the line cap. */

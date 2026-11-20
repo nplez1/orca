@@ -31,7 +31,7 @@ vi.mock('node:fs/promises', () => ({
   stat: statMock
 }))
 
-vi.mock('./linked-file-inspection', () => ({
+vi.mock('./shell/linked-file-inspection', () => ({
   inspectLinkedFile: inspectLinkedFileMock
 }))
 
@@ -39,8 +39,8 @@ vi.mock('../codex-cli/command', () => ({
   resolveCliCommand: (command: string) => command
 }))
 
-import { registerShellHandlers } from './shell'
-import { resolveDefaultAppOpenTarget } from './shell-owned-path-target'
+import { registerShellHandlers } from './shell/shell'
+import { resolveDefaultAppOpenTarget } from './shell/shell-owned-path-target'
 
 const store = { getSshTarget: () => undefined }
 

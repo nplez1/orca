@@ -4,12 +4,15 @@ import { useAppStore } from '@/store'
 import { useTranslate } from '@/i18n/use-translate'
 import { getAgentCatalog } from '@/lib/agent-catalog/agent-catalog'
 import { AgentIcon } from '@/components/agent/icons/AgentIcon'
-import { useShortcutKeyDetails, type ShortcutKeyComboDetails } from '@/hooks/useShortcutLabel'
+import {
+  useShortcutKeyDetails,
+  type ShortcutKeyComboDetails
+} from '@/lib/keyboard/useShortcutLabel'
 import { useTabBarDefaultAgent } from '@/components/tab-bar/use-tab-bar-default-agent'
-import { hasGitHubBackedProject } from '@/components/landing-preflight-issues'
+import { hasGitHubBackedProject } from '@/components/onboarding/landing/landing-preflight-issues'
 import { GitHubStarButton } from '@/components/GitHubStarButton'
 import { useOrcaStarState } from '@/components/orca-star-state'
-import { ShortcutKeyCombo } from '@/components/ShortcutKeyCombo'
+import { ShortcutKeyCombo } from '@/components/ui/ShortcutKeyCombo'
 import { OrcaBrandMark } from '@/components/OrcaBrandMark'
 import type { TuiAgent } from '../../../../shared/agent-launch/catalog/tui-agent'
 

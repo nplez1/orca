@@ -1,7 +1,7 @@
 import { translate } from '@/i18n/i18n'
 import { resolveAgentTypeFromTerminalTitle } from '@/components/sidebar/workspace-card/activity/worktree-title-derived-agent-rows'
 import { detectAgentStatusFromTitle } from '../../../../../shared/agent-status/title/agent-title-status'
-import { tabHasLivePty } from '../../../../../shared/tab-has-live-pty'
+import { tabHasLivePty } from '../../../../../shared/workspace-layout/terminal-surfaces/tab-has-live-pty'
 import {
   collectRuntimePaneLeafIds,
   isRuntimePaneTitleOrphan,
@@ -18,6 +18,7 @@ import type {
 import type { TuiAgent } from '../../../../../shared/agent-launch/catalog/tui-agent'
 import type { AgentType } from '../../../../../shared/agent-status/contracts/agent-status-types'
 import type { LiveAgentWorktreeStatus } from '../../../../../shared/sidebar-list/feed-facts/workspace-activity-facts'
+import type { WorktreeStatus as SharedWorktreeStatus } from '../../../../../shared/worktree/row-display/worktree-status-rollup'
 
 export type WorktreeStatus =
   | 'active'
@@ -30,6 +31,11 @@ export type WorktreeStatus =
   | 'done'
   | 'inactive'
   | 'setup'
+
+/** Shared rollups and bot folds have no `setup`: a row still setting up counts as plain live. */
+export function asSharedWorktreeStatus(status: WorktreeStatus): SharedWorktreeStatus {
+  return status === 'setup' ? 'active' : status
+}
 
 type WorktreeStatusHeuristicOptions = {
   liveAgentStatus?: LiveAgentWorktreeStatus

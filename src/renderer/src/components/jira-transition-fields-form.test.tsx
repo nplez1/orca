@@ -4,7 +4,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { JiraCreateField, JiraTransition } from '../../../shared/jira/jira-types'
-import { JiraTransitionFieldsForm } from './jira-transition-fields-form'
+import { JiraTransitionFieldsForm } from './task-page/jira/issue-workspace/jira-transition-fields-form'
 
 vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback: string) => fallback

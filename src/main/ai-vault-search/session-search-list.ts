@@ -1,5 +1,5 @@
 import type { AiVaultAgent, AiVaultSession } from '../../shared/ai-vault/contracts/ai-vault-types'
-import type { ExecutionHostId } from '../../shared/execution-host'
+import type { ExecutionHostId } from '../../shared/execution-host/execution-host'
 import type SyncDatabase from '../sqlite/sync-database'
 import { parseVaultQuery } from '../../shared/ai-vault/session-display/ai-vault-session-filters'
 import { sessionRowFilter } from './query/session-search-row-filter'

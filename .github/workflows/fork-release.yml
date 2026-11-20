@@ -154,7 +154,8 @@ jobs:
       node_versions: '["24"]'
       runner: ubuntu-24.04-arm
       shards: ${{ needs.unit-plan.outputs.shards }}
-      run_relay_integration: false
+      # `run_relay_integration` is gone: upstream removed the input and the relay job in the
+      # 2026-11-20 sync. Passing it fails the call at startup with no jobs.
 
   # Why a job and not a step in the artifact legs: the verdict has to arrive once, before the first
   # artifact exists, and a step in each leg would spend the same minutes three times, after the unit

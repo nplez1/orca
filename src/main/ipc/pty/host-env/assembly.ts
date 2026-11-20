@@ -1,6 +1,4 @@
-import { basename } from 'node:path'
 import { applyClaudeAgentViewEnv } from './claude-agent-view'
-import { resolveTerminalInlineImagesEnabled } from '../../../../shared/terminal/images/terminal-inline-images-settings'
 import { resolveSetupAgentSequenceLaunchCommand } from '../../../../shared/agent-launch/startup/setup-agent-sequencing'
 import {
   detectExplicitPiAgentKindFromCommand,
@@ -15,12 +13,14 @@ import { wslInteropHealthMonitor } from '../../../wsl/execution/wsl-interop-heal
 import { piTitlebarExtensionService } from '../../../pi/managed-extensions/titlebar-extension-service'
 import { prependOrcaCliDirToChildPath } from '../../../cli/launchers/orca-cli-child-path'
 import { CLI_COMMAND_NAME } from '../../../cli/installation/cli-install-constants'
+import { appendManagedAgentDirsToChildPath } from '../../../managed-agent-cli/managed-agent-cli-registry'
+import { resolveTerminalBrowserCommand } from './terminal-browser-command'
 import { getManagedWslCliDir, getManagedWslCliLauncherName } from '../../../cli/wsl/wsl-managed-cli'
 import { stripLegacyTerminalShimEnv } from '../../../pty/shell-startup/legacy-terminal-shim-dir'
 import { mergePersistedWindowsPath } from '../../../pty/environment/windows-environment-path'
 import { resolveCodexShellLaunchPreflightCommand } from '../../../pty/shell-startup/codex-shell-launch-preflight'
 import { scheduleCodexHookReconcile } from '../../../codex/hooks/reconciliation/codex-hook-reconcile'
-import { buildConfiguredProxyEnv } from '../../../../shared/network-proxy'
+import { buildConfiguredProxyEnv } from '../../../../shared/network/network-proxy'
 import { isTuiAgentEnabled } from '../../../../shared/agent-launch/catalog/tui-agent-selection'
 import type { BuildPtyHostEnvOptions } from './types'
 import { stripInheritedOrcaCodexHomeOverride } from './codex-home'
@@ -46,16 +46,6 @@ export function buildPtyHostEnv(
 ): Record<string, string> {
   mergePersistedWindowsPath(baseEnv)
   Object.assign(baseEnv, buildConfiguredProxyEnv(opts.networkProxySettings))
-
-  // Claude currently recognizes image support only in a short terminal allowlist.
-  if (
-    opts.launchAgent === 'claude' &&
-    resolveTerminalInlineImagesEnabled(opts.terminalInlineImages) &&
-    baseEnv.CLAUDE_CODE_FORCE_TERMINAL_IMAGES === undefined &&
-    process.env.CLAUDE_CODE_FORCE_TERMINAL_IMAGES === undefined
-  ) {
-    baseEnv.CLAUDE_CODE_FORCE_TERMINAL_IMAGES = '1'
-  }
 
   const openCodeConfig = captureOpenCodeSourceConfig(baseEnv, opts.userDataPath)
   const launchCommandHint = resolveSetupAgentSequenceLaunchCommand(baseEnv, opts.launchCommand)
@@ -179,7 +169,8 @@ export function buildPtyHostEnv(
     // Bare shells must not create agent homes; use existing Pi/OMP directories or userData for OMP status (#10196).
     if (shouldInstallPiExtensions && piAgentKind === 'pi') {
       const piEnv = piTitlebarExtensionService.buildPtyEnv(id, preexistingPiAgentDir, 'pi', {
-        materializeDefaultHome: explicitPiAgentKind === 'pi'
+        materializeDefaultHome: explicitPiAgentKind === 'pi',
+        cliOnPath: opts.agentsOnPath?.has('pi') === true
       })
       Object.assign(baseEnv, piEnv)
       exposePiManagedExtensionEnv(baseEnv, 'pi', piEnv)
@@ -188,6 +179,7 @@ export function buildPtyHostEnv(
     if (shouldInstallOmpExtensions && shouldPrepareOmpShadow) {
       const ompEnv = piTitlebarExtensionService.buildPtyEnv(id, preexistingOmpAgentDir, 'omp', {
         materializeDefaultHome: explicitPiAgentKind === 'omp',
+        cliOnPath: opts.agentsOnPath?.has('omp') === true,
         // WSL loads the host-rooted managed extension through drvfs; guest storage stays separate.
         ...(opts.isWsl
           ? { configDirName: '.omp' }
@@ -308,6 +300,7 @@ export function buildPtyHostEnv(
     userDataPath: opts.userDataPath,
     resourcesPath: opts.resourcesPath
   })
+  appendManagedAgentDirsToChildPath(baseEnv)
   // Why: this app's skill stubs resolve the CLI from ORCA_CLI_COMMAND first, and a native PTY is
   // where an agent normally reads them; without it the ladder falls through to a bare `orca` that
   // belongs to an official install.
@@ -324,13 +317,11 @@ export function buildPtyHostEnv(
     baseEnv.BROWSER === undefined &&
     process.env.BROWSER === undefined
   ) {
-    // Why the basename of ORCA_CLI_COMMAND: BROWSER is word-split by its consumers (xdg-open,
-    // sensible-browser), so the bundle path this resolves from would break on the space in
-    // "Orca NP.app" — while the PTY PATH is already prepended with that launcher's directory.
-    // Why not a bare `orca`: on Linux that is GNOME's screen reader and elsewhere an official
-    // install's CLI, so a URL opened from a pane would never reach this app.
-    const cliCommand = basename(baseEnv.ORCA_CLI_COMMAND ?? CLI_COMMAND_NAME)
-    baseEnv.BROWSER = `${cliCommand} open-url --url %s`
+    // Why the launcher, not a bare `orca`: on Linux that is GNOME's screen reader and elsewhere an
+    // official install's CLI, so a URL opened from a pane would never reach this app.
+    baseEnv.BROWSER = opts.isWsl
+      ? getManagedWslCliLauncherName(opts.isPackaged)
+      : resolveTerminalBrowserCommand(cliLauncher ?? CLI_COMMAND_NAME)
   }
   // Browser-relayed and SSH-managed headless hosts both have viewers on another machine.
   applyRemoteViewerClipboardEnv(baseEnv, {

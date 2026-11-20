@@ -12,24 +12,24 @@ import {
   addWorktreeCreatePhaseAttributes,
   withWorktreeSpan
 } from '../../../observability/instrumentation'
-import { createLocalWorktree } from '../../worktree-remote'
-import {
-  notifyWorktreeCatalogChanged,
-  notifyWorktreeCatalogChangedForPairedClients
-} from '../../watched-worktree-catalog-notification'
 import { workspaceSourceSchema } from '../../../../shared/telemetry/schemas/telemetry-property-schemas'
 import type { WorkspaceSource } from '../../../../shared/workspace/creation/workspace-source'
 import { isFolderRepo } from '../../../../shared/repository/repo-kind'
+import { createLocalWorktree } from '../worktree-remote'
+import {
+  notifyWorktreeCatalogChanged,
+  notifyWorktreeCatalogChangedForPairedClients
+} from '../listing/watched-worktree-catalog-notification'
 import { SshHostNotServedError } from '../../../providers/ssh-host-not-served-error'
 import { track } from '../../../telemetry/client'
-import { classifyWorkspaceCreateError } from '../../workspace-create-error-classifier'
+import { classifyWorkspaceCreateError } from '../creation/workspace-create-error-classifier'
 import { getCohortAtEmit } from '../../../telemetry/cohort-classifier'
 import { adoptProvisionedRootSshCheckout } from '../../../workspaces/catalog/provisioned-root-ssh-adoption'
 import { normalizeLinkedWorkItemFields } from '../ipc-context-schemas'
 import { createFolderWorkspace } from './folder-workspace-creation'
 import { findExactRepoOwner, isCapturedRepoCurrent } from '../listing/worktree-host-ownership'
 import { requireWorktreeCreateRoute } from '../../../workspaces/creation/worktree-create-execution-host-route'
-import { getRepoExecutionHostId } from '../../../../shared/execution-host'
+import { getRepoExecutionHostId } from '../../../../shared/execution-host/execution-host'
 import { workspaceLifecycleKey } from '../../../runtime/workspaces/lifecycle/workspace-lifecycle-commands'
 import type { WorktreeIpcContext } from '../worktree-ipc-context'
 import { beginWorkspaceCreateTelemetry } from '../../../workspaces/creation/workspace-create-telemetry'
@@ -104,12 +104,12 @@ export function registerWorktreeCreateHandlers(context: WorktreeIpcContext): voi
 
           telemetry.succeeded(result.timing)
 
-        if (isFolderRepo(repo)) {
-          notifyWorktreeCatalogChanged(mainWindow, repo.id)
-        } else {
-          // Why: the local create refreshed this renderer; paired clients hold no copy of it.
-          notifyWorktreeCatalogChangedForPairedClients(repo.id)
-        }
+          if (isFolderRepo(repo)) {
+            notifyWorktreeCatalogChanged(mainWindow, repo.id)
+          } else {
+            // Why: the local create refreshed this renderer; paired clients hold no copy of it.
+            notifyWorktreeCatalogChangedForPairedClients(repo.id)
+          }
 
           options?.onWorktreeLifecycle?.({
             kind: 'created',

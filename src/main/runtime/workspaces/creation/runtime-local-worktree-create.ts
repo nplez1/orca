@@ -15,11 +15,14 @@ import {
 } from '../../../git/refs/resolution/repo-default-base-ref'
 
 import { resolveLocalGitUsername } from '../../../git/repositories/git-username'
-import { computeWorkspaceRoot, getWorktreePathSettings } from '../../../ipc/worktree-logic'
+import {
+  computeWorkspaceRoot,
+  getWorktreePathSettings
+} from '../../../ipc/worktrees/paths/worktree-logic'
 import { resolveWorktreeCreateBase } from '../../../workspaces/creation/worktree-create-base'
 import { materializeCopiedPushTargetBase } from '../../../worktree-create-push-target-base'
-import { prepareWorktreePushTarget } from '../../../ipc/worktree-remote'
-import { getRepoExecutionHostId } from '../../../../shared/execution-host'
+import { prepareWorktreePushTarget } from '../../../ipc/worktrees/worktree-remote'
+import { getRepoExecutionHostId } from '../../../../shared/execution-host/execution-host'
 import type { RuntimeManagedWorktreeCreateArgs } from './runtime-managed-worktree-create-types'
 import type {
   RemoteFetchResult,

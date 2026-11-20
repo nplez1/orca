@@ -3,7 +3,7 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { GlobalSettings } from '../../../../shared/global-settings-types'
+import type { GlobalSettings } from '../../../../shared/settings/global-settings-types'
 
 const mocks = vi.hoisted(() => ({
   state: {} as Record<string, unknown>,
@@ -18,7 +18,7 @@ vi.mock('@/components/dashboard/bucket-counts/useAgentBucketCounts', () => ({
   useAgentBucketCounts: () => ({ attention: 0, working: 0, done: 0, idle: 0 })
 }))
 
-import AgentDashboardSidebarEntry from './AgentDashboardSidebarEntry'
+import AgentDashboardSidebarEntry from '../dashboard/sidebar/AgentDashboardSidebarEntry'
 
 function setEntryState({
   activeView = 'terminal',

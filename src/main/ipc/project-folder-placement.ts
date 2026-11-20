@@ -7,19 +7,19 @@
  */
 import { readdirSync } from 'node:fs'
 import { posix, win32 } from 'node:path'
-import { isWindowsAbsolutePathLike } from '../../shared/cross-platform-path'
+import { isWindowsAbsolutePathLike } from '../../shared/file-access/cross-platform-path'
 import {
   replaceKnownEmojiWithShortcodes,
   setEmojiShortcodeDatasetLoader
-} from '../../shared/emoji-shortcode-catalog'
+} from '../../shared/text/emoji-shortcode-catalog'
 import {
   isProjectFolderLayout,
   resolveWorktreeLayoutMode,
   type WorktreeLayoutMode
-} from '../../shared/orca-workspace-layout'
+} from '../../shared/worktree/paths/orca-workspace-layout'
 import type { Repo } from '../../shared/repository/repo-types'
 import { areWorktreePathsEqual } from '../../shared/worktree-path-comparison'
-import { requireEmojiShortcodeDataset } from './deferred-emoji-shortcode-dataset'
+import { requireEmojiShortcodeDataset } from './worktrees/paths/deferred-emoji-shortcode-dataset'
 
 setEmojiShortcodeDatasetLoader(requireEmojiShortcodeDataset)
 

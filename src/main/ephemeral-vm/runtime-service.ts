@@ -1,5 +1,5 @@
-import type { OrcaVmRecipe } from '../../shared/orca-yaml-hook-types'
 import { getEphemeralVmLifetimeLossError } from '../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipes'
+import type { OrcaVmRecipe } from '../../shared/workspace-setup/orca-yaml-hook-types'
 import {
   listEphemeralVmRuntimes,
   updateEphemeralVmRuntimeStatus

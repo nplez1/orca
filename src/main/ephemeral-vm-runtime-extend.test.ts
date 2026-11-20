@@ -8,7 +8,7 @@ import {
   upsertEphemeralVmRuntime
 } from '../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-store'
 import type { EphemeralVmRuntimeRecord } from '../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
-import type { OrcaVmRecipe } from '../shared/orca-yaml-hook-types'
+import type { OrcaVmRecipe } from '../shared/workspace-setup/orca-yaml-hook-types'
 import type { Store } from './persistence/loading-store/store'
 
 const mocks = vi.hoisted(() => ({
@@ -19,7 +19,7 @@ const mocks = vi.hoisted(() => ({
   invalidateRuntimeEnvironmentTransport: vi.fn()
 }))
 
-vi.mock('./ipc/ephemeral-vm-recipe-context', () => ({
+vi.mock('./ipc/ephemeral-vm/ephemeral-vm-recipe-context', () => ({
   getRuntimeRecipeContext: mocks.getRuntimeRecipeContext
 }))
 vi.mock('./ipc/runtime-environments/runtime-environments', () => ({

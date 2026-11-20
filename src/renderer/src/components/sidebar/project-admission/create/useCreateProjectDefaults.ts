@@ -6,11 +6,11 @@ import {
   resolveRuntimeCreateParent,
   withTimeout
 } from './runtime-create-parent'
-import type { WorktreeLayoutMode } from '../../../../../../shared/orca-workspace-layout'
+import type { WorktreeLayoutMode } from '../../../../../../shared/worktree/paths/orca-workspace-layout'
 import { callRuntimeRpc } from '@/runtime/rpc/calls/runtime-rpc-call'
 import type { AddRepoDialogStep } from '../dialog/add-repo-dialog-types'
-import type { ExecutionHostId } from '../../../../../../shared/execution-host'
-import type { GlobalSettings } from '../../../../../../shared/global-settings-types'
+import type { ExecutionHostId } from '../../../../../../shared/execution-host/execution-host'
+import type { GlobalSettings } from '../../../../../../shared/settings/global-settings-types'
 
 const LOCAL_GIT_AVAILABILITY_TIMEOUT_MS = 1500
 

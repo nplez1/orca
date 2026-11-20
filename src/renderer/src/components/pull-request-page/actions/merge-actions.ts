@@ -16,7 +16,7 @@ import type { GitHubWorkItem } from '../../../../../shared/github/work-items/wor
 import type { TaskSourceContext } from '../../../../../shared/work-items/task-source-context'
 import type { PullRequestPageProjectOrigin } from '../page-types'
 import { translate } from '@/i18n/i18n'
-import type { GitHubPRMergeStatePresentation } from '@/components/github-pr-merge-state'
+import type { GitHubPRMergeStatePresentation } from '@/components/github/github-pr-merge-state'
 import { buildGitHubPRAdminBypassConfirmation } from '@/components/github-pr-admin-bypass-confirmation'
 import { startPostMergeReviewRefresh } from '@/components/github/post-merge-review-refresh'
 import { codeHostErrorText } from '@/lib/source-control/remote/code-host-error-copy'
@@ -112,6 +112,8 @@ export async function mergePullRequest(args: {
   mergeDisabled: boolean
   method: GitHubPRMergeMethod
   item: GitHubWorkItem
+  /** The PR head the page shows; the host refuses the merge if GitHub's head moved past it. */
+  expectedHeadSha: string | null
   repoPath: string | null
   repoId: string | null
   sourceContext?: TaskSourceContext | null
@@ -163,7 +165,8 @@ export async function mergePullRequest(args: {
               prNumber: args.item.number,
               method: args.method,
               ...(bypassBranchProtection ? { bypassBranchProtection: true } : {}),
-              prRepo: args.prRepo
+              prRepo: args.prRepo,
+              expectedHeadSha: args.expectedHeadSha
             },
             { timeoutMs: 30_000 }
           )
@@ -174,7 +177,8 @@ export async function mergePullRequest(args: {
             prNumber: args.item.number,
             method: args.method,
             ...(bypassBranchProtection ? { bypassBranchProtection: true } : {}),
-            prRepo: args.prRepo
+            prRepo: args.prRepo,
+            expectedHeadSha: args.expectedHeadSha
           })
     if (!result.ok) {
       toast.error(codeHostErrorText(result))

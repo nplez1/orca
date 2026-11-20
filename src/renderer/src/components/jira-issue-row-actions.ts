@@ -1,7 +1,7 @@
 import { ArrowRight, FolderOpen, type LucideIcon } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
 import type { JiraIssue } from '../../../shared/jira/jira-types'
-import { getJiraIssueWorkspaceActions } from './jira-issue-workspace-actions'
+import { getJiraIssueWorkspaceActions } from './task-page/jira/issue-workspace/jira-issue-workspace-actions'
 
 export type JiraIssueRowAction = {
   key: string

@@ -56,12 +56,9 @@ jobs:
       node_versions: '["24"]'
       runner: ubuntu-24.04-arm
       shards: ${{ needs.plan.outputs.shards }}
-      # Why: the relay job in `unit-tests.yml` hard-codes `blacksmith-4vcpu-ubuntu-2404`, and this
-      # fork has no runner for that label — it queued for ~17.5 h in the 2026-10-26 run and was
-      # cancelled. The fork ships no cloud relay, so the job has nothing to test here. What it drops:
-      # the two `relay-region` unit files, which shard discovery excludes and only that job ran.
-      # `browser_contract` is not dropped — this caller never enabled it (its default is `false`).
-      run_relay_integration: false
+      # Note: this caller used to pass `run_relay_integration: false` because the relay job hard-coded
+      # a `blacksmith-*` runner this fork does not provision. Upstream removed that input *and* the job
+      # in the 2026-11-20 sync, so passing it now fails the run at startup with no jobs.
 
   # Why a job of its own rather than a shard: `ORCA_RUN_PATH_SEARCH_SCALE=1` turns on the 300k-path
   # parity case, which the shards deliberately skip — at 100k and 300k it was the slowest file in the

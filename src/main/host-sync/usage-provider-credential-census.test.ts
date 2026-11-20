@@ -49,6 +49,11 @@ const CREDENTIAL_STORE_PATTERNS = [
  */
 const NON_USAGE_CREDENTIAL_STORES: readonly { storeModule: string; reason: string }[] = [
   {
+    storeModule: 'antigravity/antigravity-chat-api-key-store',
+    reason:
+      "The Antigravity chat's own Gemini API key (model access), not the usage metering reader."
+  },
+  {
     storeModule: 'bitbucket/credential-store',
     reason: 'Bitbucket integration credentials; carries host-local site metadata, so no port yet.'
   },
@@ -63,6 +68,11 @@ const NON_USAGE_CREDENTIAL_STORES: readonly { storeModule: string; reason: strin
   {
     storeModule: 'credentials/encrypted-api-key-file-store',
     reason: 'The shared ciphertext file both provider stores are built on, not a credential itself.'
+  },
+  {
+    storeModule: 'google/google-credential-store',
+    reason:
+      'Google Workspace integration grants per signed-in account; kept on this host by design, so no port.'
   },
   {
     storeModule: 'host/electron-secret-store',

@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, unlinkSync } from 'node:fs'
+import { inCredentialFileOrder, credentialFileExists } from '../credentials/credential-file-io'
+import { mkdir, readFile, unlink } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { adoptLegacyHomeStore } from '../home-directory-migration'
 import {
@@ -8,7 +9,7 @@ import {
   writeCredentialFileAtomic,
   writeEncryptedCredential
 } from '../credentials/integration-credential-file'
-import type { BitbucketAuthMode } from '../../shared/bitbucket-credentials'
+import type { BitbucketAuthMode } from '../../shared/bitbucket/bitbucket-credentials'
 import { readCredentialFileProtection } from '../credentials/credential-file-protection'
 import type { SecretAtRestProtection } from '../../shared/secure-storage/secret-at-rest-protection'
 
@@ -53,21 +54,24 @@ export function getSecretPath(): string {
   return adoptLegacyHomeStore('bitbucket-credential.enc')
 }
 
-function ensureOrcaDir(): void {
-  mkdirSync(dirname(getMetadataPath()), { recursive: true })
+async function ensureOrcaDir(): Promise<void> {
+  const dir = dirname(getMetadataPath())
+  if (!(await credentialFileExists(dir))) {
+    await mkdir(dir, { recursive: true })
+  }
 }
 
 function asOptionalString(value: unknown): string | null {
   return typeof value === 'string' ? value : null
 }
 
-function readMetadataFromDisk(): BitbucketStoredMetadata | null {
+async function readMetadataFromDisk(): Promise<BitbucketStoredMetadata | null> {
   const path = getMetadataPath()
-  if (!existsSync(path)) {
+  if (!(await credentialFileExists(path))) {
     return null
   }
   try {
-    const parsed = JSON.parse(readFileSync(path, 'utf-8')) as Partial<BitbucketStoredMetadata>
+    const parsed: Partial<BitbucketStoredMetadata> = JSON.parse(await readFile(path, 'utf-8'))
     if (parsed.authMode !== 'token' && parsed.authMode !== 'basic') {
       return null
     }
@@ -84,17 +88,24 @@ function readMetadataFromDisk(): BitbucketStoredMetadata | null {
   }
 }
 
-export function getStoredBitbucketMetadata(): BitbucketStoredMetadata | null {
+async function loadMetadata(): Promise<BitbucketStoredMetadata | null> {
   if (!metadataLoadedFromDisk) {
-    cachedMetadata = readMetadataFromDisk()
+    cachedMetadata = await readMetadataFromDisk()
     metadataLoadedFromDisk = true
   }
   return cachedMetadata
 }
 
+export async function getStoredBitbucketMetadata(): Promise<BitbucketStoredMetadata | null> {
+  return inCredentialFileOrder(`${getSecretPath()}.mutation`, loadMetadata)
+}
+
 // Presence checks must avoid keychain prompts.
-export function hasStoredBitbucketCredential(): boolean {
-  return getStoredBitbucketMetadata() !== null && credentialFileHasContent(getSecretPath())
+export async function hasStoredBitbucketCredential(): Promise<boolean> {
+  return (
+    (await getStoredBitbucketMetadata()) !== null &&
+    (await credentialFileHasContent(getSecretPath()))
+  )
 }
 
 export function getStoredBitbucketCredentialError(): string | null {
@@ -102,9 +113,23 @@ export function getStoredBitbucketCredentialError(): string | null {
 }
 
 // Without force, read memory only; forced decryption can throw CredentialDecryptionError.
-export function loadStoredBitbucketSecret(
+export async function loadStoredBitbucketSecret(
   options: { force?: boolean } = {}
-): BitbucketStoredSecret | null {
+): Promise<BitbucketStoredSecret | null> {
+  return inCredentialFileOrder(`${getSecretPath()}.mutation`, () => loadSecret(options))
+}
+
+export async function loadStoredBitbucketCredential(options: { force?: boolean } = {}): Promise<{
+  secret: BitbucketStoredSecret | null
+  metadata: BitbucketStoredMetadata | null
+}> {
+  return inCredentialFileOrder(`${getSecretPath()}.mutation`, async () => ({
+    secret: await loadSecret(options),
+    metadata: await loadMetadata()
+  }))
+}
+
+async function loadSecret(options: { force?: boolean }): Promise<BitbucketStoredSecret | null> {
   if (cachedSecret !== null) {
     return cachedSecret
   }
@@ -112,11 +137,11 @@ export function loadStoredBitbucketSecret(
     return null
   }
   const path = getSecretPath()
-  if (!existsSync(path)) {
+  if (!(await credentialFileExists(path))) {
     return null
   }
   try {
-    const token = readStoredCredentialToken('Bitbucket', readFileSync(path))
+    const token = readStoredCredentialToken('Bitbucket', await readFile(path))
     if (!token) {
       return null
     }
@@ -141,57 +166,61 @@ export function loadStoredBitbucketSecret(
   }
 }
 
-export function getBitbucketCredentialProtection(): SecretAtRestProtection | null {
+export async function getBitbucketCredentialProtection(): Promise<SecretAtRestProtection | null> {
   return readCredentialFileProtection(getSecretPath())
 }
 
-export function saveBitbucketCredential(input: BitbucketCredentialSaveInput): void {
-  ensureOrcaDir()
-  const secret: BitbucketStoredSecret = {
-    accessToken: input.accessToken,
-    apiToken: input.apiToken,
-    authMode: input.authMode,
-    email: input.email,
-    baseUrl: input.baseUrl
-  }
-  writeEncryptedCredential('Bitbucket', getSecretPath(), JSON.stringify(secret))
-  const metadata: BitbucketStoredMetadata = {
-    version: 1,
-    authMode: input.authMode,
-    email: input.email,
-    baseUrl: input.baseUrl,
-    account: input.account,
-    updatedAt: new Date().toISOString()
-  }
-  writeCredentialFileAtomic(
-    getMetadataPath(),
-    Buffer.from(JSON.stringify(metadata, null, 2), 'utf-8')
-  )
-  cachedMetadata = metadata
-  metadataLoadedFromDisk = true
-  cachedSecret = secret
-  credentialError = null
+export async function saveBitbucketCredential(input: BitbucketCredentialSaveInput): Promise<void> {
+  return inCredentialFileOrder(`${getSecretPath()}.mutation`, async () => {
+    await ensureOrcaDir()
+    const secret: BitbucketStoredSecret = {
+      accessToken: input.accessToken,
+      apiToken: input.apiToken,
+      authMode: input.authMode,
+      email: input.email,
+      baseUrl: input.baseUrl
+    }
+    await writeEncryptedCredential('Bitbucket', getSecretPath(), JSON.stringify(secret))
+    const metadata: BitbucketStoredMetadata = {
+      version: 1,
+      authMode: input.authMode,
+      email: input.email,
+      baseUrl: input.baseUrl,
+      account: input.account,
+      updatedAt: new Date().toISOString()
+    }
+    await writeCredentialFileAtomic(
+      getMetadataPath(),
+      Buffer.from(JSON.stringify(metadata, null, 2), 'utf-8')
+    )
+    cachedMetadata = metadata
+    metadataLoadedFromDisk = true
+    cachedSecret = secret
+    credentialError = null
+  })
 }
 
 // Surface failed deletes so credentials cannot silently reappear on relaunch.
-export function clearStoredBitbucketCredential(): void {
-  try {
-    for (const path of [getSecretPath(), getMetadataPath()]) {
-      try {
-        unlinkSync(path)
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-          throw error
+export async function clearStoredBitbucketCredential(): Promise<void> {
+  return inCredentialFileOrder(`${getSecretPath()}.mutation`, async () => {
+    try {
+      for (const path of [getSecretPath(), getMetadataPath()]) {
+        try {
+          await unlink(path)
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+            throw error
+          }
         }
       }
+    } finally {
+      // Clear cached credentials even when deletion only partly succeeds.
+      cachedMetadata = null
+      metadataLoadedFromDisk = true
+      cachedSecret = null
+      credentialError = null
     }
-  } finally {
-    // Clear cached credentials even when deletion only partly succeeds.
-    cachedMetadata = null
-    metadataLoadedFromDisk = true
-    cachedSecret = null
-    credentialError = null
-  }
+  })
 }
 
 /** @internal - tests need a clean in-memory cache between cases. */

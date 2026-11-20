@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { JiraUserPicker } from '@/components/jira-user-picker'
+import { JiraUserPicker } from '@/components/task-page/jira/issue-workspace/jira-user-picker'
 import type { RuntimeJiraSettings } from '@/runtime/jira/runtime-jira-target'
 import type { JiraUser } from '../../../../../../shared/jira/jira-types'
 

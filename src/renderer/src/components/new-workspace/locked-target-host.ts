@@ -1,4 +1,7 @@
-import { toRuntimeExecutionHostId, type ExecutionHostId } from '../../../../shared/execution-host'
+import {
+  toRuntimeExecutionHostId,
+  type ExecutionHostId
+} from '../../../../shared/execution-host/execution-host'
 
 /**
  * True when the run target the composer would create on is the host the copied workspace already

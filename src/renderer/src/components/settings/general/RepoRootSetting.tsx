@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import type { GlobalSettings } from '../../../../../shared/global-settings-types'
-import { LOCAL_EXECUTION_HOST_ID } from '../../../../../shared/execution-host'
+import type { GlobalSettings } from '../../../../../shared/settings/global-settings-types'
+import { LOCAL_EXECUTION_HOST_ID } from '../../../../../shared/execution-host/execution-host'
 import {
   resolveWorktreeLayoutMode,
   type WorktreeLayoutMode
-} from '../../../../../shared/orca-workspace-layout'
+} from '../../../../../shared/worktree/paths/orca-workspace-layout'
 import { browseRuntimeServerDirectory } from '@/runtime/files/reads/runtime-server-directory-browser'
 import { getCloneParentForHost } from '../../sidebar/project-admission/create/clone-defaults'
 import { HostFolderSettingRow } from './HostFolderSettingRow'

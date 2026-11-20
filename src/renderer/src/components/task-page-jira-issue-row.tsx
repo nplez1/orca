@@ -9,7 +9,10 @@ import { JiraIssueRowContextMenu } from './JiraIssueRowContextMenu'
 import { buildJiraIssueRowWorkspaceAction } from './jira-issue-row-actions'
 import { JiraIssueWorkspaceSplitAction } from './JiraIssueWorkspaceSplitAction'
 import type { Worktree } from '../../../shared/worktree/types'
-import { jiraListColumnVisibility, type JiraListColumn } from './jira-list-columns'
+import {
+  jiraListColumnVisibility,
+  type JiraListColumn
+} from './task-page/jira/listing/jira-list-columns'
 import { JiraIssueCell, unassignedLabel } from './task-page/jira/listing/task-page-jira-issue-cells'
 import type { JiraIssue } from '../../../shared/jira/jira-types'
 import { JiraSprintCell, type TaskPageJiraSprintOptions } from './task-page-jira-sprint-cell'

@@ -3,7 +3,7 @@ import {
   writeFileAtomically,
   writeFileAtomicallyIfUnchanged
 } from '../filesystem/atomic-file-publication'
-import { isDefinitiveAbsence } from '../../shared/definitive-filesystem-absence'
+import { isDefinitiveAbsence } from '../../shared/errors/definitive-filesystem-absence'
 import {
   isKeychainNotFoundError,
   readKeychainPassword,

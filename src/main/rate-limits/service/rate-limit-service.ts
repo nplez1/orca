@@ -41,7 +41,7 @@ import {
 } from '../../claude-accounts/selection/runtime-selection'
 import type { InactiveClaudeAccount } from '../providers/claude/claude-managed-account-usage'
 import type { RateLimitState } from '../../../shared/agent-usage/rate-limits/rate-limit-types'
-import type { NetworkProxySettings } from '../../../shared/network-proxy'
+import type { NetworkProxySettings } from '../../../shared/network/network-proxy'
 
 export class RateLimitService extends RateLimitServiceAccountRefresh {
   setCodexHomePathResolver(resolver: CodexHomePathResolver): void {
@@ -66,33 +66,45 @@ export class RateLimitService extends RateLimitServiceAccountRefresh {
 
   setOpenCodeGoConfigResolver(
     resolver: () => OpenCodeGoRateLimitConfig,
-    apiKeyResolver?: () => string | null
+    apiKeyResolver?: () => string | null | Promise<string | null>
   ): void {
     this.openCodeGoConfigResolver = resolver
     this.openCodeGoApiKeyResolver = apiKeyResolver ?? null
   }
 
-  setMiniMaxConfigResolver(resolver: () => MiniMaxRateLimitConfig): void {
+  setMiniMaxConfigResolver(
+    resolver: () => MiniMaxRateLimitConfig | Promise<MiniMaxRateLimitConfig>
+  ): void {
     this.miniMaxConfigResolver = resolver
   }
 
-  setZcodePlanConfigResolver(resolver: () => ZcodePlanRateLimitConfig): void {
+  setZcodePlanConfigResolver(
+    resolver: () => ZcodePlanRateLimitConfig | Promise<ZcodePlanRateLimitConfig>
+  ): void {
     this.zcodePlanConfigResolver = resolver
   }
 
-  setDeepSeekConfigResolver(resolver: () => DeepSeekRateLimitConfig): void {
+  setDeepSeekConfigResolver(
+    resolver: () => DeepSeekRateLimitConfig | Promise<DeepSeekRateLimitConfig>
+  ): void {
     this.deepSeekConfigResolver = resolver
   }
 
-  setFireworksConfigResolver(resolver: () => FireworksRateLimitConfig): void {
+  setFireworksConfigResolver(
+    resolver: () => FireworksRateLimitConfig | Promise<FireworksRateLimitConfig>
+  ): void {
     this.fireworksConfigResolver = resolver
   }
 
-  setDeepInfraConfigResolver(resolver: () => DeepInfraRateLimitConfig): void {
+  setDeepInfraConfigResolver(
+    resolver: () => DeepInfraRateLimitConfig | Promise<DeepInfraRateLimitConfig>
+  ): void {
     this.deepInfraConfigResolver = resolver
   }
 
-  setCopilotConfigResolver(resolver: () => CopilotRateLimitConfig): void {
+  setCopilotConfigResolver(
+    resolver: () => CopilotRateLimitConfig | Promise<CopilotRateLimitConfig>
+  ): void {
     this.copilotConfigResolver = resolver
   }
 
@@ -205,6 +217,7 @@ export class RateLimitService extends RateLimitServiceAccountRefresh {
   }
 
   start(options: { fetchImmediately?: boolean } = {}): void {
+    this.publicationStopped = false
     if (options.fetchImmediately !== false) {
       this.clearDeferredStartupRefresh()
       void this.fetchAll()
@@ -219,6 +232,7 @@ export class RateLimitService extends RateLimitServiceAccountRefresh {
   }
 
   stop(): void {
+    this.publicationStopped = true
     this.abortActiveFetchCycle()
     this.clearQueuedFetches()
     this.inactiveClaudeFetching.clear()
@@ -231,28 +245,45 @@ export class RateLimitService extends RateLimitServiceAccountRefresh {
     this.mainWindow = null
   }
 
-  getState(): RateLimitState {
+  async getState(): Promise<RateLimitState> {
     this.pruneInactiveClaudeState()
     this.pruneInactiveCodexState()
     // Why: these presence flags come from credential files on disk, so a switched-off
     // provider must report false without its store being touched.
     const disabled = this.disabledUsageProviderIds()
+    const [
+      minimaxCookieConfigured,
+      minimaxApiKeyConfigured,
+      zcodePlanApiKeyConfigured,
+      deepseekApiKeyConfigured,
+      fireworksApiKeyConfigured,
+      deepInfraApiKeyConfigured,
+      copilotCredentialsConfigured
+    ] = await Promise.all([
+      disabled.has('minimax') ? false : hasMiniMaxSessionCookie(),
+      disabled.has('minimax') ? false : hasMiniMaxApiKey(),
+      disabled.has('zcode') ? false : hasZcodePlanApiKey(),
+      disabled.has('deepseek') ? false : hasDeepSeekApiKey(),
+      disabled.has('fireworks') ? false : hasFireworksCredentials(),
+      disabled.has('deepinfra') ? false : hasDeepInfraApiKey(),
+      disabled.has('copilot') ? false : hasCopilotCredentials()
+    ])
     return {
       ...this.state,
       // Why: the cookie lives on the filesystem, not GlobalSettings; surface its presence so the renderer keeps the MiniMax bar across reloads.
-      minimaxCookieConfigured: disabled.has('minimax') ? false : hasMiniMaxSessionCookie(),
-      minimaxApiKeyConfigured: disabled.has('minimax') ? false : hasMiniMaxApiKey(),
-      zcodePlanApiKeyConfigured: disabled.has('zcode') ? false : hasZcodePlanApiKey(),
+      minimaxCookieConfigured,
+      minimaxApiKeyConfigured,
+      zcodePlanApiKeyConfigured,
       opencodeGoApiKeyConfigured: disabled.has('opencode-go')
         ? false
         : this.openCodeGoApiKeyConfigured,
       // Why: these credentials live on disk, so main is the only place that can tell the renderer a provider is set up before its first fetch lands.
-      deepseekApiKeyConfigured: disabled.has('deepseek') ? false : hasDeepSeekApiKey(),
-      fireworksApiKeyConfigured: disabled.has('fireworks') ? false : hasFireworksCredentials(),
-      deepinfraApiKeyConfigured: disabled.has('deepinfra') ? false : hasDeepInfraApiKey(),
+      deepseekApiKeyConfigured,
+      fireworksApiKeyConfigured,
+      deepinfraApiKeyConfigured: deepInfraApiKeyConfigured,
       copilotTokenConfigured: disabled.has('copilot')
         ? false
-        : hasCopilotCredentials() || getCachedCopilotGhCredentials()?.status === 'ok',
+        : copilotCredentialsConfigured || getCachedCopilotGhCredentials()?.status === 'ok',
       grokAuthConfigured: this.grokAuthConfigured,
       cursorAuthConfigured: this.cursorAuthConfigured,
       ...disabledUsageProviderFlagOverrides(disabled),

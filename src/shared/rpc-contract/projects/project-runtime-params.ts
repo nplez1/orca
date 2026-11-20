@@ -1,11 +1,11 @@
 import { z } from 'zod'
-import { WORKTREE_LAYOUT_MODES } from '../../orca-workspace-layout'
+import { WORKTREE_LAYOUT_MODES } from '../../worktree/paths/orca-workspace-layout'
 import { OptionalString, requiredString } from '../rpc-param-primitives'
 import {
   LOCAL_EXECUTION_HOST_ID,
   normalizeExecutionHostId,
   parseExecutionHostId
-} from '../../execution-host'
+} from '../../execution-host/execution-host'
 
 export const ProjectProviderIdentity = z.object({
   provider: z.literal('github'),

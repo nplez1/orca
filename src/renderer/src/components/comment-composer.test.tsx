@@ -14,7 +14,7 @@ vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback: string) => fallback
 }))
 
-vi.mock('@/components/ShortcutKeyCombo', () => ({
+vi.mock('@/components/ui/ShortcutKeyCombo', () => ({
   ShortcutKeyCombo: () => <span />
 }))
 

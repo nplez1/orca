@@ -4,8 +4,11 @@ import {
   withAgentTrustLaunchArgs
 } from '../../../shared/agent-launch/startup/agent-trust-launch-args'
 import type { AgentStartupShell } from '../../../shared/agent-launch/startup/tui-agent-startup-shell'
-import type { GlobalSettings } from '../../../shared/global-settings-types'
-import { isPathInsideOrEqual, resolveRuntimePath } from '../../../shared/cross-platform-path'
+import type { GlobalSettings } from '../../../shared/settings/global-settings-types'
+import {
+  isPathInsideOrEqual,
+  resolveRuntimePath
+} from '../../../shared/file-access/cross-platform-path'
 import { resolveTerminalWorkspacePath } from '../../../shared/shell/launch/terminal-startup-cwd'
 import {
   applyAgentWorkspaceTrust,

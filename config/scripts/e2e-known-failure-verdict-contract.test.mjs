@@ -70,7 +70,8 @@ describe('known-failure verdict wiring', () => {
   it('records every entry with the fields the verdict reads', () => {
     expect(manifest.titles.length).toBeGreaterThan(0)
     for (const entry of manifest.titles) {
-      expect(entry.file).toMatch(/^tests\/e2e\/[^/]+\.spec\.ts$/)
+      // Why nested: this tree groups e2e specs by area (`tests/e2e/terminal/rendering/…`).
+      expect(entry.file).toMatch(/^tests\/e2e\/(?:[^/]+\/)*[^/]+\.spec\.ts$/)
       expect(entry.title.length).toBeGreaterThan(0)
       // Why: `*` is the file-level form in the unit manifests, and a title of `*` would turn one spec
       // entry into a whole-file one.

@@ -172,7 +172,7 @@ export function assertJenkinsServersReportable(): void {
   }
 }
 
-export function hasJenkinsServerToken(serverId: string): boolean {
+export async function hasJenkinsServerToken(serverId: string): Promise<boolean> {
   // Why content rather than existence: the token file is created empty when a write fails partway, and
   // an empty file authenticates nothing — calling it a token reports the server as unreadable forever
   // and keeps a host on a stale one instead of letting the main clear it.
@@ -180,7 +180,9 @@ export function hasJenkinsServerToken(serverId: string): boolean {
 }
 
 /** How a server's stored token sits on disk, or null when it has none. */
-export function getJenkinsServerTokenProtection(serverId: string): SecretAtRestProtection | null {
+export async function getJenkinsServerTokenProtection(
+  serverId: string
+): Promise<SecretAtRestProtection | null> {
   return readCredentialFileProtection(getTokenPath(serverId))
 }
 
@@ -199,7 +201,10 @@ export function readJenkinsServerToken(serverId: string): string | null {
   return readStoredCredentialToken('Jenkins', readFileSync(path))
 }
 
-export function saveJenkinsServer(profile: JenkinsServerProfile, apiToken: string | null): void {
+export async function saveJenkinsServer(
+  profile: JenkinsServerProfile,
+  apiToken: string | null
+): Promise<void> {
   const file = writableServersFile()
   const servers = file.servers.filter((server) => server.id !== profile.id)
   servers.push(profile)
@@ -210,7 +215,7 @@ export function saveJenkinsServer(profile: JenkinsServerProfile, apiToken: strin
     if (!existsSync(tokenDir)) {
       mkdirSync(tokenDir, { recursive: true })
     }
-    writeEncryptedCredential('Jenkins', getTokenPath(profile.id), apiToken)
+    await writeEncryptedCredential('Jenkins', getTokenPath(profile.id), apiToken)
   }
   writeServersFile({ version: 1, servers })
 }

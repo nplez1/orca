@@ -4,7 +4,10 @@ import { mkdir } from 'node:fs/promises'
 import { DEFAULT_REPO_BADGE_COLOR } from '../../../shared/repository/appearance/repo-badge-color'
 import { homedir } from 'node:os'
 import { dirname } from 'node:path'
-import { LOCAL_EXECUTION_HOST_ID, type ExecutionHostId } from '../../../shared/execution-host'
+import {
+  LOCAL_EXECUTION_HOST_ID,
+  type ExecutionHostId
+} from '../../../shared/execution-host/execution-host'
 import type { Repo } from '../../../shared/repository/repo-types'
 import { isFolderRepo } from '../../../shared/repository/repo-kind'
 import { getGitCloneFailureMessage } from '../../../shared/git/remotes/git-clone-failure-message'

@@ -18,8 +18,13 @@ export type RuntimeAiVaultHostInfo = {
 }
 
 export type RuntimeAiVaultScanOptions = {
+  /** One page's request bound. */
   timeoutMs?: number
+  /** Support-routed reply budget once the host is reachable. */
+  responseTimeoutMs?: number
+  /** The whole drain's bound, so a paged listing gets more than one reply's worth of time. */
   drainTimeoutMs?: number
+  /** Stops the page drain when the caller cancels; each page request carries it too. */
   signal?: AbortSignal
 }
 
@@ -36,7 +41,7 @@ export async function scanRuntimeAiVaultSessions(args: {
   listArgs?: AiVaultListArgs
   options?: RuntimeAiVaultScanOptions
 }): Promise<AiVaultListResult> {
-  const { signal, ...scannerOptions } = args.options ?? {}
+  const signal = args.options?.signal
   throwIfAiVaultScanCancelled(signal)
   if (!args.scanner) {
     return runtimeScanIssueResult(
@@ -46,10 +51,11 @@ export async function scanRuntimeAiVaultSessions(args: {
   }
   try {
     return await abandonRemoteSessionScanOnCancel(
-      args.scanner(args.hostInfo.environmentId, runtimeScanArgs(args.hostInfo, args.listArgs), {
-        ...scannerOptions,
-        ...(signal ? { signal } : {})
-      }),
+      args.scanner(
+        args.hostInfo.environmentId,
+        runtimeScanArgs(args.hostInfo, args.listArgs),
+        args.options
+      ),
       signal
     )
   } catch (error) {

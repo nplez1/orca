@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { basename as pathBasename, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { runInNewContext } from 'node:vm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -173,7 +173,9 @@ describe('bundle id com.nplez1.orca', () => {
   })
 
   it('ships one appId in both copies of the compatibility contract', () => {
-    const contract = JSON.parse(source('src/shared/local-build-compatibility-contract.json'))
+    const contract = JSON.parse(
+      source('src/shared/remote-runtime/orcad-distribution/local-build-compatibility-contract.json')
+    )
     const declared = /appId: '([^']+)'/.exec(
       source('src/shared/remote-runtime/orcad-distribution/local-build-compatibility-contract.ts')
     )
@@ -337,11 +339,12 @@ describe('install-owned names', () => {
       }
     )
 
-    // Why the basename: BROWSER is word-split by its consumers, so the bundle path this resolves from
-    // would break on the space in "Orca NP.app". A bare `orca` is GNOME's screen reader on Linux and
-    // an official install's CLI elsewhere, so a URL opened from a pane would never reach this build.
+    // Why only the basename is pinned: upstream #43232 set BROWSER to the CLI itself (it takes a URL
+    // argument now), so this resolves to a path here. What must hold is that it is THIS build's CLI —
+    // a bare `orca` is GNOME's screen reader on Linux and an official install's CLI elsewhere, so a
+    // URL opened from a pane would never reach this app.
     const launcher = process.platform === 'win32' ? 'orca-np-dev.cmd' : 'orca-np-dev'
-    expect(env.BROWSER).toBe(`${launcher} open-url --url %s`)
+    expect(pathBasename(env.BROWSER)).toBe(launcher)
   })
 })
 

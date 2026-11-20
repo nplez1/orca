@@ -78,7 +78,6 @@ export class PiTitlebarExtensionService {
     safeRemoveOverlay(overlayDir, this.getOverlayRoot(kind))
   }
 
-
   private writeOmpFallbackStatusExtension(source: string): string | undefined {
     const fallbackDir = join(
       getAppEnvironment().getPath('userData'),
@@ -96,10 +95,8 @@ export class PiTitlebarExtensionService {
       : undefined
   }
 
-  private installManagedExtensions(
-    sourceAgentDir: string,
-    kind: PiAgentKind
-  ): PiManagedExtensionEnv {
+  /** Refreshes Orca-owned extension files in a Pi agent dir; user-owned files with these names stay. */
+  installManagedExtensions(sourceAgentDir: string, kind: PiAgentKind): PiManagedExtensionEnv {
     const extensionsDir = join(sourceAgentDir, 'extensions')
     try {
       mkdirSync(extensionsDir, { recursive: true })
@@ -144,7 +141,7 @@ export class PiTitlebarExtensionService {
     ptyId: string,
     existingAgentDir: string | undefined,
     kind: PiAgentKind,
-    options?: { materializeDefaultHome?: boolean; configDirName?: string }
+    options?: { materializeDefaultHome?: boolean; configDirName?: string; cliOnPath?: boolean }
   ): Record<string, string> {
     const freshConfigEnv = kind === 'omp' ? this.buildFreshOmpEnv() : {}
     const sourceAgentDir = existingAgentDir || getDefaultPiAgentDir(kind, options?.configDirName)
@@ -157,9 +154,9 @@ export class PiTitlebarExtensionService {
       }
     }
 
-    // Bare shells must not recreate deleted agent homes; materialize only on explicit opt-in (#10196).
+    // Bare shells must not recreate deleted agent homes (#10196) or write into one whose CLI is gone (#43445).
     const materializeDefaultHome = options?.materializeDefaultHome !== false
-    if (!existsSync(sourceAgentDir) && !materializeDefaultHome) {
+    if (!materializeDefaultHome && (options?.cliOnPath === false || !existsSync(sourceAgentDir))) {
       if (kind === 'omp') {
         const statusSource = withOrcaManagedPiExtensionMarker(getPiAgentStatusExtensionSource(kind))
         const statusExtensionPath = this.writeOmpFallbackStatusExtension(statusSource)

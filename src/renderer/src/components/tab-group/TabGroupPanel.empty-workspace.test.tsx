@@ -21,7 +21,7 @@ const mocks = vi.hoisted(() => {
 vi.mock('@/store', () => ({ useAppStore: mocks.useAppStore }))
 vi.mock('../../store', () => ({ useAppStore: mocks.useAppStore }))
 vi.mock('../tab-bar/TabBar', () => ({ default: () => null }))
-vi.mock('../tab-bar/TabBarQuickCommandsButton', () => ({
+vi.mock('../tab-bar/quick-commands/TabBarQuickCommandsButton', () => ({
   TabBarQuickCommandsButton: () => null
 }))
 vi.mock('@/runtime/browser/client-hosting/client-hosted-browser-row-state', () => ({
@@ -31,7 +31,7 @@ vi.mock('@/components/tab-bar/use-tab-bar-default-agent', () => ({
   useTabBarDefaultAgent: () => ({ agent: null, isAgentLaunchPending: false })
 }))
 vi.mock('../../../../../resources/logo.svg', () => ({ default: 'logo.svg' }))
-vi.mock('./useTabGroupWorkspaceModel', () => ({
+vi.mock('./workspace-model/useTabGroupWorkspaceModel', () => ({
   useTabGroupWorkspaceModel: () => ({
     activeTab: null,
     agentSessionItems: [],

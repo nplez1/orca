@@ -16,5 +16,5 @@ export function createDefaultWorkspacePathIndexWorker(): Worker {
   if (!existsSync(workerPath)) {
     throw new Error(`Workspace path index worker entry not found: ${workerPath}`)
   }
-  return spawnWorkerThread(workerPath)
+  return spawnWorkerThread(workerPath, { name: 'orca-workspace-path-index' })
 }

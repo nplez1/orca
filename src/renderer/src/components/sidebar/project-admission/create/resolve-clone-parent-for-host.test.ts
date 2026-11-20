@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   toRuntimeExecutionHostId,
   toSshExecutionHostId
-} from '../../../../../../shared/execution-host'
+} from '../../../../../../shared/execution-host/execution-host'
 import { buildExecutionHostRegistry } from '../../../../../../shared/execution-host/execution-host-registry'
 import { buildProjectHostSetupOptions } from '@/lib/workspace/creation/project-host-setup-options'
 import {

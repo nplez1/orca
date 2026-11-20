@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget (299/300); the fork's +5-line delta rides inside it, and splitting costs a permanent sync hunk. */
 import { withGitSpan } from '../../observability/instrumentation'
 import {
   resolveGitFetchHeadCommand,
@@ -27,7 +28,10 @@ import {
   GitCommandTimeoutError,
   gitCommandTimeoutMs
 } from '../../../shared/git/commands/git-command-timeout'
-import { classifyGitCommand } from '../../../shared/git/commands/git-command-classification'
+import {
+  classifyGitCommand,
+  findGitSubcommandIndex
+} from '../../../shared/git/commands/git-command-classification'
 import { createAbortError } from './process-capture/abort-error'
 import { readCapturedGitBuffer, readCapturedGitString } from './process-capture/captured-git-output'
 import { runUnlessGitCwdKnownMissing } from './host-routing/missing-git-spawn-cwd'
@@ -85,6 +89,11 @@ async function gitExecFileAsyncUnlocked(
       // Which Git ran: a project's runtime can route it into a distro whatever its cwd.
       span?.setAttribute('git.runs_in', gitRunsIn(resolved))
       const timeoutMs = gitCommandTimeoutMs(args, options.timeout, options.timeoutMsForTest)
+      const readOnly = classifyGitCommand(args) === 'read'
+      // ls-remote is network but writes nothing, so like a read it holds no fence past its worker.
+      const holdsNoFence = readOnly || args[findGitSubcommandIndex(args)] === 'ls-remote'
+      // Set once a child's worker is lost: its permit is back in the pool, so nothing may replay on it.
+      let workerLost = false
       const capture = (
         command: ResolvedCommand
       ): Promise<{ stdout: string | Buffer; stderr: string | Buffer }> => {
@@ -92,12 +101,10 @@ async function gitExecFileAsyncUnlocked(
         terminationState.current = new Promise<void>((resolve) => {
           reportTerminated = resolve
         })
-        options.observeChildTermination?.(
-          terminationState.current,
-          classifyGitCommand(args) !== 'read'
-        )
+        options.observeChildTermination?.(terminationState.current, !readOnly)
         const captureOptions = {
           cwd: command.cwd,
+          ownedPosixGroup: process.platform !== 'win32' && !command.wsl,
           encoding: (options.encoding ?? 'utf-8') as BufferEncoding,
           maxBuffer: options.maxBuffer,
           timeout: timeoutMs,
@@ -107,7 +114,18 @@ async function gitExecFileAsyncUnlocked(
           terminationBarrier: options.terminationBarrier,
           admissionTier: options.admissionTier,
           spawnOnWorkerThread: options.spawnOnWorkerThread,
+          // Admission already passed; the capture rechecks at the spawn call itself.
+          ...(options.canStart ? { canStart: options.canStart } : {}),
           onChildTerminated: reportTerminated,
+          // A lost worker's child returns its permit now; a write's mutation fences keep waiting on its end,
+          // while a read (which no fence or writer observer tracks) ends with the worker.
+          onWorkerLost: () => {
+            workerLost = true
+            if (!holdsNoFence) {
+              grant.release()
+            }
+          },
+          workerLossEndsLifetime: holdsNoFence,
           ...(options.onStderr ? { onStderr: options.onStderr } : {}),
           ...(timeoutMs === undefined
             ? {}
@@ -141,7 +159,7 @@ async function gitExecFileAsyncUnlocked(
           ) {
             await terminationState.current
             const wasMissing = invalidateMissingDirectWslGit(error, resolved)
-            if (options.canStart?.() === false) {
+            if (options.canStart?.() === false || (await options.beforeStart?.()) === false) {
               throw createAbortError()
             }
             const fallback = resolveGitCommand(args, effectiveOptions, true, true)
@@ -167,18 +185,22 @@ async function gitExecFileAsyncUnlocked(
       }
       try {
         options.admissionSignal?.throwIfAborted()
-        if (options.canStart?.() === false) {
+        if (options.canStart?.() === false || (await options.beforeStart?.()) === false) {
           throw createAbortError()
         }
         return await runCapturedCommand()
       } catch (error) {
+        if (workerLost) {
+          throw error
+        }
         return await retryGitFetchRefRace(
           args,
           error,
           runCapturedCommand,
           () => terminationState.current,
           options.signal,
-          options.canStart
+          // A replay after a lost worker would run on a permit already returned.
+          () => !workerLost && options.canStart?.() !== false
         )
       } finally {
         releaseGitAdmissionAfter(terminationState.current, grant)
@@ -211,7 +233,8 @@ export function gitExecFileAsync(args: string[], callerOptions: GitExecOptions) 
             command.cwd,
             options.signal,
             () => gitExecFileAsyncUnlocked(args, options, terminationState),
-            command.gitDir
+            command.gitDir,
+            process.platform === 'win32' ? () => terminationState.current : undefined
           )
         : gitExecFileAsyncUnlocked(args, options, terminationState)
     )
@@ -267,6 +290,7 @@ async function gitExecFileAsyncBufferInSpan(
       })
       const { stdout } = await execFileCapture(resolved.binary, resolved.args, {
         cwd: resolved.cwd,
+        ownedPosixGroup: process.platform !== 'win32' && !resolved.wsl,
         encoding: 'buffer',
         signal: options.signal,
         stdin: options.stdin,
@@ -275,6 +299,8 @@ async function gitExecFileAsyncBufferInSpan(
         env: untranslatedGitOutputEnv(options.env),
         admissionTier: options.admissionTier,
         onChildTerminated: reportTerminated,
+        // A buffered read holds only admission, so a lost worker ends it.
+        workerLossEndsLifetime: true,
         ...(timeoutMs === undefined
           ? {}
           : { createTimeoutError: () => new GitCommandTimeoutError(timeoutMs) })
