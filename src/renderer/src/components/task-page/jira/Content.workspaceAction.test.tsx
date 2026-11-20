@@ -9,7 +9,7 @@ import type { JiraIssue } from '../../../../../shared/jira/jira-types'
 import type { Worktree } from '../../../../../shared/worktree/types'
 import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/work-items/jira/jira-issue-workspace-attachment'
 import { openJiraIssueWorkspace } from '@/lib/jira-issue-workspace-open'
-import { defaultJiraListColumnIds, visibleJiraListColumns } from '../../jira-list-columns'
+import { defaultJiraListColumnIds, visibleJiraListColumns } from './listing/jira-list-columns'
 import type { TaskPageComposerActionsModel } from '../use-task-page-composer-actions'
 
 // Why: this pins the seam the helper tests cannot see — which handler Content wires
@@ -43,7 +43,7 @@ vi.mock('./listing/task-page-jira-issue-list', () => ({
   }
 }))
 
-vi.mock('@/components/JiraIssueWorkspace', () => ({
+vi.mock('@/components/task-page/jira/issue-workspace/JiraIssueWorkspace', () => ({
   default: (props: { issueWorkspaceAttachmentIndex: unknown; onUse: unknown }) => {
     spies.sheet(props.onUse, props.issueWorkspaceAttachmentIndex)
     return null
@@ -53,7 +53,9 @@ vi.mock('@/components/JiraIssueWorkspace', () => ({
 vi.mock('./Board', () => ({ TaskPageJiraBoard: () => null }))
 vi.mock('../linear/Content', () => ({ TaskPageLinearContent: () => null }))
 // Presentation chrome the list branch renders; the test only pins the handler wiring.
-vi.mock('@/components/jira-list-columns-menu', () => ({ JiraListColumnsMenu: () => null }))
+vi.mock('@/components/task-page/jira/listing/jira-list-columns-menu', () => ({
+  JiraListColumnsMenu: () => null
+}))
 vi.mock('./task-page-jira-view-controls', () => ({
   TaskPageJiraViewControls: () => null
 }))

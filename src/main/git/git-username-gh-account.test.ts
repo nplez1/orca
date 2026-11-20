@@ -10,7 +10,7 @@ vi.mock('./command-runner/hosted-cli/gh-exec-file', () => ({
   ghExecFileAsync: mocks.ghExec,
   ghExecFileWithScopeAsync: mocks.ghExec
 }))
-vi.mock('../../../shared/git/refs/git-default-base-ref', () => ({
+vi.mock('../../shared/git/refs/git-default-base-ref', () => ({
   resolveDefaultBaseRefViaExec: async () => 'refs/remotes/origin/main'
 }))
 

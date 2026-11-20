@@ -41,7 +41,7 @@ export async function listEditFields(
   siteId?: string | null,
   strict = false
 ): Promise<JiraEditableField[]> {
-  const entries = getClients(siteId)
+  const entries = await getClients(siteId)
   requireStrictJiraSite(entries, siteId, strict)
   const entry = entries[0]
   if (!entry) {
@@ -90,7 +90,7 @@ export async function listEditFields(
     return editable.sort((left, right) => left.field.name.localeCompare(right.field.name))
   } catch (error) {
     if (isAuthError(error)) {
-      clearToken(entry.site.id)
+      await clearToken(entry)
       throw error
     }
     recordSwallowedFailure('jira', error, 'listEditFields failed')

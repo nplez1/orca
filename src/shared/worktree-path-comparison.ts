@@ -8,7 +8,7 @@
  * upstream changes the rules, which is the signal to re-port.
  */
 import { posix, win32 } from 'node:path'
-import { isWindowsAbsolutePathLike } from './cross-platform-path'
+import { isWindowsAbsolutePathLike } from './file-access/cross-platform-path'
 import { foldWslUncPathCaseInsensitiveParts } from './file-access/wsl-paths'
 
 /** Path syntax determines case folding: preserve POSIX and WSL ext4 tails even on Windows to avoid merging checkouts. */

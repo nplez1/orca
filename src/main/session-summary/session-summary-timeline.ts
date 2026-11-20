@@ -15,7 +15,7 @@ import type {
   SessionSummaryTimelineEntry,
   SessionSummaryTimelineKind
 } from '../../shared/session-summary-types'
-import { isKnownHarnessInjectedUserTurnText } from '../../shared/harness-injected-user-turns'
+import { isKnownHarnessInjectedUserTurnText } from '../../shared/agent-session/journal/harness-injected-user-turns'
 import type { SessionSummarySourceEvent } from './session-summary-event-digest'
 import {
   describeSessionSummaryToolBurst,

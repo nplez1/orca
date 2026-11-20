@@ -43,7 +43,7 @@ vi.mock('@/runtime/jira/runtime-jira-client.ts', () => ({
   jiraAddIssueComment: (...args: unknown[]) => mocks.jiraAddIssueComment(...args)
 }))
 
-vi.mock('@/components/sidebar/CommentMarkdown', () => ({
+vi.mock('@/components/comment-markdown/CommentMarkdown', () => ({
   default: ({ content }: { content: string }) => <div>{content}</div>
 }))
 vi.mock('@/i18n/i18n', () => ({

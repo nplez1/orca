@@ -1,6 +1,9 @@
 import { ipcMain } from 'electron'
 import { isFolderRepo } from '../../../../shared/repository/repo-kind'
-import { isRepoOnCatalogHost, LOCAL_EXECUTION_HOST_ID } from '../../../../shared/execution-host'
+import {
+  isRepoOnCatalogHost,
+  LOCAL_EXECUTION_HOST_ID
+} from '../../../../shared/execution-host/execution-host'
 import type { DetectedWorktreeListResult } from '../../../../shared/worktree/types'
 import { EMPTY_RETIRED_NAME_REGISTRY } from '../../../../shared/worktree/naming/retired-name-registry'
 import { getRetiredNameRegistryForRepo } from '../../../workspaces/removal/retirement/worktree-name-retirement'

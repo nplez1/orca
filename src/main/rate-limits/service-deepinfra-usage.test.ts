@@ -131,7 +131,7 @@ describe('RateLimitService DeepInfra usage', () => {
   it('fetches the DeepInfra balance and stores it under the deepinfra key', async () => {
     const service = new RateLimitService()
     service.setDeepInfraConfigResolver(() => ({ apiKey: 'sk-deepinfra-balance-key' }))
-    vi.mocked(hasDeepInfraApiKey).mockReturnValue(true)
+    vi.mocked(hasDeepInfraApiKey).mockResolvedValue(true)
     vi.mocked(fetchDeepInfraRateLimits).mockResolvedValueOnce(
       creditsProvider('deepinfra', 'balance')
     )
@@ -144,7 +144,7 @@ describe('RateLimitService DeepInfra usage', () => {
       signal: expect.any(AbortSignal)
     })
 
-    const state = service.getState()
+    const state = await service.getState()
     expect(state.deepinfra?.status).toBe('ok')
     expect(state.deepinfra?.provider).toBe('deepinfra')
     expect(state.deepinfra?.credits).toEqual({
@@ -154,12 +154,12 @@ describe('RateLimitService DeepInfra usage', () => {
     expect(state.deepinfraApiKeyConfigured).toBe(true)
   })
 
-  it('reports deepinfraApiKeyConfigured from the key store even without a resolver', () => {
+  it('reports deepinfraApiKeyConfigured from the key store even without a resolver', async () => {
     const service = new RateLimitService()
-    vi.mocked(hasDeepInfraApiKey).mockReturnValue(true)
+    vi.mocked(hasDeepInfraApiKey).mockResolvedValue(true)
 
-    expect(service.getState().deepinfraApiKeyConfigured).toBe(true)
-    expect(service.getState().deepinfra).toBeNull()
+    expect((await service.getState()).deepinfraApiKeyConfigured).toBe(true)
+    expect((await service.getState()).deepinfra).toBeNull()
   })
 
   it('keeps the credits-only balance visible through a transient failure', async () => {
@@ -170,11 +170,11 @@ describe('RateLimitService DeepInfra usage', () => {
       .mockRejectedValueOnce(new Error('DeepInfra billing request failed: network timeout'))
 
     await service.refresh()
-    expect(service.getState().deepinfra?.credits?.amount.units).toBe('42')
+    expect((await service.getState()).deepinfra?.credits?.amount.units).toBe('42')
 
     await service.refresh()
 
-    const state = service.getState()
+    const state = await service.getState()
     // Why: a balance has no quota window for the stale policy to test, so a
     // regression here blanks the status bar on any single transient error.
     expect(state.deepinfra?.status).toBe('error')
@@ -192,7 +192,7 @@ describe('RateLimitService DeepInfra usage', () => {
 
     await service.refresh()
 
-    const state = service.getState()
+    const state = await service.getState()
     expect(fetchDeepInfraRateLimits).not.toHaveBeenCalled()
     expect(state.deepinfra?.status).toBe('error')
     expect(state.deepinfra?.error).toBe('DeepInfra API key could not be decrypted')
@@ -212,14 +212,15 @@ describe('RateLimitService DeepInfra usage', () => {
       .mockImplementationOnce(() => pending.promise)
 
     await service.refresh()
-    expect(service.getState().deepinfra?.credits?.amount.units).toBe('42')
+    expect((await service.getState()).deepinfra?.credits?.amount.units).toBe('42')
 
     apiKey = 'sk-deepinfra-account-b'
     const secondRefresh = service.refresh()
-    await flushMicrotasks()
+    // Why 12: the fork resolvers are async, so a cycle needs more ticks to reach its generation stamps.
+    await flushMicrotasks(12)
 
     // Why: a new key must not keep showing the previous account's balance while its fetch is in flight.
-    const pendingState = service.getState()
+    const pendingState = await service.getState()
     expect(pendingState.deepinfra?.status).toBe('fetching')
     expect(pendingState.deepinfra?.credits).toBeUndefined()
     expect(fetchDeepInfraRateLimits).toHaveBeenLastCalledWith({
@@ -230,7 +231,7 @@ describe('RateLimitService DeepInfra usage', () => {
     pending.resolve(creditsProvider('deepinfra', 'balance'))
     await secondRefresh
 
-    const state = service.getState()
+    const state = await service.getState()
     expect(fetchDeepInfraRateLimits).toHaveBeenCalledTimes(2)
     expect(state.deepinfra?.status).toBe('ok')
     expect(state.deepinfra?.credits?.amount.units).toBe('42')
@@ -246,23 +247,23 @@ describe('RateLimitService DeepInfra usage', () => {
       .mockImplementationOnce(() => secondDeepInfra.promise)
 
     const firstRefresh = service.refresh()
-    await flushMicrotasks()
+    await flushMicrotasks(12)
 
     service.invalidateDeepInfraCredentialState()
     const queuedRefresh = service.refresh()
-    await flushMicrotasks()
+    await flushMicrotasks(12)
 
     firstDeepInfra.resolve(creditsWithAmount('42'))
-    await flushMicrotasks()
+    await flushMicrotasks(12)
 
-    const staleState = service.getState()
+    const staleState = await service.getState()
     expect(staleState.deepinfra?.status).toBe('fetching')
     expect(staleState.deepinfra?.credits).toBeUndefined()
 
     secondDeepInfra.resolve(creditsWithAmount('7'))
     await Promise.all([firstRefresh, queuedRefresh])
 
-    expect(service.getState().deepinfra?.credits?.amount.units).toBe('7')
+    expect((await service.getState()).deepinfra?.credits?.amount.units).toBe('7')
   })
 
   it('never fetches a switched-off DeepInfra', async () => {
@@ -274,7 +275,7 @@ describe('RateLimitService DeepInfra usage', () => {
     await service.refresh()
 
     expect(fetchDeepInfraRateLimits).not.toHaveBeenCalled()
-    expect(service.getState().deepinfra).toBeNull()
-    expect(service.getState().deepinfraApiKeyConfigured).toBe(false)
+    expect((await service.getState()).deepinfra).toBeNull()
+    expect((await service.getState()).deepinfraApiKeyConfigured).toBe(false)
   })
 })

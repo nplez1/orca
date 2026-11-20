@@ -6,6 +6,7 @@ import {
   type StatusBarToggleSearchEntry
 } from '../appearance-status-bar-provider-toggles'
 import { getMuseStatusBarToggleSearchEntry } from './appearance-status-bar-muse-toggle-search'
+import { getGitBlameStatusBarToggleSearchEntry } from './appearance-status-bar-git-blame-toggle-search'
 
 export const getStatusBarToggles = createLocalizedCatalog(
   (): readonly StatusBarToggleSearchEntry[] => [
@@ -106,6 +107,7 @@ export const getStatusBarToggles = createLocalizedCatalog(
         'settings.appearance.statusBar.portsToggleDescription',
         'Show live workspace ports. Click it for workspace-scoped ports and external listeners.'
       )
-    }
+    },
+    getGitBlameStatusBarToggleSearchEntry()
   ]
 )

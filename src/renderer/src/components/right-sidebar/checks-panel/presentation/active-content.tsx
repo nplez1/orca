@@ -6,7 +6,7 @@ import {
 import React, { useCallback } from 'react'
 import { ImeInput } from '@/lib/text-input/ime/ime-text-field'
 import { Check, LoaderCircle, Pencil, X } from 'lucide-react'
-import { DetachedHeadBadge } from '@/components/DetachedHeadBadge'
+import { DetachedHeadBadge } from '@/components/source-control/DetachedHeadBadge'
 import HostedReviewActions from '../../hosted-review/provider-actions/HostedReviewActions'
 import { GitHubPRStackMap } from '../../hosted-review/provider-actions/GitHubPRStackMap'
 import { SourceControlAgentActionDialog } from '../../source-control/ai/SourceControlAgentActionDialog'

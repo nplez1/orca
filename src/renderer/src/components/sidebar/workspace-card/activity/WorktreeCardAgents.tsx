@@ -2,8 +2,9 @@ import type { BranchContext } from './worktree-agent-branch-context'
 import React, { useCallback, useLayoutEffect, useMemo, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from '@/store/index'
+import { agentAttentionTurnAt } from '@/attention/agent-attention-acknowledgement'
 import DashboardAgentRow from '@/components/dashboard/DashboardAgentRow'
-import { useNow } from '@/hooks/use-now'
+import { useNow } from '@/lib/window-activity/use-now'
 import { deriveRunningAgentSendTargets } from '@/lib/agent-session/messaging/running-agent-targets'
 import {
   selectSendTargetControlInputs,
@@ -12,7 +13,7 @@ import {
 import { useAgentPresentation, useWorktreeAgentRow } from './useWorktreeAgentRows'
 import { useHostRootKeys } from './use-worktree-agent-host-roots'
 import { KeyedSummary } from './worktree-card-agent-keyed-summary'
-import type { ExecutionHostId } from '../../../../../../shared/execution-host'
+import type { ExecutionHostId } from '../../../../../../shared/execution-host/execution-host'
 import { useWorktreeAgentDisplay } from './use-worktree-agent-display'
 import { cn } from '@/lib/class-names'
 import { recomputeOn } from '@/lib/recompute-on'
@@ -27,7 +28,7 @@ import { useUiLanguageRevision } from '@/i18n/use-ui-language-revision'
 import { useWorktreeAgentActivation } from './use-worktree-agent-activation'
 import { opensClaudeParentConversation } from '@/lib/agent-session/navigation/claude-agent-row-view'
 import { IdleChildAgentGroupRow } from './worktree-card-idle-child-agents'
-import type { AgentChildren } from '@/store/slices/agent-status/agent-row-display-index'
+import type { AgentChildren } from '@/store/slices/agent-status/projection/agent-row-display-model'
 import type { DashboardAgentRow as AgentRow } from '@/components/dashboard/rows/dashboard-agent-row'
 
 const stopBubble = (event: React.SyntheticEvent) => event.stopPropagation()
@@ -281,7 +282,7 @@ const AgentBranch = React.memo(function AgentBranch({
     agent: row,
     showModel: context.showAgentModels,
     now: context.now,
-    isUnvisited: row.rowSource === 'live' && acknowledgedAt < row.entry.stateStartedAt,
+    isUnvisited: row.rowSource === 'live' && acknowledgedAt < agentAttentionTurnAt(row.entry),
     onActivate: context.onActivate,
     childAgentCount: hasChildren ? children.keys.length : undefined,
     childAgentsExpanded: expanded,

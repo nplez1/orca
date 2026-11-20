@@ -1,6 +1,6 @@
 import type { StateCreator } from 'zustand'
 import type { AppState } from '../types'
-import type { ExecutionHostId } from '../../../../shared/execution-host'
+import type { ExecutionHostId } from '../../../../shared/execution-host/execution-host'
 import type { PRCommentInlineDisplay } from '@/lib/pr-comment-inline-display'
 
 /** Where the project menu wants the Available Hosts add flow opened, for which host, and from

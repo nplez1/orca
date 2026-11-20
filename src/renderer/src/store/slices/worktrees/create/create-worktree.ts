@@ -7,7 +7,7 @@ import { repoHostId } from '../listing/worktree-host-ownership'
 import {
   isUnresolvedOwnerHostId,
   toRuntimeExecutionHostId
-} from '../../../../../../shared/execution-host'
+} from '../../../../../../shared/execution-host/execution-host'
 import { adoptFromEndpoint } from '../../../host-catalog/endpoint-catalog-adoption'
 import type { WorktreeSlice } from '../worktree-slice-contract'
 import type { WorktreeSliceGet, WorktreeSliceSet } from '../listing/worktree-slice-types'
@@ -34,7 +34,7 @@ import {
   WORKTREE_PUSH_TARGET_BASE_RUNTIME_CAPABILITY
 } from '../../../../../../shared/remote-runtime/protocol/worktree-runtime-capabilities'
 import { showLocalBaseRefUpdateSuggestionToast } from '@/components/sidebar/workspace-creation/base-ref-update/local-base-ref-suggestion-toast'
-import { requestWorktreeBaseFallbackNotice } from '@/components/worktree-base-fallback-notice'
+import { requestWorktreeBaseFallbackNotice } from '@/components/sidebar/workspace-creation/base-ref-update/worktree-base-fallback-notice'
 import { showLocalBaseRefRefreshToast } from './local-base-ref-refresh-toast'
 import { applyCreatedWorktree } from './created-worktree-state-merge'
 import { adoptRuntimeProvisionedRoot } from './runtime-provisioned-root-adoption'
@@ -57,12 +57,10 @@ import {
   type CreateAttemptOutcome
 } from './worktree-create-parent-pick'
 
-type RuntimeTarget = RuntimeClientTarget
-
 async function runCreateAttempt(
   request: WorktreeCreateRequest,
   attempt: WorktreeCreateAttempt,
-  target: RuntimeTarget,
+  target: RuntimeClientTarget,
   clientCreateSettings: ClientWorktreeCreateSettings = {}
 ): Promise<CreateAttemptOutcome> {
   const provisionedRoot = request.options?.provisionedRoot
@@ -292,7 +290,14 @@ export function createCreateWorktree(
           }
           const { result } = outcome
           showWorktreeCreateWarningToast(result.warning)
-          reviewSetupTrustMismatch(get, repoId, creationHostId, result, target)
+          reviewSetupTrustMismatch(
+            get,
+            repoId,
+            creationHostId,
+            result,
+            target,
+            options?.hookTrustContext
+          )
           showLocalBaseRefRefreshToast(result.localBaseRefRefresh, result.worktree, {
             updateSettings: get().updateSettings,
             executionHostId: creationHostId

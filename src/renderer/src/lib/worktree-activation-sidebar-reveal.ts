@@ -1,4 +1,4 @@
-import type { ExecutionHostId } from '../../../shared/execution-host'
+import type { ExecutionHostId } from '../../../shared/execution-host/execution-host'
 import type { Worktree } from '../../../shared/worktree/types'
 import { revealRepoInProjectFilter } from '../components/sidebar/worktree-list/controls/project-filter-reveal'
 import { isDetachedHeadWorkspace } from '../../../shared/worktree/visibility/workspace-kinds'

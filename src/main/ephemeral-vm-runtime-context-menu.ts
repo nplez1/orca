@@ -5,7 +5,7 @@ import {
 } from '../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 import { getEphemeralVmRecipeResultConnection } from '../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipes'
 import { listEnvironments } from '../shared/remote-runtime/host-store/runtime-environment-store'
-import { getRuntimeRecipeContext } from './ipc/ephemeral-vm-recipe-context'
+import { getRuntimeRecipeContext } from './ipc/ephemeral-vm/ephemeral-vm-recipe-context'
 import {
   runEphemeralVmRecipeContextMenuItem,
   type EphemeralVmRuntimeContextMenuItemRun

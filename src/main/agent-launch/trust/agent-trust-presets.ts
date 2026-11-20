@@ -4,7 +4,7 @@ import { realpath } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { runKeyedSerializedOperation } from '../../../shared/concurrency/keyed-serialized-operations'
 import { writeFileAtomically } from '../../filesystem/atomic-file-publication'
-import { upsertOrcaCreatedProjectTrustLevel } from '../../codex/trust/toml/config-toml-trust'
+import { grantCodexProjectTrustOffMain } from '../../codex/trust/project-trust/codex-project-trust-worker-client'
 import { runExclusivelyForCodexTrustConfig } from '../../codex/trust/toml/codex-trust-config-mutation-queue'
 import { recordOrcaCreatedAntigravityTrust } from './antigravity-workspace-trust-ownership'
 import type { TuiAgentConfig } from '../../../shared/agent-launch/catalog/tui-agent-config-types'
@@ -222,22 +222,14 @@ function kimiWorkspaceTrustKey(root: string): string {
 }
 
 /** Lock configs in hook-installer order: managed runtime home before system home. */
-export async function markCodexProjectTrusted(
+export function markCodexProjectTrusted(
   workspacePath: string,
   configFiles: readonly string[]
 ): Promise<void> {
-  // Why: Codex checks the cwd's own entry before the repo root, so no git-layout logic is needed.
-  const absPath = await canonicalize(workspacePath)
-  // Why (#16441): hook installs read and rewrite these files across awaits, so
-  // an unqueued write here could land between their read and their write and be
-  // lost. Same runtime-before-system lock order the installer takes.
+  // Serialize with hook installs so their capture/restore cannot overwrite the trust grant (#16441).
   const write = configFiles.reduceRight<() => Promise<void>>(
     (inner, configFile) => () => runExclusivelyForCodexTrustConfig(configFile, inner),
-    async () => {
-      for (const configFile of configFiles) {
-        upsertOrcaCreatedProjectTrustLevel(configFile, absPath, 'trusted')
-      }
-    }
+    () => grantCodexProjectTrustOffMain(configFiles, workspacePath)
   )
   return write()
 }

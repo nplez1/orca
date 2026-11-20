@@ -1,8 +1,8 @@
 import { gitLabApiFor } from '@/runtime/repository-gitlab/gitlab-owner-api'
-import { getRepoExecutionHostId } from '../../../../../../shared/execution-host'
+import { getRepoExecutionHostId } from '../../../../../../shared/execution-host/execution-host'
 import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
-import { useConfirmationDialog } from '@/components/confirmation-dialog-context'
+import { useConfirmationDialog } from '@/components/dismiss/confirmation/confirmation-dialog-context'
 import type { GitHubPRAutoMergeAction } from '@/components/github-pr-auto-merge-action'
 import type { HostedReviewInfo } from '../../../../../../shared/source-control/hosted-review/hosted-review-contracts'
 import type {
@@ -133,7 +133,8 @@ export function useHostedReviewActions({
               prNumber: review.number,
               method,
               prRepo: githubPR?.prRepo ?? null,
-              bypassBranchProtection
+              bypassBranchProtection,
+              expectedHeadSha: githubPR?.headSha ?? null
             })
         if (!result.ok) {
           setActionError(codeHostErrorText(result))
@@ -156,6 +157,7 @@ export function useHostedReviewActions({
     [
       confirm,
       adminBypassRequired,
+      githubPR?.headSha,
       githubPR?.prRepo,
       githubPR?.mergeQueueRequired,
       githubPR?.stack,

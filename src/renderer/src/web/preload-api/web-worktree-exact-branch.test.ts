@@ -1,21 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { WORKTREE_EXACT_BRANCH_NAME_RUNTIME_CAPABILITY } from '../../../../shared/remote-runtime/protocol/worktree-runtime-capabilities'
-import { createWorktreesApi } from './web-worktrees-api'
+import { createWorktreesApi } from './workspaces/web-worktrees-api'
 
 const mocks = vi.hoisted(() => ({ status: vi.fn(), call: vi.fn(), assertEnvironment: vi.fn() }))
 vi.mock('@/i18n/i18n', () => ({ translate: (_key: string, fallback: string) => fallback }))
-vi.mock('./web-runtime-calls', () => ({
+vi.mock('../runtime/client/web-runtime-calls', () => ({
   getRemoteRuntimeStatus: mocks.status,
   callRuntimeResultWithOwner: mocks.call,
   callRuntimeResult: vi.fn(),
   withRuntimeWorktreeOwner: (row: unknown) => row
 }))
-vi.mock('./web-runtime-session', () => ({
+vi.mock('../runtime/client/web-runtime-session', () => ({
   invalidateRuntimeWorktreeCaches: vi.fn(),
   requireActiveEnvironment: () => ({ id: 'env' }),
   assertActiveEnvironment: mocks.assertEnvironment
 }))
-vi.mock('./web-runtime-worktree-catalog', () => ({
+vi.mock('./workspaces/web-runtime-worktree-catalog', () => ({
   WEB_RUNTIME_WORKTREE_LIST_LIMIT: 500,
   callRuntimeDetectedWorktrees: vi.fn(),
   listAllRuntimeWorktrees: vi.fn()

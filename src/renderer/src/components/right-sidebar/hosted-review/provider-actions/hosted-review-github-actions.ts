@@ -6,7 +6,7 @@ import type { Repo } from '../../../../../../shared/repository/repo-types'
 import {
   getRepoExecutionHostId,
   parseExecutionHostId
-} from '../../../../../../shared/execution-host'
+} from '../../../../../../shared/execution-host/execution-host'
 import {
   GITHUB_MARK_PR_READY_RUNTIME_CAPABILITY,
   GITHUB_MARK_PR_READY_UPDATE_REQUIRED_MESSAGE
@@ -32,6 +32,7 @@ export async function mergeGitHubHostedReview(args: {
   prRepo?: GitHubPRRepo | null
   /** Set only by a caller whose confirmation told the user it would skip branch protection. */
   bypassBranchProtection?: boolean
+  expectedHeadSha: string | null
 }): Promise<Awaited<ReturnType<typeof window.api.gh.mergePR>>> {
   const target = getGitHubActionTarget(args.repo)
   if (target.kind === 'environment') {
@@ -43,7 +44,8 @@ export async function mergeGitHubHostedReview(args: {
         prNumber: args.prNumber,
         method: args.method,
         ...(args.bypassBranchProtection ? { bypassBranchProtection: true } : {}),
-        prRepo: args.prRepo ?? null
+        prRepo: args.prRepo ?? null,
+        expectedHeadSha: args.expectedHeadSha
       },
       // GitHub stack merges can take several asynchronous minutes.
       { timeoutMs: 4 * 60_000 }
@@ -55,7 +57,8 @@ export async function mergeGitHubHostedReview(args: {
     prNumber: args.prNumber,
     method: args.method,
     ...(args.bypassBranchProtection ? { bypassBranchProtection: true } : {}),
-    prRepo: args.prRepo ?? null
+    prRepo: args.prRepo ?? null,
+    expectedHeadSha: args.expectedHeadSha
   })
 }
 

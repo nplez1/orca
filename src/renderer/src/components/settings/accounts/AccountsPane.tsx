@@ -1,9 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { withManagedAccountDisplayNames } from '../../../../../shared/agent-accounts/managed-account-display-names'
 import type {
   ClaudeRateLimitAccountsState,
   CodexRateLimitAccountsState
 } from '../../../../../shared/agent-accounts/managed-account-types'
 import type { CodexConfigSyncStatus } from '../../../../../shared/agent-accounts/codex/codex-config-sync-types'
+import type { RateLimitState } from '../../../../../shared/agent-usage/rate-limits/rate-limit-types'
+import { useObservedAccountPlans } from './use-observed-account-plans'
 import { toast } from 'sonner'
 import { useAppStore } from '../../../store/index'
 import { translate } from '@/i18n/i18n'
@@ -27,30 +30,29 @@ import {
   providerAccountIsActiveInView,
   providerAccountMatchesView
 } from '../../provider-accounts/provider-account-visibility'
-import { useUsageProviderEnablement } from '../use-usage-provider-enablement'
-import {
-  getProviderAccountsSections,
-  type ProviderAccountsSectionContext
-} from '../provider-accounts-sections'
-import { ProviderAccountsSection } from '../ProviderAccountsSection'
 import type { RuntimeClientTarget } from '../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
 import { runtimeTargetEnvironmentId } from '@/runtime/rpc/targets/runtime-client-target'
 import type {
   AccountsPaneProps,
   AccountsPaneSectionModel,
   ProviderAccountAction,
-  RemoveAccountTarget
+  RemoveAccountTarget,
+  RenameAccountTarget
 } from './accounts-pane-types'
+import { AccountRenameDialog } from './account-rename-dialog'
 import { EMPTY_WSL_DISTROS, getSelectedAccountRuntime } from './scope/accounts-pane-runtime'
 import { getRuntimeSentenceLabel } from '../../../lib/provider-accounts/account-runtime-label'
 import { watchCodexConfigSyncStatus } from '../../../runtime/provider-accounts/codex-config-sync-observer'
-import {
-  createClaudeAccountActionRunner,
-  createCodexAccountActionRunner
-} from './accounts-pane-account-actions'
+import { createAccountsPaneRunners } from './accounts-pane-account-actions'
 import { renderAccountsLocationSection } from './scope/accounts-pane-location-section'
 import { useUsageHostSettings } from './usage/use-usage-host-settings'
 import { ManagedDataAccountsSection } from './providers/ManagedDataAccountsSection'
+import { useUsageProviderEnablement } from '../use-usage-provider-enablement'
+import {
+  getProviderAccountsSections,
+  type ProviderAccountsSectionContext
+} from '../provider-accounts-sections'
+import { ProviderAccountsSection } from '../ProviderAccountsSection'
 import { useAccountsPaneCredentialSections } from '../accounts-pane-credential-sections'
 import { renderAccountsRemovalDialogs } from './accounts-pane-removal-dialogs'
 
@@ -74,12 +76,12 @@ export function AccountsPane({
   const codexRateLimitTarget = useAppStore((s) => s.rateLimits.codexTarget)
   const miniMaxRateLimits = useAppStore((s) => s.rateLimits.minimax)
   const recordFeatureInteraction = useAppStore((s) => s.recordFeatureInteraction)
+  const credentialSections = useAccountsPaneCredentialSections(recordFeatureInteraction)
   const fetchSettings = useAppStore((s) => s.fetchSettings)
   const runtimeEnvironments = useAppStore((s) => s.runtimeEnvironments)
   const recordedOpenCodeSettingEditsRef = useRef<Set<'cookie' | 'workspaceId' | 'apiKey'>>(
     new Set()
   )
-  const credentialSections = useAccountsPaneCredentialSections(recordFeatureInteraction)
   const localAccountRuntime = getSelectedAccountRuntime(
     nativeAccounts ? { ...settings, localAccountRuntime: 'host' } : settings,
     wslSupportedPlatform,
@@ -126,16 +128,53 @@ export function AccountsPane({
       />
     ) : null
 
-  const [codexAccounts, setCodexAccounts] =
+  const [ownerCodexAccounts, setCodexAccounts] =
     useState<CodexRateLimitAccountsState>(emptyCodexAccountsState)
   const [codexAccountsLoaded, setCodexAccountsLoaded] = useState(false)
   const [codexAction, setCodexAction] = useState<ProviderAccountAction>('idle')
-  const [claudeAccounts, setClaudeAccounts] =
+  const [ownerClaudeAccounts, setClaudeAccounts] =
     useState<ClaudeRateLimitAccountsState>(emptyClaudeAccountsState)
   const [claudeAction, setClaudeAction] = useState<ProviderAccountAction>('idle')
+  // A remote host's usage comes only from its own stream; this desktop's polls describe other logins.
+  const [ownerUsage, setOwnerUsage] = useState<{
+    environmentId: string
+    rateLimits: RateLimitState | null
+  } | null>(null)
+  // A desktop reads Grok/Cursor from its own files; the web client gets its server's meter.
+  const readsOwnerGrokCursor = !isRemoteAccountScope || isWebClientLocation()
+  const shownProviderSections = getProviderAccountsSections().filter(
+    (provider) =>
+      matchesSettingsSearch(searchQuery, provider.searchEntries()) &&
+      (readsOwnerGrokCursor || (provider.id !== 'grok' && provider.id !== 'cursor'))
+  )
+  const claudeSectionShown = shownProviderSections.some((provider) => provider.id === 'claude')
+  const codexSectionShown = shownProviderSections.some((provider) => provider.id === 'codex')
+  const { claudeAccountPlans, codexAccountPlans } = useObservedAccountPlans({
+    isRemoteAccountScope,
+    ownerUsage:
+      scopeEnvironmentId && ownerUsage?.environmentId === scopeEnvironmentId
+        ? ownerUsage.rateLimits
+        : null,
+    claudeShown: claudeSectionShown,
+    codexShown: codexSectionShown
+  })
+  // This desktop's names change with its settings, e.g. a rename in another window.
+  const localNames = isRemoteAccountScope ? undefined : settings.managedAccountDisplayNames
+  const codexAccounts = useMemo(
+    () => withManagedAccountDisplayNames(ownerCodexAccounts, localNames, 'codex'),
+    [ownerCodexAccounts, localNames]
+  )
+  const claudeAccounts = useMemo(
+    () => withManagedAccountDisplayNames(ownerClaudeAccounts, localNames, 'claude'),
+    [ownerClaudeAccounts, localNames]
+  )
   // Capture runtime slots at dialog opening; roster updates could remove the slot needed for restart diffs.
   const [removeCodexTarget, setRemoveCodexTarget] = useState<RemoveAccountTarget | null>(null)
   const [removeClaudeTarget, setRemoveClaudeTarget] = useState<RemoveAccountTarget | null>(null)
+  const [renameTarget, setRenameTarget] = useState<RenameAccountTarget | null>(null)
+  const [renamingAccountKeys, setRenamingAccountKeys] = useState<ReadonlySet<string>>(
+    () => new Set()
+  )
   const accountVisibilityOptions = {
     remoteOwner: isRemoteAccountScope,
     ownerPlatform: accountOwnerPlatform
@@ -222,7 +261,11 @@ export function AccountsPane({
         if (!snapshot.failedProviders?.includes('claude')) {
           setClaudeAccounts(snapshot.claude)
         }
+        if (scopeEnvironmentId) {
+          setOwnerUsage({ environmentId: scopeEnvironmentId, rateLimits: snapshot.rateLimits })
+        }
       },
+      onClosedAfterSnapshot: () => setOwnerUsage(null),
       onError: (error) => {
         toast.error(
           translate(
@@ -238,30 +281,26 @@ export function AccountsPane({
     }
   }, [scopeEnvironmentId])
 
-  const runCodexAccountAction = createCodexAccountActionRunner({
-    settings,
-    accountOwner,
-    isCurrentAccountOwner,
-    accountRuntime,
-    isRemoteAccountScope,
-    codexAccounts,
-    setCodexAccounts,
-    setCodexAccountsLoaded,
-    setCodexAction,
-    fetchSettings,
-    recordFeatureInteraction
-  })
-  const runClaudeAccountAction = createClaudeAccountActionRunner({
-    accountOwner,
-    isCurrentAccountOwner,
-    accountRuntime,
-    isRemoteAccountScope,
-    claudeAccounts,
-    setClaudeAccounts,
-    setClaudeAction,
-    fetchSettings,
-    recordFeatureInteraction
-  })
+  // One construction site: each runner reads the owner ref only when its action settles.
+  const { runCodexAccountAction, runClaudeAccountAction, renameAccount } =
+    createAccountsPaneRunners({
+      settings,
+      accountOwner,
+      hostLabel: accountRuntimeSentenceLabel,
+      isCurrentAccountOwner,
+      accountRuntime,
+      isRemoteAccountScope,
+      codexAccounts,
+      setCodexAccounts,
+      setCodexAccountsLoaded,
+      setCodexAction,
+      claudeAccounts,
+      setClaudeAccounts,
+      setClaudeAction,
+      setRenamingAccountKeys,
+      fetchSettings,
+      recordFeatureInteraction
+    })
   const model: AccountsPaneSectionModel = {
     settings,
     accountOwner,
@@ -288,6 +327,9 @@ export function AccountsPane({
     visibleClaudeAccounts,
     systemClaudeActive,
     setRemoveClaudeTarget,
+    setRenameTarget,
+    renameAccount,
+    renamingAccountKeys,
     runClaudeAccountAction,
     codexAccounts,
     codexAction,
@@ -302,6 +344,8 @@ export function AccountsPane({
     codexConfigSyncWarning,
     codexRateLimits,
     codexRateLimitTarget,
+    claudeAccountPlans,
+    codexAccountPlans,
     setRemoveCodexTarget,
     runCodexAccountAction,
     recordOpenCodeSettingEdit,
@@ -338,31 +382,30 @@ export function AccountsPane({
     matchesSettingsSearch(searchQuery, getAccountsLocationSearchEntries())
       ? renderAccountsLocationSection(model, t)
       : null,
-    ...getProviderAccountsSections().map((provider) =>
-      matchesSettingsSearch(searchQuery, provider.searchEntries()) ? (
-        <ProviderAccountsSection
-          key={provider.id}
-          providerId={provider.id}
-          title={provider.title}
-          description={
-            typeof provider.description === 'function'
-              ? provider.description(providerContext)
-              : provider.description
-          }
-          Icon={provider.Icon}
-          headerAction={provider.headerAction?.(providerContext)}
-          enabled={!disabledUsageProviders.includes(provider.id)}
-          onEnabledChange={(enabled) => setUsageProviderEnabled(provider.id, enabled)}
-        >
-          {provider.renderBody?.(providerContext)}
-        </ProviderAccountsSection>
-      ) : null
-    )
-  ].filter(Boolean)
+    ...shownProviderSections.map((provider) => (
+      <ProviderAccountsSection
+        key={provider.id}
+        providerId={provider.id}
+        title={provider.title}
+        description={
+          typeof provider.description === 'function'
+            ? provider.description(providerContext)
+            : provider.description
+        }
+        Icon={provider.Icon}
+        headerAction={provider.headerAction?.(providerContext)}
+        enabled={!disabledUsageProviders.includes(provider.id)}
+        onEnabledChange={(enabled) => setUsageProviderEnabled(provider.id, enabled)}
+      >
+        {provider.renderBody?.(providerContext)}
+      </ProviderAccountsSection>
+    ))
+  ]
 
   return (
     <div className="space-y-8">
       {renderAccountsRemovalDialogs(model, removeCodexTarget, removeClaudeTarget, t)}
+      <AccountRenameDialog model={model} target={renameTarget} />
       <SettingsSectionStack sections={visibleSections} />
     </div>
   )

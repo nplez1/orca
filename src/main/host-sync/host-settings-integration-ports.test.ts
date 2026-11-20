@@ -68,30 +68,31 @@ vi.mock('../jira/site-credential-store', async () => {
   const actual = await vi.importActual<typeof JiraStoreModule>('../jira/site-credential-store')
   return {
     ...actual,
-    getSiteFile: (): JiraSiteFile => ({
+    // Why async: the port awaits this store, and a sync stand-in would keep a missing await passing.
+    getSiteFile: async (): Promise<JiraSiteFile> => ({
       version: 1,
       activeSiteId: jiraState.activeSiteId,
       selectedSiteId: jiraState.selectedSiteId,
       sites: jiraState.sites
     }),
-    writeSiteFile: (file: JiraSiteFile): void => {
+    writeSiteFile: async (file: JiraSiteFile): Promise<void> => {
       jiraState.written.push(file)
       jiraState.sites = file.sites
       jiraState.activeSiteId = file.activeSiteId
     },
-    hasStoredToken: (siteId: string): boolean => jiraState.tokens.has(siteId),
-    readToken: (siteId: string): string | null =>
+    hasStoredToken: async (siteId: string): Promise<boolean> => jiraState.tokens.has(siteId),
+    readToken: async (siteId: string): Promise<string | null> =>
       jiraState.unreadable.has(siteId) ? null : (jiraState.tokens.get(siteId) ?? null),
-    saveToken: (siteId: string, token: string): void => {
+    saveToken: async (siteId: string, token: string): Promise<void> => {
       jiraState.tokens.set(siteId, token)
       jiraState.protections.set(siteId, 'sealed')
     },
-    deleteToken: (siteId: string): void => {
+    deleteToken: async (siteId: string): Promise<void> => {
       jiraState.tokens.delete(siteId)
       jiraState.protections.delete(siteId)
       jiraState.deleted.push(siteId)
     },
-    getSiteTokenProtection: (siteId: string): SecretAtRestProtection | null =>
+    getSiteTokenProtection: async (siteId: string): Promise<SecretAtRestProtection | null> =>
       jiraState.protections.get(siteId) ?? null
   }
 })
@@ -101,7 +102,10 @@ vi.mock('../jenkins/jenkins-server-store', async () => {
   return {
     ...actual,
     listJenkinsServers: (): JenkinsServerProfile[] => jenkinsState.servers,
-    saveJenkinsServer: (server: JenkinsServerProfile, token: string | null): void => {
+    saveJenkinsServer: async (
+      server: JenkinsServerProfile,
+      token: string | null
+    ): Promise<void> => {
       jenkinsState.saved.push({ server, token })
       jenkinsState.servers = [
         ...jenkinsState.servers.filter((candidate) => candidate.id !== server.id),
@@ -121,9 +125,11 @@ vi.mock('../jenkins/jenkins-server-store', async () => {
     },
     readJenkinsServerToken: (serverId: string): string | null =>
       jenkinsState.unreadable.has(serverId) ? null : (jenkinsState.tokens.get(serverId) ?? null),
-    hasJenkinsServerToken: (serverId: string): boolean => jenkinsState.tokens.has(serverId),
-    getJenkinsServerTokenProtection: (serverId: string): SecretAtRestProtection | null =>
-      jenkinsState.protections.get(serverId) ?? null
+    hasJenkinsServerToken: async (serverId: string): Promise<boolean> =>
+      jenkinsState.tokens.has(serverId),
+    getJenkinsServerTokenProtection: async (
+      serverId: string
+    ): Promise<SecretAtRestProtection | null> => jenkinsState.protections.get(serverId) ?? null
   }
 })
 
@@ -148,12 +154,12 @@ beforeEach(() => {
 })
 
 describe('the Jira credential port', () => {
-  it('exports one credential per site, carrying the site with its token', () => {
+  it('exports one credential per site, carrying the site with its token', async () => {
     jiraState.sites = [jiraSite]
     jiraState.tokens.set('site-1', 'jira-token')
     jiraState.protections.set('site-1', 'sealed')
 
-    const [credential] = createHostSettingsJiraPort().list()
+    const [credential] = await createHostSettingsJiraPort().list()
 
     expect(credential).toMatchObject({
       id: 'jira:site-1',
@@ -164,22 +170,22 @@ describe('the Jira credential port', () => {
     expect(JSON.parse(credential.payload)).toEqual({ site: jiraSite, token: 'jira-token' })
   })
 
-  it('skips a site whose token this host cannot read, without dropping the others', () => {
+  it('skips a site whose token this host cannot read, without dropping the others', async () => {
     jiraState.sites = [jiraSite, { ...jiraSite, id: 'site-2' }]
     jiraState.tokens.set('site-2', 'readable')
     jiraState.protections.set('site-1', 'sealed')
     jiraState.protections.set('site-2', 'sealed')
 
-    const credentials = createHostSettingsJiraPort().list()
+    const credentials = await createHostSettingsJiraPort().list()
 
     expect(credentials.map((credential) => credential.id)).toEqual(['jira:site-2'])
   })
 
-  it('adds a replicated site without moving which site this host is looking at', () => {
+  it('adds a replicated site without moving which site this host is looking at', async () => {
     jiraState.activeSiteId = 'site-local'
     jiraState.sites = [{ ...jiraSite, id: 'site-local' }]
 
-    createHostSettingsJiraPort().apply({
+    await createHostSettingsJiraPort().apply({
       id: 'jira:site-1',
       kind: 'jira',
       label: 'Jira Acme',
@@ -193,8 +199,8 @@ describe('the Jira credential port', () => {
     expect(jiraState.sites.map((site) => site.id).sort()).toEqual(['site-1', 'site-local'])
   })
 
-  it('refuses a malformed payload rather than writing half a site', () => {
-    expect(() =>
+  it('refuses a malformed payload rather than writing half a site', async () => {
+    await expect(
       createHostSettingsJiraPort().apply({
         id: 'jira:site-1',
         kind: 'jira',
@@ -203,28 +209,28 @@ describe('the Jira credential port', () => {
         onlyIfEmpty: false,
         payload: '{"site":{"id":42}}'
       })
-    ).toThrow('malformed')
+    ).rejects.toThrow('malformed')
     expect(jiraState.tokens.size).toBe(0)
   })
 
-  it('revokes one site without touching another', () => {
+  it('revokes one site without touching another', async () => {
     jiraState.sites = [jiraSite, { ...jiraSite, id: 'site-2' }]
     jiraState.tokens.set('site-1', 'a')
     jiraState.tokens.set('site-2', 'b')
     jiraState.protections.set('site-1', 'sealed')
     jiraState.protections.set('site-2', 'sealed')
 
-    createHostSettingsJiraPort().remove('jira:site-1')
+    await createHostSettingsJiraPort().remove('jira:site-1')
 
     expect(jiraState.deleted).toEqual(['site-1'])
     expect(jiraState.tokens.has('site-2')).toBe(true)
     expect(jiraState.sites.map((site) => site.id)).toEqual(['site-2'])
   })
 
-  it('ignores a credential id that belongs to another kind', () => {
+  it('ignores a credential id that belongs to another kind', async () => {
     jiraState.sites = [jiraSite]
 
-    createHostSettingsJiraPort().remove('jenkins:ci-1')
+    await createHostSettingsJiraPort().remove('jenkins:ci-1')
 
     expect(jiraState.deleted).toEqual([])
     expect(jiraState.sites).toHaveLength(1)
@@ -233,49 +239,49 @@ describe('the Jira credential port', () => {
   // Why: a token file that exists but cannot be read right now (EBUSY under a Windows antivirus scan,
   // EACCES) is not a deleted site. Reporting it as absent puts it in the removal list, and every host
   // then deletes a working token because one machine's read failed.
-  it('reports a site whose token cannot be read as unreadable rather than absent', () => {
+  it('reports a site whose token cannot be read as unreadable rather than absent', async () => {
     jiraState.sites = [jiraSite]
     jiraState.tokens.set('site-1', 'jira-token')
     jiraState.unreadable.add('site-1')
 
     const port = createHostSettingsJiraPort()
 
-    expect(port.unreadableIds()).toEqual(['jira:site-1'])
-    expect(port.list()).toEqual([])
+    expect(await port.unreadableIds()).toEqual(['jira:site-1'])
+    expect(await port.list()).toEqual([])
     // Why not null: null claims this host holds nothing, which is what makes a removal look verified.
-    expect(port.protectionOf('jira:site-1')).toBe('plaintext')
+    expect(await port.protectionOf('jira:site-1')).toBe('plaintext')
   })
 
   // Why this case: the token cache can answer while a fresh classification read fails (antivirus lock on
   // Windows). If `list()` judged by the classification and `unreadableIds()` by the token, the site would
   // be in neither — and the sender would then name it as a removal.
-  it('still exports a site whose token reads when its file cannot be classified', () => {
+  it('still exports a site whose token reads when its file cannot be classified', async () => {
     jiraState.sites = [jiraSite]
     jiraState.tokens.set('site-1', 'jira-token')
 
     const port = createHostSettingsJiraPort()
 
-    expect(port.unreadableIds()).toEqual([])
-    expect(port.list()).toHaveLength(1)
-    expect(port.list()[0]).toMatchObject({ protection: 'sealed' })
+    expect(await port.unreadableIds()).toEqual([])
+    expect(await port.list()).toHaveLength(1)
+    expect((await port.list())[0]).toMatchObject({ protection: 'sealed' })
     // Why the other direction here: overstating protection is what would record a plaintext copy as sealed.
-    expect(port.protectionOf('jira:site-1')).toBe('plaintext')
+    expect(await port.protectionOf('jira:site-1')).toBe('plaintext')
   })
 
-  it('does not name a site it holds no token file for', () => {
+  it('does not name a site it holds no token file for', async () => {
     jiraState.sites = [jiraSite]
 
-    expect(createHostSettingsJiraPort().unreadableIds()).toEqual([])
+    expect(await createHostSettingsJiraPort().unreadableIds()).toEqual([])
   })
 })
 
 describe('the Jenkins credential port', () => {
-  it('exports one credential per server, carrying the profile with its token', () => {
+  it('exports one credential per server, carrying the profile with its token', async () => {
     jenkinsState.servers = [jenkinsServer]
     jenkinsState.tokens.set('ci-1', 'jenkins-token')
     jenkinsState.protections.set('ci-1', 'sealed')
 
-    const [credential] = createHostSettingsJenkinsPort().list()
+    const [credential] = await createHostSettingsJenkinsPort().list()
 
     expect(credential).toMatchObject({ id: 'jenkins:ci-1', kind: 'jenkins', protection: 'sealed' })
     expect(JSON.parse(credential.payload)).toEqual({
@@ -284,14 +290,14 @@ describe('the Jenkins credential port', () => {
     })
   })
 
-  it('skips a server with no token on this host', () => {
+  it('skips a server with no token on this host', async () => {
     jenkinsState.servers = [jenkinsServer]
 
-    expect(createHostSettingsJenkinsPort().list()).toEqual([])
+    expect(await createHostSettingsJenkinsPort().list()).toEqual([])
   })
 
-  it('writes the profile and its token together on apply', () => {
-    createHostSettingsJenkinsPort().apply({
+  it('writes the profile and its token together on apply', async () => {
+    await createHostSettingsJenkinsPort().apply({
       id: 'jenkins:ci-1',
       kind: 'jenkins',
       label: 'Jenkins CI',
@@ -303,8 +309,8 @@ describe('the Jenkins credential port', () => {
     expect(jenkinsState.saved).toEqual([{ server: jenkinsServer, token: 'jenkins-token' }])
   })
 
-  it('normalizes the server URL out of the payload rather than trusting it', () => {
-    createHostSettingsJenkinsPort().apply({
+  it('normalizes the server URL out of the payload rather than trusting it', async () => {
+    await createHostSettingsJenkinsPort().apply({
       id: 'jenkins:ci-1',
       kind: 'jenkins',
       label: 'Jenkins CI',
@@ -319,8 +325,8 @@ describe('the Jenkins credential port', () => {
     expect(jenkinsState.saved[0]?.server.baseUrl).toBe('https://ci.acme.test/jenkins')
   })
 
-  it('refuses a payload whose server has no usable URL', () => {
-    expect(() =>
+  it('refuses a payload whose server has no usable URL', async () => {
+    await expect(
       createHostSettingsJenkinsPort().apply({
         id: 'jenkins:ci-1',
         kind: 'jenkins',
@@ -329,10 +335,10 @@ describe('the Jenkins credential port', () => {
         onlyIfEmpty: false,
         payload: JSON.stringify({ server: { ...jenkinsServer, baseUrl: 'not a url' }, token: 'x' })
       })
-    ).toThrow('malformed')
+    ).rejects.toThrow('malformed')
   })
 
-  it('reports a server as unheld once it is revoked', () => {
+  it('reports a server as unheld once it is revoked', async () => {
     const port = createHostSettingsJenkinsPort()
     jenkinsState.servers = [jenkinsServer]
     jenkinsState.tokens.set('ci-1', 'jenkins-token')
@@ -341,31 +347,31 @@ describe('the Jenkins credential port', () => {
     port.remove('jenkins:ci-1')
 
     expect(jenkinsState.removed).toEqual(['ci-1'])
-    expect(port.protectionOf('jenkins:ci-1')).toBeNull()
+    expect(await port.protectionOf('jenkins:ci-1')).toBeNull()
   })
 
-  it('reports a server whose token cannot be read as unreadable rather than absent', () => {
+  it('reports a server whose token cannot be read as unreadable rather than absent', async () => {
     jenkinsState.servers = [jenkinsServer]
     jenkinsState.tokens.set('ci-1', 'jenkins-token')
     jenkinsState.unreadable.add('ci-1')
 
     const port = createHostSettingsJenkinsPort()
 
-    expect(port.unreadableIds()).toEqual(['jenkins:ci-1'])
-    expect(port.list()).toEqual([])
-    expect(port.protectionOf('jenkins:ci-1')).toBe('plaintext')
+    expect(await port.unreadableIds()).toEqual(['jenkins:ci-1'])
+    expect(await port.list()).toEqual([])
+    expect(await port.protectionOf('jenkins:ci-1')).toBe('plaintext')
   })
 
-  it('still exports a server whose token reads when its file cannot be classified', () => {
+  it('still exports a server whose token reads when its file cannot be classified', async () => {
     jenkinsState.servers = [jenkinsServer]
     // No protection recorded: the classification read failed while the token itself reads fine.
     jenkinsState.tokens.set('ci-1', 'jenkins-token')
 
     const port = createHostSettingsJenkinsPort()
 
-    expect(port.unreadableIds()).toEqual([])
-    expect(port.list()).toHaveLength(1)
-    expect(port.list()[0]).toMatchObject({ protection: 'sealed' })
-    expect(port.protectionOf('jenkins:ci-1')).toBe('plaintext')
+    expect(await port.unreadableIds()).toEqual([])
+    expect(await port.list()).toHaveLength(1)
+    expect((await port.list())[0]).toMatchObject({ protection: 'sealed' })
+    expect(await port.protectionOf('jenkins:ci-1')).toBe('plaintext')
   })
 })

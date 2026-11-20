@@ -5,7 +5,7 @@ import StatusIndicator, { type Status } from './workspace-card/surface/StatusInd
 
 // Why this file survives upstream retiring its StatusIndicator suite (#34156): the `setup` state is
 // the fork's, so upstream's removal took the only coverage of it with it.
-vi.mock('@/components/StateIndicatorTooltip', async () => {
+vi.mock('@/components/agent/status/StateIndicatorTooltip', async () => {
   const { createElement } = await import('react')
   return {
     StateIndicatorTooltip: ({

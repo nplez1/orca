@@ -83,11 +83,8 @@ export function useMobilePrActions(input: PrActionsInput) {
     clearError: useCallback(() => engine.clearError(), [engine]),
     clearBlocked: useCallback(() => engine.clearBlocked(), [engine]),
     merge: useCallback(
-      (
-        method?: Parameters<PrActionsEngine['merge']>[0],
-        bypassBranchProtection?: Parameters<PrActionsEngine['merge']>[1]
-      ): Promise<boolean> =>
-        ready ? engine.merge(method, bypassBranchProtection) : Promise.resolve(false),
+      (...args: Parameters<PrActionsEngine['merge']>): Promise<boolean> =>
+        ready ? engine.merge(...args) : Promise.resolve(false),
       [engine, ready]
     ),
     setAutoMerge: useCallback(

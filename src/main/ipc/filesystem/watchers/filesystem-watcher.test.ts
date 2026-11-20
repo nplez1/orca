@@ -33,7 +33,6 @@ type HandlerMap = Record<string, (_event: unknown, args: unknown) => unknown>
 
 describe('registerFilesystemWatcherHandlers', () => {
   const handlers: HandlerMap = {}
-  const originalPlatform = process.platform
 
   beforeEach(async () => {
     vi.useRealTimers()
@@ -42,10 +41,6 @@ describe('registerFilesystemWatcherHandlers', () => {
     vi.mocked(subscribeParcelWatcher).mockReset()
     vi.mocked(createWslWatcher).mockReset()
     resetWatcherChildRegistryForTest()
-    Object.defineProperty(process, 'platform', {
-      configurable: true,
-      value: originalPlatform
-    })
     for (const key of Object.keys(handlers)) {
       delete handlers[key]
     }

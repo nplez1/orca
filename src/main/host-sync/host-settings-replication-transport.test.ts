@@ -483,17 +483,17 @@ describe('applying what the main sent', () => {
     })
   })
 
-  it('applies a snapshot and remembers the revision it reached', () => {
-    const result = applyHostSettingsReplication(snapshot(4), { registry, holdings, now: 99 })
+  it('applies a snapshot and remembers the revision it reached', async () => {
+    const result = await applyHostSettingsReplication(snapshot(4), { registry, holdings, now: 99 })
 
     expect(result).toMatchObject({ decision: 'applied' })
     expect(getHostSettingsReplication(holdings)).toMatchObject({ revision: 4 })
   })
 
-  it('asks for a snapshot instead of applying a delta past a gap, and keeps its revision', () => {
-    applyHostSettingsReplication(snapshot(4), { registry, holdings, now: 99 })
+  it('asks for a snapshot instead of applying a delta past a gap, and keeps its revision', async () => {
+    await applyHostSettingsReplication(snapshot(4), { registry, holdings, now: 99 })
 
-    const result = applyHostSettingsReplication(
+    const result = await applyHostSettingsReplication(
       { ...snapshot(9), baseRevision: 7 },
       { registry, holdings, now: 100 }
     )
@@ -502,21 +502,25 @@ describe('applying what the main sent', () => {
     expect(getHostSettingsReplication(holdings)).toMatchObject({ revision: 4 })
   })
 
-  it('refuses a version it does not know without advancing its revision', () => {
+  it('refuses a version it does not know without advancing its revision', async () => {
     // Why parsed from JSON: a newer main is exactly what sends a version this build has never seen,
     // and a round trip is how that payload arrives rather than how a test would write it.
     const fromANewerMain = JSON.parse(JSON.stringify({ ...snapshot(1), version: 2 }))
 
-    const result = applyHostSettingsReplication(fromANewerMain, { registry, holdings, now: 99 })
+    const result = await applyHostSettingsReplication(fromANewerMain, {
+      registry,
+      holdings,
+      now: 99
+    })
 
     expect(result).toEqual({ decision: 'unsupportedVersion' })
     expect(getHostSettingsReplication(holdings).revision).toBeNull()
   })
 
-  it('applies a delta whose base is the revision it holds', () => {
-    applyHostSettingsReplication(snapshot(4), { registry, holdings, now: 99 })
+  it('applies a delta whose base is the revision it holds', async () => {
+    await applyHostSettingsReplication(snapshot(4), { registry, holdings, now: 99 })
 
-    const result = applyHostSettingsReplication(
+    const result = await applyHostSettingsReplication(
       { ...snapshot(5), baseRevision: 4 },
       { registry, holdings, now: 100 }
     )

@@ -15,7 +15,7 @@ import { closeRemoteBrowserPageInOwningEnvironment } from '../hosts/browser-remo
 import { releaseDocPreviewGrant } from '@/lib/browser/documents/doc-preview-grants'
 import { destroyWorkspaceWebviews } from './browser-webview-cleanup'
 import { omitRecordKeys } from '../../worktrees/teardown/record-key-omission'
-import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../../../shared/layout-owner-switch'
+import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../../../shared/workspace-layout/layout-owner-switch'
 import { forgetDesktopCreatedServerTab } from '@/store/workspace-layout/frames/desktop-created-server-tabs'
 import {
   closeBrowserTabThroughLayoutOwner,

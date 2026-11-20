@@ -1,4 +1,4 @@
-import type { GlobalSettings } from '../../../../shared/global-settings-types'
+import type { GlobalSettings } from '../../../../shared/settings/global-settings-types'
 import { useTranslate } from '@/i18n/use-translate'
 import { isPRCommentsInlineEnabled } from '@/lib/pr-comment-inline-setting'
 import { SearchableSetting } from './section-layout/SearchableSetting'

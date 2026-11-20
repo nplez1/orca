@@ -1,9 +1,9 @@
 import { isAbsolute } from 'node:path'
-import { LOCAL_EXECUTION_HOST_ID } from '../../../shared/execution-host'
-import type { GlobalSettings } from '../../../shared/global-settings-types'
+import { LOCAL_EXECUTION_HOST_ID } from '../../../shared/execution-host/execution-host'
+import type { GlobalSettings } from '../../../shared/settings/global-settings-types'
 import { getEffectiveHostSetting } from '../../../shared/execution-host/host-setting-overrides'
 import { resolveCheckoutParent } from '../../../shared/host-repo-root'
-import { resolveWorktreeLayoutMode } from '../../../shared/orca-workspace-layout'
+import { resolveWorktreeLayoutMode } from '../../../shared/worktree/paths/orca-workspace-layout'
 import { expandLeadingHomePath } from '../../filesystem/home-path-expansion'
 
 /** A stored folder expanded against this machine's home, or '' when it cannot name one here.

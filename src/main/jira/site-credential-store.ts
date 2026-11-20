@@ -1,6 +1,7 @@
-import { existsSync, mkdirSync, readFileSync, unlinkSync } from 'node:fs'
+import { credentialFileExists, inCredentialFileOrder } from '../credentials/credential-file-io'
+import { mkdir, readFile, unlink } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { durableWriteTempPath, writeFileDurableSync } from '../filesystem/durable-file-write'
+import { durableWriteTempPath, writeFileDurable } from '../filesystem/durable-file-write'
 import {
   adoptLegacyHomeStore,
   resolveLegacyHomeStore,
@@ -47,13 +48,14 @@ export class JiraSiteFileUnreadableError extends Error {
   }
 }
 
-export function getCredentialError(siteId: string): string | undefined {
+export async function getCredentialError(siteId: string): Promise<string | undefined> {
   return tokenFileCache.error(siteId)
 }
 
 function getSiteFilePath(): string {
   return adoptLegacyHomeStore('jira-sites.json')
 }
+
 export function getTokenDir(): string {
   return adoptLegacyHomeStore('jira-tokens')
 }
@@ -62,14 +64,14 @@ function getTokenPath(siteId: string): string {
   return join(getTokenDir(), `${Buffer.from(siteId).toString('base64url')}.enc`)
 }
 
-function ensureOrcaDir(): void {
-  mkdirSync(dirname(getSiteFilePath()), { recursive: true })
+async function ensureOrcaDir(): Promise<void> {
+  await mkdir(dirname(getSiteFilePath()), { recursive: true })
 }
 
-function ensureTokenDir(): void {
+async function ensureTokenDir(): Promise<void> {
   const dir = getTokenDir()
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true })
+  if (!(await credentialFileExists(dir))) {
+    await mkdir(dir, { recursive: true })
   }
 }
 
@@ -82,7 +84,7 @@ function emptySiteFile(): JiraSiteFile {
   }
 }
 
-export function hasStoredToken(siteId: string): boolean {
+export async function hasStoredToken(siteId: string): Promise<boolean> {
   return tokenFileCache.has(siteId)
 }
 
@@ -124,14 +126,14 @@ export function normalizeSite(input: unknown): JiraSite | null {
   }
 }
 
-function readSiteFileFromDisk(): JiraSiteFileRead {
+async function readSiteFileFromDisk(): Promise<JiraSiteFileRead> {
   const { path, adoption } = resolveLegacyHomeStore('jira-sites.json')
   const adoptionFailure = adoption.kind === 'failed' ? adoption : null
-  if (!existsSync(path)) {
+  if (!(await credentialFileExists(path))) {
     return { file: emptySiteFile(), unreadable: null, adoptionFailure }
   }
   try {
-    const parsed = JSON.parse(readFileSync(path, { encoding: 'utf-8' })) as Partial<JiraSiteFile>
+    const parsed: Partial<JiraSiteFile> = JSON.parse(await readFile(path, { encoding: 'utf-8' }))
     const sites = Array.isArray(parsed.sites)
       ? parsed.sites
           .map((site) => normalizeSite(site))
@@ -168,8 +170,8 @@ function readSiteFileFromDisk(): JiraSiteFileRead {
 }
 
 /** A problem the connection status should carry, or null when the store is healthy. */
-export function getSiteFileProblem(): string | null {
-  const read = siteFileCache.get()
+export async function getSiteFileProblem(): Promise<string | null> {
+  const read = await siteFileCache.get()
   if (read.unreadable) {
     return read.unreadable.message
   }
@@ -179,13 +181,17 @@ export function getSiteFileProblem(): string | null {
   return null
 }
 
-export function getSiteFile(): JiraSiteFile {
-  const file = siteFileCache.get().file
-  return selectableSiteFile(file)
+export async function getSiteFile(): Promise<JiraSiteFile> {
+  // The registry queue keeps a token/reconnect write from landing between this read and its consumer.
+  return inCredentialFileOrder(getSiteFilePath(), async () => {
+    const read = await siteFileCache.get()
+    return selectableSiteFile(read.file)
+  })
 }
 
-function selectableSiteFile(file: JiraSiteFile): JiraSiteFile {
-  const sites = file.sites.filter((site) => hasStoredToken(site.id))
+async function selectableSiteFile(file: JiraSiteFile): Promise<JiraSiteFile> {
+  const presence = await Promise.all(file.sites.map((site) => hasStoredToken(site.id)))
+  const sites = file.sites.filter((_, index) => presence[index])
   const activeSiteId =
     file.activeSiteId && sites.some((site) => site.id === file.activeSiteId)
       ? file.activeSiteId
@@ -206,46 +212,58 @@ function selectableSiteFile(file: JiraSiteFile): JiraSiteFile {
 }
 
 /** Refuse a mutation when the file it would rewrite cannot be read. */
-export function assertSiteFileWritable(): void {
-  const read = siteFileCache.get()
+export async function assertSiteFileWritable(): Promise<void> {
+  const read = await siteFileCache.get()
   if (read.unreadable) {
     throw read.unreadable
   }
 }
 
-export function writeSiteFile(file: JiraSiteFile): void {
-  // Why refuse: this call reads the file, changes it and writes it back, so a read that answered
-  // "no sites" would persist that emptiness over every saved site and orphan their tokens.
-  assertSiteFileWritable()
-  ensureOrcaDir()
-  const path = getSiteFilePath()
-  const next = selectableSiteFile(file)
-  // Why the durable helper: a crash mid-write left truncated JSON, which the next launch read as "no
-  // sites" and the next save then persisted.
-  writeFileDurableSync(durableWriteTempPath(path), path, JSON.stringify(next, null, 2), 0o600)
-  siteFileCache.invalidate()
+export async function writeSiteFile(file: JiraSiteFile): Promise<void> {
+  return inCredentialFileOrder(getSiteFilePath(), async () => {
+    // Why refuse: this call reads the file, changes it and writes it back, so a read that answered
+    // "no sites" would persist that emptiness over every saved site and orphan their tokens.
+    await assertSiteFileWritable()
+    await ensureOrcaDir()
+    const path = getSiteFilePath()
+    const next = await selectableSiteFile(file)
+    // Why the durable helper: a crash mid-write left truncated JSON, which the next launch read as "no
+    // sites" and the next save then persisted.
+    await writeFileDurable(durableWriteTempPath(path), path, JSON.stringify(next, null, 2), 0o600)
+    siteFileCache.invalidate()
+  })
 }
 
-export function readToken(siteId: string): string | null {
+export async function readToken(siteId: string): Promise<string | null> {
   return tokenFileCache.read(siteId)
 }
 
 /** How a site's stored token sits on disk, or null when none is stored. */
-export function getSiteTokenProtection(siteId: string): SecretAtRestProtection | null {
+export async function getSiteTokenProtection(
+  siteId: string
+): Promise<SecretAtRestProtection | null> {
   return readCredentialFileProtection(getTokenPath(siteId))
 }
 
-export function saveToken(siteId: string, apiToken: string): void {
-  ensureOrcaDir()
-  ensureTokenDir()
-  writeEncryptedCredential('Jira', getTokenPath(siteId), apiToken)
-  // The next action reads the actual file, including any overlapping writer's replacement.
-  tokenFileCache.forget(siteId)
+export async function saveToken(siteId: string, apiToken: string): Promise<void> {
+  return inCredentialFileOrder(`${getTokenPath(siteId)}.mutation`, async () => {
+    await ensureOrcaDir()
+    await ensureTokenDir()
+    await writeEncryptedCredential('Jira', getTokenPath(siteId), apiToken)
+    // The next action reads the actual file, including any overlapping writer's replacement.
+    tokenFileCache.forget(siteId)
+  })
 }
 
-export function deleteToken(siteId: string): void {
-  tokenFileCache.forget(siteId)
-  try {
-    unlinkSync(getTokenPath(siteId))
-  } catch {}
+export async function deleteToken(siteId: string): Promise<void> {
+  return inCredentialFileOrder(`${getTokenPath(siteId)}.mutation`, async () => {
+    tokenFileCache.forget(siteId)
+    try {
+      await unlink(getTokenPath(siteId))
+    } catch {}
+  })
+}
+
+export function inSiteRegistryOrder<T>(run: () => Promise<T>): Promise<T> {
+  return inCredentialFileOrder(`${getSiteFilePath()}.registry`, run)
 }

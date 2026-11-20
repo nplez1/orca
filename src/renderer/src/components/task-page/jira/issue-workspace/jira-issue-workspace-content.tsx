@@ -1,0 +1,246 @@
+import type { LucideIcon } from 'lucide-react'
+import { ArrowRight, FolderOpen, LoaderCircle, RefreshCw } from 'lucide-react'
+import { JiraIssueMarkdown } from './jira-issue-markdown'
+import type { RuntimeClientTarget } from '../../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
+import { JiraIcon } from '@/components/icons/JiraIcon'
+import { CommentComposer } from '@/components/comment-composer'
+import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useIntlLocale, useTranslate } from '@/i18n/use-translate'
+import { formatUiRelativeTimeFromDate } from '@/i18n/relative-time-format'
+import type { JiraComment, JiraIssue } from '../../../../../../shared/jira/jira-types'
+import { JiraIssueTitleLabelsEditor } from '@/components/jira-issue-title-labels-editor'
+
+export type JiraIssueWorkspaceAction = {
+  /** Stable across surfaces: the row context menu and the detail sheet render the same list. */
+  key: string
+  label: string
+  icon: LucideIcon
+  action: () => void
+  url?: string
+}
+
+const LOCAL_IMAGE_TARGET: RuntimeClientTarget = { kind: 'local' }
+
+export function JiraIssueWorkspaceContent({
+  displayed,
+  imageTarget = LOCAL_IMAGE_TARGET,
+  titleDraft,
+  setTitleDraft,
+  labelsDraft,
+  setLabelsDraft,
+  handleSaveTitle,
+  handleSaveLabels,
+  pendingField,
+  comments,
+  commentsError,
+  commentsLoading,
+  retryComments,
+  attachedWorkspaceLabel,
+  onOpenOrStartWorkspace,
+  actionItems
+}: {
+  displayed: JiraIssue
+  imageTarget?: RuntimeClientTarget
+  titleDraft: string
+  setTitleDraft: (value: string) => void
+  labelsDraft: string
+  setLabelsDraft: (value: string) => void
+  handleSaveTitle: () => void
+  handleSaveLabels: () => void
+  pendingField: string | null
+  comments: JiraComment[]
+  commentsError: string | null
+  commentsLoading: boolean
+  retryComments: () => void
+  attachedWorkspaceLabel: string | null
+  onOpenOrStartWorkspace: (issue: JiraIssue) => void
+  actionItems: JiraIssueWorkspaceAction[]
+}): React.JSX.Element {
+  const t = useTranslate()
+  const intlLocale = useIntlLocale()
+  return (
+    <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[minmax(0,1fr)_228px]">
+      <div className="min-h-0 overflow-y-auto scrollbar-sleek">
+        <section className="border-b border-border/40 px-4 py-4">
+          <JiraIssueTitleLabelsEditor
+            titleDraft={titleDraft}
+            setTitleDraft={setTitleDraft}
+            labelsDraft={labelsDraft}
+            setLabelsDraft={setLabelsDraft}
+            handleSaveTitle={handleSaveTitle}
+            handleSaveLabels={handleSaveLabels}
+            pendingField={pendingField}
+          />
+        </section>
+
+        <section className="border-b border-border/40 px-4 py-4">
+          <div className="mb-2 flex items-center gap-2">
+            <JiraIcon className="size-3 text-muted-foreground" />
+            <span className="text-xs font-medium text-foreground">{displayed.issueType.name}</span>
+            <span className="text-xs text-muted-foreground">
+              {displayed.project.key} ·{' '}
+              {displayed.assignee?.displayName ??
+                t('auto.components.JiraIssueWorkspace.0b6b5646ed', 'Unassigned')}
+            </span>
+          </div>
+          {displayed.description?.trim() ? (
+            <JiraIssueMarkdown
+              target={imageTarget}
+              content={displayed.description}
+              className="text-sm leading-relaxed"
+            />
+          ) : (
+            <p className="text-sm italic text-muted-foreground">
+              {t('auto.components.JiraIssueWorkspace.c4889a47e4', 'No description provided.')}
+            </p>
+          )}
+        </section>
+
+        <section className="px-4 py-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-[13px] font-medium text-foreground">
+                {t('auto.components.JiraIssueWorkspace.9a980b06b9', 'Comments')}
+              </span>
+              {comments.length > 0 ? (
+                <span className="text-xs text-muted-foreground">{comments.length}</span>
+              ) : null}
+            </div>
+            {commentsError ? (
+              <Button
+                variant="outline"
+                size="xs"
+                onClick={retryComments}
+                disabled={commentsLoading}
+                className="gap-1"
+              >
+                {commentsLoading ? (
+                  <LoaderCircle className="size-3 animate-spin" />
+                ) : (
+                  <RefreshCw className="size-3" />
+                )}
+                {t('auto.components.JiraIssueWorkspace.5cd09beaf9', 'Retry')}
+              </Button>
+            ) : null}
+          </div>
+          {commentsError ? (
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {commentsError}
+            </div>
+          ) : commentsLoading && comments.length === 0 ? (
+            <div className="flex items-center justify-center py-8">
+              <LoaderCircle className="size-4 animate-spin text-muted-foreground" />
+            </div>
+          ) : comments.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              {t('auto.components.JiraIssueWorkspace.9178090e26', 'No comments yet.')}
+            </p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {comments.map((comment) => (
+                <div key={comment.id} className="rounded-md border border-border/50 bg-muted/20">
+                  <div className="flex min-w-0 items-center gap-2 border-b border-border/40 px-3 py-2">
+                    {comment.user?.avatarUrl ? (
+                      <img
+                        src={comment.user.avatarUrl}
+                        alt=""
+                        className="size-5 shrink-0 rounded-full"
+                      />
+                    ) : null}
+                    <span className="truncate text-[13px] font-semibold text-foreground">
+                      {comment.user?.displayName ??
+                        t('auto.components.JiraIssueWorkspace.666cfdd835', 'Unknown')}
+                    </span>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {formatUiRelativeTimeFromDate(comment.createdAt, undefined, intlLocale)}
+                    </span>
+                  </div>
+                  <div className="px-3 py-2">
+                    <JiraIssueMarkdown
+                      target={imageTarget}
+                      content={comment.body}
+                      compact
+                      className="text-[13px] leading-relaxed"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+
+      <aside className="border-t border-border/50 bg-muted/20 px-3 py-3 xl:border-l xl:border-t-0">
+        <Button
+          onClick={() => onOpenOrStartWorkspace(displayed)}
+          className="mb-3 w-full justify-center gap-2 sm:hidden"
+        >
+          {attachedWorkspaceLabel
+            ? t('auto.components.JiraIssueWorkspace.showWorkspace', 'Show workspace')
+            : t('auto.components.JiraIssueWorkspace.2441be6f9f', 'Start workspace')}
+          {attachedWorkspaceLabel ? (
+            <FolderOpen className="size-4" />
+          ) : (
+            <ArrowRight className="size-4" />
+          )}
+        </Button>
+        <div className="grid gap-1">
+          {actionItems.map((item) => {
+            const Icon = item.icon
+            return (
+              <Tooltip key={item.key}>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    data-link-url={item.url}
+                    onClick={item.action}
+                    className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-muted-foreground transition hover:bg-accent hover:text-accent-foreground"
+                  >
+                    <Icon className="size-3.5 shrink-0" />
+                    <span className="truncate">{item.label}</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="left" sideOffset={6}>
+                  {item.label}
+                </TooltipContent>
+              </Tooltip>
+            )
+          })}
+        </div>
+      </aside>
+    </div>
+  )
+}
+
+/** The Jira comment box: the shared composer, whose Markdown body is converted to
+ *  the site's own format on submit — Cloud takes an ADF document, Server/DC wiki
+ *  markup (`toCommentBody` in the main process). */
+export function JiraIssueCommentComposer({
+  commentDraft,
+  setCommentDraft,
+  commentSubmitting,
+  canSubmitComment,
+  handleSubmitComment
+}: {
+  commentDraft: string
+  setCommentDraft: (value: string) => void
+  commentSubmitting: boolean
+  canSubmitComment: boolean
+  handleSubmitComment: () => void
+}): React.JSX.Element {
+  const t = useTranslate()
+  return (
+    <div className="flex-none border-t border-border/50 bg-background px-3 py-3">
+      <CommentComposer
+        value={commentDraft}
+        onValueChange={setCommentDraft}
+        onSubmit={handleSubmitComment}
+        placeholder={t('auto.components.JiraIssueWorkspace.a585fd204e', 'Add a Jira comment...')}
+        submitLabel={t('auto.components.JiraIssueWorkspace.b0b92666c9', 'Comment')}
+        canSubmit={canSubmitComment}
+        submitting={commentSubmitting}
+      />
+    </div>
+  )
+}

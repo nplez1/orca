@@ -1,4 +1,4 @@
-import type { OrcaVmRecipeContextMenuItem } from './orca-yaml-hook-types'
+import type { OrcaVmRecipeContextMenuItem } from './workspace-setup/orca-yaml-hook-types'
 import { getEphemeralVmRecipeResultSchemaVersion } from './remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-checkout-mode'
 import { redactEphemeralVmRecipeDiagnosticText } from './remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-diagnostic-redaction'
 import { runRecipeCommand } from './remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-process'

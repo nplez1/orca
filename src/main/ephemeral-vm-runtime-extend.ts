@@ -15,7 +15,7 @@ import {
   updateEphemeralVmRuntimeStatus
 } from '../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-store'
 import { updateEnvironmentFromPairingCode } from '../shared/remote-runtime/host-store/runtime-environment-store'
-import { getRuntimeRecipeContext } from './ipc/ephemeral-vm-recipe-context'
+import { getRuntimeRecipeContext } from './ipc/ephemeral-vm/ephemeral-vm-recipe-context'
 import { invalidateRuntimeEnvironmentTransport } from './ipc/runtime-environments/runtime-environments'
 import {
   connectRuntimeOwnedSshTarget,

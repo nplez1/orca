@@ -1,0 +1,415 @@
+import React from 'react'
+import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
+import { useAppStore } from '@/store'
+import { cn } from '@/lib/class-names'
+import { getAgentCatalog } from '@/lib/agent-catalog/agent-catalog'
+import { getScreenSubmitModifierLabel } from '@/lib/keyboard/screen-submit-shortcut'
+import { resolveProjectCloneUrlPrefill } from '@/lib/workspace/creation/project-clone-url-prefill'
+import { useContextualTour } from '@/components/contextual-tours/use-contextual-tour'
+import {
+  AddRemoteHostDialog,
+  type AddRemoteHostMode
+} from '@/components/sidebar/host-admission/ssh/AddRemoteHostDialog'
+import { lazyWithRetry } from '@/app-shell/startup/lazy-with-retry'
+import type * as SetProjectLocationDialogModule from '@/components/new-workspace/project-location/SetProjectLocationDialog'
+import { unwrapRuntimeRpcResult } from '@/runtime/rpc/calls/runtime-rpc-result'
+import { withUiConnectTimeout } from '@/ssh/ssh-connect-ui-timeout'
+import { isSshConnectInFlight, trackSshConnect } from '@/ssh/ssh-connect-in-flight'
+import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
+import {
+  DEFAULT_DISABLED_TUI_AGENTS,
+  filterEnabledTuiAgents
+} from '../../../../../shared/agent-launch/catalog/tui-agent-selection'
+import type { RuntimeStatus } from '../../../../../shared/remote-runtime/session-graph/runtime-session-contracts'
+import type { AddRepoDialogEntryRequest } from '@/components/sidebar/project-admission/dialog/add-repo-dialog-types'
+import type { TuiAgent } from '../../../../../shared/agent-launch/catalog/tui-agent'
+import { NewWorkspaceComposerAdvancedSection } from './NewWorkspaceComposerAdvancedSection'
+import { NewWorkspaceComposerAgentSection } from './NewWorkspaceComposerAgentSection'
+import { NewWorkspaceComposerFooter } from './NewWorkspaceComposerFooter'
+import { NewWorkspaceComposerNameSection } from './NewWorkspaceComposerNameSection'
+import { NewWorkspaceComposerProjectSection } from './NewWorkspaceComposerProjectSection'
+import {
+  EMPTY_EPHEMERAL_VM_RECIPES,
+  EMPTY_PROJECT_HOST_SETUP_OPTIONS,
+  EMPTY_PROJECT_OPTIONS,
+  type NeedsProjectHostOption,
+  type NewWorkspaceComposerCardProps
+} from './new-workspace-composer-card-props'
+import { getSshStatusLabel } from './new-workspace-composer-ssh-status'
+import { useNewWorkspaceComposerFileDrop } from './use-new-workspace-composer-file-drop'
+import { useComposerFileDragOver } from './use-composer-file-drag-over'
+import type { ProjectHostSetupProvisioning } from '../use-workspace-copy-target'
+import { getRunTargetCloneAvailability } from '../run-target-clone-availability'
+import { resolveRunTargetCloneUrl } from '../run-target-clone-url'
+import { resolveComposerProjectName } from '../composer-project-name'
+import { buildDefaultAgentSettingsUpdate } from '../../../../../shared/agent-launch/choices/default-agent-settings'
+
+// Lazy-load the project-location browser outside boot; warming shares this module entry with the click.
+const loadSetProjectLocationDialog = (): Promise<typeof SetProjectLocationDialogModule> =>
+  import('@/components/new-workspace/project-location/SetProjectLocationDialog')
+
+const SetProjectLocationDialog = lazyWithRetry(
+  () =>
+    loadSetProjectLocationDialog().then((module) => ({
+      default: module.SetProjectLocationDialog
+    })),
+  { reloadKey: 'set-project-location-dialog' }
+)
+
+export default function NewWorkspaceComposerCard(
+  props: NewWorkspaceComposerCardProps
+): React.JSX.Element {
+  const t = useTranslate()
+  useTranslation()
+  const {
+    contextualTourSource,
+    containerClassName,
+    contentClassName,
+    composerRef,
+    onComposerNodeChange,
+    nameInputRef,
+    eligibleRepos,
+    repoId,
+    selectedRepoIsGit,
+    onProjectHostSetupChange,
+    selectedRepoSshStatus,
+    setupConfig,
+    setupControlsEnabled = true,
+    selectedProjectId = null,
+    parentWorktreeId,
+    onParentWorktreeIdChange,
+    selectedRepoExecutionHostId,
+    selectedRepoProjectId,
+    activeFolderWorkspaceId,
+    onAddProjectOverride,
+    onAddProjectEntryRequest,
+    onNestedDialogOpenChange,
+    runTargetClone = null
+  } = props
+  const projectOptions = props.projectOptions ?? EMPTY_PROJECT_OPTIONS
+  const projectHostSetupOptions = props.projectHostSetupOptions ?? EMPTY_PROJECT_HOST_SETUP_OPTIONS
+  const ephemeralVmRecipes = props.ephemeralVmRecipes ?? EMPTY_EPHEMERAL_VM_RECIPES
+  const { isFileDragOver, dragHandlers } = useComposerFileDragOver()
+  const attachDropOwner = useNewWorkspaceComposerFileDrop({
+    projectPath: props.selectedRepoPath,
+    hostId: selectedRepoExecutionHostId,
+    connectionId: props.selectedRepoConnectionId,
+    applyDrop: props.onNativeFileDrop
+  })
+  const openModal = useAppStore((state) => state.openModal)
+  const activeModal = useAppStore((state) => state.activeModal)
+  const defaultTuiAgent = useAppStore((state) => state.settings?.defaultTuiAgent ?? null)
+  const disabledTuiAgents = useAppStore(
+    (state) => state.settings?.disabledTuiAgents ?? DEFAULT_DISABLED_TUI_AGENTS
+  )
+  const updateSettings = useAppStore((state) => state.updateSettings)
+  const projects = useAppStore((state) => state.projects)
+  const repos = useAppStore((state) => state.repos)
+  const nameInputFocusFrameRef = React.useRef<number | null>(null)
+  const branchNameInputId = React.useId()
+  const projectDescriptionId = React.useId()
+  const [sparseEditing, setSparseEditing] = React.useState(false)
+  const [addRemoteHostMode, setAddRemoteHostMode] = React.useState<AddRemoteHostMode | null>(null)
+  const remoteHostDialogOpenRef = React.useRef(false)
+  const handleRemoteHostModeChange = React.useCallback(
+    (nextMode: AddRemoteHostMode | null): void => {
+      const nextOpen = nextMode !== null
+      if (remoteHostDialogOpenRef.current !== nextOpen) {
+        remoteHostDialogOpenRef.current = nextOpen
+        onNestedDialogOpenChange?.(nextOpen)
+      }
+      setAddRemoteHostMode(nextMode)
+    },
+    [onNestedDialogOpenChange]
+  )
+  const [setLocationOption, setSetLocationOption] = React.useState<NeedsProjectHostOption | null>(
+    null
+  )
+  const [setLocationInitialPath, setSetLocationInitialPath] = React.useState<string | undefined>(
+    undefined
+  )
+  // Retain the dialog while its cleared option drives the close animation.
+  const [setLocationDialogMounted, setSetLocationDialogMounted] = React.useState(false)
+
+  const selectedProjectName = resolveComposerProjectName({
+    projectOptions,
+    selectedProjectId,
+    eligibleRepos,
+    repoId
+  })
+  const defaultCloneUrl = resolveProjectCloneUrlPrefill(projects, repos, selectedProjectId)
+  // Why the override: a project with no remote is only clonable through the Advanced URL, so the
+  // rows must be decided by the URL a clone would use, not by the remote alone.
+  const cloneUrl = runTargetClone
+    ? resolveRunTargetCloneUrl(runTargetClone.overrides, defaultCloneUrl)
+    : defaultCloneUrl
+  const readyProjectHostSetupOptions = projectHostSetupOptions.filter(
+    (option) => option.kind === 'ready'
+  )
+  const needsSetupProjectHostSetupOptions = projectHostSetupOptions.filter(
+    (option) => option.kind === 'needs-setup'
+  )
+  // fork-comment-ok: warm the fallback chunk for a folder-only row or a failed clone, so it opens
+  // without a stall.
+  const hasFallbackLocationOption =
+    runTargetClone?.status.kind === 'failed' ||
+    runTargetClone?.status.kind === 'folder-taken' ||
+    needsSetupProjectHostSetupOptions.some(
+      (option) =>
+        getRunTargetCloneAvailability(option, {
+          projectKind: selectedRepoIsGit ? 'git' : 'folder',
+          cloneUrl
+        }).kind === 'existing-folder-only'
+    )
+  React.useEffect(() => {
+    if (hasFallbackLocationOption) {
+      void loadSetProjectLocationDialog().catch(() => {})
+    }
+  }, [hasFallbackLocationOption])
+  const shouldShowRunTargetPicker =
+    readyProjectHostSetupOptions.length > 0 ||
+    ephemeralVmRecipes.length > 0 ||
+    needsSetupProjectHostSetupOptions.length > 0
+  const sshStatusLabel = selectedRepoSshStatus
+    ? getSshStatusLabel(selectedRepoSshStatus)
+    : t('auto.components.NewWorkspaceComposerCard.notConnected', 'Not connected')
+  const connectButtonLabel =
+    selectedRepoSshStatus === 'disconnected' || selectedRepoSshStatus === null
+      ? t('auto.components.NewWorkspaceComposerCard.connect', 'Connect')
+      : t('auto.components.NewWorkspaceComposerCard.reconnect', 'Reconnect')
+  const showSetupAgentStartupPolicy =
+    setupControlsEnabled && setupConfig !== null && setupConfig.kind !== 'default-tabs'
+  const agentCatalog = getAgentCatalog()
+  const enabledAgentIds = new Set(
+    filterEnabledTuiAgents(
+      agentCatalog.map((candidate) => candidate.id),
+      disabledTuiAgents
+    )
+  )
+  const visibleQuickAgents = agentCatalog.filter((agent) => {
+    return (
+      enabledAgentIds.has(agent.id) &&
+      (props.detectedAgentIds === null || props.detectedAgentIds.has(agent.id))
+    )
+  })
+
+  const cancelNameInputFocusFrame = React.useCallback((): void => {
+    if (nameInputFocusFrameRef.current !== null) {
+      cancelAnimationFrame(nameInputFocusFrameRef.current)
+      nameInputFocusFrameRef.current = null
+    }
+  }, [])
+  const setComposerNode = React.useCallback(
+    (node: HTMLDivElement | null): void => {
+      if (!node) {
+        cancelNameInputFocusFrame()
+      }
+      attachDropOwner(node)
+      if (composerRef) {
+        composerRef.current = node
+      }
+      onComposerNodeChange?.(node)
+    },
+    [attachDropOwner, cancelNameInputFocusFrame, composerRef, onComposerNodeChange]
+  )
+  const focusNameInput = React.useCallback((): void => {
+    cancelNameInputFocusFrame()
+    nameInputFocusFrameRef.current = requestAnimationFrame(() => {
+      nameInputFocusFrameRef.current = null
+      nameInputRef?.current?.focus()
+    })
+  }, [cancelNameInputFocusFrame, nameInputRef])
+  const handleAddProject = React.useCallback((): void => {
+    if (onAddProjectOverride) {
+      onAddProjectOverride()
+      return
+    }
+    openModal('add-repo')
+  }, [onAddProjectOverride, openModal])
+  const handleAddProjectEntryRequest = React.useCallback(
+    (entryRequest: AddRepoDialogEntryRequest): void => {
+      if (onAddProjectEntryRequest) {
+        onAddProjectEntryRequest(entryRequest)
+        return
+      }
+      openModal('add-repo', { entryRequest })
+    },
+    [onAddProjectEntryRequest, openModal]
+  )
+  const handleUseExistingFolder = React.useCallback(
+    (option: NeedsProjectHostOption, initialPath?: string): void => {
+      setSetLocationInitialPath(initialPath)
+      setSetLocationDialogMounted(true)
+      setSetLocationOption(option)
+      onNestedDialogOpenChange?.(true)
+    },
+    [onNestedDialogOpenChange]
+  )
+  const handleSetLocationClose = React.useCallback((): void => {
+    setSetLocationOption(null)
+    setSetLocationInitialPath(undefined)
+    onNestedDialogOpenChange?.(false)
+  }, [onNestedDialogOpenChange])
+  const clearPendingClone = runTargetClone?.clear
+  const handleSetLocationReady = React.useCallback(
+    (setupId: string, provisioning: ProjectHostSetupProvisioning): void => {
+      handleSetLocationClose()
+      // fork-comment-ok: the fallback answered the clone this composer waited on, so it must stop
+      // blocking Create and stop reporting the failure it was opened for.
+      clearPendingClone?.()
+      onProjectHostSetupChange?.(setupId, provisioning)
+    },
+    [clearPendingClone, handleSetLocationClose, onProjectHostSetupChange]
+  )
+  const handleConnectRunTargetHost = React.useCallback(
+    async (option: NeedsProjectHostOption): Promise<void> => {
+      const action = option.connectAction
+      if (!action) {
+        return
+      }
+      try {
+        if (action.kind === 'ssh') {
+          if (isSshConnectInFlight(action.targetId)) {
+            return
+          }
+          await withUiConnectTimeout(
+            trackSshConnect(action.targetId, window.api.ssh.connect({ targetId: action.targetId }))
+          )
+          return
+        }
+        const response = await window.api.runtimeEnvironments.getStatus({
+          selector: action.environmentId,
+          timeoutMs: 15_000,
+          force: true
+        })
+        unwrapRuntimeRpcResult<RuntimeStatus>(response)
+        await useAppStore.getState().readRuntimeHostStatusSnapshots()
+      } catch (error) {
+        if (action.kind === 'runtime') {
+          await useAppStore.getState().readRuntimeHostStatusSnapshots()
+        }
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : translate(
+                'auto.components.NewWorkspaceComposerCard.hostConnectionFailed',
+                'Connection failed'
+              )
+        )
+      }
+    },
+    []
+  )
+  const handleSetDefaultAgent = React.useCallback(
+    (next: TuiAgent | 'blank' | null): void => {
+      void updateSettings(buildDefaultAgentSettingsUpdate(next))
+    },
+    [updateSettings]
+  )
+  const handleNamePlainEnter = React.useCallback((): void => {
+    const agentTrigger = composerRef?.current?.querySelector<HTMLElement>(
+      '[data-agent-launch-picker-trigger="true"]'
+    )
+    agentTrigger?.focus()
+  }, [composerRef])
+
+  useContextualTour(
+    'workspace-creation',
+    projectOptions.length > 0 && Boolean(selectedProjectId),
+    contextualTourSource ??
+      (activeModal === 'new-workspace-composer'
+        ? 'workspace_creation_modal'
+        : 'workspace_creation_visible')
+  )
+
+  return (
+    <div
+      ref={setComposerNode}
+      data-workspace-composer-root="true"
+      data-sparse-preset-editing={sparseEditing ? 'true' : undefined}
+      onDragEnter={dragHandlers.onDragEnter}
+      onDragLeave={dragHandlers.onDragLeave}
+      className={cn(
+        'flex min-h-0 min-w-0 flex-1 flex-col gap-1 rounded-md transition',
+        isFileDragOver &&
+          props.selectedRepoPath &&
+          selectedRepoExecutionHostId &&
+          props.onNativeFileDrop &&
+          'ring-2 ring-ring/30',
+        containerClassName
+      )}
+    >
+      <div className={cn('min-h-0 min-w-0 space-y-4 pt-3', contentClassName)}>
+        <NewWorkspaceComposerProjectSection
+          {...props}
+          disabled={sparseEditing}
+          projectOptions={projectOptions}
+          projectHostSetupOptions={projectHostSetupOptions}
+          ephemeralVmRecipes={ephemeralVmRecipes}
+          projectDescriptionId={projectDescriptionId}
+          onAddProject={handleAddProject}
+          onAddProjectEntryRequest={handleAddProjectEntryRequest}
+          handleOpenRemoteHostDialog={handleRemoteHostModeChange}
+          focusNameInput={focusNameInput}
+          shouldShowRunTargetPicker={shouldShowRunTargetPicker}
+          handleProjectHostSetupChange={(setupId) => onProjectHostSetupChange?.(setupId)}
+          handleAddSshHost={() => handleRemoteHostModeChange('ssh')}
+          handleAddRemoteServer={() => handleRemoteHostModeChange('server')}
+          handleConnectRunTargetHost={handleConnectRunTargetHost}
+          handleStartClone={(option) => runTargetClone?.start(option)}
+          handleUseExistingFolder={handleUseExistingFolder}
+          cloneProjectKind={selectedRepoIsGit ? 'git' : 'folder'}
+          cloneUrl={cloneUrl}
+          runTargetClone={runTargetClone}
+          sshStatusLabel={sshStatusLabel}
+          connectButtonLabel={connectButtonLabel}
+          selectedProjectName={selectedProjectName}
+        />
+        <NewWorkspaceComposerNameSection {...props} onNamePlainEnter={handleNamePlainEnter} />
+        <NewWorkspaceComposerAgentSection
+          {...props}
+          createDisabled={props.createDisabled || sparseEditing}
+          advancedLocked={sparseEditing}
+          visibleQuickAgents={visibleQuickAgents}
+          defaultTuiAgent={defaultTuiAgent}
+          handleSetDefaultAgent={handleSetDefaultAgent}
+        />
+        <NewWorkspaceComposerAdvancedSection
+          {...props}
+          onSparseEditingChange={setSparseEditing}
+          sparseEditing={sparseEditing}
+          branchNameInputId={branchNameInputId}
+          showSetupAgentStartupPolicy={showSetupAgentStartupPolicy}
+          parentWorktreeId={parentWorktreeId}
+          onParentWorktreeIdChange={onParentWorktreeIdChange}
+          selectedRepoExecutionHostId={selectedRepoExecutionHostId}
+          selectedRepoProjectId={selectedRepoProjectId}
+          activeFolderWorkspaceId={activeFolderWorkspaceId}
+        />
+      </div>
+      {!sparseEditing ? (
+        <div className="shrink-0 space-y-1">
+          <NewWorkspaceComposerFooter
+            {...props}
+            submitShortcutModifierLabel={getScreenSubmitModifierLabel()}
+          />
+        </div>
+      ) : null}
+      <AddRemoteHostDialog mode={addRemoteHostMode} onOpenChange={handleRemoteHostModeChange} />
+      {setLocationDialogMounted ? (
+        <React.Suspense fallback={null}>
+          <SetProjectLocationDialog
+            option={setLocationOption}
+            projectName={selectedProjectName}
+            projectKind={selectedRepoIsGit ? 'git' : 'folder'}
+            initialPath={setLocationInitialPath}
+            onClose={handleSetLocationClose}
+            onReady={handleSetLocationReady}
+          />
+        </React.Suspense>
+      ) : null}
+    </div>
+  )
+}

@@ -19,12 +19,12 @@ import {
   useLocalWindowsTerminalCapabilities
 } from '@/runtime/hosts/capabilities/windows-terminal-capabilities'
 import { isWebClientLocation } from '@/app-shell/platform/web-client-location'
-import { useWindowsTerminalCapabilityOwnerKey } from '@/hooks/useWindowsTerminalCapabilityOwnerKey'
+import { useWindowsTerminalCapabilityOwnerKey } from '@/runtime/hosts/capabilities/useWindowsTerminalCapabilityOwnerKey'
 import {
   isServerScope,
   resolveSettingsHostScope
 } from '@/components/settings/host-scope/settings-host-scope'
-import { getSettingsFocusedExecutionHostId } from '../../../../shared/execution-host'
+import { getSettingsFocusedExecutionHostId } from '../../../../shared/execution-host/execution-host'
 
 type AgentSettingsDialogProps = {
   open: boolean

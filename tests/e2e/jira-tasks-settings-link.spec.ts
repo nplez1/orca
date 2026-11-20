@@ -1,5 +1,9 @@
-import { test, expect } from './helpers/orca-app'
-import { getStoreState, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
+import { test, expect } from './desktop/electron-fixtures/orca-app'
+import {
+  getStoreState,
+  waitForActiveWorktree,
+  waitForSessionReady
+} from './desktop/renderer-probes/store'
 
 test('Jira Tasks settings link opens the board settings section', async ({ orcaPage }) => {
   await waitForSessionReady(orcaPage)

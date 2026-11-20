@@ -3,7 +3,7 @@
 import React from 'react'
 import { cleanup, fireEvent, render, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { getDefaultSettings } from '../../../../shared/constants'
+import { getDefaultSettings } from '../../../../shared/orca-profiles/constants'
 import { useAppStore } from '../../store'
 import { AccountsPane } from './accounts/AccountsPane'
 import { TooltipProvider } from '../ui/tooltip'

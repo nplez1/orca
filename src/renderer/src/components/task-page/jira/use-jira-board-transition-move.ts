@@ -7,7 +7,7 @@ import type {
   JiraIssueUpdate,
   JiraTransition
 } from '../../../../../shared/jira/jira-types'
-import type { JiraTransitionSubmitOutcome } from '../../jira-transition-fields-form'
+import type { JiraTransitionSubmitOutcome } from './issue-workspace/jira-transition-fields-form'
 import { jiraUpdateIssue } from '../../../runtime/jira/runtime-jira-client'
 import type { RuntimeJiraSettings } from '../../../runtime/jira/runtime-jira-client'
 import { useTranslate } from '@/i18n/use-translate'

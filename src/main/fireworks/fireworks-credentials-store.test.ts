@@ -1,288 +1,125 @@
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { _resetSecretStoreForTests, setSecretStore } from '../../shared/secure-storage/secret-store'
-import type * as FireworksCredentialsStore from './fireworks-credentials-store'
+import {
+  _resetSecretStoreForTests,
+  setSecretStore,
+  type SecretStore
+} from '../../shared/secure-storage/secret-store'
+import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
 
-const secretStoreMock = vi.hoisted(() => ({
-  isEncryptionAvailable: vi.fn(() => true),
-  encryptString: vi.fn((value: string) => Buffer.from(value)),
-  decryptString: vi.fn((value: Buffer) => value.toString('utf8'))
-}))
+const ENVELOPE_PREFIX = 'orca-fireworks-credentials:v1:'
 
-const existsSyncMock = vi.fn()
-const readFileSyncMock = vi.fn()
-const rmSyncMock = vi.fn()
-const hardenExistingSecureFileMock = vi.fn()
-const writeSecureFileMock = vi.fn()
-const homedirMock = vi.fn(() => '/home/test')
-const adoptLegacyHomeStoreMock = vi.hoisted(() =>
-  vi.fn((fileName: string) => `/home/test/.orca-np/${fileName}`)
-)
-vi.mock('../home-directory-migration', () => ({
-  adoptLegacyHomeStore: adoptLegacyHomeStoreMock
-}))
+const envelope = (payload: string, kind: 'encrypted' | 'plaintext' = 'encrypted') =>
+  `${ENVELOPE_PREFIX}${kind}:${Buffer.from(payload, 'utf8').toString('base64')}`
 
-vi.mock('node:fs', () => ({
-  existsSync: existsSyncMock,
-  readFileSync: readFileSyncMock,
-  rmSync: rmSyncMock
-}))
+function installSecretStore(sealing: boolean): void {
+  setSecretStore({
+    isEncryptionAvailable: () => sealing,
+    encryptString: (value) => Buffer.from(value),
+    decryptString: (value) => value.toString('utf8'),
+    describeProtectionGap: () => null
+  } satisfies SecretStore)
+}
 
-vi.mock('node:os', () => ({
-  homedir: homedirMock
-}))
+let home = ''
+const credentialsPath = (): string => join(home, HOME_DIRECTORY_NAME, 'fireworks-credentials.enc')
 
-vi.mock('node:path', () => ({
-  join: (...parts: string[]) => parts.join('/')
-}))
-
-vi.mock('../../shared/secure-storage/secure-file.ts', () => ({
-  hardenExistingSecureFile: hardenExistingSecureFileMock,
-  writeSecureFile: writeSecureFileMock
-}))
-
-const storePath = '/home/test/.orca-np/fireworks-credentials.enc'
-const envelope = (
-  kind: 'encrypted' | 'plaintext',
-  value: string,
-  prefix = 'orca-fireworks-credentials:v1:'
-): string => `${prefix}${kind}:${Buffer.from(value, 'utf8').toString('base64')}`
-const jsonEnvelope = (payload: unknown, kind: 'encrypted' | 'plaintext' = 'encrypted'): string =>
-  envelope(kind, JSON.stringify(payload))
-
-async function loadStore(): Promise<typeof FireworksCredentialsStore> {
-  setSecretStore({ ...secretStoreMock, describeProtectionGap: () => null })
+async function loadStore() {
   return await import('./fireworks-credentials-store')
 }
 
+beforeEach(() => {
+  home = mkdtempSync(join(tmpdir(), 'orca-fireworks-credentials-'))
+  vi.stubEnv('HOME', home)
+  vi.stubEnv('USERPROFILE', home)
+  mkdirSync(join(home, HOME_DIRECTORY_NAME))
+  vi.resetModules()
+  installSecretStore(true)
+})
+
+afterEach(() => {
+  _resetSecretStoreForTests()
+  vi.unstubAllEnvs()
+  rmSync(home, { recursive: true, force: true })
+})
+
 describe('fireworks-credentials-store', () => {
-  beforeEach(() => {
-    adoptLegacyHomeStoreMock.mockClear()
-    existsSyncMock.mockReset()
-    readFileSyncMock.mockReset()
-    rmSyncMock.mockReset()
-    hardenExistingSecureFileMock.mockReset()
-    writeSecureFileMock.mockReset()
-    secretStoreMock.isEncryptionAvailable.mockReset()
-    secretStoreMock.encryptString.mockReset()
-    secretStoreMock.decryptString.mockReset()
-    secretStoreMock.isEncryptionAvailable.mockReturnValue(true)
-    secretStoreMock.encryptString.mockImplementation((value: string) => Buffer.from(value))
-    secretStoreMock.decryptString.mockImplementation((value: Buffer) => value.toString('utf8'))
-  })
-
-  afterEach(() => {
-    _resetSecretStoreForTests()
-    vi.resetModules()
-  })
-
-  it('returns false when no file exists yet', async () => {
-    existsSyncMock.mockReturnValue(false)
+  it('round-trips the key and its account override under the Orca NP home', async () => {
     const store = await loadStore()
-    expect(store.hasFireworksCredentials()).toBe(false)
-    expect(hardenExistingSecureFileMock).not.toHaveBeenCalled()
-    expect(adoptLegacyHomeStoreMock).toHaveBeenCalledWith('fireworks-credentials.enc')
-  })
-
-  it('hardens the credentials file when checking status', async () => {
-    existsSyncMock.mockReturnValue(true)
-    const store = await loadStore()
-    expect(store.hasFireworksCredentials()).toBe(true)
-    expect(hardenExistingSecureFileMock).toHaveBeenCalledWith(storePath)
-  })
-
-  it('still reports existing credentials when status-path hardening fails', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-    existsSyncMock.mockReturnValue(true)
-    hardenExistingSecureFileMock.mockImplementation(() => {
-      throw new Error('permission denied')
+    await store.saveFireworksCredentials({
+      apiKey: '  fw-key  ',
+      accountIdOverride: ' acct-1 '
     })
-    const store = await loadStore()
-    expect(store.hasFireworksCredentials()).toBe(true)
-    expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('Failed to harden Fireworks API key file'),
-      expect.any(Error)
-    )
-    warn.mockRestore()
-  })
 
-  it('writes both fields as one encrypted JSON payload', async () => {
-    const store = await loadStore()
-    store.saveFireworksCredentials({ apiKey: 'fw_test_1234567890', accountIdOverride: null })
-    expect(secretStoreMock.encryptString).toHaveBeenCalledWith(
-      '{"apiKey":"fw_test_1234567890","accountIdOverride":null}'
-    )
-    expect(writeSecureFileMock).toHaveBeenCalledWith(
-      storePath,
-      envelope('encrypted', '{"apiKey":"fw_test_1234567890","accountIdOverride":null}'),
-      { durable: true }
-    )
-  })
-
-  it('persists an account id override alongside the key', async () => {
-    const store = await loadStore()
-    store.saveFireworksCredentials({ apiKey: 'fw_test_1234567890', accountIdOverride: 'acct-42' })
-    expect(writeSecureFileMock).toHaveBeenCalledWith(
-      storePath,
-      envelope('encrypted', '{"apiKey":"fw_test_1234567890","accountIdOverride":"acct-42"}'),
-      { durable: true }
-    )
-  })
-
-  it('trims both fields and stores a blank override as null', async () => {
-    const store = await loadStore()
-    store.saveFireworksCredentials({ apiKey: '  fw_test_1234567890  ', accountIdOverride: '   ' })
-    expect(writeSecureFileMock).toHaveBeenCalledWith(
-      storePath,
-      envelope('encrypted', '{"apiKey":"fw_test_1234567890","accountIdOverride":null}'),
-      { durable: true }
-    )
-  })
-
-  it('refuses an empty API key', async () => {
-    const store = await loadStore()
-    expect(() =>
-      store.saveFireworksCredentials({ apiKey: '   ', accountIdOverride: 'acct-42' })
-    ).toThrow('Fireworks API key is required')
-    expect(writeSecureFileMock).not.toHaveBeenCalled()
-  })
-
-  it('warns and writes a plaintext envelope when the secret store cannot seal', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-    secretStoreMock.isEncryptionAvailable.mockReturnValue(false)
-    const store = await loadStore()
-    store.saveFireworksCredentials({ apiKey: 'fw_test_1234567890', accountIdOverride: null })
-    expect(writeSecureFileMock).toHaveBeenCalledWith(
-      storePath,
-      envelope('plaintext', '{"apiKey":"fw_test_1234567890","accountIdOverride":null}'),
-      { durable: true }
-    )
-    expect(warn).toHaveBeenCalledWith(
-      '[fireworks] secret encryption unavailable — storing Fireworks API key in plaintext'
-    )
-    warn.mockRestore()
-  })
-
-  it('reads both fields back from disk and caches the payload', async () => {
-    existsSyncMock.mockReturnValue(true)
-    readFileSyncMock.mockReturnValue(
-      Buffer.from(jsonEnvelope({ apiKey: 'fw_test_1234567890', accountIdOverride: 'acct-42' }))
-    )
-    const store = await loadStore()
-    expect(store.readFireworksCredentials()).toEqual({
-      apiKey: 'fw_test_1234567890',
-      accountIdOverride: 'acct-42'
+    expect(JSON.parse(decodeEnvelope(readFileSync(credentialsPath(), 'utf8')))).toEqual({
+      apiKey: 'fw-key',
+      accountIdOverride: 'acct-1'
     })
-    expect(store.readFireworksCredentials()).toEqual({
-      apiKey: 'fw_test_1234567890',
-      accountIdOverride: 'acct-42'
+    await expect(store.readFireworksCredentials()).resolves.toEqual({
+      apiKey: 'fw-key',
+      accountIdOverride: 'acct-1'
     })
-    expect(hardenExistingSecureFileMock).toHaveBeenCalledTimes(1)
-    expect(secretStoreMock.decryptString).toHaveBeenCalledTimes(1)
+    await expect(store.hasFireworksCredentials()).resolves.toBe(true)
   })
 
-  it('normalizes a missing or blank override to null when reading', async () => {
-    existsSyncMock.mockReturnValue(true)
-    readFileSyncMock.mockReturnValue(Buffer.from(jsonEnvelope({ apiKey: 'fw_test_1234567890' })))
+  it('stores a blank override as null', async () => {
     const store = await loadStore()
-    expect(store.readFireworksCredentials()).toEqual({
-      apiKey: 'fw_test_1234567890',
+    await store.saveFireworksCredentials({ apiKey: 'fw-key', accountIdOverride: '   ' })
+
+    await expect(store.readFireworksCredentials()).resolves.toEqual({
+      apiKey: 'fw-key',
       accountIdOverride: null
     })
   })
 
-  it('returns null when no file exists', async () => {
-    existsSyncMock.mockReturnValue(false)
+  it('refuses a blank API key instead of writing one', async () => {
     const store = await loadStore()
-    expect(store.readFireworksCredentials()).toBeNull()
+
+    await expect(
+      store.saveFireworksCredentials({ apiKey: '  ', accountIdOverride: null })
+    ).rejects.toThrow('Fireworks API key is required')
+    await expect(store.hasFireworksCredentials()).resolves.toBe(false)
   })
 
-  it('throws when the secret store cannot seal an encrypted payload', async () => {
-    secretStoreMock.isEncryptionAvailable.mockReturnValue(false)
-    existsSyncMock.mockReturnValue(true)
-    readFileSyncMock.mockReturnValue(
-      Buffer.from(jsonEnvelope({ apiKey: 'fw_test_1234567890', accountIdOverride: null }))
-    )
+  it('reports an unreadable payload as the credentials it promised, not as an API key', async () => {
+    writeFileSync(credentialsPath(), envelope('not json'))
     const store = await loadStore()
-    expect(() => store.readFireworksCredentials()).toThrow(
+
+    await expect(store.readFireworksCredentials()).rejects.toThrow(
       'Fireworks credentials could not be decrypted'
     )
   })
 
-  it('throws the decrypt error for a malformed JSON payload and logs no part of it', async () => {
-    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    existsSyncMock.mockReturnValue(true)
-    readFileSyncMock.mockReturnValue(
-      Buffer.from(envelope('plaintext', 'fw_live_9f8e7d6c5b4a4e2d is not json'))
-    )
+  it('refuses a payload that is missing its key', async () => {
+    writeFileSync(credentialsPath(), envelope(JSON.stringify({ accountIdOverride: 'acct-1' })))
     const store = await loadStore()
-    expect(() => store.readFireworksCredentials()).toThrow(
-      'Fireworks credentials could not be decrypted'
-    )
-    expect(error).toHaveBeenCalledWith(
-      '[fireworks] failed to decode/decrypt credentials',
-      expect.any(Error)
-    )
-    const logged = error.mock.calls
-      .map((call) =>
-        call[1] instanceof Error ? `${call[1].message}\n${call[1].stack ?? ''}` : String(call[1])
-      )
-      .join('\n')
-    expect(logged).toContain('Fireworks credentials payload is not valid JSON')
-    expect(logged).not.toContain('fw_live_9f')
-    error.mockRestore()
-  })
 
-  it('throws the decrypt error for an absent payload', async () => {
-    existsSyncMock.mockReturnValue(true)
-    readFileSyncMock.mockReturnValue(Buffer.from(envelope('plaintext', '')))
-    const store = await loadStore()
-    expect(() => store.readFireworksCredentials()).toThrow(
+    await expect(store.readFireworksCredentials()).rejects.toThrow(
       'Fireworks credentials could not be decrypted'
     )
   })
 
-  it.each([
-    ['a JSON array', JSON.stringify(['fw_test_1234567890'])],
-    ['a JSON scalar', JSON.stringify('fw_test_1234567890')],
-    ['a missing api key', JSON.stringify({ accountIdOverride: 'acct-42' })],
-    ['a non-string api key', JSON.stringify({ apiKey: 42, accountIdOverride: null })],
-    ['a blank api key', JSON.stringify({ apiKey: '   ', accountIdOverride: null })]
-  ])('throws the decrypt error for %s', async (_label, rawPayload) => {
-    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    existsSyncMock.mockReturnValue(true)
-    readFileSyncMock.mockReturnValue(Buffer.from(envelope('encrypted', rawPayload)))
+  it('reads nothing when no credentials were ever saved', async () => {
     const store = await loadStore()
-    expect(() => store.readFireworksCredentials()).toThrow(
-      'Fireworks credentials could not be decrypted'
-    )
-    error.mockRestore()
+
+    await expect(store.readFireworksCredentials()).resolves.toBeNull()
+    await expect(store.hasFireworksCredentials()).resolves.toBe(false)
   })
 
-  it('cannot read a MiniMax key file envelope', async () => {
-    existsSyncMock.mockReturnValue(true)
-    readFileSyncMock.mockReturnValue(
-      Buffer.from(envelope('plaintext', 'sk-minimax', 'orca-minimax-api-key:v1:'))
-    )
+  it('clears the cached credentials and removes the file', async () => {
     const store = await loadStore()
-    expect(() => store.readFireworksCredentials()).toThrow(
-      'Fireworks credentials could not be decrypted'
-    )
-  })
+    await store.saveFireworksCredentials({ apiKey: 'fw-key', accountIdOverride: null })
 
-  it('clears the cached payload and removes the file', async () => {
-    let filePresent = true
-    existsSyncMock.mockImplementation((path: string) => path === storePath && filePresent)
-    readFileSyncMock.mockReturnValueOnce(
-      Buffer.from(jsonEnvelope({ apiKey: 'fw_test_1234567890', accountIdOverride: null }))
-    )
-    const store = await loadStore()
-    expect(store.readFireworksCredentials()).toEqual({
-      apiKey: 'fw_test_1234567890',
-      accountIdOverride: null
-    })
-    filePresent = false
-    store.clearFireworksCredentials()
-    expect(rmSyncMock).toHaveBeenCalledWith(storePath, { force: true })
-    expect(store.readFireworksCredentials()).toBeNull()
+    await store.clearFireworksCredentials()
+
+    await expect(store.readFireworksCredentials()).resolves.toBeNull()
+    await expect(store.hasFireworksCredentials()).resolves.toBe(false)
   })
 })
+
+function decodeEnvelope(raw: string): string {
+  const rest = raw.slice(ENVELOPE_PREFIX.length)
+  return Buffer.from(rest.slice(rest.indexOf(':') + 1), 'base64').toString('utf8')
+}

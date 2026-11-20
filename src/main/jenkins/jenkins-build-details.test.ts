@@ -68,18 +68,18 @@ async function loadModules() {
   }
 }
 
-function configureServer(
+async function configureServer(
   connection: {
     saveJenkinsServerFromArgs: (args: {
       label: string
       baseUrl: string
       username: string
       apiToken: string
-    }) => JenkinsSaveServerResult
+    }) => Promise<JenkinsSaveServerResult>
   },
   baseUrl = 'https://ci.example.com'
-): void {
-  const result = connection.saveJenkinsServerFromArgs({
+): Promise<void> {
+  const result = await connection.saveJenkinsServerFromArgs({
     label: 'CI',
     baseUrl,
     username: 'ada',
@@ -105,7 +105,7 @@ afterEach(() => {
 describe('getJenkinsBuildDetails', () => {
   it('reads a build and its stages, authenticating with the stored token', async () => {
     const { connection, details } = await loadModules()
-    configureServer(connection)
+    await configureServer(connection)
     route = (url) =>
       url.includes('wfapi/describe')
         ? json({ startTimeMillis: 1_700_000_000_000, stages: [{ name: 'Test', status: 'FAILED' }] })
@@ -132,7 +132,7 @@ describe('getJenkinsBuildDetails', () => {
 
   it('reads each stage’s steps and failure text from its own describe link', async () => {
     const { connection, details } = await loadModules()
-    configureServer(connection)
+    await configureServer(connection)
     route = (url) => {
       if (url.includes('/execution/node/5/')) {
         return json({ stageFlowNodes: [{ id: '6', name: 'Git', status: 'SUCCESS' }] })
@@ -183,7 +183,7 @@ describe('getJenkinsBuildDetails', () => {
 
   it('bounds how many stage details it fetches', async () => {
     const { connection, details } = await loadModules()
-    configureServer(connection)
+    await configureServer(connection)
     route = (url) => {
       if (url.includes('/execution/node/')) {
         return json({ stageFlowNodes: [{ name: 'Step', status: 'SUCCESS' }] })
@@ -211,7 +211,7 @@ describe('getJenkinsBuildDetails', () => {
 
   it('returns what arrived when the stage fan-out outruns its time budget', async () => {
     const { connection, details } = await loadModules()
-    configureServer(connection)
+    await configureServer(connection)
     route = (url) => {
       if (url.includes('/execution/node/')) {
         // A stage detail that never answers: the budget, not the request, must end the read.
@@ -247,7 +247,7 @@ describe('getJenkinsBuildDetails', () => {
 
   it('does not follow a stage link outside the configured server', async () => {
     const { connection, details } = await loadModules()
-    configureServer(connection)
+    await configureServer(connection)
     route = (url) => {
       if (url.includes('/execution/node/')) {
         return json({ stageFlowNodes: [{ name: 'Stolen', status: 'SUCCESS' }] })
@@ -277,7 +277,7 @@ describe('getJenkinsBuildDetails', () => {
 
   it('asks for only the build fields it maps', async () => {
     const { connection, details } = await loadModules()
-    configureServer(connection)
+    await configureServer(connection)
     route = (url) =>
       url.includes('wfapi') ? new Response(null, { status: 404 }) : json(buildBody())
 
@@ -292,7 +292,7 @@ describe('getJenkinsBuildDetails', () => {
 
   it('still renders the build when the stage endpoint is unavailable (freestyle)', async () => {
     const { connection, details } = await loadModules()
-    configureServer(connection)
+    await configureServer(connection)
     route = (url) =>
       url.includes('wfapi') ? new Response(null, { status: 404 }) : json(buildBody())
 
@@ -340,7 +340,7 @@ describe('getJenkinsBuildDetails', () => {
 
   it('calls a configured server authoritative on 404', async () => {
     const { connection, details } = await loadModules()
-    configureServer(connection)
+    await configureServer(connection)
     route = () => new Response(null, { status: 404 })
 
     await expect(details.getJenkinsBuildDetails({ url: check.url, check })).resolves.toMatchObject({
@@ -351,7 +351,7 @@ describe('getJenkinsBuildDetails', () => {
 
   it('reads a login page as an auth problem for a configured server', async () => {
     const { connection, details } = await loadModules()
-    configureServer(connection)
+    await configureServer(connection)
     route = () =>
       new Response('<html>Sign in</html>', {
         status: 200,
@@ -367,7 +367,7 @@ describe('getJenkinsBuildDetails', () => {
   it('refuses a same-origin redirect that leaves the configured server path', async () => {
     const { connection, details } = await loadModules()
     // A path-prefixed server is the case where a same-origin hop can leave the credential's scope.
-    configureServer(connection, 'https://ci.example.com/jenkins')
+    await configureServer(connection, 'https://ci.example.com/jenkins')
     const prefixedBuildUrl = 'https://ci.example.com/jenkins/job/team/job/repo/12/'
     const respondWithUrl = (url: string): Response => {
       const response = json(buildBody())
@@ -390,7 +390,7 @@ describe('getJenkinsBuildDetails', () => {
 
   it('stops reading a response larger than the client will hold', async () => {
     const { connection, details } = await loadModules()
-    configureServer(connection)
+    await configureServer(connection)
     route = () =>
       new Response(`{"padding":"${'x'.repeat(9 * 1024 * 1024)}"}`, {
         status: 200,
@@ -405,7 +405,7 @@ describe('getJenkinsBuildDetails', () => {
 
   it('refuses a response that came from an origin we did not ask', async () => {
     const { connection, details } = await loadModules()
-    configureServer(connection)
+    await configureServer(connection)
     route = () => {
       const response = new Response('<html>Sign in</html>', {
         status: 200,
@@ -424,7 +424,7 @@ describe('getJenkinsBuildDetails', () => {
 
   it('treats unparseable JSON from a configured server as a Jenkins failure, not a foreign URL', async () => {
     const { connection, details } = await loadModules()
-    configureServer(connection)
+    await configureServer(connection)
     route = () =>
       new Response('{"number": 12,', {
         status: 200,
@@ -439,7 +439,7 @@ describe('getJenkinsBuildDetails', () => {
 
   it('reports a transport failure instead of an empty pane', async () => {
     const { connection, details } = await loadModules()
-    configureServer(connection)
+    await configureServer(connection)
     route = () => {
       throw new Error('net::ERR_CERT_AUTHORITY_INVALID')
     }
@@ -548,7 +548,7 @@ describe('getJenkinsBuildDetails', () => {
 
   it('leaves redirects to the transport for a configured server', async () => {
     const { connection, details } = await loadModules()
-    configureServer(connection, 'https://ci.example-builds.net')
+    await configureServer(connection, 'https://ci.example-builds.net')
     route = (url) =>
       url.includes('wfapi') ? new Response(null, { status: 404 }) : json(buildBody())
 
@@ -565,7 +565,7 @@ describe('getJenkinsBuildDetails', () => {
 
   it('still reads a private host once its server is configured', async () => {
     const { connection, details } = await loadModules()
-    configureServer(connection, 'http://jenkins.internal')
+    await configureServer(connection, 'http://jenkins.internal')
     route = (url) =>
       url.includes('wfapi') ? new Response(null, { status: 404 }) : json(buildBody())
 

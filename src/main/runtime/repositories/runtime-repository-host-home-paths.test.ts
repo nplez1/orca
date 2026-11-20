@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url'
 import { runProcessSync } from '@orca/process-host'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Repo } from '../../../shared/repository/repo-types'
-import { partialRuntimeStore } from '../orca-runtime-tests/runtime-store-partial-fixture'
+import { partialRuntimeStore } from '../construction/test-context/runtime-store-partial-fixture'
 import { RuntimeRepositoryCloneController } from './runtime-repository-clone-controller'
 import { RuntimeRepositoryRegistrationController } from './runtime-repository-registration-controller'
 

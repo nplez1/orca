@@ -7,7 +7,7 @@ import {
   getJiraIssueRowActions,
   type JiraIssueRowWorkspaceAction
 } from './jira-issue-row-actions'
-import { getJiraIssueWorkspaceActions } from './jira-issue-workspace-actions'
+import { getJiraIssueWorkspaceActions } from './task-page/jira/issue-workspace/jira-issue-workspace-actions'
 
 vi.mock('@/lib/work-items/jira/jira-issue-key-casing', () => ({
   getJiraIssueKeyCasingSeedOptions: () => ({})

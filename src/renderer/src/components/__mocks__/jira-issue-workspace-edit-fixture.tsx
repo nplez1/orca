@@ -6,7 +6,7 @@ import type {
   JiraIssue,
   JiraIssueUpdate
 } from '../../../../shared/jira/jira-types'
-import type { GlobalSettings } from '../../../../shared/global-settings-types'
+import type { GlobalSettings } from '../../../../shared/settings/global-settings-types'
 import {
   getTaskSourceCacheScope,
   type TaskSourceContext
@@ -27,7 +27,7 @@ import type {
 import type { jiraListAssignableUsersForTarget } from '@/runtime/jira/runtime-jira-user-fields-client'
 import { getJiraRuntimeTarget, type RuntimeJiraSettings } from '@/runtime/jira/runtime-jira-target'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import JiraIssueWorkspace from '../JiraIssueWorkspace'
+import JiraIssueWorkspace from '../task-page/jira/issue-workspace/JiraIssueWorkspace'
 
 const runtimeMocks: {
   jiraAddIssueCommentForTarget: Mock<typeof jiraAddIssueCommentForTarget>
@@ -137,7 +137,7 @@ vi.mock('@/i18n/i18n', async (importOriginal) => ({
   translate: (_key: string, fallback: string, options?: Parameters<typeof I18n.translate>[2]) =>
     fallback.replace(/\{\{(\w+)\}\}/g, (match, key: string) => String(options?.[key] ?? match))
 }))
-vi.mock('@/components/sidebar/CommentMarkdown', () => ({
+vi.mock('@/components/comment-markdown/CommentMarkdown', () => ({
   default: ({ content }: { content: string }) => <div>{content}</div>
 }))
 vi.mock('sonner', () => ({ toast }))

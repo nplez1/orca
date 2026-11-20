@@ -27,6 +27,7 @@ import { resolveCancelVerdictLatch } from '../../../shared/agent-hook-listener/s
 import { AgentHookServerScreenPromptWiring } from './server-screen-prompt-wiring'
 import { claimsPaneAfterExit } from './agent-exit-evidence'
 import { writePiClaudeChildParentMarker } from './pi-claude-child-parent-marker'
+import { resolvedHookAgentType } from './pane-agent-turn-continuity'
 
 export abstract class AgentHookServerStatusUpdate extends AgentHookServerScreenPromptWiring {
   protected applyNormalizedStatus(
@@ -118,7 +119,7 @@ export abstract class AgentHookServerStatusUpdate extends AgentHookServerScreenP
       payload.payload.sessionBoundary === true &&
       !rootContext.acquired &&
       this.sameTerminalOwner(previous, payload) &&
-      this.preservesStoppingDone(previous.paneKey)
+      this.preservesStoppingAgent(previous.paneKey)
     ) {
       return previous
     }
@@ -209,6 +210,10 @@ export abstract class AgentHookServerStatusUpdate extends AgentHookServerScreenP
     if (previous && stateReconciledPayload === previous) {
       return previous
     }
+    const resumed = this.preserveAcceptedTurn(previous, stateReconciledPayload, rowBefore, origin)
+    if (resumed !== null) {
+      return resumed
+    }
     // Relay restart loses root context; child hooks must not erase persisted resume/model identity.
     const rootContextPreservingPayload = retainHookRootContext(
       stateReconciledPayload,
@@ -217,13 +222,10 @@ export abstract class AgentHookServerStatusUpdate extends AgentHookServerScreenP
       !!previous && this.sameTerminalOwner(previous, stateReconciledPayload),
       rootContext.returningProviderSession
     )
-    const identityResolvedPayload =
-      identity.agentType === rootContextPreservingPayload.payload.agentType
-        ? rootContextPreservingPayload
-        : {
-            ...rootContextPreservingPayload,
-            payload: { ...rootContextPreservingPayload.payload, agentType: identity.agentType }
-          }
+    const identityResolvedPayload = resolvedHookAgentType(
+      rootContextPreservingPayload,
+      identity.agentType
+    )
     const attachedPayload = attachClaudePermissionToolUseId(previous, identityResolvedPayload)
     // Resolve cancellation before permission holds adopt a replayed main-agent observation.
     const latch = resolveCancelVerdictLatch(previous, attachedPayload, Date.now())

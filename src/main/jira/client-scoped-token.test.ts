@@ -45,12 +45,14 @@ afterEach(async () => {
 })
 
 describe('scoped Jira Cloud tokens over HTTP', () => {
-  it('resolves the tenant without a credential and connects an email-free Bearer token', async () => {
+  it('connects an email-free scoped token and routes requests through its tenant', async () => {
     fixture = await startJiraAuthFixture((request, response) => {
       if (request.url === `${SITE}/_edge/tenant_info`) {
         jiraFixtureJson(response, 200, { cloudId: 'cloud-abc' })
       } else if (request.url === `${GATEWAY}/rest/api/3/myself`) {
         jiraFixtureJson(response, 200, VIEWER)
+      } else if (request.url.startsWith(`${GATEWAY}/rest/api/3/`)) {
+        jiraFixtureJson(response, 200, { issues: [] })
       } else {
         jiraFixtureJson(response, 401, {})
       }
@@ -69,6 +71,65 @@ describe('scoped Jira Cloud tokens over HTTP', () => {
         method: 'GET'
       }
     ])
+    const client = (await jira.getClients())[0]
+    if (!client) {
+      throw new Error('Expected connected scoped Jira client')
+    }
+    await jira.jiraRequest(client, '/rest/api/3/issue/ALP-1', { method: 'PUT', body: '{}' })
+    await jira.jiraRequestBinary(client, `${SITE}/rest/api/3/attachment/content/1?redirect=false`)
+    expect(fixture.requests.slice(-2).map((request) => request.url)).toEqual([
+      `${GATEWAY}/rest/api/3/issue/ALP-1`,
+      `${GATEWAY}/rest/api/3/attachment/content/1?redirect=false`
+    ])
+    for (const url of [
+      'https://evil.example/attachment.png',
+      `${SITE}/secure/attachment/1/shot.png`,
+      `${SITE}/rest-other/attachment/1/shot.png`,
+      'https://api.atlassian.com/ex/jira/other-cloud/rest/api/3/attachment/content/1',
+      `${GATEWAY}-other/rest/api/3/attachment/content/1`,
+      `${GATEWAY}/../other-cloud/rest/api/3/attachment/content/1`
+    ]) {
+      await expect(jira.jiraRequestBinary(client, url)).rejects.toThrow(
+        /configured site|REST content URL/
+      )
+    }
+    expect(fixture.requests).toHaveLength(4)
+  })
+
+  it('never pairs a reconnected token with the site record it replaces', async () => {
+    fixture = await startJiraAuthFixture((request, response) => {
+      if (request.url === `${SITE}/rest/api/3/myself`) {
+        jiraFixtureJson(response, 200, VIEWER)
+      } else {
+        jiraFixtureJson(response, 401, {})
+      }
+    })
+    const jira = await loadClient()
+    await expect(
+      jira.connect({ ...CREDENTIAL, apiToken: 'unscoped-token' })
+    ).resolves.toMatchObject({
+      ok: true
+    })
+    const store = await import('./site-credential-store')
+    const file = await store.getSiteFile()
+    const site = file.sites[0]
+    if (!site) {
+      throw new Error('Expected the connected Jira site')
+    }
+
+    // Same steps as connect(): token first, then the site record, under the registry queue.
+    let reader: ReturnType<typeof jira.getClients> = Promise.resolve([])
+    await store.inSiteRegistryOrder(async () => {
+      await store.saveToken(site.id, 'scoped-token')
+      reader = jira.getClients()
+      await store.writeSiteFile({ ...file, sites: [{ ...site, apiBaseUrl: GATEWAY }] })
+    })
+
+    const [client] = await reader
+    expect(client?.site.apiBaseUrl).toBe(GATEWAY)
+    expect(client?.authorization).toBe(
+      `Basic ${Buffer.from(`${CREDENTIAL.email}:scoped-token`).toString('base64')}`
+    )
   })
 
   it('retries site-rejected Basic tokens on the gateway and keeps that route after reload', async () => {
@@ -98,44 +159,7 @@ describe('scoped Jira Cloud tokens over HTTP', () => {
       url: `${GATEWAY}/rest/api/3/myself`,
       authorization: `Basic ${Buffer.from('ada@example.com:private-token').toString('base64')}`
     })
-    expect(reloaded.getStatus()).toMatchObject({ supportsScopedTokens: true })
-  })
-
-  it('routes reads, edits and site attachment links through the selected gateway tenant', async () => {
-    fixture = await startJiraAuthFixture((request, response) => {
-      if (request.url.endsWith('/_edge/tenant_info')) {
-        jiraFixtureJson(response, 200, { cloudId: 'cloud-abc' })
-      } else if (request.url.endsWith('/myself')) {
-        jiraFixtureJson(response, 200, VIEWER)
-      } else {
-        jiraFixtureJson(response, 200, { issues: [] })
-      }
-    })
-    const jira = await loadClient()
-    await jira.connect({ ...CREDENTIAL, email: '' })
-    const client = jira.getClients()[0]
-    if (!client) {
-      throw new Error('Expected connected scoped Jira client')
-    }
-    await jira.jiraRequest(client, '/rest/api/3/issue/ALP-1', { method: 'PUT', body: '{}' })
-    await jira.jiraRequestBinary(client, `${SITE}/rest/api/3/attachment/content/1?redirect=false`)
-    expect(fixture.requests.slice(-2).map((request) => request.url)).toEqual([
-      `${GATEWAY}/rest/api/3/issue/ALP-1`,
-      `${GATEWAY}/rest/api/3/attachment/content/1?redirect=false`
-    ])
-    for (const url of [
-      'https://evil.example/attachment.png',
-      `${SITE}/secure/attachment/1/shot.png`,
-      `${SITE}/rest-other/attachment/1/shot.png`,
-      'https://api.atlassian.com/ex/jira/other-cloud/rest/api/3/attachment/content/1',
-      `${GATEWAY}-other/rest/api/3/attachment/content/1`,
-      `${GATEWAY}/../other-cloud/rest/api/3/attachment/content/1`
-    ]) {
-      await expect(jira.jiraRequestBinary(client, url)).rejects.toThrow(
-        /configured site|REST content URL/
-      )
-    }
-    expect(fixture.requests).toHaveLength(4)
+    await expect(reloaded.getStatus()).resolves.toMatchObject({ supportsScopedTokens: true })
   })
 
   it('retains saved credentials when a later search lacks scopes', async () => {
@@ -152,8 +176,8 @@ describe('scoped Jira Cloud tokens over HTTP', () => {
     await jira.connect({ ...CREDENTIAL, email: '' })
     const { listIssues } = await import('./jira-issue-search')
     await expect(listIssues()).rejects.toThrow('scope')
-    expect(jira.getStatus().connected).toBe(true)
-    expect(jira.getClients()).toHaveLength(1)
+    expect((await jira.getStatus()).connected).toBe(true)
+    await expect(jira.getClients()).resolves.toHaveLength(1)
   })
 
   it('recognizes scope failures in authentication headers without clearing the token', async () => {
@@ -187,7 +211,7 @@ describe('scoped Jira Cloud tokens over HTTP', () => {
     expect(result.error).toContain('api.atlassian.com')
     expect(result.error).toContain('email')
     expect(result.error).not.toContain('private-token')
-    expect(jira.getStatus().connected).toBe(false)
+    expect((await jira.getStatus()).connected).toBe(false)
   })
 
   it('reports unauthenticated tenant lookup failures without calling a gateway', async () => {
@@ -275,7 +299,7 @@ describe('scoped Jira Cloud tokens over HTTP', () => {
       )
     }
     const jira = await loadClient()
-    expect(jira.getStatus().sites?.map((site) => site.id)).toEqual(['legacy', 'scoped'])
-    expect(jira.getClients()[0]?.site.authType).toBe('cloud')
+    expect((await jira.getStatus()).sites?.map((site) => site.id)).toEqual(['legacy', 'scoped'])
+    expect((await jira.getClients())[0]?.site.authType).toBe('cloud')
   })
 })

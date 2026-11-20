@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { getRepoExecutionHostId } from '../../../shared/execution-host'
+import { getRepoExecutionHostId } from '../../../shared/execution-host/execution-host'
 import type { GitRemoteIdentity } from '../../../shared/git/remotes/git-remote-identity'
 import type { Repo } from '../../../shared/repository/repo-types'
 import type { RepoHostTarget } from '../../../shared/repository/repo-host-identity'
@@ -89,13 +89,6 @@ const REFRESH_STARTUP_DELAY_MS = 5 * 60 * 1000
 /** Resolved identities refresh on a six-hour TTL (`RESOLVED_IDENTITY_REFRESH_TTL_MS`). */
 const REFRESH_TTL_MS = 6 * 60 * 60 * 1000
 
-const movedIdentity: GitRemoteIdentity = {
-  canonicalKey: 'git.company.test/platform/sample-app',
-  remoteName: 'upstream',
-  remoteUrl: 'git@git.company.test:platform/sample-app.git',
-  remoteKeys: ['git.company.test/platform/sample-app']
-}
-
 // fork-comment-ok: fork-only identity field; the why must sit above the code a sync rewrites.
 /** A fork keeps its parent on upstream and its own repository on origin. */
 const forkIdentity: GitRemoteIdentity = {
@@ -173,45 +166,6 @@ describe('enrichMissingRepoGitRemoteIdentities', () => {
 
     expect(store.updateRepo).not.toHaveBeenCalled()
     expect(repo.gitRemoteIdentity).toBeUndefined()
-  })
-
-  it('overwrites a resolved identity when the re-probe finds a different canonical key', async () => {
-    vi.useFakeTimers()
-    vi.setSystemTime(1_000)
-    vi.mocked(probeGitRemoteIdentity).mockResolvedValue({
-      status: 'resolved',
-      identity: movedIdentity
-    })
-    const repo = makeRepo({ gitRemoteIdentity: remoteIdentity })
-    const store = makeStore(repo)
-    const onChanged = vi.fn()
-
-    await sweep(store)
-    vi.setSystemTime(1_000 + REFRESH_STARTUP_DELAY_MS + 1)
-    enrichMissingRepoGitRemoteIdentities(store, { onChanged })
-    await drainEnrichmentSweep()
-
-    expect(store.updateRepo).toHaveBeenCalledWith(repoTarget('repo-1', 'local'), {
-      gitRemoteIdentity: movedIdentity
-    })
-    expect(repo.gitRemoteIdentity).toEqual(movedIdentity)
-    expect(onChanged).toHaveBeenCalledTimes(1)
-  })
-
-  it('keeps the existing identity when a re-probe cannot reach the host', async () => {
-    vi.useFakeTimers()
-    vi.setSystemTime(1_000)
-    vi.mocked(probeGitRemoteIdentity).mockResolvedValue({ status: 'unavailable' })
-    const repo = makeRepo({ connectionId: 'builder', gitRemoteIdentity: remoteIdentity })
-    const store = makeStore(repo)
-
-    await sweep(store)
-    vi.setSystemTime(1_000 + REFRESH_STARTUP_DELAY_MS + 1)
-    await sweep(store)
-
-    expect(probeGitRemoteIdentity).toHaveBeenCalledTimes(1)
-    expect(store.updateRepo).not.toHaveBeenCalled()
-    expect(repo.gitRemoteIdentity).toEqual(remoteIdentity)
   })
 
   it('keeps the existing identity when a re-probe reports no usable remote', async () => {

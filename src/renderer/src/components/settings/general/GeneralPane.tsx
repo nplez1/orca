@@ -1,6 +1,6 @@
 import type React from 'react'
 import { useEffect, useRef } from 'react'
-import type { GlobalSettings } from '../../../../../shared/global-settings-types'
+import type { GlobalSettings } from '../../../../../shared/settings/global-settings-types'
 import { useAppStore } from '../../../store/index'
 import { CliSection } from '../cli/install/CliSection'
 import { GeneralEditorSettingsSection } from '../editor/GeneralEditorSettingsSection'
@@ -31,7 +31,7 @@ import { getGeneralSubPageTitle, type GeneralSubPage } from './general-sub-pages
 import { useOpenInMenuDraft } from './OpenInMenuSetting'
 import type { SettingsHostScope } from '../host-scope/settings-host-scope'
 import type { RuntimeClientTarget } from '../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
-import { getLocalExecutionHostLabel } from '../../../../../shared/execution-host'
+import { getLocalExecutionHostLabel } from '../../../../../shared/execution-host/execution-host'
 
 /** Whether two Settings targets name the same machine. */
 function sameRuntimeTarget(left: RuntimeClientTarget | null, right: RuntimeClientTarget): boolean {

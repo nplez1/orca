@@ -1,4 +1,4 @@
-import type { CheckDetailsErrorAction } from '../../../shared/editor-tab-view-types'
+import type { CheckDetailsErrorAction } from '../../../shared/editor/views/editor-tab-view-types'
 import type { JenkinsBuildDetailsFailureReason } from '../../../shared/jenkins-check-details'
 
 export type { CheckDetailsErrorAction }

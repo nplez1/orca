@@ -1,10 +1,10 @@
-import type { GlobalSettings } from '../../../../../shared/global-settings-types'
-import { normalizeNativeChatAppearanceSettings } from '../../../../../shared/native-chat/native-chat-appearance-settings'
+import type { GlobalSettings } from '../../../../../shared/settings/global-settings-types'
+import { normalizeNativeChatAppearanceSettings } from '../../../../../shared/native-chat/settings/native-chat-appearance-settings'
 import { normalizeTerminalQuickCommands } from '../../../../../shared/terminal/quick-commands/terminal-quick-commands'
 import { assertTerminalQuickCommandsStorable } from '../../../../../shared/terminal/quick-commands/terminal-quick-command-prompt-limit'
 import { normalizeTerminalCustomThemes } from '../../../../../shared/terminal-themes/terminal-custom-themes'
 import { normalizeTaskProviderSettings } from '../../../../../shared/work-items/task-providers'
-import { normalizeOpenInApplications } from '../../../../../shared/open-in-applications'
+import { normalizeOpenInApplications } from '../../../../../shared/editor/launch/open-in-applications'
 import { normalizeDisabledUsageProviders } from '../../../../../shared/usage-provider-enablement'
 import {
   normalizeMobilePairingCustomAddress,
@@ -12,7 +12,7 @@ import {
 } from '../../../../../shared/remote-runtime/pairing/mobile-pairing-custom-address'
 import { normalizeDisabledTuiAgents } from '../../../../../shared/agent-launch/catalog/tui-agent-selection'
 import { sanitizeAgentLaunchProfileUpdates } from '../../../../../shared/agent-launch/choices/tui-agent-launch-defaults'
-import { normalizeUiLanguage } from '../../../../../shared/ui-language'
+import { normalizeUiLanguage } from '../../../../../shared/i18n/ui-language'
 import { normalizeDesktopTerminalScrollbackRows } from '../../../../../shared/terminal/replay/terminal-scrollback-policy'
 import { createNonSecureContextUuid as createBrowserUuid } from '../../../../../shared/identifiers/non-secure-context-uuid'
 

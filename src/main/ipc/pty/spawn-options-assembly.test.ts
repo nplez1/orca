@@ -5,9 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   assemblePtySpawnLaunchOptions,
   type PtySpawnLaunchOptionsInput
-} from './spawn-options-assembly'
+} from './spawn/spawn-options-assembly'
 import type { AgentWorkspaceTrustDecision } from '../../../shared/agent-launch/permissions/agent-workspace-trust-decision'
-import type { GlobalSettings } from '../../../shared/global-settings-types'
+import type { GlobalSettings } from '../../../shared/settings/global-settings-types'
 
 // Why: an agent with a trust preset writes one into the agent's home, and these tests must not touch
 // the developer's real one.

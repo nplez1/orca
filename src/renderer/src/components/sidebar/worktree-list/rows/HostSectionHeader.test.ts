@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   toRuntimeExecutionHostId,
   toSshExecutionHostId
-} from '../../../../../../shared/execution-host'
+} from '../../../../../../shared/execution-host/execution-host'
 import type { EphemeralVmRuntimeRecord } from '../../../../../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 import { resolveEphemeralHostLease } from './HostSectionHeader'
 

@@ -13,10 +13,10 @@ import {
   writeFile
 } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
-import { isPathInsideOrEqual } from '../../shared/cross-platform-path'
+import { isPathInsideOrEqual } from '../../shared/file-access/cross-platform-path'
 import { getSafeRelativePath } from '../git/worktrees/content-paths/worktree-symlink-detection'
 import { recordSwallowedFailure } from '../observability/swallowed-failure'
-import { WorktreeLinkedPathTargetExistsError } from './worktree-apfs-clone'
+import { WorktreeLinkedPathTargetExistsError } from './worktrees/linked-paths/worktree-apfs-clone'
 
 const WORKTREE_STAGING_DIRECTORY_PREFIX = '.orca-worktree-stage-'
 const WORKTREE_STAGING_DIRECTORY_PATTERN = /^\.orca-worktree-stage-(\d+)-[A-Za-z0-9]{6}$/u

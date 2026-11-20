@@ -7,20 +7,8 @@ const deepSeekApiKeyStore = createEncryptedApiKeyFileStore({
   logScope: 'deepseek'
 })
 
-export function hasDeepSeekApiKey(): boolean {
-  return deepSeekApiKeyStore.has()
-}
-
+export const hasDeepSeekApiKey = deepSeekApiKeyStore.has
 export const getDeepSeekApiKeyProtection = deepSeekApiKeyStore.protection
-
-export function saveDeepSeekApiKey(key: string): void {
-  deepSeekApiKeyStore.save(key)
-}
-
-export function readDeepSeekApiKey(): string | null {
-  return deepSeekApiKeyStore.read()
-}
-
-export function clearDeepSeekApiKey(): void {
-  deepSeekApiKeyStore.clear()
-}
+export const saveDeepSeekApiKey = deepSeekApiKeyStore.save
+export const readDeepSeekApiKey = deepSeekApiKeyStore.read
+export const clearDeepSeekApiKey = deepSeekApiKeyStore.clear

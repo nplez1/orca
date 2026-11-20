@@ -125,14 +125,15 @@ describe('RateLimitService fork provider sibling cycle', () => {
     vi.mocked(fetchDeepSeekRateLimits).mockImplementationOnce(() => pendingDeepSeek.promise)
 
     const cycle = service.refresh()
-    await flushMicrotasks()
+    // Why 12: the fork resolvers are async, so a cycle needs more ticks to reach its generation stamps.
+    await flushMicrotasks(12)
 
-    expect(service.getState().deepseek?.status).toBe('fetching')
+    expect((await service.getState()).deepseek?.status).toBe('fetching')
 
     pendingDeepSeek.resolve(creditsProvider('deepseek', 'balance'))
     await cycle
 
-    const state = service.getState()
+    const state = await service.getState()
     expect(state.deepseek?.status).toBe('ok')
     expect(state.deepseek?.credits?.amount.units).toBe('42')
   })
@@ -158,9 +159,9 @@ describe('RateLimitService fork provider sibling cycle', () => {
     expect(fetchDeepSeekRateLimits).not.toHaveBeenCalled()
     expect(fetchFireworksRateLimits).not.toHaveBeenCalled()
     expect(fetchCopilotRateLimits).not.toHaveBeenCalled()
-    expect(service.getState().deepseek).toBeNull()
-    expect(service.getState().fireworks).toBeNull()
-    expect(service.getState().copilot).toBeNull()
+    expect((await service.getState()).deepseek).toBeNull()
+    expect((await service.getState()).fireworks).toBeNull()
+    expect((await service.getState()).copilot).toBeNull()
   })
 
   describe('an open Retry-After', () => {
@@ -200,7 +201,7 @@ describe('RateLimitService fork provider sibling cycle', () => {
         // Why the control: the second cycle did run, and only the gated provider was skipped.
         expect(fetchFireworksRateLimits).toHaveBeenCalledTimes(2)
         expect(fetchDeepSeekRateLimits).toHaveBeenCalledTimes(1)
-        expect(service.getState().deepseek?.usageMetadata?.failureKind).toBe('rate-limited')
+        expect((await service.getState()).deepseek?.usageMetadata?.failureKind).toBe('rate-limited')
       } finally {
         vi.useRealTimers()
       }
@@ -246,15 +247,15 @@ describe('RateLimitService fork provider sibling cycle', () => {
         vi.setSystemTime(Date.now() + 6 * 60 * 1000)
         holdClaude = true
         const cycle = service.refreshIfStale()
-        await flushMicrotasks()
+        await flushMicrotasks(12)
         service.invalidateDeepSeekCredentialState()
         heldClaude.resolve(okProvider('claude', 4))
         await cycle
 
         // Why: the old key's rate-limited snapshot must not overwrite the new key's placeholder.
         expect(fetchDeepSeekRateLimits).toHaveBeenCalledTimes(1)
-        expect(service.getState().deepseek?.status).toBe('fetching')
-        expect(service.getState().deepseek?.updatedAt).toBe(0)
+        expect((await service.getState()).deepseek?.status).toBe('fetching')
+        expect((await service.getState()).deepseek?.updatedAt).toBe(0)
       } finally {
         vi.useRealTimers()
       }

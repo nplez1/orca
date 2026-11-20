@@ -1,7 +1,9 @@
 import { EventEmitter } from 'node:events'
 import type { BrowserWindow } from 'electron'
 import { vi } from 'vitest'
-import type { UpdaterSpy } from './updater-test-harness'
+
+// Upstream deleted updater-test-harness.ts (#43339); this file survives upstream, so the fake it
+// built lives here rather than in a restored harness.
 
 export type UpdaterMainWindowFake = BrowserWindow & {
   /** Emits the native `closed` event without faking the destroyed flag Electron also sets. */
@@ -15,7 +17,9 @@ export type UpdaterMainWindowFake = BrowserWindow & {
  * Minimal BrowserWindow stand-in: the updater binds to it, guards it and sends status through it.
  * Pass the `send` spy the test asserts on; teardown is driven through `close`/`destroy*`.
  */
-export function createUpdaterMainWindow(send: UpdaterSpy = vi.fn()): UpdaterMainWindowFake {
+export function createUpdaterMainWindow(
+  send: (...args: unknown[]) => unknown = vi.fn()
+): UpdaterMainWindowFake {
   const events = new EventEmitter()
   let windowDestroyed = false
   let webContentsDestroyed = false

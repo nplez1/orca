@@ -5,11 +5,11 @@ import {
   getRepoExecutionHostId,
   getSettingsFocusedExecutionHostId,
   parseExecutionHostId
-} from '../../../../../../shared/execution-host'
+} from '../../../../../../shared/execution-host/execution-host'
 import {
   CLOSED_REVIEW_REFRESH_INTERVAL_MS,
   reviewRefreshIntervalMs
-} from '../../../../../../shared/review-refresh-policy'
+} from '../../../../../../shared/source-control/hosted-review/review-refresh-policy'
 import {
   buildPRRefreshCandidate,
   findWorktreeReviewOwner,

@@ -1,5 +1,5 @@
-import type { GlobalSettings } from '../../../../../shared/global-settings-types'
-import { getSettingsFocusedExecutionHostId } from '../../../../../shared/execution-host'
+import type { GlobalSettings } from '../../../../../shared/settings/global-settings-types'
+import { getSettingsFocusedExecutionHostId } from '../../../../../shared/execution-host/execution-host'
 import { ipcOrRuntimeTargetForHostId } from '@/runtime/rpc/targets/runtime-client-target'
 import type { RuntimeClientTarget } from '../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
 

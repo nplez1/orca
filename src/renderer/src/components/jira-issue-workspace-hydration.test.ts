@@ -4,7 +4,7 @@ import {
   editedJiraIssueFields,
   jiraIssueRollbackPatch,
   mergeJiraIssueHydration
-} from './jira-issue-workspace-hydration'
+} from './task-page/jira/issue-workspace/jira-issue-workspace-hydration'
 
 function issue(overrides: Partial<JiraIssue> = {}): JiraIssue {
   return {

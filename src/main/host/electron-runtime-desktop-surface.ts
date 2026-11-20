@@ -1,11 +1,12 @@
 import { isResourceWindowVisible } from '../window/visibility/resource-view-admission'
 import { BrowserWindow, ipcMain, Notification, powerMonitor } from 'electron'
 import { readDesktopAwayState } from '../notifications/desktop-away-state'
+import { showDesktopNotification } from '../notifications/desktop-notification'
 import type { RuntimeDesktopSurface } from '../runtime/construction/runtime-desktop-surface'
 import { translateMain } from '../i18n/main-i18n'
 import { encodeRepoIconPng } from './electron-repo-icon-png'
 import { fetchWithElectronManualRedirects } from './electron-manual-redirect-fetch'
-import { ORCA_SIDEBAR_INPUTS_IS_MAIN } from '../../shared/sidebar-inputs-switch'
+import { ORCA_SIDEBAR_INPUTS_IS_MAIN } from '../../shared/sidebar-list/feed/sidebar-inputs-switch'
 
 export const electronRuntimeDesktopSurface: RuntimeDesktopSurface = {
   translateNotification: translateMain,
@@ -14,7 +15,7 @@ export const electronRuntimeDesktopSurface: RuntimeDesktopSurface = {
     if (!Notification.isSupported()) {
       return false
     }
-    new Notification({ title, body }).show()
+    showDesktopNotification(new Notification({ title, body }))
     return true
   },
   sendToRenderers: (channel, payload) => {

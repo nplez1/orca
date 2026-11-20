@@ -18,7 +18,7 @@ import { CheckRunDetails } from './check-run-details'
 import { JenkinsRebuildButton } from '@/components/jenkins-rebuild-button'
 import { CheckRunTime } from './check-run-time'
 import { getCheckStatusLabel } from '@/components/github/pr-check-presentation'
-import { getCheckConclusion } from '@/components/pr-check-counts'
+import { getCheckConclusion } from '@/components/github/pr-check-counts'
 import { type ChecksListProps, useChecksListState } from '../refresh/use-checks-list-state'
 import {
   openAppHttpLink,

@@ -6,7 +6,7 @@ import { EditorContent, useEditor, useEditorState } from '@tiptap/react'
 import { Bold, Code2, Italic, List, LoaderCircle, Quote, Send } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { ShortcutKeyCombo } from '@/components/ShortcutKeyCombo'
+import { ShortcutKeyCombo } from '@/components/ui/ShortcutKeyCombo'
 import { RichMarkdownToolbarButton } from './editor/rich-markdown/commands/RichMarkdownToolbarButton'
 import {
   getRichMarkdownSpellcheckAttribute,

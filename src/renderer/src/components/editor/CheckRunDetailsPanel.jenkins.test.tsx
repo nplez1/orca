@@ -14,13 +14,16 @@ vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback: string) => fallback
 }))
 
-vi.mock('@/components/sidebar/CommentMarkdown', () => ({
+vi.mock('@/components/comment-markdown/CommentMarkdown', () => ({
   default: ({ content }: { content: string }) => content
 }))
 
-vi.mock('@/components/right-sidebar/source-control/panel/source-control-fix-split-button.tsx', () => ({
-  SourceControlFixSplitButton: () => null
-}))
+vi.mock(
+  '@/components/right-sidebar/source-control/panel/source-control-fix-split-button.tsx',
+  () => ({
+    SourceControlFixSplitButton: () => null
+  })
+)
 
 vi.mock('./check-details/actions/check-run-details-fix-with-ai.ts', () => ({
   useCheckRunDetailsFixWithAI: () => ({

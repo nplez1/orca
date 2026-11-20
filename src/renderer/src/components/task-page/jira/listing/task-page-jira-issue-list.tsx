@@ -16,7 +16,7 @@ import {
   type JiraIssueWorkspaceAttachmentIndex
 } from '@/lib/work-items/jira/jira-issue-workspace-attachment'
 import { JiraIssueRow } from '../../../task-page-jira-issue-row'
-import type { JiraListColumn } from '../../../jira-list-columns'
+import type { JiraListColumn } from './jira-list-columns'
 
 // Re-exported so the board sections can group through the same production function.
 export { groupJiraIssuesByStatus, type TaskPageJiraIssueSection }

@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's review actions ride upstream's checks tab, and splitting costs a permanent sync hunk. */
-import { PRCheckEmptyDetails } from '@/components/pr-check-empty-details'
+import { PRCheckEmptyDetails } from '@/components/github/pr-check-empty-details'
 import { isCompletePRCheckOwner } from '../../../../../shared/github/checks/complete-pr-check-owner'
-import { usePRCheckRefreshOwner } from '@/hooks/use-pr-check-refresh-owner'
+import { usePRCheckRefreshOwner } from '@/lib/work-items/github/use-pr-check-refresh-owner'
 import React, { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { LoaderCircle } from 'lucide-react'
 import { useMountedRef } from '@/hooks/useMountedRef'
@@ -11,7 +11,7 @@ import {
   createGitHubChecksTabState,
   resolveGitHubChecksTabState,
   toggleGitHubChecksTabExpandedKey
-} from '@/components/github-checks-tab-state'
+} from '@/components/github/github-checks-tab-state'
 import {
   canUseGitHubRepoContext,
   getGitHubSourceRuntimeHost
@@ -34,7 +34,7 @@ import {
   getCheckCounts,
   getOverallCheckCounts,
   getChecksSummaryLabel
-} from '@/components/pr-check-counts'
+} from '@/components/github/pr-check-counts'
 import { resolvePullRequestRepo } from '@/components/github/github-work-item-identity'
 import { getCheckDetailsKey } from '@/components/github/pr-check-presentation'
 import { checkDetailsNeedRefresh } from '@/components/github/check-details-cache'

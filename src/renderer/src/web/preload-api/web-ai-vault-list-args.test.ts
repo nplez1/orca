@@ -2,11 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AiVaultListResult } from '../../../../shared/ai-vault/contracts/ai-vault-types'
 
 const callRuntimeResult = vi.hoisted(() => vi.fn())
-vi.mock('./web-runtime-calls', () => ({ callRuntimeResult }))
-vi.mock('./web-runtime-session', () => ({
+vi.mock('../runtime/client/web-runtime-calls', () => ({ callRuntimeResult }))
+vi.mock('../runtime/client/web-runtime-session', () => ({
   requireActiveEnvironment: () => ({ id: 'owning-host' })
 }))
-const { createWebAiVaultApi } = await import('./web-ai-vault-api')
+const { createWebAiVaultApi } = await import('./agents/web-ai-vault-api')
 
 const EMPTY_RESULT: AiVaultListResult = {
   sessions: [],

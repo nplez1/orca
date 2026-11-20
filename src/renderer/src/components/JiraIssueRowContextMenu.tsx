@@ -11,7 +11,7 @@ import { useTranslate } from '@/i18n/use-translate'
 import type { JiraIssue } from '../../../shared/jira/jira-types'
 import { getJiraIssueRowActions, type JiraIssueRowWorkspaceAction } from './jira-issue-row-actions'
 import { Popover, PopoverAnchor } from '@/components/ui/popover'
-import { JiraPromptTemplatePopover } from './JiraPromptTemplatePopover'
+import { JiraPromptTemplatePopover } from './task-page/jira/creation/JiraPromptTemplatePopover'
 
 /** The Jira task row and both board cards share one surface: right-click (or the
  *  platform context-menu key) opens every action the detail sheet declares, in one list. */

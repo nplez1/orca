@@ -19,6 +19,10 @@ export type VersionedCacheDatabaseSchema = {
   // Main-thread callers pass 'fail-fast' so a rebuild blocked by a held file throws at once
   // (callers retry later) instead of sleeping through Windows unlock retries.
   removal?: CacheDatabaseRemoval
+  // Throws when the file can't be removed yet (another thread still holds it).
+  beforeRemove?: () => void
+  // 0 when another thread checkpoints this connection's WAL; SQLite's default otherwise.
+  walAutocheckpoint?: number
 }
 
 /** A cache written by a build newer than this one: refuse it instead of destroying the newer build's index. */
@@ -53,6 +57,7 @@ export function openVersionedCacheDatabase(
       throw error
     }
     // One retry only: a second failure on a file we just created is not corruption.
+    schema.beforeRemove?.()
     removeVersionedCacheDatabase(path, schema.removal)
     return openExisting(path, schema)
   }
@@ -73,6 +78,7 @@ function openExisting(path: string, schema: VersionedCacheDatabaseSchema): SyncD
       // Unlink stale caches; dropping multi-GB tables can exceed scanner readiness deadlines.
       releaseForRemoval(db)
       db = null
+      schema.beforeRemove?.()
       removeVersionedCacheDatabase(path, schema.removal)
       db = openWithPragmas(path, schema)
     }
@@ -108,8 +114,9 @@ function openWithPragmas(
   path: string,
   {
     pageSize,
-    busyTimeoutMs = 5000
-  }: Pick<VersionedCacheDatabaseSchema, 'pageSize' | 'busyTimeoutMs'>
+    busyTimeoutMs = 5000,
+    walAutocheckpoint
+  }: Pick<VersionedCacheDatabaseSchema, 'pageSize' | 'busyTimeoutMs' | 'walAutocheckpoint'>
 ): SyncDatabase {
   const db = new SyncDatabase(path)
   try {
@@ -122,8 +129,9 @@ function openWithPragmas(
     db.pragma('auto_vacuum = INCREMENTAL')
     // WAL readers see committed state while writers publish atomically.
     db.pragma('journal_mode = WAL')
-    db.pragma('synchronous = NORMAL')
-    db.pragma('journal_size_limit = 8388608')
+    const autoCheckpoint =
+      walAutocheckpoint === undefined ? '' : ` PRAGMA wal_autocheckpoint = ${walAutocheckpoint};`
+    db.exec(`PRAGMA synchronous = NORMAL; PRAGMA journal_size_limit = 8388608;${autoCheckpoint}`)
     return db
   } catch (error) {
     db?.close()

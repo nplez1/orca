@@ -1,5 +1,5 @@
 import * as path from 'node:path'
-import { isWindowsAbsolutePathLike } from '../../../../shared/cross-platform-path'
+import { isWindowsAbsolutePathLike } from '../../../../shared/file-access/cross-platform-path'
 import { beginLocalWorkspacePathIndexReconciliation } from '../../../workspace-path-index/workspace-path-index-runtime'
 import type { WatchedRoot } from './filesystem-watcher-wsl'
 import { reconcileLocalWorkspacePathIndexEvents } from './filesystem-watcher-path-index-reconciliation'

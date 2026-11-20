@@ -1,7 +1,12 @@
 import { requireStrictJiraSite } from './jira-read-failure'
 import type { JiraProjectStatusOrder, JiraTransition } from '../../shared/jira/jira-types'
 import { acquire, release } from './request-queue'
-import { apiBasePath, JiraApiError, jiraRequest } from './authenticated-request'
+import {
+  apiBasePath,
+  JiraApiError,
+  jiraRequest,
+  type JiraClientForSite
+} from './authenticated-request'
 import { clearToken, getClients, isAuthError } from './client'
 import { describeFieldDraft } from './jira-field-drafts'
 import { mapCreateField, mapStatus } from './jira-issue-mapping'
@@ -46,7 +51,7 @@ function holdsValue(raw: unknown): boolean {
  * asked for, which is the behaviour without it.
  */
 async function attachCurrentValues(
-  entry: ReturnType<typeof getClients>[number],
+  entry: JiraClientForSite,
   key: string,
   transitions: JiraTransition[]
 ): Promise<void> {
@@ -92,7 +97,7 @@ async function attachCurrentValues(
   } catch (error) {
     // Why rethrow auth: a dead token must not read as "these fields are empty".
     if (isAuthError(error)) {
-      clearToken(entry.site.id)
+      await clearToken(entry)
       throw error
     }
     console.warn('[jira] transition field values failed:', error)
@@ -106,7 +111,7 @@ async function attachCurrentValues(
  * the list can match it. Costs nothing when no field on the screens needs a list.
  */
 async function attachProjectFieldOptions(
-  entry: ReturnType<typeof getClients>[number],
+  entry: JiraClientForSite,
   key: string,
   transitions: JiraTransition[]
 ): Promise<void> {
@@ -135,7 +140,7 @@ export async function listTransitions(
   siteId?: string | null,
   strict = false
 ): Promise<JiraTransition[]> {
-  const entries = getClients(siteId)
+  const entries = await getClients(siteId)
   requireStrictJiraSite(entries, siteId, strict)
   const entry = entries[0]
   if (!entry) {
@@ -168,7 +173,7 @@ export async function listTransitions(
     return transitions
   } catch (error) {
     if (isAuthError(error)) {
-      clearToken(entry.site.id)
+      await clearToken(entry)
       throw error
     }
     console.warn('[jira] listTransitions failed:', error)
@@ -186,7 +191,7 @@ export async function getProjectStatusOrder(
   siteId?: string | null
 ): Promise<JiraProjectStatusOrder> {
   // Omitted siteId can resolve to all-sites; board metadata needs one owning connection.
-  const entries = getClients(siteId)
+  const entries = await getClients(siteId)
   const entry = entries.length === 1 ? entries[0] : undefined
   if (!entry) {
     return { statusIdsByColumn: [] }
@@ -247,7 +252,7 @@ export async function getProjectStatusOrder(
     return { statusIdsByColumn, ...(boardColumns.length ? { columns: boardColumns } : {}) }
   } catch (error) {
     if (isAuthError(error)) {
-      clearToken(entry.site.id)
+      await clearToken(entry)
       throw error
     }
     console.warn('[jira] getProjectStatusOrder failed:', error)

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseOrcaYaml } from './orca-yaml'
+import { parseOrcaYaml } from './workspace-setup/orca-yaml'
 import { MAX_VM_RECIPE_CONTEXT_MENU_ITEMS } from './orca-yaml-vm-recipes'
 
 function recipeYaml(recipeLines: string[]): string {

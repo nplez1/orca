@@ -1,8 +1,8 @@
 import type { SessionSummaryAiSettings } from './session-summary-ai-types'
 import type { DisableableUsageProviderId } from './usage-provider-enablement'
-import type { AgentDashboardCardClickAction } from './ui-chrome-types'
+import type { AgentDashboardCardClickAction } from './ui-chrome/ui-chrome-types'
 import type { JiraBoardSelection } from './jira/jira-types'
-import type { OrcaWorkspaceLayoutSettings } from './orca-workspace-layout'
+import type { OrcaWorkspaceLayoutSettings } from './worktree/paths/orca-workspace-layout'
 
 /** Global settings this fork adds on top of upstream's `GlobalSettings`.
  *  Declared here and intersected so the upstream-owned `global-settings-types.ts`

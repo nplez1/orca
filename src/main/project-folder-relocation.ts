@@ -5,17 +5,23 @@
  * `git worktree repair` re-establishes them, so nothing here is triggered by a scan or a load.
  * The planner is pure so `--dry-run` can report the same decision the action would make.
  */
-import type { GlobalSettings } from '../shared/global-settings-types'
+import type { GlobalSettings } from '../shared/settings/global-settings-types'
 import { stat } from 'node:fs/promises'
 import { dirname } from 'node:path'
-import { getRepoExecutionHostId, LOCAL_EXECUTION_HOST_ID } from '../shared/execution-host'
-import { isProjectFolderLayout, resolveWorktreeLayoutMode } from '../shared/orca-workspace-layout'
+import {
+  getRepoExecutionHostId,
+  LOCAL_EXECUTION_HOST_ID
+} from '../shared/execution-host/execution-host'
+import {
+  isProjectFolderLayout,
+  resolveWorktreeLayoutMode
+} from '../shared/worktree/paths/orca-workspace-layout'
 import { isFolderRepo } from '../shared/repository/repo-kind'
 import type { Repo } from '../shared/repository/repo-types'
 import { areWorktreePathsEqual } from '../shared/worktree-path-comparison'
 import { getRepoMainWorktreeId } from '../shared/worktree/id'
 import { getRuntimePathOps, sanitizeWorktreeName } from './ipc/project-folder-placement'
-import { computeWorkspaceRoot, getWorktreePathSettings } from './ipc/worktree-logic'
+import { computeWorkspaceRoot, getWorktreePathSettings } from './ipc/worktrees/paths/worktree-logic'
 
 export type RelocationSkipReason =
   | 'not-project-folder-layout'

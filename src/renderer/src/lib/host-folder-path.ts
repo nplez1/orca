@@ -1,4 +1,4 @@
-import { isRuntimePathAbsolute } from '../../../shared/cross-platform-path'
+import { isRuntimePathAbsolute } from '../../../shared/file-access/cross-platform-path'
 
 /** The home shapes a host's own process expands: `~` and `~/…`, plus `~\…` on a Windows host.
  *  Deliberately duplicated from `workspace-dir-input.ts`'s private check so no `src/shared` file

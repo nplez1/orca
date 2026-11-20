@@ -6,10 +6,10 @@ import { workspacePathCatalogPathFlags } from '../../../../shared/workspace-path
 import {
   relativePathInsideRoot,
   isWindowsAbsolutePathLike
-} from '../../../../shared/cross-platform-path'
+} from '../../../../shared/file-access/cross-platform-path'
 import { buildRgArgsForQuickOpen } from '../../../../shared/quick-open/quick-open-filter'
 import type { WorkspacePathSearchCorrelationId } from '../../../../shared/workspace-path-search-instrumentation'
-import { getLocalGitOptionsForRegisteredWorktree } from '../../local-worktree-runtime-options'
+import { getLocalGitOptionsForRegisteredWorktree } from '../../worktrees/local-worktree-runtime-options'
 import {
   applyLocalWorkspacePathIndexDelta,
   completeLocalWorkspacePathIndexReconciliation,

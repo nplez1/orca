@@ -47,13 +47,14 @@ function decode(payload: string): JenkinsServerReplicationPayload | null {
 export function createHostSettingsJenkinsPort(): HostSettingsCredentialPort {
   // Why one read per server, as the Jira adapter does: `list()` and `unreadableIds()` must not disagree
   // about a token, or a server lands in neither list and the sender puts it in the removal list.
-  function readServerToken(
+  async function readServerToken(
     serverId: string
-  ):
+  ): Promise<
     | { kind: 'absent' }
     | { kind: 'unreadable' }
-    | { kind: 'token'; token: string; protection: SecretAtRestProtection | null } {
-    if (!hasJenkinsServerToken(serverId)) {
+    | { kind: 'token'; token: string; protection: SecretAtRestProtection | null }
+  > {
+    if (!(await hasJenkinsServerToken(serverId))) {
       return { kind: 'absent' }
     }
     let token: string | null
@@ -65,27 +66,27 @@ export function createHostSettingsJenkinsPort(): HostSettingsCredentialPort {
     if (token === null) {
       return { kind: 'unreadable' }
     }
-    return { kind: 'token', token, protection: getJenkinsServerTokenProtection(serverId) }
+    return { kind: 'token', token, protection: await getJenkinsServerTokenProtection(serverId) }
   }
 
   return {
     kind: HOST_SETTINGS_JENKINS_KIND,
     canSeal: canSealReplicatedCredential,
-    unreadableIds: () => {
+    unreadableIds: async () => {
       const unreadable: string[] = []
       for (const server of listJenkinsServers()) {
-        if (readServerToken(server.id).kind === 'unreadable') {
+        if ((await readServerToken(server.id)).kind === 'unreadable') {
           unreadable.push(`${HOST_SETTINGS_JENKINS_KIND}:${server.id}`)
         }
       }
       return unreadable
     },
-    protectionOf: (id) => {
+    protectionOf: async (id) => {
       const serverId = serverIdOf(id)
       if (serverId === null) {
         return null
       }
-      const read = readServerToken(serverId)
+      const read = await readServerToken(serverId)
       // Why plaintext rather than null: see the Jira adapter — null claims this host holds nothing, and
       // that is what turns an unreadable token into a removal reported as verified. Why not `sealed` for a
       // classification that failed: overstating it records a plaintext copy as sealed.
@@ -95,10 +96,10 @@ export function createHostSettingsJenkinsPort(): HostSettingsCredentialPort {
           ? 'plaintext'
           : (read.protection ?? 'plaintext')
     },
-    list: () => {
+    list: async () => {
       const credentials: ReplicatedHostCredential[] = []
       for (const server of listJenkinsServers()) {
-        const read = readServerToken(server.id)
+        const read = await readServerToken(server.id)
         if (read.kind !== 'token') {
           continue
         }
@@ -117,7 +118,7 @@ export function createHostSettingsJenkinsPort(): HostSettingsCredentialPort {
       }
       return credentials
     },
-    apply: (credential) => {
+    apply: async (credential) => {
       const decoded = decode(credential.payload)
       if (decoded === null) {
         throw new Error('Jenkins server payload is malformed')
@@ -127,7 +128,7 @@ export function createHostSettingsJenkinsPort(): HostSettingsCredentialPort {
       if (credential.id !== `${HOST_SETTINGS_JENKINS_KIND}:${decoded.server.id}`) {
         throw new Error('Jenkins server payload does not match the credential it arrived as')
       }
-      saveJenkinsServer(decoded.server, decoded.token)
+      await saveJenkinsServer(decoded.server, decoded.token)
     },
     remove: (id) => {
       const serverId = serverIdOf(id)

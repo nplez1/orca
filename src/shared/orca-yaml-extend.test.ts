@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseOrcaYaml } from './orca-yaml'
+import { parseOrcaYaml } from './workspace-setup/orca-yaml'
 import { EPHEMERAL_VM_LIFETIME_DURATION_LIMITS } from './ephemeral-vm-lifetime'
 
 function recipeYaml(recipeLines: string[]): string {

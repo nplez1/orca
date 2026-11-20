@@ -4,7 +4,7 @@ import {
   parseExecutionHostId,
   toRuntimeExecutionHostId,
   type ExecutionHostId
-} from '../../../../../../shared/execution-host'
+} from '../../../../../../shared/execution-host/execution-host'
 import type { ProjectHostSetup } from '../../../../../../shared/project/project-types'
 import type { Repo } from '../../../../../../shared/repository/repo-types'
 import { useAppStore } from '../../../../store/index'
@@ -19,6 +19,7 @@ import { matchesSettingsSearch, type SettingsSearchEntry } from '../../search/se
 
 import { useTranslate } from '@/i18n/use-translate'
 import { useConfiguredExecutionHostOptions } from '@/hooks/use-configured-execution-host-options'
+import { useRuntimeStatusByEnvironmentId } from '@/store/slices/runtime-status/views/use-runtime-status-view'
 import { buildSetupHostOptions, getSetupStateLabel } from './repository-host-setup-options'
 import { getRepositoryHostSetupsSectionId } from '../repository-settings-targets'
 import { RepositoryHostSetupActions } from './RepositoryHostSetupActions'
@@ -76,7 +77,7 @@ export function RepositoryHostSetupsSection({
   const deleteProjectHostSetup = useAppStore((state) => state.deleteProjectHostSetup)
   const sshTargetLabels = useAppStore((state) => state.sshTargetLabels)
   const sshConnectionStates = useAppStore((state) => state.sshConnectionStates)
-  const runtimeStatusByEnvironmentId = useAppStore((state) => state.runtimeStatusByEnvironmentId)
+  const runtimeStatusByEnvironmentId = useRuntimeStatusByEnvironmentId()
   const sshStateByEnvironment = useAppStore((state) => state.sshStateByEnvironment)
   const removedSshTargetLabels = useAppStore((state) => state.removedSshTargetLabels)
   const sshTargetsHydrated = useAppStore((state) => state.sshTargetsHydrated)

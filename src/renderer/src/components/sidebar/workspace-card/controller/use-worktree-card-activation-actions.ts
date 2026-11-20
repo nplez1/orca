@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 
-import { getRepoExecutionHostId } from '../../../../../../shared/execution-host'
 import { queueWorkspaceActivationTerminalFocus } from '../../../../lib/workspace/activation/workspace-activation-terminal-focus'
 import { restoreAgentTabFocusAfterGesture } from '@/lib/agent-tab-focus-policy'
+import { getRepoExecutionHostId } from '../../../../../../shared/execution-host/execution-host'
 import '@/diagnostics/crash-reporting/crash-diagnostics'
 import { recordRendererCrashBreadcrumb } from '../../../../diagnostics/crash-reporting/crash-breadcrumb-recorder'
 import { activateWorktreeFromSidebar } from '@/lib/workspace/activation/sidebar-worktree-activation'

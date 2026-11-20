@@ -7,15 +7,18 @@ import type { Store } from '../../persistence/loading-store/store'
 import {
   layoutNestsPrimaryCheckout,
   resolveWorktreeLayoutMode
-} from '../../../shared/orca-workspace-layout'
-import { DEFAULT_REPO_BADGE_COLOR } from '../../../shared/constants'
+} from '../../../shared/worktree/paths/orca-workspace-layout'
+import { DEFAULT_REPO_BADGE_COLOR } from '../../../shared/repository/appearance/repo-badge-color'
 import type { Repo } from '../../../shared/repository/repo-types'
 import type { RepositoryMetadataOwner } from '../../workspaces/catalog/imported-folder-project-link'
-import { getRepoExecutionHostId, LOCAL_EXECUTION_HOST_ID } from '../../../shared/execution-host'
+import {
+  getRepoExecutionHostId,
+  LOCAL_EXECUTION_HOST_ID
+} from '../../../shared/execution-host/execution-host'
 import { expandLeadingHomePath } from '../../filesystem/home-path-expansion'
 import { resolveDefaultCreateProjectParent } from './default-create-project-parent'
 import { getInitDefaultBranchName } from '../../git/init-default-branch'
-import { sanitizeWorktreeName } from '../worktree-logic'
+import { sanitizeWorktreeName } from '../worktrees/paths/worktree-logic'
 import { probeGitAvailability } from '../../git/command-runner/host-routing/git-availability'
 import { gitExecFileAsync } from '../../git/command-runner/git-exec-file'
 import { inspectGitRepoForRegistrationAsync } from '../../git/repositories/discovery/repo-detection'

@@ -5,7 +5,7 @@ import { runtimeTargetForOwnerEnvironment } from '../runtime/rpc/targets/runtime
 import {
   mergeQuickOpenRecentCandidates,
   useQuickOpenRecentCache
-} from './quick-open-recent-validation'
+} from './file-actions/quick-open/quick-open-recent-validation'
 import type { RuntimeFileListing } from './runtime-path-search-request'
 
 /** The options the listing itself used, so a validated recent path is one the caller's scope would

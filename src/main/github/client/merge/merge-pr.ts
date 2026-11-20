@@ -15,13 +15,19 @@ import type { PullRequestLookupData } from './../lookup/pull-request-lookup-data
 import { derivePullRequestMergeable } from './../lookup/pull-request-lookup-data'
 import { getRestPRByNumber, getPRByNumber } from './../lookup/pr-number-lookup'
 import { STACK_METADATA_UNAVAILABLE_ERROR } from './../lookup/pr-stack-summary-cache'
-import { codeHostFailure } from '../../../../shared/code-host-failure-copy'
+import { codeHostFailure } from '../../../../shared/source-control/code-host-failure-copy'
+
+export const PR_HEAD_MOVED_MERGE_ERROR =
+  'This pull request changed since you loaded it. Refresh and review the latest commits before merging.'
+
+/** `expectedHeadSha` fences the merge to the head the caller reviewed; GitHub refuses it if the head moved. */
 export async function mergePR(
   repoPath: string,
   prNumber: number,
   method: 'merge' | 'squash' | 'rebase' = 'squash',
   connectionId?: string | null,
   prRepo?: GitHubApiRepository | null,
+  expectedHeadSha?: string | null,
   localGitOptions: LocalGitExecOptions = {},
   options: { bypassBranchProtection?: boolean } = {}
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -54,6 +60,9 @@ export async function mergePR(
         diagnostic
       )
       return { ok: false, error: STACK_METADATA_UNAVAILABLE_ERROR }
+    }
+    if (expectedHeadSha && restData.headRefOid && restData.headRefOid !== expectedHeadSha) {
+      return { ok: false, error: PR_HEAD_MOVED_MERGE_ERROR }
     }
     if (restData.stack) {
       const mergeMetadata = await detectRepositoryMergeMetadata(
@@ -91,6 +100,9 @@ export async function mergePR(
     const args = ['pr', 'merge', String(prNumber), `--${method}`]
     if (ownerRepo) {
       args.push('--repo', `${ownerRepo.owner}/${ownerRepo.repo}`)
+    }
+    if (expectedHeadSha) {
+      args.push('--match-head-commit', expectedHeadSha)
     }
     if (preflight.adminBypass) {
       // Why: `gh pr merge` refuses a BLOCKED pull request before the server ever sees it, so an

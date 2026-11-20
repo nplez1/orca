@@ -1,9 +1,6 @@
 import { mergeGitConfigEnvProtocol } from '../../../shared/git/commands/git-credential-prompt-env'
 import { restoreManagedDataAccountEnvironment } from '../../../shared/agent-launch/environment/managed-data-account-environment'
-import {
-  ORCA_IMAGE_PROTOCOL_ENV,
-  ORCA_IMAGE_PROTOCOL_VALUE
-} from '../../../shared/terminal/images/terminal-image-protocol'
+import { ORCA_IMAGE_PROTOCOL_ENV } from '../../../shared/terminal/images/terminal-image-protocol'
 import {
   PI_CLIPBOARD_OSC52_ENV,
   PI_CLIPBOARD_OSC52_VALUE
@@ -13,6 +10,7 @@ import { removeChromiumDisabledSessionBus } from '../../pty/shell-startup/chromi
 import { stripInheritedBuildModeEnv } from '../../pty/shell-startup/build-mode-env'
 import { stripPiProcessOwnerEnv } from '../../pty/shell-startup/pi-process-owner-env'
 import { removeInheritedNoColor } from '../../pty/shell-startup/terminal-color-env'
+import { stampInheritedTmuxEnv } from '../../pty/shell-startup/inherited-tmux-env'
 import { isWindowsGitBashShellPath } from '../../pty/shell-startup/git-bash'
 import { applyScrubSafeAgentEnvAliases } from '../../../shared/agent-hook-listener/transport/agent-hook-scrub-safe-env'
 import { removeUnspecifiedPaneIdentityEnv } from './local-pty-launch-context'
@@ -73,10 +71,13 @@ export function buildInheritedLocalPtyEnvironment(
     // supports-hyperlinks rejects Orca by name despite xterm supporting OSC 8; force support.
     FORCE_HYPERLINK: '1',
     // Why: pi needs this to copy over OSC 52 for a paired client (see pi-clipboard-osc52-env).
-    [PI_CLIPBOARD_OSC52_ENV]: PI_CLIPBOARD_OSC52_VALUE,
-    [ORCA_IMAGE_PROTOCOL_ENV]: ORCA_IMAGE_PROTOCOL_VALUE
+    [PI_CLIPBOARD_OSC52_ENV]: PI_CLIPBOARD_OSC52_VALUE
   } satisfies Record<string, string>
+  if (explicitEnv?.[ORCA_IMAGE_PROTOCOL_ENV] === undefined) {
+    delete spawnEnv[ORCA_IMAGE_PROTOCOL_ENV]
+  }
   removeUnspecifiedPaneIdentityEnv(spawnEnv, explicitEnv)
+  stampInheritedTmuxEnv(spawnEnv, explicitEnv)
   stripPiProcessOwnerEnv(spawnEnv)
   removeAppImageRuntimeEnv(spawnEnv)
   removeChromiumDisabledSessionBus(spawnEnv)

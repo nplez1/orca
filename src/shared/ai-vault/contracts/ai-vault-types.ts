@@ -1,7 +1,7 @@
 import type { AiVaultScanIssueText } from '../scanning/ai-vault-scan-issue-copy'
 import type { TuiAgent } from '../../agent-launch/catalog/tui-agent'
 import type { AgentSessionAccountHome } from '../../agent-session/lifecycle/accounts/agent-session-account-home'
-import type { ExecutionHostId, ExecutionHostScope } from '../../execution-host'
+import type { ExecutionHostId, ExecutionHostScope } from '../../execution-host/execution-host'
 
 export const AI_VAULT_AGENTS = [
   'claude',
@@ -40,6 +40,9 @@ export const AI_VAULT_SCOPE_PATHS_MAX_COUNT = 64
  * `kind` either.
  */
 export const AI_VAULT_LIST_SKIP_ISSUE_PATH = 'aiVault.listSessions'
+
+// One host's list scan can take minutes on a busy server, far past the default remote RPC timeout.
+export const AI_VAULT_SINGLE_HOST_LIST_TIMEOUT_MS = 150_000
 
 // Why: IPC rejection drops `Error.name`, so the renderer can only recognise a
 // cancelled scan by its message. Both sides share this literal.

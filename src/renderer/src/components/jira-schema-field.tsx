@@ -3,7 +3,10 @@ import { resolveJiraFieldControlKind } from '../../../shared/jira-field-renderin
 import { joinJiraFieldDraft } from '../../../shared/jira-field-draft'
 import { JiraOptionMultiSelect, jiraOptionToken } from '@/components/jira-option-multi-select'
 import { JiraUserMultiPicker, jiraHeldUsers } from '@/components/jira-user-multi-picker'
-import { JiraUserPicker, type JiraUserPickerFixedOption } from '@/components/jira-user-picker'
+import {
+  JiraUserPicker,
+  type JiraUserPickerFixedOption
+} from '@/components/task-page/jira/issue-workspace/jira-user-picker'
 import { getJiraCreateAllowedValueLabel } from '@/components/task-page/jira/creation/task-page-jira-create-fields'
 import { Input } from '@/components/ui/input'
 import {

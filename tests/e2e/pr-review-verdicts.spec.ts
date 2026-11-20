@@ -1,7 +1,7 @@
-import { test, expect } from './helpers/orca-app'
-import { openChecks } from './helpers/source-control-ai-generation'
-import { seedPRCommentsSidebarFixture } from './helpers/pr-comments-sidebar-fixture'
-import { waitForActiveWorktree, waitForSessionReady } from './helpers/store'
+import { test, expect } from './desktop/electron-fixtures/orca-app'
+import { openChecks } from './source-control/source-control-ai-generation'
+import { seedPRCommentsSidebarFixture } from './source-control/pr-comments-sidebar-fixture'
+import { waitForActiveWorktree, waitForSessionReady } from './desktop/renderer-probes/store'
 import type { PRComment } from '../../src/shared/github/comments/comment-types'
 
 /**

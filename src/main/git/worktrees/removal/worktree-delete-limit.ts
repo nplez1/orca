@@ -98,7 +98,3 @@ function waitForSlot(
     void granted.then(() => settle(true))
   })
 }
-
-export function _worktreeDeleteLimitSnapshotForTests(): { running: number; waiting: number } {
-  return { running, waiting: waiting.length }
-}

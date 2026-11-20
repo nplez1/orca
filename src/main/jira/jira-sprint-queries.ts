@@ -71,7 +71,7 @@ export async function getIssueSprintAssignment(request: {
   siteId?: string | null
   boardId?: string | null
 }): Promise<JiraSprintAssignment> {
-  const entry = getSingleClient(request.siteId)
+  const entry = await getSingleClient(request.siteId)
   // Why one deadline over the whole read: it lists every page of every board the issue
   // could move to, so per-request patience does not bound how long it can take.
   return withJiraQueuedDeadline(
@@ -113,7 +113,7 @@ export async function getIssueSprintAssignment(request: {
         return { sprint, sprints: [...byId.values()].sort(compareSprints) }
       } catch (error) {
         if (isAuthError(error)) {
-          clearToken(entry.site.id)
+          await clearToken(entry)
         }
         throw error
       }

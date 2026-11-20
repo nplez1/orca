@@ -1,4 +1,4 @@
-import type { GlobalSettings } from '../../../shared/global-settings-types'
+import type { GlobalSettings } from '../../../shared/settings/global-settings-types'
 
 /** PR review threads inline in code are on unless the user has explicitly turned them off. */
 export function isPRCommentsInlineEnabled(

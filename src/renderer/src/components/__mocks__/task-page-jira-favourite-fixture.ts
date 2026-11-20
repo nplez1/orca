@@ -1,6 +1,6 @@
 import { useMemo, useRef } from 'react'
 import { vi, type Mock } from 'vitest'
-import type { ExecutionHostId } from '../../../../shared/execution-host'
+import type { ExecutionHostId } from '../../../../shared/execution-host/execution-host'
 import type { JiraIssue, JiraIssueSearchPage } from '../../../../shared/jira/jira-types'
 import type { JiraSavedFilterState } from '../../../../shared/jira/jira-saved-filters'
 import type { TaskPageLinearViewStateModel } from '../task-page/linear/use-task-page-linear-view-state'

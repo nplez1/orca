@@ -1,8 +1,8 @@
 import { jiraListIssuesForTarget, jiraSearchIssues } from '@/runtime/jira/runtime-jira-client'
 import { getJiraRuntimeTarget } from '@/runtime/jira/runtime-jira-target'
-import { isIntegrationCredentialDecryptionError } from '../../../../../shared/integration-credential-errors'
 import type { JiraSiteSelection } from '../../../../../shared/jira/jira-types'
 import type { TaskSourceContext } from '../../../../../shared/work-items/task-source-context'
+import { isIntegrationCredentialDecryptionError } from '../../../../../shared/secure-storage/integration-credential-errors'
 import type { JiraSlice, JiraSliceGet, JiraSliceSet } from './jira-slice-contract'
 import {
   cachedIssues,

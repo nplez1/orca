@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { OrcaVmRecipe } from './orca-yaml-hook-types'
+import type { OrcaVmRecipe } from './workspace-setup/orca-yaml-hook-types'
 import {
   buildContextMenuEnv,
   describeContextMenuItemFailure,

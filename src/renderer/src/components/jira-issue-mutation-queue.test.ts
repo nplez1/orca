@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { JiraIssue } from '../../../shared/jira/jira-types'
 import { JiraWriteTimeoutError } from '@/runtime/jira-write-deadline'
-import { enqueueJiraIssueMutation, subscribeJiraIssueMutation } from './jira-issue-mutation-queue'
+import {
+  enqueueJiraIssueMutation,
+  subscribeJiraIssueMutation
+} from './task-page/jira/issue-workspace/jira-issue-mutation-queue'
 
 function issue(key: string, title = 'Server title'): JiraIssue {
   return {

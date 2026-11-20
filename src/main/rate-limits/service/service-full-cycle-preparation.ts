@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget (286/300); the fork's +20-line delta rides inside it, and splitting costs a permanent sync hunk. */
 import { fetchActiveClaudeRateLimits } from '../providers/claude/claude-active-usage-fetch'
 import { fetchCodexRateLimits } from '../providers/codex/codex-fetcher'
 import { fetchGeminiRateLimits } from '../providers/gemini/gemini-usage-fetcher'
@@ -15,7 +16,8 @@ import { fetchOpenCodeGoUsage } from '../providers/opencode-go/opencode-go-usage
 import { prepareForkProviderCycle } from '../fork/fork-provider-cycle'
 import { RateLimitServiceCycleFetchState } from './service-cycle-fetch-state'
 import { trackSettledProviderResult } from './service-sibling-provider-result'
-import type { FetchAllCyclePrepared, ProviderRateLimits } from './service-types'
+import type { FetchAllCyclePrepared } from './full-cycle-prepared'
+import type { ProviderRateLimits } from '../../../shared/agent-usage/rate-limits/rate-limit-types'
 
 export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServiceCycleFetchState {
   protected async prepareFetchAllCycle(
@@ -29,19 +31,31 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     // gate below skips a credential read or substitutes a hidden snapshot.
     const disabled = this.disabledUsageProviderIds()
     this.resetDisabledProviderCredentialFlags(disabled)
+    const credentialGenerations = [
+      this.opencodeFetchGeneration,
+      this.minimaxFetchGeneration,
+      this.zcodeFetchGeneration
+    ]
+    // Capture identities before awaits so a switch cannot reattribute the old credentials.
     const claudeTarget = this.claudeFetchTarget
-    // Capture before await so a switch invalidates both attribution and result application.
     const claudeGeneration = this.claudeFetchGeneration
-    const claudeAuthPreparation = disabled.has('claude')
-      ? undefined
-      : await this.claudeAuthPreparationResolver?.(claudeTarget)
+    // Why in one await with the Claude read: the fork resolvers read credential files, and a
+    // separate round trip for them would add a microtask before this cycle's generation stamps.
+    const [claudeAuthPreparation, [deepSeek, fireworks, deepInfra, copilot]] = await Promise.all([
+      disabled.has('claude') ? undefined : this.claudeAuthPreparationResolver?.(claudeTarget),
+      Promise.all([
+        this.resolveDeepSeekConfig(),
+        this.resolveFireworksConfig(),
+        this.resolveDeepInfraConfig(),
+        this.resolveCopilotConfig()
+      ])
+    ])
     if (signal.aborted) {
       return null
     }
     this.rememberClaudeAuthSnapshot(claudeAuthPreparation, claudeGeneration, claudeTarget)
     const claudeProvenance = claudeAuthPreparation?.provenance ?? 'system'
     const codexTarget = this.codexFetchTarget
-    // Capture before await so a reset invalidates this cycle.
     const codexGeneration = this.codexFetchGeneration
     // Gate only Codex, never siblings, when its runtime is skipped (#STA-4422).
     // Why: resolveCodexHome probes credential homes, so a disabled Codex skips it entirely.
@@ -56,17 +70,14 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     if (signal.aborted) {
       return null
     }
-    const previousState = this.state
     const antigravityGeneration = this.antigravityFetchGeneration
     const antigravityTarget = this.antigravityFetchTarget
     const codexFetchGated = disabled.has('codex') || codexHome?.skip === true
     const codexHomePath = codexHome?.homePath ?? null
-    const codexStateBeforeFetch =
-      previousState.codex?.status === 'fetching' ? null : previousState.codex
     const codexProvenance = codexFetchGated
       ? null
       : this.getCodexProvenance(codexTarget, codexHomePath)
-    const openCodeGoConfig = this.resolveOpenCodeGoConfig()
+    const openCodeGoConfig = await this.resolveOpenCodeGoConfig()
     // Why a call-site gate here: its config resolver cannot say "switched off", because this
     // fetcher treats an empty settings key as "look elsewhere" and resolves OpenCode's own
     // credential store and environment, then can make the request. UpdateState nulling the result
@@ -77,12 +88,39 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     const openCodeGoApiKey = openCodeGoConfig.apiKey
     const openCodeGoApiKeyError = openCodeGoConfig.apiKeyError
     const openCodeGoApiKeyReadSkipped = openCodeGoConfig.apiKeyReadSkipped
-    const miniMaxConfigResult = this.resolveMiniMaxConfig()
+    const miniMaxConfigResult = await this.resolveMiniMaxConfig()
     const miniMaxCookie = miniMaxConfigResult.config.sessionCookie
     const miniMaxGroupId = miniMaxConfigResult.config.groupId
     const miniMaxModels = miniMaxConfigResult.config.models
     const miniMaxEndpoint = miniMaxConfigResult.config.endpoint
     const miniMaxApiKey = miniMaxConfigResult.config.apiKey
+    const zcodePlanConfigResult = await this.resolveZcodePlanConfig()
+    if (signal.aborted) {
+      return null
+    }
+    if (
+      claudeGeneration !== this.claudeFetchGeneration ||
+      codexGeneration !== this.codexFetchGeneration ||
+      antigravityGeneration !== this.antigravityFetchGeneration ||
+      credentialGenerations.some(
+        (generation, index) =>
+          generation !==
+          [this.opencodeFetchGeneration, this.minimaxFetchGeneration, this.zcodeFetchGeneration][
+            index
+          ]
+      )
+    ) {
+      // Retry through the existing queue with current account homes and credentials.
+      this.fullFetchQueued ??= { force: options?.force ?? false }
+      return null
+    }
+    // Preserve live usage received while credentials were loading.
+    const previousState = this.state
+    const codexStateBeforeFetch =
+      previousState.codex?.status === 'fetching' ? null : previousState.codex
+    const geminiCliOAuthEnabled = disabled.has('gemini')
+      ? false
+      : (this.geminiCliOAuthEnabledResolver?.() ?? false)
     const forkProviderCycle = prepareForkProviderCycle({
       disabled,
       signal,
@@ -94,12 +132,7 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
         copilot: previousState.copilot
       },
       isRetryAfterActive: (limits) => this.isRetryAfterActive(limits),
-      resolveConfigs: () => ({
-        deepSeek: this.resolveDeepSeekConfig(),
-        fireworks: this.resolveFireworksConfig(),
-        deepInfra: this.resolveDeepInfraConfig(),
-        copilot: this.resolveCopilotConfig()
-      }),
+      configs: { deepSeek, fireworks, deepInfra, copilot },
       syncGenerations: (fingerprints) => ({
         deepSeek: this.syncDeepSeekFetchGeneration(fingerprints.deepSeek),
         fireworks: this.syncFireworksFetchGeneration(fingerprints.fireworks),
@@ -108,13 +141,9 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
       }),
       apiKeyCredentialError: (provider, message) => this.getApiKeyCredentialError(provider, message)
     })
-    const geminiCliOAuthEnabled = disabled.has('gemini')
-      ? false
-      : (this.geminiCliOAuthEnabledResolver?.() ?? false)
     // Probe auth during fetch, not hot renderer/mobile getState calls.
     const grokAuthReadResult = disabled.has('grok') ? null : readGrokAuthSession()
     this.grokAuthConfigured = disabled.has('grok') ? false : grokAuthReadResult?.status === 'ok'
-
     // Config changes discard old-account usage; hash credentials because only identity changes matter.
     const apiKeyFingerprint = openCodeGoApiKey
       ? createHash('sha256').update(openCodeGoApiKey).digest('hex')
@@ -122,12 +151,9 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     const currentConfigHash = `${cookie}|${workspaceIdOverride}|${apiKeyFingerprint}|${openCodeGoApiKeyError ?? ''}`
     const opencodeConfigChanged = currentConfigHash !== this.lastOpencodeConfigHash
     const opencodeGeneration = this.syncOpencodeFetchGeneration(currentConfigHash)
-
     const currentMiniMaxConfigHash = `${miniMaxCookie}|${miniMaxGroupId}|${miniMaxModels}|${miniMaxEndpoint}|${miniMaxApiKey}|${miniMaxConfigResult.error ?? ''}`
     const miniMaxConfigChanged = currentMiniMaxConfigHash !== this.lastMiniMaxConfigHash
     const miniMaxGeneration = this.syncMiniMaxFetchGeneration(currentMiniMaxConfigHash)
-
-    const zcodePlanConfigResult = this.resolveZcodePlanConfig()
     const zcodePlanApiKey = zcodePlanConfigResult.config.apiKey
     // Hash credentials because only changes matter, never retain the raw key here.
     const currentZcodeConfigHash = zcodePlanApiKey
@@ -157,7 +183,6 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
         zcode: zcodeConfigChanged
       }
     })
-
     // Async Keychain/worker DB reads must not delay other providers.
     const cursorResultPromise = disabled.has('cursor')
       ? trackSettledProviderResult(Promise.resolve(this.disabledUsageProviderSnapshot('cursor')))
@@ -175,7 +200,6 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
           ? Promise.resolve(this.getZcodePlanCredentialError(zcodePlanConfigResult.error))
           : fetchZcodeRateLimits({ signal, planCredential: zcodePlanCredential })
     )
-
     // Hidden meters avoid the CLI spawn; the separate promise keeps other providers responsive.
     const antigravityResultPromise = trackSettledProviderResult(
       antigravityFetchAllowed
@@ -184,7 +208,6 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
           )
         : Promise.resolve(previousState.antigravity ?? antigravityUsageDisabledSnapshot())
     )
-
     const missingWslCodexHome =
       codexFetchGated || codexHomePath ? null : this.getMissingWslCodexHomeResult(codexTarget)
     // Why: reading Grok's auth file is the credential import, so a disabled Grok never reaches it.
@@ -193,14 +216,12 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
           fetchGrokRateLimits({ signal, authReadResult: grokAuthReadResult })
         )
       : trackSettledProviderResult(Promise.resolve(this.disabledUsageProviderSnapshot('grok')))
-
     // Live display does not waive automated Retry-After gates.
     const claudeFetchGated =
       disabled.has('claude') ||
       !this.isClaudeOAuthUsageEnabled() ||
       claudeGeneration !== this.claudeFetchGeneration ||
       (!options?.force && this.shouldSkipAutomatedFetch('claude', previousState.claude))
-
     const [claudeResult, codexResult, geminiResult, opencodeGoResult, kimiResult, miniMaxResult] =
       await Promise.allSettled([
         claudeFetchGated
@@ -220,6 +241,7 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
           : (missingWslCodexHome ??
             fetchCodexRateLimits({
               codexHomePath,
+              readingAccount: codexHome?.readingAccount,
               networkProxySettings: this.networkProxySettingsResolver?.(),
               signal
             })),
@@ -262,7 +284,6 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
                 apiKey: miniMaxApiKey
               })
       ])
-
     if (signal.aborted) {
       return null
     }

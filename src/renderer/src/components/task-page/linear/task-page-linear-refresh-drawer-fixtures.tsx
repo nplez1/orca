@@ -1,7 +1,7 @@
 import { defaultScopeHost } from '@/runtime/hosts/selection/default-creation-host'
-import { LinearIssueTextEditor } from '../../LinearIssueTextEditor'
-import { useLinearIssueEditController } from '../../linear-item-drawer-edit-controller'
-import type { LinearEditState } from '../../linear-item-drawer-types'
+import { LinearIssueTextEditor } from './issue-workspace/LinearIssueTextEditor'
+import { useLinearIssueEditController } from './item-drawer/linear-item-drawer-edit-controller'
+import type { LinearEditState } from './item-drawer/linear-item-drawer-types'
 import type { LinearIssue } from '../../../../../shared/linear/issue-types'
 
 export function DrawerFields({ row, editState }: { row: LinearIssue; editState: LinearEditState }) {

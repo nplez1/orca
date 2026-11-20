@@ -1,7 +1,9 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget (265/300); the fork's +43-line delta rides inside it, and splitting costs a permanent sync hunk. */
 import type { TransferListItem } from 'node:worker_threads'
 import { WorkerThreadConcurrentRequestRegistry } from '../worker-thread-concurrent-request-registry'
 import { LazyWorkerThreadHost } from './lazy-worker-thread-host'
 import type { WorkerThreadFactory } from './worker-thread-transport'
+import { UTILITY_WORKER_HOST_PAUSED } from '../utility-worker-host/utility-worker-host-protocol'
 
 /** Serialize worker calls; failures must never move their work onto the main thread. */
 
@@ -317,7 +319,14 @@ export class WorkerThreadRequestQueue<
   private failQueuedAsUnavailable(): void {
     const pending = this.queue
     this.queue = []
-    const reason = this.host.isRetiring ? 'previous worker still exiting' : 'worker spawn failed'
+    const failure = this.host.spawnFailure
+    const paused =
+      failure instanceof Error && 'code' in failure && failure.code === UTILITY_WORKER_HOST_PAUSED
+    const reason = this.host.isRetiring
+      ? 'previous worker still exiting'
+      : paused
+        ? failure.message
+        : 'worker spawn failed'
     for (const call of pending) {
       this.settle(call, () => call.reject(this.options.createUnavailableError(reason)))
     }

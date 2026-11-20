@@ -12,7 +12,7 @@ import {
   settleGitHubChecksTabDetails,
   settleGitHubChecksTabDetailsKeepingShown,
   type CheckDetailsLoadState
-} from '@/components/github-checks-tab-state'
+} from '@/components/github/github-checks-tab-state'
 import {
   checkDetailsRowState,
   readCachedCheckDetails,

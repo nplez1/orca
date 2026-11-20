@@ -52,15 +52,15 @@ async function loadModules() {
   return { connection, rebuild }
 }
 
-function configureServer(connection: {
+async function configureServer(connection: {
   saveJenkinsServerFromArgs: (args: {
     label: string
     baseUrl: string
     username: string
     apiToken: string
-  }) => JenkinsSaveServerResult
-}): void {
-  const result = connection.saveJenkinsServerFromArgs({
+  }) => Promise<JenkinsSaveServerResult>
+}): Promise<void> {
+  const result = await connection.saveJenkinsServerFromArgs({
     label: 'CI',
     baseUrl: SERVER_URL,
     username: 'ada',
@@ -96,7 +96,7 @@ afterEach(() => {
 describe('rerunJenkinsBuild', () => {
   it('posts to the build’s replay action, authenticated, with the crumb', async () => {
     const { connection, rebuild } = await loadModules()
-    configureServer(connection)
+    await configureServer(connection)
     route = (url) => {
       if (url.includes('crumbIssuer')) {
         return json({ crumbRequestField: 'Jenkins-Crumb', crumb: 'abc123' })
@@ -120,7 +120,7 @@ describe('rerunJenkinsBuild', () => {
 
   it('accepts a rerun that answers with a redirect to the job page', async () => {
     const { connection, rebuild } = await loadModules()
-    configureServer(connection)
+    await configureServer(connection)
     route = () => redirectToJob()
 
     // Why: Jenkins ends a queued rerun with `sendRedirect`, so a redirect is the success path and
@@ -133,7 +133,7 @@ describe('rerunJenkinsBuild', () => {
 
   it('reports a freestyle build as not replayable', async () => {
     const { connection, rebuild } = await loadModules()
-    configureServer(connection)
+    await configureServer(connection)
     route = (url, init) => {
       if (init.method === 'POST') {
         return new Response(null, { status: 404 })
@@ -155,7 +155,7 @@ describe('rerunJenkinsBuild', () => {
 
   it('blames the account when a pipeline run exists but offers no rerun', async () => {
     const { connection, rebuild } = await loadModules()
-    configureServer(connection)
+    await configureServer(connection)
     route = (_url, init) =>
       init.method === 'POST'
         ? new Response(null, { status: 404 })
@@ -174,7 +174,7 @@ describe('rerunJenkinsBuild', () => {
 
   it('reports a pruned build as missing', async () => {
     const { connection, rebuild } = await loadModules()
-    configureServer(connection)
+    await configureServer(connection)
     route = () => new Response(null, { status: 404 })
 
     const result = await rebuild.rerunJenkinsBuild({ url: CHECK_URL })
@@ -188,7 +188,7 @@ describe('rerunJenkinsBuild', () => {
 
   it('does not retry when Jenkins refuses the rerun', async () => {
     const { connection, rebuild } = await loadModules()
-    configureServer(connection)
+    await configureServer(connection)
     route = (_url, init) =>
       init.method === 'POST' ? new Response(null, { status: 403 }) : json({})
 
@@ -204,7 +204,7 @@ describe('rerunJenkinsBuild', () => {
 
   it('reports a redirect that landed on a failure as unconfirmed', async () => {
     const { connection, rebuild } = await loadModules()
-    configureServer(connection)
+    await configureServer(connection)
     route = (_url, init) => {
       if (init.method !== 'POST') {
         return json({})
@@ -248,7 +248,7 @@ describe('rerunJenkinsBuild', () => {
 
   it('distinguishes a Jenkins link that names no build from a non-Jenkins one', async () => {
     const { connection, rebuild } = await loadModules()
-    configureServer(connection)
+    await configureServer(connection)
 
     // A GitHub Actions job URL parses as a job named `456` with no build, and a job-level Jenkins
     // link names no build either — neither has a build to rerun.

@@ -13,8 +13,8 @@ export type DeepSeekCredentialsStatus = {
   apiKeyConfigured: boolean
 }
 
-function getDeepSeekCredentialsStatus(): DeepSeekCredentialsStatus {
-  const apiKeyConfigured = hasDeepSeekApiKey()
+async function getDeepSeekCredentialsStatus(): Promise<DeepSeekCredentialsStatus> {
+  const apiKeyConfigured = await hasDeepSeekApiKey()
   return { configured: apiKeyConfigured, apiKeyConfigured }
 }
 
@@ -37,21 +37,21 @@ function refreshAfterDeepSeekCredentialChange(
 
 export function registerDeepSeekCredentialsHandlers(rateLimits: RateLimitService | null): void {
   ipcMain.handle('deepseekCredentials:getStatus', () => getDeepSeekCredentialsStatus())
-  ipcMain.handle('deepseekCredentials:saveApiKey', (_event, key: string) => {
+  ipcMain.handle('deepseekCredentials:saveApiKey', async (_event, key: string) => {
     // Validate the IPC argument in the main process; the renderer-declared type
     // is compile-time only and the value arrives as unknown over IPC.
     if (typeof key !== 'string') {
       throw new Error('DeepSeek API key must be a string')
     }
-    saveDeepSeekApiKey(key)
+    await saveDeepSeekApiKey(key)
     noteReplicatedCredentialChanged()
     refreshAfterDeepSeekCredentialChange(rateLimits, 'save')
-    return getDeepSeekCredentialsStatus()
+    return await getDeepSeekCredentialsStatus()
   })
-  ipcMain.handle('deepseekCredentials:clearApiKey', () => {
-    clearDeepSeekApiKey()
+  ipcMain.handle('deepseekCredentials:clearApiKey', async () => {
+    await clearDeepSeekApiKey()
     noteReplicatedCredentialChanged()
     refreshAfterDeepSeekCredentialChange(rateLimits, 'clear')
-    return getDeepSeekCredentialsStatus()
+    return await getDeepSeekCredentialsStatus()
   })
 }

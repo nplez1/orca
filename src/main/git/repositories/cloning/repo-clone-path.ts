@@ -6,7 +6,7 @@ import {
   isWindowsAbsolutePathLike,
   normalizeRuntimePathForComparison,
   normalizeRuntimePathSeparators
-} from '../../../../shared/cross-platform-path'
+} from '../../../../shared/file-access/cross-platform-path'
 import { resolveCreatePathAlias } from '../../../workspaces/creation/worktree-create-in-flight'
 import { expandLeadingHomePath } from '../../../filesystem/home-path-expansion'
 

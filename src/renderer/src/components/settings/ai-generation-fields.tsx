@@ -26,7 +26,6 @@ import { AgentIcon } from '@/components/agent/icons/AgentIcon'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
-import { DropdownMenuItem } from '../ui/dropdown-menu'
 import { AgentLaunchPicker } from '../agent/AgentLaunchPicker'
 import {
   aiCommitPrPickerDraft,
@@ -108,12 +107,15 @@ function AiGenerationLaunchAgentPicker({
           : undefined
       }
       emptyLabel={unsupportedOrUnconfiguredLabel(unsupportedAgentLabel, t)}
-    >
-      <DropdownMenuItem onSelect={() => onAgentChange(CUSTOM_AGENT_ID)}>
-        <Terminal className="size-3.5" />
-        {t('auto.components.feature.wall.AiCommitPrSettingsCard.560d4feb00', 'Custom')}
-      </DropdownMenuItem>
-    </AgentLaunchPicker>
+      choices={[
+        {
+          id: CUSTOM_AGENT_ID,
+          icon: <Terminal className="size-3.5" />,
+          label: t('auto.components.feature.wall.AiCommitPrSettingsCard.560d4feb00', 'Custom'),
+          onSelect: () => onAgentChange(CUSTOM_AGENT_ID)
+        }
+      ]}
+    />
   )
 }
 
@@ -157,7 +159,7 @@ function AiGenerationAgentSelect({
         </span>
       </SelectTrigger>
       <SelectContent portalContainer={selectPortalRoot} position="popper" align="start">
-        {listCommitMessageAgentCapabilities().map((capability) => (
+        {listCommitMessageAgentCapabilities('commitMessage').map((capability) => (
           <SelectItem key={capability.id} value={capability.id} className="cursor-pointer">
             <span className="flex items-center gap-2">
               <AgentIcon agent={capability.id} size={14} />

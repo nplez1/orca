@@ -1,7 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { textToAdf } from './adf-markdown'
 import { markdownCommentBody, markdownToAdf, markdownToJiraWiki } from './jira-comment-body'
 import type { JiraSite } from '../../shared/jira/jira-types'
+
+/** The shape the pre-toolbar plain-text path sent: one paragraph per line, `\r?\n` split. */
+function plainTextAdf(text: string): Record<string, unknown> {
+  return {
+    type: 'doc',
+    version: 1,
+    content: text.split(/\r?\n/).map((line) => ({
+      type: 'paragraph',
+      content: line ? [{ type: 'text', text: line }] : []
+    }))
+  }
+}
 
 function site(overrides: Partial<JiraSite> = {}): JiraSite {
   return {
@@ -83,11 +94,11 @@ describe('comment body conversion', () => {
     })
   })
 
-  // Every comment that predates the toolbar went out through `textToAdf`, so the
+  // Every comment that predates the toolbar went out through the plain-text path, so the
   // converter has to agree with it wherever no Markdown is present.
   it('matches the plain-text ADF shape for unformatted bodies', () => {
     for (const body of ['just a note', 'line one\nline two', 'gap\n\nbelow', '']) {
-      expect(markdownToAdf(body)).toEqual(textToAdf(body))
+      expect(markdownToAdf(body)).toEqual(plainTextAdf(body))
     }
   })
 
@@ -114,9 +125,9 @@ describe('comment body conversion', () => {
   })
 
   it('reads a carriage return the way the plain-text path does', () => {
-    // Byte parity for wiki, separator parity for ADF: `textToAdf` splits on \r?\n.
+    // Byte parity for wiki, separator parity for ADF: the plain-text path splits on \r?\n.
     expect(markdownToJiraWiki('one\r\ntwo')).toBe('one\r\ntwo')
-    expect(markdownToAdf('one\r\ntwo')).toEqual(textToAdf('one\r\ntwo'))
+    expect(markdownToAdf('one\r\ntwo')).toEqual(plainTextAdf('one\r\ntwo'))
   })
 
   it('does not emphasise an intraword underscore', () => {

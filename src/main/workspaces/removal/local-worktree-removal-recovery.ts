@@ -3,7 +3,10 @@ import { pruneGitWorktrees } from '../../git/worktrees/removal/worktree-prune-gu
 import type { GitWorktreeInfo } from '../../../shared/worktree/types'
 import { assertWorktreeUnlockedForRemoval } from '../../../shared/worktree/removal/removal'
 import { areWorktreePathsEqual } from '../../git/worktrees/catalog/worktree-path-comparison'
-import { formatWorktreeRemovalError, isOrphanedWorktreeError } from '../../ipc/worktree-logic'
+import {
+  formatWorktreeRemovalError,
+  isOrphanedWorktreeError
+} from '../../ipc/worktrees/paths/worktree-logic'
 import { listWorktreesStrict } from '../../git/worktrees/catalog/worktree-listing'
 import {
   normalizeLocalBranchRef,
@@ -125,7 +128,8 @@ export async function recoverPartialLocalWorktreeRemoval(
     await removeLocalWorktreePath(
       args.canonicalWorktreePath,
       args.localWorktreeGitOptions,
-      args.signal
+      args.signal,
+      { markerLast: true }
     )
   } catch (error) {
     throwIfSignalAborted(args.signal)

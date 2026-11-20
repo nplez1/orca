@@ -4,7 +4,10 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { JiraUser } from '../../../shared/jira/jira-types'
 import type { RuntimeJiraSettings } from '@/runtime/jira/runtime-jira-target'
-import { JiraUserPicker, splitJiraUserPickerOptions } from './jira-user-picker'
+import {
+  JiraUserPicker,
+  splitJiraUserPickerOptions
+} from './task-page/jira/issue-workspace/jira-user-picker'
 
 vi.mock('@/runtime/jira/runtime-jira-client.ts', () => ({ jiraSearchUsers: vi.fn() }))
 

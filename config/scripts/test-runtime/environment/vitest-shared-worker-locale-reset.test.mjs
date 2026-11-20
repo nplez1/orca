@@ -6,7 +6,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import {
   getRendererLanguageDetection,
   setRendererLanguageDetection
-} from '../../../../src/shared/ui-locale'
+} from '../../../../src/shared/i18n/ui-locale'
 import { restoreSharedWorkerLocale } from './vitest-shared-worker-locale-reset.mjs'
 import { resolvePinnedBunExecutable } from '../../tool-invocation/pinned-bun-executable.mjs'
 

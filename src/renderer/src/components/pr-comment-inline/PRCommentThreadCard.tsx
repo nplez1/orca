@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react'
 import { Check, ChevronsDownUp, CornerDownLeft, ExternalLink, Reply, Undo2 } from 'lucide-react'
 import { cn } from '@/lib/class-names'
 import { openAppHttpLink } from '@/lib/browser/navigation/app-http-link-open'
-import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
+import CommentMarkdown from '@/components/comment-markdown/CommentMarkdown'
 import {
   RightPanelCommentComposer,
   type RightPanelCommentSubmitResult

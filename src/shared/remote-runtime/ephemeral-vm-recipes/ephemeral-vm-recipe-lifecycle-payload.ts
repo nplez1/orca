@@ -1,7 +1,10 @@
 import type { EphemeralVmRecipeResult } from './ephemeral-vm-recipes'
 import type { EphemeralVmRecipeContext } from './ephemeral-vm-recipe-runner'
 import { quoteShellToken } from './ephemeral-vm-recipe-process'
-import type { OrcaVmRecipe, OrcaVmRecipeContextMenuItem } from '../../orca-yaml-hook-types'
+import type {
+  OrcaVmRecipe,
+  OrcaVmRecipeContextMenuItem
+} from '../../workspace-setup/orca-yaml-hook-types'
 
 export type EphemeralVmRecipeLifecycleMode =
   | 'suspend'

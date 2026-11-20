@@ -7,7 +7,7 @@ import { useCreateProjectDefaults } from './useCreateProjectDefaults'
 import {
   toRuntimeExecutionHostId,
   toSshExecutionHostId
-} from '../../../../../../shared/execution-host'
+} from '../../../../../../shared/execution-host/execution-host'
 
 const browseRuntimeServerDirectory = vi.hoisted(() => vi.fn())
 

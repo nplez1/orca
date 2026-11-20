@@ -16,7 +16,7 @@ import {
   type AiVaultSession
 } from '../../../shared/ai-vault/contracts/ai-vault-types'
 import { aiVaultScanIssueText } from '../../../shared/ai-vault/scanning/ai-vault-scan-issue-copy'
-import type { ExecutionHostId } from '../../../shared/execution-host'
+import type { ExecutionHostId } from '../../../shared/execution-host/execution-host'
 import { ScannedSessionCollection } from './session-root-dedup'
 import type { AntigravityWorkspaceResolver } from '../scanners/antigravity/session-scanner-antigravity-history'
 import {
@@ -32,7 +32,10 @@ import {
 } from '../parse-cache/session-parse-cache-store'
 import { canStopParsingSessions } from './session-scan-cutoff'
 import { throwIfAiVaultScanCancelled } from '../scan-lifecycle/ai-vault-scan-cancellation'
-import { noteAiVaultScanReadingFile, noteAiVaultScanWorkChanged } from '../scan-lifecycle/ai-vault-scan-progress'
+import {
+  noteAiVaultScanReadingFile,
+  noteAiVaultScanWorkChanged
+} from '../scan-lifecycle/ai-vault-scan-progress'
 
 const SESSION_PARSE_CONCURRENCY = 8
 

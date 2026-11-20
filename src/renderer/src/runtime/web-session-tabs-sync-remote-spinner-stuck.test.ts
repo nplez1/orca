@@ -32,7 +32,7 @@ import {
 } from '../../../shared/agent-status/contracts/agent-status-freshness'
 import { makePaneKey } from '../../../shared/workspace-layout/stable-pane-id'
 import { toWebTerminalSurfaceTabId } from '../../../shared/workspace-layout/terminal-surface-id'
-import { getDefaultSettings } from '../../../shared/constants'
+import { getDefaultSettings } from '../../../shared/orca-profiles/constants'
 import type { AppState } from '../store/types'
 import { createTestStore, makeWorktree, seedStore } from '../store/slices/store-test-helpers'
 import {
@@ -40,9 +40,9 @@ import {
   registerRendererOwnedAgentStatusPane,
   resetRendererOwnedAgentStatusPanesForTests
 } from '../components/terminal-pane/agent-status/renderer-owned-agent-status-registry'
-import { applyWebSessionTabsSnapshot } from './web-session-tabs-sync/snapshot-api'
-import { resetWebSessionTabsSnapshotFreshnessForTests } from './web-session-tabs-sync/tracking-lifecycle'
-import { shouldApplyWebSessionTabsSnapshot } from './web-session-tabs-sync/tracking-decisions'
+import { applyWebSessionTabsSnapshot } from './web-session-tabs-sync/snapshots/snapshot-api'
+import { resetWebSessionTabsSnapshotFreshnessForTests } from './web-session-tabs-sync/tracking/tracking-lifecycle'
+import { shouldApplyWebSessionTabsSnapshot } from './web-session-tabs-sync/tracking/tracking-decisions'
 import { selectWorktreeAgentActivitySummary } from '../components/sidebar/workspace-card/activity/worktree-agent-activity-summary'
 
 vi.mock('../store', () => ({

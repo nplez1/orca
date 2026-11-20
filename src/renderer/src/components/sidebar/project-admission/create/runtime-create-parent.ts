@@ -1,11 +1,11 @@
-import type { WorktreeLayoutMode } from '../../../../../../shared/orca-workspace-layout'
+import type { WorktreeLayoutMode } from '../../../../../../shared/worktree/paths/orca-workspace-layout'
 import {
   toRuntimeExecutionHostId,
   type ExecutionHostId
-} from '../../../../../../shared/execution-host'
+} from '../../../../../../shared/execution-host/execution-host'
 import { canonicalHostIdOrder } from '../../../../../../shared/execution-host/managed-orcad-execution-host'
 import { resolveCheckoutParent } from '../../../../../../shared/host-repo-root'
-import type { GlobalSettings } from '../../../../../../shared/global-settings-types'
+import type { GlobalSettings } from '../../../../../../shared/settings/global-settings-types'
 import { browseRuntimeServerDirectory } from '@/runtime/files/reads/runtime-server-directory-browser'
 import { getUsableStoredHostRoot } from './clone-defaults'
 

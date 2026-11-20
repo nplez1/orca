@@ -12,7 +12,7 @@ import type { RuntimeJiraSettings } from '@/runtime/jira/runtime-jira-target'
 import {
   JiraTransitionFieldsForm,
   type JiraTransitionSubmitOutcome
-} from '../../../jira-transition-fields-form'
+} from '../issue-workspace/jira-transition-fields-form'
 import {
   classifyTransitionRequirements,
   rejectedTransitionFieldKeys

@@ -20,9 +20,9 @@ import {
   type SessionSummarySnapshot
 } from '../../../../shared/session-summary-types'
 import { unwrapRuntimeRpcResult } from '../../runtime/rpc/calls/runtime-rpc-result'
-import { parseExecutionHostId } from '../../../../shared/execution-host'
-import { callEnvironmentEnvelope } from './web-runtime-calls'
-import { requireActiveEnvironmentOrNull } from './web-runtime-session'
+import { parseExecutionHostId } from '../../../../shared/execution-host/execution-host'
+import { callEnvironmentEnvelope } from '../runtime/client/web-runtime-calls'
+import { requireActiveEnvironmentOrNull } from '../runtime/client/web-runtime-session'
 import { SETTINGS_STORAGE_KEY, readJson } from './web-storage'
 
 export const WEB_SESSION_SUMMARY_NO_HOST_MESSAGE = 'Pair this web client with an Orca server first.'

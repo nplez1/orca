@@ -5,7 +5,18 @@
 name; where an older entry reads oddly for the topology it was written in (a `main` that mirrored
 upstream), the date on it is the explanation. `upstream/main` has always meant upstream's.
 
-Last updated **2026-11-15** — `main` merged upstream main @ `1ce376b27e` (1,180 commits) from
+Last updated **2026-11-20** — `main` merged upstream main @ `0c6207e3d7` (1,425 commits) from
+`1db15d9ff0` (merge base `1ce376b27e`, merge `2ed6a05ce78`). **477 conflicted paths** —
+`both-rewrote 248, union 126, modify/delete 81, rename-replay 12, duplicate-tail 7,
+duplicate-members 2, add/add 1`. 77 modify/delete paths and 83 fork-modified test files were settled
+by the ledger, 54 paths were proved mechanically, 4 moved paths were ported by hand, and the remaining
+241 were resolved in 18 area batches. Upstream moved 2,358 paths, so import re-pointing was again the
+cost: `pnpm tc` opened at 1,083 errors and needed a rename-map pass plus five area passes to reach
+clean. Decisions are in [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md)
+§ "2026-11-20 sync", and the narrative in [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) § Sync log. Every
+local PR branch now sits on a pre-sync base and needs its own catch-up before it can be opened.
+
+Previous — **2026-11-15** — `main` merged upstream main @ `1ce376b27e` (1,180 commits) from
 `a992b134ff` (merge base `86ee16da9ea`). **694 conflicted paths, 824 hunks** — `both-rewrote 325,
 modify/delete 182, union 166, rename-replay 10, duplicate-tail 5, add/add 4, duplicate-members 2`.
 10 fork deletions and 163 upstream test retirements were settled by the ledger, 189 paths were proved

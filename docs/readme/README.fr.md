@@ -115,7 +115,7 @@ La liste de features ci-dessous est celle d'Orca upstream ; ses liens « Docs »
 
 Surveillez et pilotez vos agents depuis votre téléphone — soyez notifié quand un agent termine, et envoyez des instructions de suivi où que vous soyez.
 
-[App Store iOS](https://apps.apple.com/us/app/orca-ide/id6766130217) · [APK Android](https://orca.dev/download/android) · [Docs →](https://orca.dev/docs/mobile)
+[App Store iOS](https://apps.apple.com/us/app/orca-ide/id6766130217) · [Google Play](https://play.google.com/store/apps/details?id=dev.orca.app) · [APK Android](https://orca.dev/download/android) · [Docs →](https://orca.dev/docs/mobile)
 
 </td>
 <td width="50%">
@@ -304,7 +304,7 @@ Orca NP s'installe à côté d'un Orca officiel et se met à jour depuis les rel
 Associez l'app mobile Orca à Orca NP pour surveiller et piloter vos agents depuis votre téléphone. Les apps sont publiées par Orca upstream et fonctionnent avec Orca NP.
 
 - **iOS :** [Télécharger sur l'App Store](https://apps.apple.com/us/app/orca-ide/id6766130217)
-- **Android :** [Télécharger l'APK](https://orca.dev/download/android)
+- **Android :** [Google Play](https://play.google.com/store/apps/details?id=dev.orca.app) · [Télécharger l'APK](https://orca.dev/download/android)
 
 ---
 

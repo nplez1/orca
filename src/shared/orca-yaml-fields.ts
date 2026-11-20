@@ -1,4 +1,4 @@
-import { isOrcaYamlFieldWithinLimit } from './orca-yaml-file-limit'
+import { isOrcaYamlFieldWithinLimit } from './workspace-setup/orca-yaml-file-limit'
 
 /** Field coercions shared by every `orca.yaml` reader. */
 

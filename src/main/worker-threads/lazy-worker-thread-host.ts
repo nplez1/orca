@@ -1,11 +1,13 @@
+import { unrefTimer } from '../../shared/timers/unref-timer'
 import type { WorkerRequestTransport, WorkerThreadFactory } from './worker-thread-transport'
 
 /** Clients own request state and must fail queued calls when spawning fails. */
 export class LazyWorkerThreadHost<TResponse> {
   private worker: WorkerRequestTransport | null = null
-  private idleTimer: NodeJS.Timeout | null = null
+  private idleTimer: ReturnType<typeof setTimeout> | null = null
   private cleanupListeners: (() => void) | null = null
   private reportedUnavailable = false
+  private lastSpawnFailure: unknown
   private retiring: { completion: Promise<void>; failure?: unknown } | null = null
 
   constructor(
@@ -35,6 +37,11 @@ export class LazyWorkerThreadHost<TResponse> {
     return this.retiring !== null
   }
 
+  /** Why the last spawn failed, so callers can tell the user (e.g. a paused worker host). */
+  get spawnFailure(): unknown {
+    return this.lastSpawnFailure
+  }
+
   /** Returns null if spawning fails or a previous worker is still retiring. */
   ensure(): WorkerRequestTransport | null {
     if (this.worker) {
@@ -59,8 +66,10 @@ export class LazyWorkerThreadHost<TResponse> {
       // Never keep the app alive for background work.
       worker.unref?.()
       this.worker = worker
+      this.lastSpawnFailure = undefined
       return worker
     } catch (err) {
+      this.lastSpawnFailure = err
       if (!this.reportedUnavailable) {
         this.reportedUnavailable = true
         this.options.onUnavailable(err)
@@ -122,7 +131,7 @@ export class LazyWorkerThreadHost<TResponse> {
     if (!this.worker) {
       return
     }
-    this.idleTimer = setTimeout(() => {
+    const timer = setTimeout(() => {
       this.idleTimer = null
       // Recheck idle state so requests arriving during the delay survive.
       if (!this.options.isIdle()) {
@@ -134,7 +143,8 @@ export class LazyWorkerThreadHost<TResponse> {
       }
       this.destroy()
     }, this.options.idleTeardownMs)
-    this.idleTimer.unref?.()
+    unrefTimer(timer)
+    this.idleTimer = timer
   }
 
   clearIdleTimer(): void {

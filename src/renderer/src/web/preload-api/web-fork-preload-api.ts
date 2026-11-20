@@ -4,7 +4,7 @@ import {
   createDeepInfraCredentialsApi,
   createDeepSeekCredentialsApi,
   createFireworksCredentialsApi
-} from './web-agent-accounts-api'
+} from './agents/web-agent-accounts-api'
 import { createWebSessionSummaryApi } from './web-session-summary-api'
 
 export type WebForkPreloadApi = Pick<

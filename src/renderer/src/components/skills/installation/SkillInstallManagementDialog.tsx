@@ -30,9 +30,6 @@ export function SkillInstallManagementDialog({
   const t = useTranslate()
   const copy = skillInstallManagementCopy(t)
   const runtimeEnvironments = useAppStore((state) => state.runtimeEnvironments)
-  const sshConnectionStates = useAppStore((state) => state.sshConnectionStates)
-  const sshTargetLabels = useAppStore((state) => state.sshTargetLabels)
-  const hiddenSshTargetIds = useAppStore((state) => state.hiddenSshTargetIds)
   const [environmentId, setEnvironmentId] = useState('local')
   const [installs, setInstalls] = useState<ManagedSkillInstall[]>([])
   const [selectedKey, setSelectedKey] = useState('')
@@ -186,9 +183,7 @@ export function SkillInstallManagementDialog({
           packageId: selected.packageId,
           versionId,
           operationId,
-          ...(environmentId === 'local' || environmentId.startsWith('ssh:')
-            ? {}
-            : { environmentId }),
+          ...(environmentId === 'local' ? {} : { environmentId }),
           selectedSkillIds: selectedSkills.map((skill) => skill.id),
           ...(selectedInstall.providers ? { providers: selectedInstall.providers } : {}),
           destination: selected.destination,
@@ -225,7 +220,7 @@ export function SkillInstallManagementDialog({
         packageId: selected.packageId,
         versionId,
         operationId,
-        ...(environmentId === 'local' || environmentId.startsWith('ssh:') ? {} : { environmentId }),
+        ...(environmentId === 'local' ? {} : { environmentId }),
         destination: selected.destination,
         ...(selectedInstall.providers ? { providers: selectedInstall.providers } : {}),
         ...(discardLocal ? { conflictResolution: 'replace-and-discard-local' } : {})
@@ -268,7 +263,7 @@ export function SkillInstallManagementDialog({
     }
     const cancelled = await window.api.skills.cancelInstall({
       operationId: installProgress.activeOperationId,
-      ...(environmentId === 'local' || environmentId.startsWith('ssh:') ? {} : { environmentId })
+      ...(environmentId === 'local' ? {} : { environmentId })
     })
     if (!cancelled.cancelled) {
       setError(
@@ -296,9 +291,7 @@ export function SkillInstallManagementDialog({
       const operations = await Promise.all(
         targets.map((install) =>
           window.api.skills.removeInstall({
-            ...(environmentId === 'local' || environmentId.startsWith('ssh:')
-              ? {}
-              : { environmentId }),
+            ...(environmentId === 'local' ? {} : { environmentId }),
             name: install.name,
             destination: install.destination,
             ...(discardLocal ? { conflictResolution: 'replace-and-discard-local' as const } : {})
@@ -358,9 +351,6 @@ export function SkillInstallManagementDialog({
         result={result}
         runtimeEnvironments={runtimeEnvironments}
         selectedKey={selectedKey}
-        sshConnectionStates={sshConnectionStates}
-        sshTargetLabels={sshTargetLabels}
-        hiddenSshTargetIds={hiddenSshTargetIds}
         versionId={versionId}
         onCancelInstall={() => void cancelInstall()}
         onClose={close}

@@ -3,7 +3,7 @@ import { getConnectionId } from '@/lib/workspace/ownership/connection-context'
 import { getRuntimeGitBranchCompare } from '../../../runtime/source-control/git/runtime-git-diff-client'
 import { useAppStore } from '@/store'
 import { getWorktreeGitOwnerTarget } from '../source-control/sync/worktree-git-owner-target'
-import type { ExecutionHostId } from '../../../../../shared/execution-host'
+import type { ExecutionHostId } from '../../../../../shared/execution-host/execution-host'
 import { useSourceControlBaseRefDefault } from '../source-control/sync/use-base-ref-default'
 import {
   resolveSourceControlBaseRef,

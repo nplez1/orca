@@ -8,7 +8,7 @@ import type { Repo } from '../../../shared/repository/repo-types'
 import { isFolderRepo } from '../../../shared/repository/repo-kind'
 import { dirname } from 'node:path'
 import { homedir } from 'node:os'
-import { DEFAULT_REPO_BADGE_COLOR } from '../../../shared/constants'
+import { DEFAULT_REPO_BADGE_COLOR } from '../../../shared/repository/appearance/repo-badge-color'
 import { getGitCloneFailureMessage } from '../../../shared/git/remotes/git-clone-failure-message'
 import { gitSpawnAfterWindowsEnvironmentReady } from '../../git/command-runner/git-spawn'
 import { promptGuardGitEnv } from '../../git/command-runner/git-environment/git-process-env'
@@ -27,7 +27,10 @@ import {
   getSavedProjectPathKeys,
   resolveCloneDestination
 } from '../../git/repositories/cloning/repo-clone-path'
-import { getRepoExecutionHostId, LOCAL_EXECUTION_HOST_ID } from '../../../shared/execution-host'
+import {
+  getRepoExecutionHostId,
+  LOCAL_EXECUTION_HOST_ID
+} from '../../../shared/execution-host/execution-host'
 import { detectRepoLocalMetadata } from '../../repository-icons/repo-icon-autodetect'
 import { prepareLocalWorktreeRootForRepo } from '../../workspaces/creation/worktree-root-preparation'
 import { invalidateAuthorizedRootsCache } from '../worktrees/removal/registered-worktree-roots-cache'

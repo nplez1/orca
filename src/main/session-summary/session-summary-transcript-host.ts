@@ -4,7 +4,7 @@ import {
   parseExecutionHostId,
   toSshExecutionHostId,
   type ExecutionHostId
-} from '../../shared/execution-host'
+} from '../../shared/execution-host/execution-host'
 
 export type SessionSummaryTranscriptHost =
   /** This machine: the transcript path is opened directly. */

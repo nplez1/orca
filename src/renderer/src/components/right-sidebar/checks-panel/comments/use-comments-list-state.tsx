@@ -26,7 +26,7 @@ import {
   filterPRCommentListEntries,
   getPRReviewVerdicts
 } from '../../../../../../shared/pr-review-verdicts'
-import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
+import { usePrefersReducedMotion } from '@/hooks/theme/usePrefersReducedMotion'
 import { getPRCommentPresentationClasses } from './pr-comment-presentation'
 import type {
   GitHubReactionContent,
@@ -44,7 +44,7 @@ import { usePRBotAuthorOverrides } from '@/lib/source-control/review/pr-bot-auth
 import { translate } from '@/i18n/i18n'
 import { useTranslate, type Translate } from '@/i18n/use-translate'
 import { PRCommentGroupView } from './comment-group'
-import { useNow } from '@/hooks/use-now'
+import { useNow } from '@/lib/window-activity/use-now'
 
 /** How long a jumped-to comment stays marked before the mark clears itself. */
 export const PR_COMMENT_REVEAL_HIGHLIGHT_MS = 1500

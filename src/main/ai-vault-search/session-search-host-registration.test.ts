@@ -46,7 +46,8 @@ it('registers an in-process service for a host with no scanner child', async () 
   installed = installInProcessSessionSearchService({
     dataRoot: harness.root,
     roots: harness.roots,
-    settings: { contentEnabled: false, historyDays: null }
+    settings: { contentEnabled: false, historyDays: null },
+    getScopeCatalog: () => null
   })
   expect(installed).not.toBeNull()
 
@@ -74,18 +75,21 @@ it('registers an in-process service for a host with no scanner child', async () 
 })
 
 it('orcad indexes metadata without content consent and discovers a late root', async () => {
-  const { installOrcadSessionSearchService } = await import('../orcad/host-runtime/orcad-session-search')
+  const { installOrcadSessionSearchService } =
+    await import('../orcad/host-runtime/orcad-session-search')
   // Content consent is not what starts the index any more: the history list's own
   // rows are indexed regardless, which is why a host reaches for its roots here.
   installed = await installOrcadSessionSearchService({
     userDataPath: harness.root,
-    getSettings: () => ({ aiVaultSearch: { contentEnabled: false, historyDays: null } })
+    getSettings: () => ({ aiVaultSearch: { contentEnabled: false, historyDays: null } }),
+    getScopeCatalog: () => null
   })
   await vi.waitFor(() => expect(localAiVaultScanRoots).toHaveBeenCalled())
   installed?.dispose()
   installed = await installOrcadSessionSearchService({
     userDataPath: harness.root,
-    getSettings: () => ({ aiVaultSearch: { contentEnabled: true, historyDays: null } })
+    getSettings: () => ({ aiVaultSearch: { contentEnabled: true, historyDays: null } }),
+    getScopeCatalog: () => null
   })
   await searchSessionService({ query: 'latehostroot', freshness: 'wait-until-current' }, 'ipc')
   const late = join(harness.root, 'late-claude')
@@ -108,7 +112,8 @@ it('re-applies content consent on an in-process host without reinstalling the se
   installed = installInProcessSessionSearchService({
     dataRoot: harness.root,
     roots: harness.roots,
-    settings: { contentEnabled: false, historyDays: null }
+    settings: { contentEnabled: false, historyDays: null },
+    getScopeCatalog: () => null
   })
   // Metadata is not a consent decision, so a host with content off still answers — from titles
   // and paths rather than message bodies. `apply` is asynchronous, so each consent
@@ -139,4 +144,40 @@ it('re-applies content consent on an in-process host without reinstalling the se
       contentEnabled: false
     })
   )
+})
+
+it('orcad resolves workspace scopes through its scope catalog', async () => {
+  const { installOrcadSessionSearchService } =
+    await import('../orcad/host-runtime/orcad-session-search')
+  installed = await installOrcadSessionSearchService({
+    userDataPath: harness.root,
+    getSettings: () => ({ aiVaultSearch: { contentEnabled: true, historyDays: null } }),
+    getScopeCatalog: () => ({
+      repos: [{ id: 'repo-1', path: '/repo/app', kind: 'git' }],
+      projects: [],
+      projectHostSetups: [],
+      worktreeMeta: {},
+      settings: { workspaceDir: '/workspaces', nestWorkspaces: false }
+    })
+  })
+  const claudeProjectsDir = join(harness.root, 'scoped-claude')
+  const id = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
+  await writeClaudeTranscript(
+    join(claudeProjectsDir, 'project', `${id}.jsonl`),
+    ['scopedhostterm'],
+    id
+  )
+  localAiVaultScanRoots.mockResolvedValue({ ...harness.roots, claudeProjectsDir })
+  const response = await searchSessionService(
+    {
+      query: 'scopedhostterm',
+      freshness: 'wait-until-current',
+      within: { kind: 'workspace', worktreeId: 'repo-1::/repo/app' }
+    },
+    'ipc'
+  )
+  expect(response.kind).toBe('results')
+  if (response.kind === 'results') {
+    expect(response.hits.map((hit) => hit.sessionId)).toEqual([id])
+  }
 })

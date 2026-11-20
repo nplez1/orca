@@ -30,6 +30,7 @@ function renderBoard() {
   return render(
     <TooltipProvider>
       <TaskPageJiraBoard
+        columnOrderScopeKey="scope-a"
         formatUpdatedAt={() => 'Today'}
         issues={[issue]}
         onMoveIssue={async () => {}}

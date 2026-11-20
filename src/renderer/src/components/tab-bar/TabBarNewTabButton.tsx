@@ -62,7 +62,7 @@ function useHoldToOpenMenu(onOpenMenu: () => void): {
   return { onPointerDown, onPointerUp: clearTimer }
 }
 
-function PlainNewTabTrigger(): React.JSX.Element {
+function PlainNewTabTrigger({ className = '' }: { className?: string }): React.JSX.Element {
   const t = useTranslate()
   const label = t('auto.components.tab.bar.TabBar.b1a132357f', 'New tab')
   return (
@@ -73,7 +73,7 @@ function PlainNewTabTrigger(): React.JSX.Element {
             type="button"
             data-testid="new-tab-button"
             data-contextual-tour-target="tab-create-menu"
-            className={PLAIN_BUTTON_CLASS}
+            className={`${PLAIN_BUTTON_CLASS} ${className}`}
             style={NO_DRAG_STYLE}
             // Why: with no launchable agent this is the "+" E2E matches by its exact "New tab" name; the
             // split controls below are addressed by data-testid because their labels name the agent.
@@ -95,13 +95,15 @@ function SplitNewTabTrigger({
   isAgentLaunchPending,
   isMenuOpen,
   onLaunchAgent,
-  onOpenMenu
+  onOpenMenu,
+  className = ''
 }: {
   agent: TuiAgent
   isAgentLaunchPending: boolean
   isMenuOpen: boolean
   onLaunchAgent: (agent: TuiAgent) => void
   onOpenMenu: () => void
+  className?: string
 }): React.JSX.Element {
   const t = useTranslate()
   const agentLabel = getAgentCatalog().find((entry) => entry.id === agent)?.label ?? agent
@@ -121,7 +123,7 @@ function SplitNewTabTrigger({
   const hold = useHoldToOpenMenu(onOpenMenu)
 
   return (
-    <div className={SPLIT_GROUP_CLASS} style={NO_DRAG_STYLE}>
+    <div className={`${SPLIT_GROUP_CLASS} ${className}`} style={NO_DRAG_STYLE}>
       <Tooltip>
         <TooltipTrigger asChild>
           <button
@@ -188,7 +190,8 @@ export function TabBarNewTabButton({
   agentLaunchEnabled = true,
   isMenuOpen,
   onLaunchAgent,
-  onOpenMenu
+  onOpenMenu,
+  className
 }: {
   worktreeId: string
   /** Floating panels own their own agent button, so they render the plain "+". */
@@ -197,10 +200,12 @@ export function TabBarNewTabButton({
   isMenuOpen: boolean
   onLaunchAgent: (agent: TuiAgent) => void
   onOpenMenu: () => void
+  /** Strip-width visibility, owned by the tab bar that knows how much room is left. */
+  className?: string
 }): React.JSX.Element {
   const { agent, isAgentLaunchPending } = useTabBarDefaultAgent(worktreeId, agentLaunchEnabled)
   if (agent === null) {
-    return <PlainNewTabTrigger />
+    return <PlainNewTabTrigger className={className} />
   }
   return (
     <SplitNewTabTrigger
@@ -209,6 +214,7 @@ export function TabBarNewTabButton({
       isMenuOpen={isMenuOpen}
       onLaunchAgent={onLaunchAgent}
       onOpenMenu={onOpenMenu}
+      className={className}
     />
   )
 }

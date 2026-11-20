@@ -16,7 +16,7 @@ import { createInterface } from 'node:readline'
 import { consumeSubagentDeclarationRecord } from '../session-scanner-subagent-declaration'
 import type { AiVaultSession } from '../../../shared/ai-vault/contracts/ai-vault-types'
 import { rovoTranscriptPathForMetadata } from '../../../shared/ai-vault/session-display/ai-vault-session-log-resource'
-import type { ExecutionHostId } from '../../../shared/execution-host'
+import type { ExecutionHostId } from '../../../shared/execution-host/execution-host'
 import { withOmpSubagentTranscriptCount } from './omp/session-scanner-omp-subagent-transcripts'
 import type {
   FileWithMtime,

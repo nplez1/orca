@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mergeLocaleOverlay } from './fork-catalog-overlay'
 import { i18n, setRendererPluginLanguagePacks, setRendererUiLanguage } from './i18n'
-import { UI_LANGUAGE_CHINESE, UI_LANGUAGE_SPANISH } from '../../../shared/ui-language'
+import { UI_LANGUAGE_CHINESE, UI_LANGUAGE_SPANISH } from '../../../shared/i18n/ui-language'
 
 describe('mergeLocaleOverlay', () => {
   it('overlays values and drops tombstoned keys', () => {

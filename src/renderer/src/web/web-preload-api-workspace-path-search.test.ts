@@ -13,7 +13,7 @@ import { WORKSPACE_PATH_SEARCH_NAME_FILTER_CAPABILITY } from '../../../shared/wo
 import {
   installBrowserGlobals,
   writeStoredRuntimeEnvironment
-} from './web-preload-api-test-harness'
+} from './testing/web-preload-api-test-harness'
 
 const NameFilterRequestSchema = z.object({
   query: z.string(),
@@ -53,12 +53,12 @@ describe('paired web workspace path search', () => {
   beforeEach(() => vi.resetModules())
   afterEach(() => {
     vi.unstubAllGlobals()
-    vi.doUnmock('./web-runtime-client')
+    vi.doUnmock('./runtime/client/web-runtime-client')
   })
 
   it('negotiates before sending the new mode and returns host-authoritative metadata', async () => {
     const runtimeCalls: { method: string; params: unknown }[] = []
-    vi.doMock('./web-runtime-client', () => ({
+    vi.doMock('./runtime/client/web-runtime-client', () => ({
       WebRuntimeClient: class {
         call(method: string, params?: unknown): Promise<RuntimeRpcResponse<unknown>> {
           runtimeCalls.push({ method, params })
@@ -140,7 +140,7 @@ describe('paired web workspace path search', () => {
 
   it('cancels the first superseded query through the runtime transport', async () => {
     let requestSignal: AbortSignal | undefined
-    vi.doMock('./web-runtime-client', () => ({
+    vi.doMock('./runtime/client/web-runtime-client', () => ({
       WebRuntimeClient: class {
         call(
           method: string,
@@ -194,7 +194,7 @@ describe('paired web workspace path search', () => {
 
   it('cancels a superseded query through the runtime transport', async () => {
     let requestSignal: AbortSignal | undefined
-    vi.doMock('./web-runtime-client', () => ({
+    vi.doMock('./runtime/client/web-runtime-client', () => ({
       WebRuntimeClient: class {
         call(
           method: string,
@@ -248,7 +248,7 @@ describe('paired web workspace path search', () => {
 
   it('uses a bounded partial legacy result without sending the new enum', async () => {
     const runtimeCalls: { method: string; params: unknown }[] = []
-    vi.doMock('./web-runtime-client', () => ({
+    vi.doMock('./runtime/client/web-runtime-client', () => ({
       WebRuntimeClient: class {
         call(method: string, params?: unknown): Promise<RuntimeRpcResponse<unknown>> {
           runtimeCalls.push({ method, params })

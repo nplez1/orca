@@ -13,35 +13,39 @@ import type {
 } from '../../../../../shared/jira/jira-types'
 import type { TaskPageJiraListPage } from '@/components/task-page/jira/task-page-jira-list-pagination'
 import type { TaskPageJiraLoadError } from '@/components/task-page/jira/listing/task-page-jira-load-state'
-import type { TaskPageJiraJqlRejection } from '@/components/task-page/jira/listing/task-page-jira-search'
+import type { JiraJqlRejection } from '../../../../../shared/jira/jira-issue-input-search'
 import type { JiraPresetId } from '@/components/task-page/task-page-localized-options'
 import type {
   JiraIssueSortColumn,
   JiraIssueSortDirection,
   JiraPrioritiesBySite
-} from '../../jira-issue-sorter'
-import {
-  loadJiraBoardViewPreferences,
-  updateJiraBoardViewPreferences
-} from '../../jira-board-view-storage'
+} from './listing/jira-issue-sorter'
 import { jiraListPrioritiesForTarget } from '@/runtime/jira/runtime-jira-detail-client'
-import { loadJiraLinkedView, saveJiraLinkedView } from '../../jira-linked-view-storage'
-import { loadJiraViewMode, saveJiraViewMode, type JiraViewMode } from '../../jira-view-mode-storage'
+import { loadJiraLinkedView, saveJiraLinkedView } from './listing/jira-linked-view-storage'
+import {
+  loadJiraViewMode,
+  saveJiraViewMode,
+  type JiraViewMode
+} from './listing/jira-view-mode-storage'
 import {
   fallbackJiraSortColumn,
   loadJiraListColumnIds,
   saveJiraListColumnIds,
   visibleJiraListColumns,
   type JiraListColumnId
-} from '../../jira-list-columns'
+} from './listing/jira-list-columns'
 import {
   ipcOrRuntimeTargetForHostId,
   runtimeTargetEnvironmentId
 } from '@/runtime/rpc/targets/runtime-client-target'
 import { getEnvironmentRuntimeContextKey } from '@/runtime/hosts/observations/provider-runtime-context'
 import { getTaskSourceCacheScope } from '../../../../../shared/work-items/task-source-context'
-import { useTaskPageJiraProjectScope } from './filters/use-task-page-jira-project-scope'
+import {
+  loadJiraBoardViewPreferences,
+  updateJiraBoardViewPreferences
+} from '../../jira-board-view-storage'
 const EMPTY_JIRA_PRIORITIES: JiraPrioritiesBySite = new Map()
+
 export function useTaskPageJiraListState(model: TaskPageLinearViewStateModel) {
   const {
     jiraConnected,
@@ -62,13 +66,6 @@ export function useTaskPageJiraListState(model: TaskPageLinearViewStateModel) {
       ipcOrRuntimeTargetForHostId(jiraTaskSourceContext?.hostId ?? accountBackedTaskSourceHostId),
     [accountBackedTaskSourceHostId, jiraTaskSourceContext]
   )
-  const jiraProjectScope = useTaskPageJiraProjectScope(
-    model.repos,
-    model.selectedRepos,
-    model.pageData.preselectedRepoId,
-    model.accountBackedTaskSourceHostId,
-    selectedJiraSiteId
-  )
   const [jiraIssues, setJiraIssues] = useState<JiraIssue[]>([])
   // Why a generation of its own: "load more" runs outside the fetch effect's closure, so
   // this is the only way a late page can tell it no longer owns the list.
@@ -79,7 +76,7 @@ export function useTaskPageJiraListState(model: TaskPageLinearViewStateModel) {
   const [jiraLoading, setJiraLoading] = useState(false)
   const [jiraError, setJiraError] = useState<TaskPageJiraLoadError | null>(null)
   const [jiraErrorDetailsOpen, setJiraErrorDetailsOpen] = useState(false)
-  const [jiraJqlRejection, setJiraJqlRejection] = useState<TaskPageJiraJqlRejection | null>(null)
+  const [jiraJqlRejection, setJiraJqlRejection] = useState<JiraJqlRejection | null>(null)
   const [jiraSearchInput, setRawJiraSearchInput] = useState('')
   const [appliedJiraSearch, setAppliedJiraSearch] = useState('')
   const [jiraHasWorkspace, setJiraLinkedView] = useState(loadJiraLinkedView)
@@ -230,7 +227,6 @@ export function useTaskPageJiraListState(model: TaskPageLinearViewStateModel) {
     ...quickFilters,
     jiraStatusCatalog,
     setJiraStatusCatalog,
-    ...jiraProjectScope,
     jiraIssues,
     setJiraIssues,
     jiraListPage,
@@ -240,6 +236,8 @@ export function useTaskPageJiraListState(model: TaskPageLinearViewStateModel) {
     setJiraListLoadingMore,
     jiraListLoadMoreError,
     setJiraListLoadMoreError,
+    jiraBoardViewMode,
+    setJiraBoardViewMode,
     jiraLoading,
     setJiraLoading,
     jiraError,
@@ -248,8 +246,6 @@ export function useTaskPageJiraListState(model: TaskPageLinearViewStateModel) {
     setJiraErrorDetailsOpen,
     jiraJqlRejection,
     setJiraJqlRejection,
-    jiraBoardViewMode,
-    setJiraBoardViewMode,
     jiraSearchInput,
     setJiraSearchInput,
     appliedJiraSearch,

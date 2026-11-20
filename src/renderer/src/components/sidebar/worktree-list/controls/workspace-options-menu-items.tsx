@@ -9,7 +9,7 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger
 } from '@/components/ui/dropdown-menu'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { OptionChoiceSubmenu } from './OptionChoiceSubmenu'
 import { countActiveWorkspaceFilters } from '../../../../../../shared/workspace-view/workspace-row-filters'
 import { useShallow } from 'zustand/react/shallow'
 import { selectSidebarFilterState, sidebarWorkspaceRowFilters } from './sidebar-filter-actions'
@@ -36,7 +36,10 @@ import {
 } from '../../../../../../shared/workspace-view/workspace-view-options'
 import { useTranslate } from '@/i18n/use-translate'
 import { SidebarGroupByToggle } from './SidebarGroupByToggle'
-import { withoutHiddenRepos } from '../../../../../../shared/hidden-projects'
+import { HideBotCreatedFilterRow } from '@/components/bots/HideBotCreatedFilterRow'
+import { withoutHiddenRepos } from '../../../../../../shared/project/catalog/hidden-projects'
+import { selectDrawsNewWorktreeCards } from '@/store/appearance/worktree-card-style'
+import { trackWorktreeCardStyleChanged } from '../../workspace-card/template/worktree-card-style-telemetry'
 
 export function useWorkspaceOptionsFilterBadge(): {
   hasAnyFilter: boolean
@@ -102,9 +105,19 @@ function CardStyleOption({ preserveWorkspaceBoardOpen }: OptionItemProps): JSX.E
       >
         <DropdownMenuRadioGroup
           value={experimental ? 'experimental' : 'classic'}
-          onValueChange={(value) =>
-            void updateSettings({ experimentalNewWorktreeCardStyle: value === 'experimental' })
-          }
+          onValueChange={(value) => {
+            const next = value === 'experimental'
+            void updateSettings({ experimentalNewWorktreeCardStyle: next }).then(() => {
+              const state = useAppStore.getState()
+              if ((state.settings?.experimentalNewWorktreeCardStyle === true) !== next) {
+                return
+              }
+              state.setWorktreeCardsIntroChoice(null)
+              if (next !== experimental) {
+                trackWorktreeCardStyleChanged(next, 'options_menu')
+              }
+            })
+          }}
         >
           <DropdownMenuRadioItem value="classic">{classicLabel}</DropdownMenuRadioItem>
           <DropdownMenuRadioItem value="experimental">{experimentalLabel}</DropdownMenuRadioItem>
@@ -148,56 +161,14 @@ function SortByOptionItem({ preserveWorkspaceBoardOpen }: OptionItemProps): JSX.
   const t = useTranslate()
   const sortBy = useAppStore((s) => s.sortBy)
   const setSortBy = useAppStore((s) => s.setSortBy)
-  const sortLabel = SORT_OPTIONS.find((opt) => opt.id === sortBy)?.label ?? 'Sort'
   return (
-    <DropdownMenuSub>
-      <DropdownMenuSubTrigger>
-        <span className="flex flex-1 items-center justify-between">
-          <span>
-            {t('auto.components.sidebar.SidebarWorkspaceOptionsMenu.7bada3b1ab', 'Sort by')}
-          </span>
-          <span className="text-[11px] font-medium text-muted-foreground">{sortLabel}</span>
-        </span>
-      </DropdownMenuSubTrigger>
-      <DropdownMenuSubContent
-        className="w-44"
-        data-workspace-board-preserve-open={preserveWorkspaceBoardOpen ? '' : undefined}
-      >
-        <DropdownMenuRadioGroup
-          value={sortBy}
-          onValueChange={(value) => {
-            const next = SORT_OPTIONS.find((opt) => opt.id === value)
-            if (next) {
-              setSortBy(next.id)
-            }
-          }}
-        >
-          {SORT_OPTIONS.map((opt) => {
-            const radioItem = (
-              <DropdownMenuRadioItem
-                key={opt.id}
-                value={opt.id}
-                // Keep the menu open for comparing modes and toggling properties.
-                onSelect={(e) => e.preventDefault()}
-              >
-                {opt.label}
-              </DropdownMenuRadioItem>
-            )
-            if (!opt.description) {
-              return radioItem
-            }
-            return (
-              <Tooltip key={opt.id}>
-                <TooltipTrigger asChild>{radioItem}</TooltipTrigger>
-                <TooltipContent side="right" sideOffset={6}>
-                  {opt.description}
-                </TooltipContent>
-              </Tooltip>
-            )
-          })}
-        </DropdownMenuRadioGroup>
-      </DropdownMenuSubContent>
-    </DropdownMenuSub>
+    <OptionChoiceSubmenu
+      label={t('auto.components.sidebar.SidebarWorkspaceOptionsMenu.7bada3b1ab', 'Sort by')}
+      choices={SORT_OPTIONS}
+      value={sortBy}
+      onChange={setSortBy}
+      preserveWorkspaceBoardOpen={preserveWorkspaceBoardOpen}
+    />
   )
 }
 
@@ -205,50 +176,14 @@ function ProjectOrderOptionItem({ preserveWorkspaceBoardOpen }: OptionItemProps)
   const t = useTranslate()
   const projectOrderBy = useAppStore((s) => s.projectOrderBy)
   const setProjectOrderBy = useAppStore((s) => s.setProjectOrderBy)
-  const projectOrderLabel =
-    PROJECT_ORDER_OPTIONS.find((opt) => opt.id === projectOrderBy)?.label ?? 'Manual'
   return (
-    <DropdownMenuSub>
-      <DropdownMenuSubTrigger>
-        <span className="flex flex-1 items-center justify-between">
-          <span>
-            {t('auto.components.sidebar.SidebarWorkspaceOptionsMenu.09faabd875', 'Project order')}
-          </span>
-          <span className="text-[11px] font-medium text-muted-foreground">{projectOrderLabel}</span>
-        </span>
-      </DropdownMenuSubTrigger>
-      <DropdownMenuSubContent
-        className="w-44"
-        data-workspace-board-preserve-open={preserveWorkspaceBoardOpen ? '' : undefined}
-      >
-        <DropdownMenuRadioGroup
-          value={projectOrderBy}
-          onValueChange={(value) => {
-            const next = PROJECT_ORDER_OPTIONS.find((opt) => opt.id === value)
-            if (next) {
-              setProjectOrderBy(next.id)
-            }
-          }}
-        >
-          {PROJECT_ORDER_OPTIONS.map((opt) => (
-            <Tooltip key={opt.id}>
-              <TooltipTrigger asChild>
-                <DropdownMenuRadioItem
-                  value={opt.id}
-                  // Keep the menu open so people can compare order modes.
-                  onSelect={(e) => e.preventDefault()}
-                >
-                  {opt.label}
-                </DropdownMenuRadioItem>
-              </TooltipTrigger>
-              <TooltipContent side="right" sideOffset={6}>
-                {opt.description}
-              </TooltipContent>
-            </Tooltip>
-          ))}
-        </DropdownMenuRadioGroup>
-      </DropdownMenuSubContent>
-    </DropdownMenuSub>
+    <OptionChoiceSubmenu
+      label={t('auto.components.sidebar.SidebarWorkspaceOptionsMenu.09faabd875', 'Project order')}
+      choices={PROJECT_ORDER_OPTIONS}
+      value={projectOrderBy}
+      onChange={setProjectOrderBy}
+      preserveWorkspaceBoardOpen={preserveWorkspaceBoardOpen}
+    />
   )
 }
 
@@ -287,7 +222,7 @@ function SectionHeading({ section }: { section: WorkspaceViewSection }): JSX.Ele
     case 'show':
       return (
         <DropdownMenuLabel>
-          {t('auto.components.sidebar.SidebarWorkspaceOptionsMenu.showSection', 'Show')}
+          {t('auto.components.sidebar.SidebarWorkspaceOptionsMenu.selectionSection', 'Selection')}
         </DropdownMenuLabel>
       )
     case 'group':
@@ -314,13 +249,12 @@ export function WorkspaceOptionsMenuItems({
 }: {
   preserveWorkspaceBoardOpen?: boolean
 }): JSX.Element {
-  const t = useTranslate()
   const repoCount = useAppStore((s) => s.repos.length)
   const workspaceStatuses = useAppStore((s) => s.workspaceStatuses)
   const groupBy = useAppStore((s) => s.groupBy)
   const showSleepingWorkspaces = useAppStore((s) => s.showSleepingWorkspaces)
   const hideWorkspacesFromOtherDevices = useAppStore((s) => s.hideWorkspacesFromOtherDevices)
-  const newCardStyle = useAppStore((s) => s.settings?.experimentalNewWorktreeCardStyle === true)
+  const newCardStyle = useAppStore(selectDrawsNewWorktreeCards)
   const runtimeEnvironmentCount = useAppStore((s) => s.runtimeEnvironments.length)
   const runtimeEnvironmentCatalogHydrated = useAppStore((s) => s.runtimeEnvironmentCatalogHydrated)
   const { hostOptions } = useSidebarHostScopeOptions()
@@ -341,12 +275,6 @@ export function WorkspaceOptionsMenuItems({
 
   return (
     <>
-      <DropdownMenuLabel className="pb-0 text-sm text-foreground">
-        {t(
-          'auto.components.sidebar.SidebarWorkspaceOptionsMenu.workspaceOptions',
-          'Workspace options'
-        )}
-      </DropdownMenuLabel>
       {sections.map(({ section, options }, index) => (
         <Fragment key={section}>
           {index > 0 && <DropdownMenuSeparator />}
@@ -373,6 +301,8 @@ export function WorkspaceOptionsMenuItems({
               preserveWorkspaceBoardOpen={preserveWorkspaceBoardOpen}
             />
           ) : null}
+          {/* Desktop-only: bots live on this computer, so it stays out of the shared option list. */}
+          {section === 'filters' && <HideBotCreatedFilterRow />}
         </Fragment>
       ))}
     </>

@@ -36,6 +36,7 @@ export function fetchMergePR(
     /** Set only after the sidebar's confirmation told the user it would skip branch protection. */
     bypassBranchProtection?: boolean
     prRepo?: GitHubPrRepoSlug | null
+    expectedHeadSha?: string | null
   }
 ): Promise<GitHubPrMutationOutcome> {
   const params: Record<string, unknown> = { prNumber: args.prNumber }
@@ -44,6 +45,9 @@ export function fetchMergePR(
   }
   if (args.bypassBranchProtection) {
     params.bypassBranchProtection = true
+  }
+  if (args.expectedHeadSha) {
+    params.expectedHeadSha = args.expectedHeadSha
   }
   return settleGithubPrMutation(githubPrMergeRun, () =>
     githubPrMergeRun.request(

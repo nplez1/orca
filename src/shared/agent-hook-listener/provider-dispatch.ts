@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget (259/300); the fork's +48-line delta rides inside it, and splitting costs a permanent sync hunk. */
 import { normalizeCompatibleLifecycleEvent } from './providers/compatible-lifecycle-events'
 
 import type { AgentMainAgentStatus } from '../agent-status/lifecycle/main-agent-status'
@@ -77,6 +78,8 @@ export function normalizeProviderEvent(input: {
   envelope: Record<string, unknown>
   extractedPrompt: ExtractedPromptText
   previousOpenCodeMainAgent?: AgentMainAgentStatus
+  /** A new Claude prompt_id opened the turn on this event. */
+  opensTurn?: boolean
   ownsHoldRetraction?: boolean
   claimedBeyondDescendants?: boolean
 }): ProviderDispatchResult {
@@ -146,7 +149,14 @@ export function normalizeProviderEvent(input: {
       )
       break
     case 'claude':
-      payload = normalizeClaudeEvent(state, eventName, promptText, paneKey, hookPayload)
+      payload = normalizeClaudeEvent(
+        state,
+        eventName,
+        promptText,
+        paneKey,
+        hookPayload,
+        input.opensTurn
+      )
       break
     case 'codex':
       payload = normalizeCodexEvent(

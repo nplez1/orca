@@ -4,7 +4,7 @@ import {
   LOCAL_EXECUTION_HOST_ID,
   getWorktreeExecutionHostId,
   type ExecutionHostId
-} from '../../../../../../shared/execution-host'
+} from '../../../../../../shared/execution-host/execution-host'
 import { isDetachedHeadWorkspace } from '../../../../../../shared/worktree/visibility/workspace-kinds'
 import { branchName } from '../../../../lib/source-control/branches/branch-name'
 import {

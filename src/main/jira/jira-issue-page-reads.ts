@@ -1,4 +1,4 @@
-import { sortByUpdatedAtDescending } from '../../shared/updated-at-order'
+import { sortByUpdatedAtDescending } from '../../shared/collections/updated-at-order'
 import type { JiraIssue, JiraIssueFilter, JiraIssueListFilters } from '../../shared/jira/jira-types'
 import { buildJiraPresetJql } from '../../shared/jira/jira-preset-jql'
 import { apiBasePath, jiraRequest, type JiraClientForSite } from './authenticated-request'

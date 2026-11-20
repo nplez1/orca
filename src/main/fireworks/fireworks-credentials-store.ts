@@ -42,11 +42,9 @@ function parseFireworksCredentials(payload: string): FireworksCredentials {
   }
 }
 
-export function hasFireworksCredentials(): boolean {
-  return fireworksCredentialsStore.has()
-}
+export const hasFireworksCredentials = fireworksCredentialsStore.has
 
-export function saveFireworksCredentials(credentials: FireworksCredentials): void {
+export async function saveFireworksCredentials(credentials: FireworksCredentials): Promise<void> {
   const apiKey = credentials.apiKey.trim()
   if (!apiKey) {
     throw new Error('Fireworks API key is required')
@@ -56,13 +54,13 @@ export function saveFireworksCredentials(credentials: FireworksCredentials): voi
     apiKey,
     accountIdOverride: override === '' ? null : override
   }
-  fireworksCredentialsStore.save(JSON.stringify(payload))
+  await fireworksCredentialsStore.save(JSON.stringify(payload))
 }
 
-export function readFireworksCredentials(): FireworksCredentials | null {
+export async function readFireworksCredentials(): Promise<FireworksCredentials | null> {
   let payload: string | null
   try {
-    payload = fireworksCredentialsStore.read()
+    payload = await fireworksCredentialsStore.read()
   } catch (error) {
     // Why: a payload this module cannot decrypt is reported as the credentials it
     // promised, not as the factory's "API key" — the file holds a key and an override.
@@ -80,6 +78,4 @@ export function readFireworksCredentials(): FireworksCredentials | null {
   }
 }
 
-export function clearFireworksCredentials(): void {
-  fireworksCredentialsStore.clear()
-}
+export const clearFireworksCredentials = fireworksCredentialsStore.clear

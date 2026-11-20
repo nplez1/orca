@@ -5,7 +5,7 @@ import { cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { JiraIssue } from '../../../shared/jira/jira-types'
 import { defaultScopeHost } from '@/runtime/hosts/selection/default-creation-host'
-import type { EditableJiraIssueField } from './jira-issue-workspace-hydration'
+import type { EditableJiraIssueField } from './task-page/jira/issue-workspace/jira-issue-workspace-hydration'
 import { useJiraIssueWorkspaceRefresh } from './use-jira-issue-workspace-refresh'
 
 const mocks = vi.hoisted(() => ({

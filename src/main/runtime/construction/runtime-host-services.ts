@@ -1,4 +1,5 @@
 import { RuntimeAgentStatusSources } from './runtime-agent-status-sources'
+import type { ClaudeAccountSelectedHandler } from '../../../shared/agent-accounts/managed-account-types'
 
 import type * as Calls from './runtime-host-service-calls'
 import type { RuntimeConstructionBindings as HostBindings } from './runtime-construction-dependencies'
@@ -13,7 +14,7 @@ import {
   confirmRunTerminalShellAlone,
   readRunTerminalClientUse
 } from '../terminal/lifecycle/run-terminal-client-use'
-import type { ExecutionHostId } from '../../../shared/execution-host'
+import type { ExecutionHostId } from '../../../shared/execution-host/execution-host'
 import { RuntimePreservedBranchCleanup } from '../repositories/runtime-preserved-branch-cleanup'
 import { installOrcaRuntimeOwnedControllers } from '../orca-runtime-owned-controllers'
 import type { RuntimeRepositoryRelocationController } from '../runtime-repository-relocation-controller'
@@ -24,6 +25,7 @@ import type { AgentStatus } from '../../../shared/agent-status/title/agent-title
 import { RuntimeLegacyWorkerTerminalRecoveryPersistence } from '../orchestration/terminal-authority/runtime-legacy-worker-terminal-recovery-persistence'
 import { RuntimeLegacyWorkerTerminalRecoveryController } from '../orchestration/terminal-authority/runtime-legacy-worker-terminal-recovery-controller'
 import { reconcileRequestedWorkerTerminalReleases } from '../orchestration/terminal-authority/release/worker-terminal-release-reconciliation'
+import { sweepStoppedWorkerTerminals } from '../orchestration/terminal-authority/release/stopped-worker-terminal-release'
 
 import type { RuntimeAccountController } from '../agent-session/environment/runtime-account-controller'
 import type { RuntimeMobileSpeechCatalog } from '../speech/runtime-mobile-speech-catalog'
@@ -226,7 +228,10 @@ export abstract class OrcaRuntimeWithPreservedBranchCleanup extends RuntimeAgent
     isTerminalProvenAbsent: (candidate) => this.isLeafPtyProvenAbsent(candidate.ptyId),
     hasRequestedReleases: () =>
       (this.getExistingOrchestrationDb()?.listWorkerTerminalReleaseBacklog(1).length ?? 0) > 0,
-    reconcileRequestedReleases: () => reconcileRequestedWorkerTerminalReleases(this),
+    reconcileRequestedReleases: () =>
+      reconcileRequestedWorkerTerminalReleases(this).then(() =>
+        sweepStoppedWorkerTerminals(this, () => this.legacyWorkerRecovery.isStopped())
+      ),
     reconcile: (options) => this.reconcileLegacyWorkerTerminals(options),
     updateRetry: (plan, deferredDispatchIds, options) =>
       this.updateLegacyWorkerTerminalRecoveryRetry(plan, deferredDispatchIds, options)
@@ -243,7 +248,20 @@ export abstract class OrcaRuntimeWithPreservedBranchCleanup extends RuntimeAgent
 
   protected ptyControllerInventoryGenerationByProvider = new Map<string, number>()
 
+  // Constructed by installOrcaRuntimeOwnedControllers (transcript-split); the wiring there must match
+  // upstream's construction, including the Claude-account selection handler.
   declare protected readonly accounts: RuntimeAccountController
+
+  protected abstract onClaudeAccountSelected(
+    ...change: Parameters<ClaudeAccountSelectedHandler>
+  ): ReturnType<ClaudeAccountSelectedHandler>
+
+  /** Seam for installOrcaRuntimeOwnedControllers, which builds `accounts` outside this class. */
+  public handleClaudeAccountSelected(
+    ...change: Parameters<ClaudeAccountSelectedHandler>
+  ): ReturnType<ClaudeAccountSelectedHandler> {
+    return this.onClaudeAccountSelected(...change)
+  }
 
   declare protected readonly mobileSpeech: RuntimeMobileSpeechCatalog
 

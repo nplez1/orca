@@ -8,7 +8,7 @@ import type {
 import {
   JiraTransitionFieldsForm,
   type JiraTransitionSubmitOutcome
-} from '@/components/jira-transition-fields-form'
+} from '@/components/task-page/jira/issue-workspace/jira-transition-fields-form'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { useTranslate } from '@/i18n/use-translate'
 import type { RuntimeJiraSettings } from '../../../runtime/jira/runtime-jira-client'
