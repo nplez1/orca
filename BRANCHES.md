@@ -367,14 +367,19 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
   claim, and the lane subscribes `/loop`'s `loop:state` — the armed set it publishes itself once per
   real change — beside the two pi-subagents events. Still fail-safe: a channel nothing answers posts
   no field and holds nothing, and nothing is inferred from tool calls.
-- **Base:** `main`.
-- **Verified:** 18 tests in `src/main/pi/agent-status-scheduled-work.test.ts` (the real generated
+- **Base:** `main`, rebased onto `5ad2b7bd33d` immediately before the PR (`git range-diff` reports all six
+  commits `=`, so the reviewed R1/R2 patches are the ones on the branch and no resolver hunk needed a
+  re-check).
+- **Verified:** 19 tests in `src/main/pi/agent-status-scheduled-work.test.ts` (the real generated
   extension driven into the real listener), 101 across the pi lane; `tc:node` clean; format, oxlint,
   typecheck and changed-code quality clean. `check:changed`'s two remaining failures
   (`direct-link-open-ratchet`, `main-blocking-api-ratchet`) are pre-existing baseline drift in files
   this branch does not touch. Gate 1 not required — no global input (`src/main/pi/**` plus a
-  fork-owned `.md`). Gate 2: reviewed by `claude/opus`, high — **pending**: the Claude Code CLI is
-  rate-limited until 05:40 PT, so the PR opens after that round.
+  fork-owned `.md`). Gate 2: reviewed by `claude/opus`, high — R1 clean (2 MINOR, 2 NIT); delta on R2
+  found one doc NIT, fixed, delta otherwise clean. MINOR 1 (a fire that empties the roster publishes
+  before it starts the turn, so an immediate release could read `done` for the gap) is recorded in the
+  PR body rather than fixed: unconfirmed against pi's binary, and the remedy is a timed flush plus a
+  fire-driving test, not one hunk.
 
 ### nplez1/issue-358 — the fold reads prose, not the tool log (fork issue #358, PR #363)
 
