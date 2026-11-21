@@ -21,14 +21,25 @@ const LOOP_STATE = 'loop:state'
 type LiveJob = {
   id: string
   prompt: string
-  mode: 'fixed' | 'dynamic'
+  mode: 'fixed' | 'dynamic' | 'once'
   nextAt?: number
   runs: number
   paused?: boolean
+  maxRuns?: number
+  until?: number
 }
 
 /** A cold scheduler job as pi-subagents lists it. */
-type ColdJob = { id: string; schedule: string; prompt: string; enabled: boolean; nextRun?: string }
+type ColdJob = {
+  id: string
+  schedule: string
+  prompt: string
+  enabled: boolean
+  nextRun?: string
+  runCount?: number
+  maxRuns?: number
+  until?: string
+}
 
 type Inventory = { live: LiveJob[]; cold: ColdJob[] }
 
@@ -276,6 +287,49 @@ describe('pi scheduled work holds the pane as monitoring', () => {
 
     expect(harness.accepted.at(-1)?.state).toBe('done')
     expect(harness.accepted.at(-1)?.workingMode).toBeUndefined()
+  })
+
+  it('holds nothing for a job whose bound was already reached', async () => {
+    const inventory: Inventory = { live: [], cold: [] }
+    const harness = createHarness({ inventory })
+    await startTurn(harness)
+    const now = Date.now()
+    inventory.live.push(
+      // A spent one-shot: its fire is its whole schedule, and `/loop` collects it on the next tick.
+      liveLoop({ id: 'loop-spent', mode: 'once', runs: 1, nextAt: undefined }),
+      liveLoop({ id: 'loop-maxed', runs: 2, maxRuns: 2 }),
+      liveLoop({ id: 'loop-expired', runs: 1, until: now - 1_000 })
+    )
+    inventory.cold.push(
+      coldJob({
+        id: 'job-maxed',
+        runCount: 3,
+        maxRuns: 3,
+        nextRun: new Date(now + 3_600_000).toISOString()
+      }),
+      coldJob({ id: 'job-expired', until: new Date(now - 1_000).toISOString() })
+    )
+
+    await drive(harness, 'agent_end', {})
+
+    expect(harness.posted.at(-1)?.scheduled_work).toBeUndefined()
+    expect(harness.accepted.at(-1)?.state).toBe('done')
+  })
+
+  it('holds an armed one-shot that has not fired yet', async () => {
+    const inventory: Inventory = { live: [], cold: [] }
+    const harness = createHarness({ inventory })
+    await startTurn(harness)
+    inventory.live.push(
+      liveLoop({ id: 'loop-once', mode: 'once', runs: 0, nextAt: Date.now() + 600_000 })
+    )
+
+    await drive(harness, 'agent_end', {})
+
+    expect(harness.posted.at(-1)?.scheduled_work).toEqual({
+      jobs: [{ id: 'loop-once', kind: 'live', next_in_ms: 600_000 }]
+    })
+    expect(harness.accepted.at(-1)?.workingMode).toBe('monitoring')
   })
 
   it('reads the whole revamped roster: only the jobs that can still fire hold', async () => {
