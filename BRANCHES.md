@@ -352,7 +352,7 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
 
 ## Branches
 
-### nplez1/New-Loop-Job-Support — a pi pane reads its own scheduled work (pi revamp follow-up)
+### nplez1/New-Loop-Job-Support — a pi pane reads its own scheduled work (pi revamp follow-up, PR #449)
 
 - **Why:** pi-config's `/loop` and pi-subagents were revamped into one `manage_schedules` roster over two
   homes — live loops that re-enter the session, cold jobs that spawn a subagent — with pause/resume,
