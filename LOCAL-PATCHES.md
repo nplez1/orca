@@ -996,6 +996,13 @@ The events list carries a third entry rather than replacing one: the two pi-suba
 announce cold work, and `/loop`'s create/remove request channels are still deliberately not bound
 (binding them reads the inventory before the change lands).
 
+**Known uncovered, on purpose.** `plugins/pi-codex-goal` schedules its own re-entry —
+`provider-limit-auto-resume` five minutes after a provider limit, `continuation-scheduler`
+sub-second after a turn — and emits **nothing** on `pi.events`. During the five-minute wait the pane
+reads `done` while the session will resume itself. Covering it needs that extension to publish the
+pending continuation first (a `goals:state`-style channel naming the resume instant); it is not the
+job/loop surface, so the lane is left as it is until that signal exists.
+
 ### `local(skills)`: re-track the three agent skills the internal move removed
 
 Upstream moved its agent skills out of the tree on 2026-04-29 (`c85f487ebf`, "chore: move agent
