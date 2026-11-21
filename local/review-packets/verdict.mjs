@@ -152,6 +152,9 @@ export function readReport(dir, id) {
     counts: parsed.counts,
     warning: warning || null,
     cost,
-    run
+    run,
+    // Why surfaced: a slice reviewed by a fallback reviewer records which one, so the manifest can say
+    // so instead of attributing every slice to the packet's reviewer.
+    reviewer: typeof result.reviewer === 'string' ? result.reviewer : null
   }
 }

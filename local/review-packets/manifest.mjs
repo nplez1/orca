@@ -94,6 +94,7 @@ export function buildManifest(state, { revision }) {
       ...(reported ? entry.report.counts : { problem: entry.report.problem }),
       unresolved: blocking.filter((finding) => !isResolved(state, finding)).length,
       costUsd: entry.report.cost ?? null,
+      ...(entry.report.reviewer ? { reviewer: entry.report.reviewer } : {}),
       ...(entry.report.verdict?.coverage ? { coverage: entry.report.verdict.coverage } : {}),
       findings: entry.findings.map((finding) => ({
         id: finding.id,
@@ -106,6 +107,16 @@ export function buildManifest(state, { revision }) {
       }))
     }
   })
+  const fallback = new Map()
+  for (const entry of state.slices) {
+    const reviewer = entry.report.reviewer
+    if (entry.report.status === 'reported' && reviewer && reviewer !== REVIEWER.name) {
+      fallback.set(reviewer, (fallback.get(reviewer) ?? 0) + 1)
+    }
+  }
+  const fallbackNote = fallback.size
+    ? `${[...fallback].map(([reviewer, count]) => `${count} by ${reviewer}`).join(', ')} on the same packet prompts and rules, because the ${REVIEWER.name} budget ran out mid-review. `
+    : ''
   const round1 = state.slices.filter((entry) => entry.kind === 'sync')
   const deltas = state.slices.filter((entry) => entry.kind === 'delta')
   const cost = state.slices.reduce((total, entry) => total + (entry.report.cost ?? 0), 0)
@@ -132,7 +143,7 @@ export function buildManifest(state, { revision }) {
       },
       uncovered: sync.uncovered
     },
-    note: `${round1.length} slice(s) over the remerge diff of ${sync.merge.slice(0, 11)}, ${sync.reviewed.bytes} of ${sync.artifact.bytes} bytes reviewed (${sync.excluded.bytes} bytes in ${sync.excluded.files} files left to their verifying checks). Round 1: ${countLine(round1)}. ${deltaNote}${reported}/${slices.length} slices reported; $${cost.toFixed(2)} total.`,
+    note: `${fallbackNote}${round1.length} slice(s) over the remerge diff of ${sync.merge.slice(0, 11)}, ${sync.reviewed.bytes} of ${sync.artifact.bytes} bytes reviewed (${sync.excluded.bytes} bytes in ${sync.excluded.files} files left to their verifying checks). Round 1: ${countLine(round1)}. ${deltaNote}${reported}/${slices.length} slices reported; $${cost.toFixed(2)} total.`,
     slices,
     waiver: null
   }

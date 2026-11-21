@@ -214,6 +214,10 @@ function buildNeedsSetupOptions({
       const unavailableDetail =
         getHostHealthUnavailableDetail(host.health) ?? getHostSetupUnavailableDetail(host)
       const isAvailable = unavailableDetail === null
+      // fork-comment-ok: a host-local project has a kind-specific line, and the generic "add a remote"
+      // would tell a folder project to add a remote it can never have.
+      const locationUnavailableDetail =
+        hostLocalKind === null ? getProjectLocationUnavailableDetail(projectId, host.id) : null
       const connectAction = getHostConnectAction(host)
       return {
         id: `needs-setup:${host.id}`,
@@ -223,7 +227,7 @@ function buildNeedsSetupOptions({
         label: host.label ? translateHostDisplayLabel(host) : getExecutionHostLabel(host.id),
         detail:
           unavailableDetail ??
-          getProjectLocationUnavailableDetail(projectId, host.id) ??
+          locationUnavailableDetail ??
           getNeedsSetupDetail(hostLocalKind, pendingSetup),
         isAvailable,
         attention: host.health === 'error',
