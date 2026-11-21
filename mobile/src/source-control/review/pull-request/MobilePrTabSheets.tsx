@@ -120,9 +120,8 @@ function PrMergeSheet({ tab, request }: { tab: MobilePrTab; request: PrTabSheetR
       return
     }
     setSubmitted(true)
-    // The engine takes one second argument, so a merge that waives branch protection names the bypass
-    // and every other merge keeps the head fence.
-    if (await tab.actions.merge(method, adminBypassRequired ? true : reviewedHeadSha)) {
+    // Both arguments, always: the head fence still applies to a merge that bypasses protection.
+    if (await tab.actions.merge(method, reviewedHeadSha, adminBypassRequired)) {
       tab.closeSheetIf(request)
     }
   }

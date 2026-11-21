@@ -54,3 +54,39 @@ describe('PrActionsEngine — PR identity changes', () => {
     expect(refetch).not.toHaveBeenCalled()
   })
 })
+
+describe('PrActionsEngine — merge arguments', () => {
+  function engineWithMerge(mergePR: PrActionMutations['mergePR']) {
+    return new PrActionsEngine({
+      mutations: {
+        mergePR,
+        setPRAutoMerge: async () => ({ ok: true }),
+        updatePRState: async () => ({ ok: true }),
+        markReadyForReview: async () => ({ ok: true }),
+        markDraft: async () => ({ ok: true }),
+        requestReviewers: async () => ({ ok: true }),
+        removeReviewers: async () => ({ ok: true }),
+        rerunChecks: async () => ({ ok: true })
+      },
+      prNumber: 7,
+      prRepo: { owner: 'acme', repo: 'widgets' },
+      refetch: vi.fn(),
+      onChange: vi.fn()
+    })
+  }
+
+  it('keeps the head fence on a merge that bypasses branch protection', async () => {
+    const mergePR = vi.fn(async () => ({ ok: true }))
+    await engineWithMerge(mergePR).merge('squash', 'abc123', true)
+    expect(mergePR).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedHeadSha: 'abc123', bypassBranchProtection: true })
+    )
+  })
+
+  it('sends no bypass field for an ordinary merge', async () => {
+    const mergePR = vi.fn(async () => ({ ok: true }))
+    await engineWithMerge(mergePR).merge('merge', 'abc123')
+    expect(mergePR).toHaveBeenCalledWith(expect.objectContaining({ expectedHeadSha: 'abc123' }))
+    expect(mergePR.mock.calls[0][0]).not.toHaveProperty('bypassBranchProtection')
+  })
+})

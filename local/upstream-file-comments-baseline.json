@@ -3,7 +3,7 @@
   "base": "0c6207e3d713d94aac7fea93603849e3514ae7cf",
   "perFileThreshold": 5,
   "accepted": "the 2026-11-20 sync (0c6207e3d7, 1425 upstream commits, 579 fork commits replayed): the merged total is 5115 after trimming service-credential-read-account-switch.test.ts to 4 fork lines, and the per-file maxima are re-keyed at upstream's moved paths",
-  "total": 5115,
+  "total": 5113,
   "files": {
     ".github/workflows/e2e.yml": 13,
     ".github/workflows/pr.yml": 7,

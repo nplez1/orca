@@ -39,7 +39,7 @@ import {
   repoCreateFailure,
   type RepoCreateFailure
 } from '../../../shared/repository/creation/repo-create-failure-copy'
-import { getDefaultCreateProjectParent } from './default-create-project-parent'
+import { resolveDefaultCreateProjectParent } from '../../ipc/repos/default-create-project-parent'
 
 type RuntimeRepositoryRegistrationDependencies = {
   getStore: () => RuntimeStore | null
@@ -302,7 +302,9 @@ export class RuntimeRepositoryRegistrationController {
 
   /** Read on this host so a paired client suggests this host's Workspace Directory, not its own. */
   defaultCreateParent(): string {
-    return getDefaultCreateProjectParent(this.requireStore().getSettings())
+    // fork-comment-ok: the clone flow, the Settings row and `repos:create` all use this one rule, so a
+    // project and a clone never land in two different folders (local(parity)).
+    return resolveDefaultCreateProjectParent(this.requireStore().getSettings(), homedir())
   }
 
   private requireStore(): RuntimeStore {

@@ -18,9 +18,11 @@ function absoluteStoredParent(value: string, home: string): string {
  * the Settings row also use, so a project and a clone never land in two different folders.
  */
 export function resolveDefaultCreateProjectParent(
-  settings: Pick<
-    GlobalSettings,
-    'hostSettingOverrides' | 'workspaceDir' | 'nestWorkspaces' | 'worktreeLayoutMode'
+  settings: Partial<
+    Pick<
+      GlobalSettings,
+      'hostSettingOverrides' | 'workspaceDir' | 'nestWorkspaces' | 'worktreeLayoutMode'
+    >
   >,
   home: string
 ): string {

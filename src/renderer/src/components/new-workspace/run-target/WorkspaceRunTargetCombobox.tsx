@@ -28,6 +28,7 @@ export default function WorkspaceRunTargetCombobox({
   clone = null,
   onStartClone,
   onUseExistingFolder,
+  onRecipeChange,
   ...picker
 }: {
   hostOptions: readonly ProjectHostSetupOption[]
@@ -73,6 +74,19 @@ export default function WorkspaceRunTargetCombobox({
       })
   }
 
+  const clearPendingClone = clone?.clear
+  // fork-comment-ok: a ready host or a recipe replaces the pending clone, so it stops blocking Create
+  // and a clone that finishes later cannot retarget the selection the user just made.
+  const selectHost = (id: string): void => {
+    onHostChange?.(id)
+    onRecipeChange?.(null)
+    clearPendingClone?.()
+  }
+  const selectRecipe = (recipeId: string | null): void => {
+    onRecipeChange?.(recipeId)
+    clearPendingClone?.()
+  }
+
   const options = hostOptions.map((option): RunTargetHostOption => {
     const id = getProjectHostSetupSelectionKey(option)
     const { hostId, label } = option
@@ -84,7 +98,7 @@ export default function WorkspaceRunTargetCombobox({
         detail: option.path,
         searchText: option.detail,
         available: true,
-        onSelect: () => onHostChange?.(id)
+        onSelect: () => selectHost(id)
       }
     }
     const connecting = connectingHosts.has(hostId)
@@ -108,10 +122,16 @@ export default function WorkspaceRunTargetCombobox({
         clone.retry()
         return
       }
-      chooseFolder?.(option)
+      if (action === 'use-existing-folder') {
+        chooseFolder?.(option)
+      }
     }
+    // fork-comment-ok: 'none' means refused or already cloning; letting the row through would re-enter
+    // provisioning and race the clone resolveRunTargetRowAction is protecting.
     const canSelect =
-      action === 'start-clone' || action === 'retry-clone' || chooseFolder !== undefined
+      (action === 'start-clone' && onStartClone !== undefined) ||
+      (action === 'retry-clone' && clone !== null) ||
+      (action === 'use-existing-folder' && chooseFolder !== undefined)
     return {
       id,
       hostId,
@@ -142,6 +162,7 @@ export default function WorkspaceRunTargetCombobox({
   return (
     <RunTargetCombobox
       {...picker}
+      onRecipeChange={selectRecipe}
       hostOptions={options}
       selectedHostId={selected ? getProjectHostSetupSelectionKey(selected) : null}
     />

@@ -297,9 +297,8 @@ export function useMobileSourceControlNextStep({
             : t('pullRequest.prActionsSection.mergeButton', 'Merge'),
           onConfirm: () => {
             setMergeIntent(null)
-            // The engine takes one second argument, so a merge that waives branch protection names the
-            // bypass and every other merge keeps the head fence.
-            actions.merge(mergeIntent.method, adminBypassRequired ? true : mergeIntent.headSha)
+            // Both arguments, always: the head fence still applies to a merge that bypasses protection.
+            actions.merge(mergeIntent.method, mergeIntent.headSha, adminBypassRequired)
           },
           onCancel: () => setMergeIntent(null)
         }
