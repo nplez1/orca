@@ -982,17 +982,22 @@ that changed what the two channels answer. Two shapes the lane read wrongly:
 - **A paused job is listed and arms nothing.** `/loop` keeps a paused loop's id, prompt and cadence
   and only unarms it, so `loop:rpc:schedules:list` returns it with `paused: true` and no `nextAt` —
   the same shape as a self-paced loop waiting for its wakeup, which is why presence was enough
-  before. Presence is now filtered by the extensions' own "can it still fire" rules: `!paused`,
-  `enabled !== false`, `runs`/`runCount` under an unspent `maxRuns`, an `until` neither passed nor
-  at or before the armed fire, and no spent live one-shot. The inventory's no-fire-time case still
-  holds, because a dynamic loop between wakeups genuinely is armed.
-- **`loop:state` is the armed set `/loop` publishes itself, once per real change.** The lane bound
-  only pi-subagents' two events, so a loop armed, paused, resumed, expired or re-armed between turns
+  before. Presence is now filtered by what each extension knows before a fire: `!paused` and
+  `enabled !== false` on both homes, plus — on the cold home only — `runCount` under an unspent
+  `maxRuns` and an `until` neither passed nor at or before the armed fire. Those bounds are cold-only
+  on purpose: the scheduler moves `runCount` in the same step it disables the job, so a firing cold
+  job is never dropped, while `/loop` moves `runs` when it arms the fire and starts the turn
+  afterwards, so the same test would release a live pane mid-fire. The inventory's no-fire-time case
+  still holds, because a dynamic loop between wakeups genuinely is armed.
+- **`loop:state` is the armed set `/loop` publishes itself, whenever that set changes.** The lane
+  bound only pi-subagents' two events, so a loop armed, paused or re-armed between turns
   had no post to ride: `/loop` typed at an idle prompt, or a `manage_schedules` call that lands after
   the turn ended, left the pane `done` with the loop armed until the first fire. It is now a third
   subscribed channel, and it also covers the session-start order case — a restored loop's emit is
   caught when Orca's extension loads first, and Orca's own `session_start` ask catches it when the
-  `loop` extension loads first.
+  `loop` extension loads first. The set holds only jobs with an armed fire, so a dynamic loop between
+  wakeups is invisible to it — pausing or ending one of those moves nothing, which over-holds rather
+  than releasing early, and the ≤60s re-check is the bound.
 
 The events list carries a third entry rather than replacing one: the two pi-subagents channels still
 announce cold work, and `/loop`'s create/remove request channels are still deliberately not bound

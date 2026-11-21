@@ -289,57 +289,59 @@ describe('pi scheduled work holds the pane as monitoring', () => {
     expect(harness.accepted.at(-1)?.workingMode).toBeUndefined()
   })
 
-  it('holds nothing for a job whose bound was already reached', async () => {
+  it('keeps holding a live loop whose last fire is already armed and in flight', async () => {
     const inventory: Inventory = { live: [], cold: [] }
     const harness = createHarness({ inventory })
     await startTurn(harness)
     const now = Date.now()
+    // Why these hold: `/loop` moves `runs` when it arms the fire and starts the turn only after it has
+    // published the new armed set, so a live job at or over its bound is mid-fire, not finished — dropping
+    // it here would read `done` for the gap before `before_agent_start` arrives.
     inventory.live.push(
-      // A spent one-shot: its fire is its whole schedule, and `/loop` collects it on the next tick.
       liveLoop({ id: 'loop-spent', mode: 'once', runs: 1, nextAt: undefined }),
       liveLoop({ id: 'loop-maxed', runs: 2, maxRuns: 2 }),
-      liveLoop({ id: 'loop-expired', runs: 1, until: now - 1_000 })
-    )
-    inventory.cold.push(
-      coldJob({
-        id: 'job-maxed',
-        runCount: 3,
-        maxRuns: 3,
-        nextRun: new Date(now + 3_600_000).toISOString()
-      }),
-      coldJob({ id: 'job-expired', until: new Date(now - 1_000).toISOString() })
+      liveLoop({ id: 'loop-past-until', runs: 1, until: now - 1_000 })
     )
 
     await drive(harness, 'agent_end', {})
 
-    expect(harness.posted.at(-1)?.scheduled_work).toBeUndefined()
-    expect(harness.accepted.at(-1)?.state).toBe('done')
+    expect(harness.posted.at(-1)?.scheduled_work).toEqual({
+      jobs: [
+        { id: 'loop-spent', kind: 'live' },
+        { id: 'loop-maxed', kind: 'live', next_in_ms: 300_000 },
+        { id: 'loop-past-until', kind: 'live', next_in_ms: 300_000 }
+      ]
+    })
+    expect(harness.accepted.at(-1)?.workingMode).toBe('monitoring')
   })
 
-  it('holds nothing for a job whose next fire is already past its bound', async () => {
+  it('holds nothing for a cold job whose bound was already reached', async () => {
     const inventory: Inventory = { live: [], cold: [] }
     const harness = createHarness({ inventory })
     await startTurn(harness)
     const now = Date.now()
     const until = now + 60_000
-    inventory.live.push(
-      // Why: both homes refuse a fire at or after `until`, so a fire armed later than the bound is the one
-      // thing that will never happen — waiting for `until` itself would hold the pane for the whole window.
-      liveLoop({ id: 'loop-bound-before-fire', until, nextAt: until + 1_000 }),
-      liveLoop({ id: 'loop-fires-before-bound', until, nextAt: until - 1_000 })
-    )
+    // Why the cold home may drop these: the scheduler moves `runCount` in the same step it disables the
+    // job, so a job at or over its bound (or armed past it) has no fire left and cannot be mid-fire.
     inventory.cold.push(
+      coldJob({ id: 'job-maxed', runCount: 3, maxRuns: 3 }),
+      coldJob({ id: 'job-expired', until: new Date(now - 1_000).toISOString() }),
       coldJob({
         id: 'job-bound-before-fire',
         until: new Date(until).toISOString(),
         nextRun: new Date(until + 1_000).toISOString()
+      }),
+      coldJob({
+        id: 'job-fires-before-bound',
+        until: new Date(until).toISOString(),
+        nextRun: new Date(until - 1_000).toISOString()
       })
     )
 
     await drive(harness, 'agent_end', {})
 
     expect(harness.posted.at(-1)?.scheduled_work).toEqual({
-      jobs: [{ id: 'loop-fires-before-bound', kind: 'live', next_in_ms: 59_000 }]
+      jobs: [{ id: 'job-fires-before-bound', kind: 'cold', next_in_ms: 59_000 }]
     })
     expect(harness.accepted.at(-1)?.workingMode).toBe('monitoring')
   })
