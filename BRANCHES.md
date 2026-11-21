@@ -352,6 +352,30 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
 
 ## Branches
 
+### nplez1/New-Loop-Job-Support — a pi pane reads its own scheduled work (pi revamp follow-up)
+
+- **Why:** pi-config's `/loop` and pi-subagents were revamped into one `manage_schedules` roster over two
+  homes — live loops that re-enter the session, cold jobs that spawn a subagent — with pause/resume,
+  bounds (`maxRuns`/`until`) and one-shots. Orca's pi status lane, which holds a finished turn as
+  `working` + `monitoring` while scheduled work is armed, still read the roster by the old rules, so
+  three shapes were wrong: a paused loop stays listed with no `nextAt` and pinned the pane to
+  monitoring for the rest of the session; a loop armed, paused or cancelled between turns published
+  nothing the lane subscribed, so the pane read `done` with work armed; and a job whose bound was
+  reached, or a spent one-shot, kept holding until the 60s poll.
+- **Shape:** the reader takes the extensions' own "can this still fire" predicates (`paused`,
+  `enabled: false`, `maxRuns`, `until`, a spent live one-shot) instead of treating presence as a
+  claim, and the lane subscribes `/loop`'s `loop:state` — the armed set it publishes itself once per
+  real change — beside the two pi-subagents events. Still fail-safe: a channel nothing answers posts
+  no field and holds nothing, and nothing is inferred from tool calls.
+- **Base:** `main`.
+- **Verified:** 18 tests in `src/main/pi/agent-status-scheduled-work.test.ts` (the real generated
+  extension driven into the real listener), 101 across the pi lane; `tc:node` clean; format, oxlint,
+  typecheck and changed-code quality clean. `check:changed`'s two remaining failures
+  (`direct-link-open-ratchet`, `main-blocking-api-ratchet`) are pre-existing baseline drift in files
+  this branch does not touch. Gate 1 not required — no global input (`src/main/pi/**` plus a
+  fork-owned `.md`). Gate 2: reviewed by `claude/opus`, high — **pending**: the Claude Code CLI is
+  rate-limited until 05:40 PT, so the PR opens after that round.
+
 ### nplez1/issue-358 — the fold reads prose, not the tool log (fork issue #358, PR #363)
 
 - **Why:** the session-summary fold was handed one line per tool event, and every tool call is _two_
