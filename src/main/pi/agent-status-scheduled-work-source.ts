@@ -9,8 +9,8 @@ import type { PiAgentKind } from '../../shared/agent-launch/catalog/pi-agent-kin
  *
  *  Both homes can be paused (`manage_schedules` presents them as one roster), and both keep listing a
  *  paused job with its id and cadence while it arms nothing, so presence alone is not a claim: a paused
- *  or disabled job holds nothing. `loop:state`, published by `/loop` once per real change, is the signal
- *  for a loop armed, paused, resumed or expired between turns — the one movement no post carries.
+ *  or disabled job holds nothing. `loop:state` is `/loop`'s armed set — only jobs with an armed fire — so
+ *  it announces an arm, pause or resume between turns; a dynamic loop between wakeups moves it silently.
  *
  *  Nothing here is inferred from tool calls: a `ScheduleWakeup` fallback covers dynamic loops only, and
  *  would miss fixed loops and cold jobs entirely. A channel nothing answers is absent, never empty — no
@@ -118,9 +118,9 @@ export function getPiAgentStatusScheduledWorkModuleLines(kind: PiAgentKind): str
     "        : typeof job.nextRun === 'string'",
     '          ? Date.parse(job.nextRun)',
     '          : Number.NaN',
-    '    // Why the cold home alone: the scheduler moves `runCount` in the same step it disables the job, so a',
-    '    // firing cold job is never dropped here. `/loop` moves `runs` when it arms the fire, *before* that',
-    "    // fire's turn starts, so the same test would release a live pane mid-fire and read `done` for the gap.",
+    '    // Why the cold home alone: `runCount`, `enabled` and `nextRun` are written together at finalize, so a',
+    '    // firing cold job still reads its pre-fire count and the slot that fired. `/loop` moves `runs` when it',
+    "    // arms the fire, before that fire's turn starts — the same test would release a live pane mid-fire.",
     '    if (kind === "cold") {',
     '      const runs =',
     "        typeof job.runs === 'number' ? job.runs : typeof job.runCount === 'number' ? job.runCount : 0",
