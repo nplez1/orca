@@ -375,11 +375,11 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
   typecheck and changed-code quality clean. `check:changed`'s two remaining failures
   (`direct-link-open-ratchet`, `main-blocking-api-ratchet`) are pre-existing baseline drift in files
   this branch does not touch. Gate 1 not required — no global input (`src/main/pi/**` plus a
-  fork-owned `.md`). Gate 2: reviewed by `claude/opus`, high — R1 clean (2 MINOR, 2 NIT); delta on R2
-  found one doc NIT, fixed, delta otherwise clean. MINOR 1 (a fire that empties the roster publishes
-  before it starts the turn, so an immediate release could read `done` for the gap) is recorded in the
-  PR body rather than fixed: unconfirmed against pi's binary, and the remedy is a timed flush plus a
-  fire-driving test, not one hunk.
+  fork-owned `.md`). Gate 2: reviewed by `claude/opus`, high — R1 (1 SHOULD-FIX, 2 MINOR, 2 NIT, all
+  fixed), delta on R2 clean, delta on R3 (2 MINOR, both fixed). The SHOULD-FIX is the reason the bound
+  tests are cold-only: a second round on R1 escalated the mid-fire release the first round had called
+  MINOR, and it was right — `/loop` moves `runs` when it arms the fire and starts the turn afterwards,
+  so judging a bound on the live home released the pane for exactly the gap the hold exists to cover.
 
 ### nplez1/issue-358 — the fold reads prose, not the tool log (fork issue #358, PR #363)
 
