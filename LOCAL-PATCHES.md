@@ -4871,13 +4871,13 @@ Six things a reader will otherwise get wrong:
   legacy directory is safe to resolve. Only a build older than both (executable `Orca.exe`) stays
   unreachable, and that one is indistinguishable from the official app by design.
 
-### `local(test)`: the 2026-11-20 sync's deleted coverage — three test sets recorded, not re-homed
+### `local(test)`: the 2026-11-20 sync's deleted coverage — three test sets re-homed, two gaps recorded
 
 This sync of `0c6207e3d71` took upstream deletions of test files the fork had extended, and one
 upstream test lost the fork's `it.each` block with the file it lived in. The release review of the
-merge found each one; two more of the same class were re-homed in the same pass (see the end), and
-these three are recorded here because re-homing them costs a rewrite of the harness rather than an
-import path.
+merge found each one. Three were re-homed by re-pointing their imports at the modules upstream moved;
+the two below are recorded instead, because one tests a handler whose harness upstream deleted rather
+than moved, and one is an assertion inside an upstream test that upstream relocated without it.
 
 - **`src/main/ipc/worktrees-local-create-base-prefetch.test.ts` (303 lines, fork-only, deleted).** It
   was the only test of the create-base prefetch and of the concurrent username/base-ref probe, whose
@@ -4886,13 +4886,6 @@ import path.
   `worktrees-test-runtime-stub.ts` — no longer exists at HEAD, so the file cannot be re-pointed; a
   port means rebuilding that harness around upstream's new worktree IPC layout. Nothing at HEAD pins
   either behavior now.
-- **`src/renderer/src/runtime/web-session-tabs-sync/agent-status/web-session-tabs-sync-remote-status-title-flap.test.ts`
-  (401 lines at HEAD, deleted).** The fork's `+179` lines on top of the base pinned the parts of the
-  paired-pane fence the fork owns: a host question that reports `waiting` through
-  `ui_prompt_start` (Pi) or the Copilot screen lane pierces the fence, `resetHostDialogObservationsForTests`
-  in setup, and a three-cycle flap count. Upstream deleted the whole file; the successor covering the
-  same tracking API at HEAD is `web-session-tabs-sync-remote-spinner-stuck.test.ts`, which does not
-  carry those cases. A port is a rewrite against a different harness, not a re-point.
 - **`src/renderer/src/web/web-preload-api-workspace-catalog.test.ts` (fork's `it.each`, 3 cases,
   dropped).** The fork's block was the only test of the web client's
   `repos.getDefaultCreateProjectParent` wiring (three platform cases). Upstream relocated the test
@@ -4903,7 +4896,16 @@ import path.
   rule and now delegates to `resolveDefaultCreateProjectParent` (see the review finding on
   `runtime-repository-registration-controller.defaultCreateParent`).
 
-Re-homed in this pass instead of recorded, both import-path-only ports that pass at HEAD:
+Re-homed in this pass instead of recorded, all import-path-only ports that pass at HEAD:
+
+`src/renderer/src/runtime/web-session-tabs-sync/agent-status/web-session-tabs-sync-remote-status-title-flap.test.ts`
+(restored, 6 cases) — the fork's `+179` lines pinned the parts of the paired-pane fence the fork owns:
+a host question that reports `waiting` through `ui_prompt_start` (Pi) or the Copilot screen lane
+pierces the fence, `resetHostDialogObservationsForTests` in setup, and a three-cycle flap count. Upstream
+deleted the file; restoring the fork's version needed four imports re-pointed (`shared/orca-profiles/constants`,
+`snapshots/snapshot-api`, `./agent-status-patch`, `tracking/tracking-{lifecycle,decisions}`) and no
+behavioural change.
+
 `window-close-request-coordinator.test.ts` (12 fork cases: close-guard veto and ordering, quit
 retraction, the checkpoint-in-progress flag, re-entrant dispatch, the Terminal-less close) moved to
 `src/renderer/src/app-shell/shutdown/`, and `terminal-tab-actions-unified-close.test.ts` (5 cases: the
