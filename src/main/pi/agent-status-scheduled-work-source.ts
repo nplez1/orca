@@ -7,6 +7,11 @@ import type { PiAgentKind } from '../../shared/agent-launch/catalog/pi-agent-kin
  *  - `loop:rpc:schedules:list` — live loops and self-paced wakeups, served by the user's `loop` extension.
  *  - `subagents:rpc:schedules:list` — cold jobs in pi-subagents' scheduler, keyed by session id.
  *
+ *  Both homes can be paused (`manage_schedules` presents them as one roster), and both keep listing a
+ *  paused job with its id and cadence while it arms nothing, so presence alone is not a claim: a paused
+ *  or disabled job holds nothing. `loop:state`, published by `/loop` once per real change, is the signal
+ *  for a loop armed, paused, resumed or expired between turns — the one movement no post carries.
+ *
  *  Nothing here is inferred from tool calls: a `ScheduleWakeup` fallback covers dynamic loops only, and
  *  would miss fixed loops and cold jobs entirely. A channel nothing answers is absent, never empty — no
  *  inventory means no hold, which is what keeps an older build reading exactly as it does today.
@@ -72,7 +77,10 @@ export function getPiAgentStatusScheduledWorkModuleLines(kind: PiAgentKind): str
     'const PI_SCHEDULED_WORK_MAX_JOBS = 20',
     "// Why only the published channels: /loop's own create/remove requests are request channels this lane",
     '// binds before the loop extension does, so asking on them reads the inventory before the change lands.',
-    'const PI_SCHEDULED_WORK_EVENT_CHANNELS = ["subagents:scheduled", "subagents:scheduler_ready"]',
+    '// `loop:state` is the armed set `/loop` publishes itself, once per real change, so it is the one signal',
+    '// for a loop armed, paused, resumed, expired or re-armed between turns — a `/loop` typed at the prompt',
+    '// or a `manage_schedules` call that lands after the turn ends carries no post of its own.',
+    'const PI_SCHEDULED_WORK_EVENT_CHANNELS = ["subagents:scheduled", "subagents:scheduler_ready", "loop:state"]',
     '',
     'function piScheduledWorkJobs(): PiScheduledWorkJob[] {',
     '  const jobs: PiScheduledWorkJob[] = []',
@@ -89,9 +97,12 @@ export function getPiAgentStatusScheduledWorkModuleLines(kind: PiAgentKind): str
     '  if (!Array.isArray(list)) return jobs',
     '  for (const entry of list.slice(0, PI_SCHEDULED_WORK_MAX_JOBS)) {',
     "    if (!entry || typeof entry !== 'object') continue",
-    '    const job = entry as { id?: unknown; enabled?: unknown; nextAt?: unknown; nextRun?: unknown }',
+    '    const job = entry as { id?: unknown; enabled?: unknown; paused?: unknown; nextAt?: unknown; nextRun?: unknown }',
     "    if (typeof job.id !== 'string' || !job.id) continue",
-    '    if (kind === "cold" && job.enabled === false) continue',
+    '    // Why both homes: pausing keeps the id, prompt and cadence and arms nothing, so a paused job is',
+    '    // still listed — live says `paused`, the scheduler says `enabled: false`. Neither will fire again',
+    '    // until it is resumed, and a listed-but-unarmed job would claim a hold forever.',
+    '    if (job.paused === true || job.enabled === false) continue',
     '    const nextAt =',
     "      typeof job.nextAt === 'number' && Number.isFinite(job.nextAt)",
     '        ? job.nextAt',
