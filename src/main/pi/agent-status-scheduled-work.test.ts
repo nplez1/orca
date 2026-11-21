@@ -316,6 +316,34 @@ describe('pi scheduled work holds the pane as monitoring', () => {
     expect(harness.accepted.at(-1)?.state).toBe('done')
   })
 
+  it('holds nothing for a job whose next fire is already past its bound', async () => {
+    const inventory: Inventory = { live: [], cold: [] }
+    const harness = createHarness({ inventory })
+    await startTurn(harness)
+    const now = Date.now()
+    const until = now + 60_000
+    inventory.live.push(
+      // Why: both homes refuse a fire at or after `until`, so a fire armed later than the bound is the one
+      // thing that will never happen — waiting for `until` itself would hold the pane for the whole window.
+      liveLoop({ id: 'loop-bound-before-fire', until, nextAt: until + 1_000 }),
+      liveLoop({ id: 'loop-fires-before-bound', until, nextAt: until - 1_000 })
+    )
+    inventory.cold.push(
+      coldJob({
+        id: 'job-bound-before-fire',
+        until: new Date(until).toISOString(),
+        nextRun: new Date(until + 1_000).toISOString()
+      })
+    )
+
+    await drive(harness, 'agent_end', {})
+
+    expect(harness.posted.at(-1)?.scheduled_work).toEqual({
+      jobs: [{ id: 'loop-fires-before-bound', kind: 'live', next_in_ms: 59_000 }]
+    })
+    expect(harness.accepted.at(-1)?.workingMode).toBe('monitoring')
+  })
+
   it('holds an armed one-shot that has not fired yet', async () => {
     const inventory: Inventory = { live: [], cold: [] }
     const harness = createHarness({ inventory })

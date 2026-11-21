@@ -982,7 +982,9 @@ that changed what the two channels answer. Two shapes the lane read wrongly:
 - **A paused job is listed and arms nothing.** `/loop` keeps a paused loop's id, prompt and cadence
   and only unarms it, so `loop:rpc:schedules:list` returns it with `paused: true` and no `nextAt` —
   the same shape as a self-paced loop waiting for its wakeup, which is why presence was enough
-  before. Presence is now `!paused && enabled !== false`; the inventory's no-fire-time case still
+  before. Presence is now filtered by the extensions' own "can it still fire" rules: `!paused`,
+  `enabled !== false`, `runs`/`runCount` under an unspent `maxRuns`, an `until` neither passed nor
+  earlier than the armed fire, and no spent live one-shot. The inventory's no-fire-time case still
   holds, because a dynamic loop between wakeups genuinely is armed.
 - **`loop:state` is the armed set `/loop` publishes itself, once per real change.** The lane bound
   only pi-subagents' two events, so a loop armed, paused, resumed, expired or re-armed between turns
