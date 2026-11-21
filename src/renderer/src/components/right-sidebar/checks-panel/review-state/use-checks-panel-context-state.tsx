@@ -209,7 +209,9 @@ export function useChecksPanelContextState(model: ChecksPanelContextStateInput) 
   const hostedReviewEntry = useAppStore((s) =>
     hostedReviewCacheKey ? s.hostedReviewCache[hostedReviewCacheKey] : undefined
   )
-  const hostedReview = hostedReviewEntry?.data ?? null
+  const hostedReview = isStaleMergedGitHubReviewForHead(hostedReviewEntry, activeWorktree?.head)
+    ? null
+    : (hostedReviewEntry?.data ?? null)
   const linkedReviewNumber =
     activeWorktree?.linkedPR ??
     activeWorktree?.linkedGitLabMR ??
