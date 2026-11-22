@@ -5011,7 +5011,7 @@ the `spawnSync` timeout.
 `LOOK_AROUND_AGENTS` is the whole gate, and it listed `claude` and `codex`. Adding `'pi'` flips every
 reader at once — eleven call sites in nine files, so `lookAroundSupported` is the line a sync must not
 move: the setting is honoured (`bot-look-around-state.ts:311`), a slot can come due and `Look now` is
-allowed (`bot-look-around-runner.ts:119,164,203`), the CLI stops refusing (`bots-look-around.ts:74`),
+allowed (`bot-look-around-runner.ts:118,163,202`), the CLI stops refusing (`bots-look-around.ts:74`),
 both renderer sections and the Up-next rows grow (`BotLookAroundSection.tsx:89`,
 `BotTidyUpSection.tsx:54`, `BotSettingsRoot.tsx:368`, `bot-upcoming-rows.ts:26`), and — because
 `bot-memory-tidy-up-runner.ts:106` and `bot-memory-tidy-up.ts:162` read the same constant —
@@ -5046,9 +5046,9 @@ Anchors, each a bare line or word in a file upstream owns — the reason is here
 | -------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------- |
 | `src/shared/bots/bot-look-around.ts`               | `:9`   | `'pi'` in `LOOK_AROUND_AGENTS`                                                                       |
 | `src/main/pi/rpc/launch/rpc-launch.ts`             | `:72`  | `'bash'` in `PI_READ_TOOLS`                                                                          |
-| `src/main/pi/rpc/launch/rpc-launch.ts`             | `:179` | spread `piReadOnlyGateArgs()` into a `tools === 'read'` run, beside `--no-mcp` (plus the one import) |
+| `src/main/pi/rpc/launch/rpc-launch.ts`             | `:180` | spread `piReadOnlyGateArgs()` into a `tools === 'read'` run, beside `--no-mcp` (plus the one import) |
 | `src/main/runtime/rpc/methods/bots-look-around.ts` | `:75`  | the refusal names no agent: `'This bot’s agent cannot look around.'`                                 |
-| `src/main/bots/bot-look-around-runner.ts`          | `:265` | one import and one expression: `lookStartFailureWords(error, LOOK_FAILURES.couldNotStart)`           |
+| `src/main/bots/bot-look-around-runner.ts`          | `:264` | one import and one expression: `lookStartFailureWords(error, LOOK_FAILURES.couldNotStart)`           |
 
 Read top to bottom: a word, a word, one spread, one string, and one import plus one expression. The
 fork's whole hook on upstream's launch path is `...piReadOnlyGateArgs()`, which is the shape the rules
@@ -5064,8 +5064,9 @@ ask for — the diff says a function name, not a paragraph.
   `writePiExtensionFile` is `async`, so an async helper could not reach that call site at all. The write
   is therefore a `writeFileSync` to a staged temp name plus `renameSync`, guarded by a
   "already the right content" compare: Pi exits when an extension fails to load, so a concurrent launch
-  must never read a half-written file. A rename that Windows refuses because Pi holds the old file open
-  falls back to that file when it already holds this source, which is the only case where it is safe.
+  must never read a half-written file. A rename that Windows refuses because another process holds the
+  old file open falls back to that file only when it already holds this source — another launch's write,
+  not a running Pi's older copy, which still fails closed.
 - `src/main/pi/fork-read-only-gate.test.ts` — drives the **generated** extension (evaluated with
   `new Function`, as Pi would load it) and compares it with `lookAroundCommandAllowed` over one command
   corpus, so the duplicated policy cannot drift apart in silence — the corpus carries the paths a
