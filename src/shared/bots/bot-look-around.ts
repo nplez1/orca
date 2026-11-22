@@ -6,7 +6,7 @@ import type { BotAgent } from '../bot-types'
 import { startOfLocalDay } from '../automations/scheduling/automation-cron-occurrence'
 
 /** Only these agents have a place where Orca can hold a run to reads. */
-export const LOOK_AROUND_AGENTS = ['claude', 'codex'] as const satisfies readonly BotAgent[]
+export const LOOK_AROUND_AGENTS = ['claude', 'codex', 'pi'] as const satisfies readonly BotAgent[]
 
 export function lookAroundSupported(agent: string): boolean {
   return LOOK_AROUND_AGENTS.some((entry) => entry === agent)

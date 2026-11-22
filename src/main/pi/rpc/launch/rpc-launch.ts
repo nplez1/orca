@@ -34,6 +34,7 @@ export type PiRpcLaunchOptions = {
   backgroundWork?: PiBackgroundWorkLaunch
   /** The extension that registers a bot's own tools, and the servers it reads; absent: none. */
   botTools?: { extension: string; servers: string }
+  readOnlyGate?: { extension: string }
 }
 
 const CALLER_ENV_TO_DELETE = [
@@ -68,7 +69,7 @@ export function piRpcSessionlessEnvironment(env: Readonly<Record<string, string>
   }
 }
 
-const PI_READ_TOOLS = ['read', 'grep', 'find', 'ls'] as const
+const PI_READ_TOOLS = ['read', 'grep', 'find', 'ls', 'bash'] as const
 // A limited run is refused any other tool selection, which could widen it.
 const PI_TOOL_SELECTION_FLAGS = [
   '--tools',
@@ -129,6 +130,9 @@ export function buildPiRpcLaunch(options: PiRpcLaunchOptions): ProviderProcessLa
   if (selection) {
     throw new Error(`Pi ${selection.split('=')[0]} conflicts with a limited tool launch`)
   }
+  if (options.tools === 'read' && !options.readOnlyGate) {
+    throw new Error('A limited Pi run needs its read-only gate')
+  }
   let provider = false
   let model = false
   for (let index = 0; index < args.length; index++) {
@@ -179,6 +183,7 @@ export function buildPiRpcLaunch(options: PiRpcLaunchOptions): ProviderProcessLa
       ...(options.tools === 'none' ? ['--no-tools', '--no-mcp'] : []),
       ...(options.backgroundWork ? ['--extension', options.backgroundWork.extension] : []),
       ...(options.botTools ? ['--extension', options.botTools.extension] : []),
+      ...(options.readOnlyGate ? ['--extension', options.readOnlyGate.extension] : []),
       ...(options.sessionFile ? ['--session', options.sessionFile] : []),
       ...(options.forkFile ? ['--fork', options.forkFile] : [])
     ],
