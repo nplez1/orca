@@ -39,6 +39,7 @@ const CORPUS = [
   'gh pr view 12',
   'gh issue list --repo nplez1/orca',
   'gh run view 44',
+  'gh pr view https://github.com/nplez1/orca/pull/1',
   'git status',
   'git log --oneline -5',
   'git diff HEAD~1',
@@ -47,6 +48,9 @@ const CORPUS = [
   'orca bot connectors',
   'orca slack read --channel general',
   'orca linear issue ENG-12',
+  '"${ORCA_CLI_COMMAND:-orca}" worktree ps',
+  '"${ORCA_CLI_COMMAND:-orca}" slack find standup',
+  'bash -lc \'"${ORCA_CLI_COMMAND:-orca}" worktree ps\'',
   "bash -lc 'git status'",
   "zsh -lc 'gh pr checks'",
   'gh pr merge 12',
@@ -58,9 +62,13 @@ const CORPUS = [
   'rm -rf /',
   'gh api -XPOST /repos/a/b/merges',
   'gh pr view --repo other/repo',
+  'gh pr list --repo=evil.com/a/b',
+  'gh pr list -Rhost/o/r',
   'gh pr list --web',
   'gh pr view 1 --web',
+  'gh pr view https://example.com/x',
   'git diff --output=/tmp/x',
+  'git show :src/main/a.ts',
   'git -c core.pager=less log',
   'orca slack join general',
   'orca slack download general',
@@ -85,6 +93,17 @@ describe('the look-around gate Pi loads', () => {
     for (const toolName of ['read', 'grep', 'find', 'ls']) {
       expect(await gate().toolCall({ toolName, input: {} })).toBeUndefined()
     }
+  })
+
+  it('refuses a tool neither layer bounded, and a call it cannot name', async () => {
+    for (const toolName of ['write', 'edit', 'Agent', 'subagent', 'code', 'bash_output']) {
+      expect(await gate().toolCall({ toolName, input: {} })).toEqual({
+        block: true,
+        reason: LOOK_AROUND_REFUSAL
+      })
+    }
+    expect(await gate().toolCall({})).toEqual({ block: true, reason: LOOK_AROUND_REFUSAL })
+    expect(await gate().toolCall(undefined)).toEqual({ block: true, reason: LOOK_AROUND_REFUSAL })
   })
 
   it('refuses a bash call whose command it cannot read, and says why', async () => {

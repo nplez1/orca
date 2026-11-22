@@ -22,8 +22,7 @@ import {
   lookFailureIsQuiet,
   usageLimitAlreadyNoted
 } from './bot-look-around-failures'
-import { agentCliInstallationProblemOf } from '../native-chat/agent-launch/agent-cli-installation-error'
-import { errorMessage } from '../../shared/errors/error-message'
+import { lookStartFailureWords } from './bot-look-around-start-failure'
 import { lookAroundPrompt } from './bot-look-around-prompt'
 import { lookAroundDueAt } from './bot-look-around-schedule'
 import {
@@ -262,9 +261,7 @@ export class BotLookAroundRunner {
     } catch (error) {
       if (!gate.deferred()) {
         console.warn('[bots] look-around could not run', error)
-        failure = agentCliInstallationProblemOf(error)
-          ? `${LOOK_FAILURES.couldNotStart} ${errorMessage(error)}`
-          : LOOK_FAILURES.couldNotStart
+        failure = lookStartFailureWords(error, LOOK_FAILURES.couldNotStart)
       }
       await stopIfKept(gate, this.deps, sessionId, start)
     } finally {

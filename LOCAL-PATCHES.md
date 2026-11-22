@@ -5008,14 +5008,17 @@ enough to the job's 50 that one step could take the whole job.
 the `spawnSync` timeout.
 ### `local(bots)`: look around on Pi, and the shell a look run needs
 
-`LOOK_AROUND_AGENTS` is the whole gate, and it listed `claude` and `codex`. Six readers take their
-answer from it, so adding `'pi'` flips all of them at once: the setting is honoured
-(`bot-look-around-state.ts:311`), a slot can come due and `Look now` is allowed, a started look may
-continue, the CLI stops refusing, and — because `bot-memory-tidy-up-runner.ts:106` and
-`bot-memory-tidy-up.ts:162` read the same constant — **overnight memory tidy-up arrives with it**. That
-coupling is the reason this patch is not only about looking around: a reply-only run needs nothing more
-than `--no-tools --no-mcp`, so the easier half rides along rather than shipping separately. The long
-form, with the readers table and the open questions, is `local/design/look-around-pi.md`.
+`LOOK_AROUND_AGENTS` is the whole gate, and it listed `claude` and `codex`. Adding `'pi'` flips every
+reader at once — eleven call sites in nine files, so `lookAroundSupported` is the line a sync must not
+move: the setting is honoured (`bot-look-around-state.ts:311`), a slot can come due and `Look now` is
+allowed (`bot-look-around-runner.ts:119,164,203`), the CLI stops refusing (`bots-look-around.ts:74`),
+both renderer sections and the Up-next rows grow (`BotLookAroundSection.tsx:89`,
+`BotTidyUpSection.tsx:54`, `BotSettingsRoot.tsx:368`, `bot-upcoming-rows.ts:26`), and — because
+`bot-memory-tidy-up-runner.ts:106` and `bot-memory-tidy-up.ts:162` read the same constant —
+**overnight memory tidy-up arrives with it**. That coupling is the reason this patch is not only about
+looking around: a reply-only run needs nothing more than `--no-tools --no-mcp`, so the easier half
+rides along rather than shipping separately. The long form, with the design's own readers table and the
+open questions, is `local/design/look-around-pi.md`.
 
 The launch side was already done and tested; the gap was that nothing held a pi run to reads. A look
 prompt's entire job is shell reads (`gh pr view|checks|diff`, `orca worktree ps`, `git log|show|diff`,
@@ -5029,10 +5032,13 @@ instead of a person). Pi's `tool_call` event can block, so pi gets the same two 
    selection on a limited run, which is what keeps a user from widening it; that guard must grow with
    the read set, not stay behind it.
 2. **The per-call gate.** A managed extension, written by the fork module below and passed as
-   `--extension`, answers every `bash` call from the read-only policy and returns
-   `{ block: true, reason: LOOK_AROUND_REFUSAL }` otherwise — pi's own contract, and the same refusal
-   text a blocked Claude run gives its owner. `read`/`grep`/`find`/`ls` are left alone: layer 1 already
-   bounded them. It is not installed for a reply-only session, where layer 1 means no tools at all.
+   `--extension`, lets `read`/`grep`/`find`/`ls` through (layer 1 bounded those), answers a `bash` call
+   from the read-only policy, and refuses **everything else** — an extension's own tool, a subagent —
+   returning `{ block: true, reason: LOOK_AROUND_REFUSAL }`, pi's own contract and the same refusal
+   text a blocked Claude run gives its owner. Denying by default is deliberate: `--tools` bounds Pi's
+   own built-ins, but a look run still loads the user's extensions, and nothing in the tree says
+   `--tools` also removes tools those register. It is the answer `lookAroundToolDecision` already gives
+   Claude, and it is not installed for a reply-only session, where layer 1 means no tools at all.
 
 Anchors, each a bare line or word in a file upstream owns — the reason is here, never in the file:
 
@@ -5042,11 +5048,11 @@ Anchors, each a bare line or word in a file upstream owns — the reason is here
 | `src/main/pi/rpc/launch/rpc-launch.ts`             | `:72`  | `'bash'` in `PI_READ_TOOLS`                                                                          |
 | `src/main/pi/rpc/launch/rpc-launch.ts`             | `:179` | spread `piReadOnlyGateArgs()` into a `tools === 'read'` run, beside `--no-mcp` (plus the one import) |
 | `src/main/runtime/rpc/methods/bots-look-around.ts` | `:75`  | the refusal names no agent: `'This bot’s agent cannot look around.'`                                 |
-| `src/main/bots/bot-look-around-runner.ts`          | `:265` | a too-old agent CLI keeps its cause in the recorded failure                                          |
+| `src/main/bots/bot-look-around-runner.ts`          | `:265` | one import and one expression: `lookStartFailureWords(error, LOOK_FAILURES.couldNotStart)`           |
 
-Read top to bottom the five are a word, a word, one spread, one string and one expression. The fork's
-whole hook on upstream's launch path is `...piReadOnlyGateArgs()`, which is the shape the rules ask for
-— the diff says a function name, not a paragraph.
+Read top to bottom: a word, a word, one spread, one string, and one import plus one expression. The
+fork's whole hook on upstream's launch path is `...piReadOnlyGateArgs()`, which is the shape the rules
+ask for — the diff says a function name, not a paragraph.
 
 **Fork-owned, all the logic:**
 
@@ -5058,12 +5064,20 @@ whole hook on upstream's launch path is `...piReadOnlyGateArgs()`, which is the 
   `writePiExtensionFile` is `async`, so an async helper could not reach that call site at all. The write
   is therefore a `writeFileSync` to a staged temp name plus `renameSync`, guarded by a
   "already the right content" compare: Pi exits when an extension fails to load, so a concurrent launch
-  must never read a half-written file.
+  must never read a half-written file. A rename that Windows refuses because Pi holds the old file open
+  falls back to that file when it already holds this source, which is the only case where it is safe.
 - `src/main/pi/fork-read-only-gate.test.ts` — drives the **generated** extension (evaluated with
   `new Function`, as Pi would load it) and compares it with `lookAroundCommandAllowed` over one command
-  corpus, so the duplicated policy cannot drift apart in silence. It also covers `user_bash` (nobody
-  types in a look run, but a command that arrives that way is held to the same policy), a bash call whose
-  command it cannot read, and the writer's idempotence.
+  corpus, so the duplicated policy cannot drift apart in silence — the corpus carries the paths a
+  loosened regex would slip through (`"${ORCA_CLI_COMMAND:-orca}"`, bare and inside `bash -lc`, a
+  github.com URL, `--repo=` and `-R` values that are not a repo, `git show :path`). It also covers
+  `user_bash` (nobody types in a look run, but a command that arrives that way is held to the same
+  policy), a tool neither layer bounded, a bash call whose command it cannot read, and the writer's
+  idempotence.
+- `src/main/bots/bot-look-around-start-failure.ts` + its test — the recorded failure for a look that
+  could not start, so the runner keeps one expression. `agentCliInstallationProblemOf` searches the
+  error's cause chain while `errorMessage` reads only the outermost error, so formatting the found
+  problem with `agentCliTooOldWords` is what actually surfaces a wrapped too-old refusal.
 
 **Why the wiring is in the launch builder and not the resolution layer.** `backgroundWork` and
 `botTools` are wired in `rpc-launch-resolution.ts`, and that is the wrong file to touch: measured over
@@ -5083,22 +5097,29 @@ agent's full OS permissions. Same class of guarantee in practice; not the same m
 to describe as a sandbox.
 
 **The too-old trap this patch opens.** `piToolLimit` throws `AgentCliInstallationError.tooOld('pi', …)`
-below 1.0.4 (`rpc-launch.ts:101`), which could not fire while pi never looked around. Now an older
-install fails _every_ look, the failure is counted, and ten in a row turn Look around off
-(`LOOK_FAILURES_TO_TURN_OFF`) — with the runner having dropped the cause, the owner sees "The last look
-couldn't start." ten times and no hint that pi needed updating. The runner therefore keeps the cause in
-the recorded failure when the error is an installation problem, so ten notices say _pi 1.0.3 is too
-old_. Making the setting's offer depend on the host's agent capabilities is the real fix and belongs
-upstream; this one line is the cheap fork version.
+below 1.0.4 (`rpc-launch.ts:102`), which could not fire while pi never looked around. Now an older
+install fails _every_ look, each failure is recorded against the run, and ten in a row turn Look around
+off (`LOOK_FAILURES_TO_TURN_OFF`) — with the runner having dropped the cause, the record says "The last
+look couldn't start." on every one and nothing tells the owner that pi needed updating. The runner
+therefore records the cause beside that line when the error is an installation problem, so the run's
+record reads _Your Pi CLI on this computer is 1.0.3. Chats need 1.0.4 or newer._ Making the setting's
+offer depend on the host's agent capabilities is the real fix and belongs upstream; one expression is
+the cheap fork version.
+
+**The same trap, still open for tidy-up.** `piToolLimit` refuses `'reply-only'` below the same version,
+so every tidy-up on such a host fails with `TIDY_UP_FAILURES.couldNotStart` and no cause — the half
+this patch turned on is also the half that inherits the trap. Left alone here because it is a second
+runner and a second upstream anchor; the same one-line treatment is the follow-up.
 
 **Deliberately not done here.** A read scoped to the bot's home folder would be strictly better than
 Claude's anywhere-read, but the first patch matches Claude rather than exceeding it. And
-`LOOK_AROUND_AGENTS` stays a list: turning it into a capability would need an edit in each of the six
-readers, which is exactly the divergence this patch avoids. Both are in the design note's open
+`LOOK_AROUND_AGENTS` stays a list: turning it into a capability would need an edit at each of the
+eleven call sites, which is exactly the divergence this patch avoids. Both are in the design note's open
 questions.
 
 Tests: `src/main/pi/fork-read-only-gate.test.ts` (the generated extension against the policy corpus, the
-launch args and the writer), `src/main/pi/rpc/launch/rpc-launch.test.ts` (the `read` mapping now names
-the extension — matched by `/orca-look-around-gate\.ts$/` rather than by literal path, because vitest's
-app environment installs its own `userData` and the absolute path is not stable there), and the existing
-bot look-around suites.
+launch args and the writer), `src/main/bots/bot-look-around-start-failure.test.ts` (a wrapped too-old
+refusal keeps its cause, a plain failure does not), `src/main/pi/rpc/launch/rpc-launch.test.ts` (the
+`read` mapping now names the extension — matched by `/orca-look-around-gate\.ts$/` rather than by
+literal path, because vitest's app environment installs its own `userData` and the absolute path is not
+stable there), and the existing bot look-around suites.

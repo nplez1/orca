@@ -1,7 +1,8 @@
 // A look-around run on Pi is held by two layers: `--tools read,grep,find,ls,bash --no-mcp` at launch,
-// and this extension, which refuses any bash call the read-only policy would not allow. Pi runs the
-// extension in its own process, so it carries its own copy of the policy; the unit test runs it and
-// `lookAroundCommandAllowed` over one corpus so the two cannot drift apart in silence.
+// and this extension, which lets those four through and refuses anything else unless the read-only
+// policy allows the bash call. Pi runs the extension in its own process, so it carries its own copy of
+// the policy; the unit test runs it and `lookAroundCommandAllowed` over one corpus so the two cannot
+// drift apart in silence.
 import { randomUUID } from 'node:crypto'
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -11,7 +12,7 @@ import { LOOK_AROUND_REFUSAL } from '../bots/bot-look-around-policy'
 
 export const PI_LOOK_AROUND_GATE_EXTENSION_FILE = 'orca-look-around-gate.ts'
 
-/** Where Pi's per-chat extensions live; the same folder the bot-tools and background-work ones use. */
+/** Where Pi's per-chat extensions live, under userData because the launch builder gets no state dir. */
 export function piReadOnlyGateDirectory(): string {
   const base = hasAppEnvironment() ? getAppEnvironment().getPath('userData') : tmpdir()
   return join(base, 'pi-native-chat')
@@ -138,13 +139,20 @@ function allowed(command) {
   return path[0] !== 'branch' || args.every((word) => GIT_BRANCH_LISTING.has(word))
 }
 
+const BOUNDED_TOOLS = new Set(['read', 'grep', 'find', 'ls'])
+
 export default function (pi) {
   pi.on('tool_call', async (event) => {
-    // read, grep, find and ls are already bounded by --tools; only bash can reach anything.
-    if (!event || event.toolName !== 'bash') {
+    const toolName = event && typeof event.toolName === 'string' ? event.toolName : null
+    if (toolName !== null && BOUNDED_TOOLS.has(toolName)) {
       return undefined
     }
-    const command = event.input && typeof event.input.command === 'string' ? event.input.command : null
+    // --tools bounds those four; bash is held to the policy, and anything else - an extension's own
+    // tool, a subagent - is bounded by neither layer, so it is refused.
+    const command =
+      toolName === 'bash' && event.input && typeof event.input.command === 'string'
+        ? event.input.command
+        : null
     return command !== null && allowed(command) ? undefined : { block: true, reason: REFUSAL }
   })
   // Nobody types in a look run, but a command that arrives that way is held to the same policy.
@@ -159,10 +167,7 @@ export default function (pi) {
 `
 }
 
-/**
- * The extension arguments for a limited run, or nothing when it already holds the right content.
- * Synchronous because `buildPiRpcLaunch` is: an async write could not reach this call site.
- */
+/** The extension arguments for a limited run: the path is stable, the content is what may change. */
 export function piReadOnlyGateArgs(): string[] {
   return ['--extension', writePiReadOnlyGateSync()]
 }
@@ -171,14 +176,14 @@ function writePiReadOnlyGateSync(): string {
   const directory = piReadOnlyGateDirectory()
   const path = piReadOnlyGatePath()
   const source = piReadOnlyGateSource()
-  const current = (() => {
+  const current = (): string | null => {
     try {
       return readFileSync(path, 'utf8')
     } catch {
       return null
     }
-  })()
-  if (current === source) {
+  }
+  if (current() === source) {
     return path
   }
   // Pi exits when an extension fails to load, so a concurrent launch must never read a partial file.
@@ -189,6 +194,10 @@ function writePiReadOnlyGateSync(): string {
     renameSync(staged, path)
   } catch (error) {
     rmSync(staged, { force: true })
+    // Windows refuses to replace a file Pi holds open; if it already holds this source, use it.
+    if (current() === source) {
+      return path
+    }
     throw error
   }
   return path
