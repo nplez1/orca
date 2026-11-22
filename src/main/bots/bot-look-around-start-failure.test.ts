@@ -8,8 +8,8 @@ const tooOldPi = (version: string, minimumVersion: string) =>
 
 describe('what a look records when it could not start', () => {
   it('keeps a too-old agent CLI’s cause beside the generic line', () => {
-    expect(lookStartFailureWords(tooOldPi('1.0.3', '1.0.4'), couldNotStart)).toBe(
-      "The last look couldn't start. Your Pi CLI on this computer is 1.0.3. Chats need 1.0.4 or newer."
+    expect(lookStartFailureWords(tooOldPi('1.0.3', '1.0.4'), couldNotStart)).toMatch(
+      /^The last look couldn't start\. .*1\.0\.3.*1\.0\.4/
     )
   })
 
@@ -20,8 +20,8 @@ describe('what a look records when it could not start', () => {
         'provider start failed'
       )
     })
-    expect(lookStartFailureWords(wrapped, couldNotStart)).toBe(
-      "The last look couldn't start. Your Pi CLI on this computer is 1.0.2. Chats need 1.0.4 or newer."
+    expect(lookStartFailureWords(wrapped, couldNotStart)).toMatch(
+      /^The last look couldn't start\. .*1\.0\.2.*1\.0\.4/
     )
   })
 

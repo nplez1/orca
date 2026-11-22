@@ -1,21 +1,19 @@
 // A look-around run on Pi is held by two layers: `--tools read,grep,find,ls,bash --no-mcp` at launch,
 // and this extension, which lets those four through and refuses anything else unless the read-only
 // policy allows the bash call. Pi runs the extension in its own process, so it carries its own copy of
-// the policy; the unit test runs it and `lookAroundCommandAllowed` over one corpus so the two cannot
-// drift apart in silence.
+// the policy; the unit test runs it against `lookAroundCommandAllowed` for every read path the policy
+// declares and pins the policy text it mirrors, so a tightening upstream trips a red here.
 import { randomUUID } from 'node:crypto'
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { getAppEnvironment, hasAppEnvironment } from '../../shared/app-lifecycle/app-environment'
+import { getAppEnvironment } from '../../shared/app-lifecycle/app-environment'
 import { LOOK_AROUND_REFUSAL } from '../bots/bot-look-around-policy'
 
 export const PI_LOOK_AROUND_GATE_EXTENSION_FILE = 'orca-look-around-gate.ts'
 
 /** Where Pi's per-chat extensions live, under userData because the launch builder gets no state dir. */
 export function piReadOnlyGateDirectory(): string {
-  const base = hasAppEnvironment() ? getAppEnvironment().getPath('userData') : tmpdir()
-  return join(base, 'pi-native-chat')
+  return join(getAppEnvironment().getPath('userData'), 'pi-native-chat')
 }
 
 export function piReadOnlyGatePath(): string {

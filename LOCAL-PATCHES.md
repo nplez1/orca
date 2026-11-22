@@ -5012,7 +5012,7 @@ the `spawnSync` timeout.
 `LOOK_AROUND_AGENTS` is the whole gate, and it listed `claude` and `codex`. Adding `'pi'` flips every
 reader at once — eleven call sites in nine files, so `lookAroundSupported` is the line a sync must not
 move: the setting is honoured (`bot-look-around-state.ts:311`), a slot can come due and `Look now` is
-allowed (`bot-look-around-runner.ts:118,163,202`), the CLI stops refusing (`bots-look-around.ts:74`),
+allowed (`bot-look-around-runner.ts:118,163,202`), the CLI stops refusing (`bots-look-around.ts:75`),
 both renderer sections and the Up-next rows grow (`BotLookAroundSection.tsx:89`,
 `BotTidyUpSection.tsx:54`, `BotSettingsRoot.tsx:368`, `bot-upcoming-rows.ts:26`), and — because
 `bot-memory-tidy-up-runner.ts:106` and `bot-memory-tidy-up.ts:162` read the same constant —
@@ -5069,13 +5069,18 @@ ask for — the diff says a function name, not a paragraph.
   old file open falls back to that file only when it already holds this source — another launch's write,
   not a running Pi's older copy, which still fails closed.
 - `src/main/pi/fork-read-only-gate.test.ts` — drives the **generated** extension (evaluated with
-  `new Function`, as Pi would load it) and compares it with `lookAroundCommandAllowed` over one command
-  corpus, so the duplicated policy cannot drift apart in silence — the corpus carries the paths a
-  loosened regex would slip through (`"${ORCA_CLI_COMMAND:-orca}"`, bare and inside `bash -lc`, a
-  github.com URL, `--repo=` and `-R` values that are not a repo, `git show :path`). It also covers
-  `user_bash` (nobody types in a look run, but a command that arrives that way is held to the same
-  policy), a tool neither layer bounded, a bash call whose command it cannot read, and the writer's
-  idempotence.
+  `new Function`, as Pi would load it) against `lookAroundCommandAllowed`, one allowed case and one
+  refused-argument case for **every** `READ_COMMANDS` path, plus the shapes a bot actually writes
+  (`"${ORCA_CLI_COMMAND:-orca}"`, bare and inside `bash -lc`, a repository, a github.com URL) and the
+  commands that must never run (`gh pr merge`, `git push`, shell syntax, an unparsable command). A
+  corpus alone cannot see upstream _tightening_ the policy — a path removed, or a refused argument
+  added, after a security report leaves the template loose while every case still agrees — so the test
+  also pins a sha256 of `bot-look-around-policy.ts` from `READ_COMMANDS` through
+  `lookAroundCommandAllowed`, and fails with "upstream changed the look-around policy; re-mirror
+  fork-read-only-gate.ts and update this hash". **`src/main/bots/bot-look-around-policy.ts` is therefore
+  a file the next sync must watch**, and `fork-read-only-gate.ts`'s template is the only fork-side copy
+  of it. It also covers `user_bash` (nobody types in a look run, but a command that arrives that way is
+  held to the same policy), a tool neither layer bounded, and a bash call whose command it cannot read.
 - `src/main/bots/bot-look-around-start-failure.ts` + its test — the recorded failure for a look that
   could not start, so the runner keeps one expression. `agentCliInstallationProblemOf` searches the
   error's cause chain while `errorMessage` reads only the outermost error, so formatting the found
@@ -5096,7 +5101,10 @@ only (`rpc-launch.ts:113` throws otherwise), and `fullAccess` is resolved indepe
 (`rpc-launch-resolution.ts:231`). So unlike Claude, whose hook is backed by the CLI's own permission
 engine, pi's guarantee is two Orca-side guards inside the agent process, and the extension runs with the
 agent's full OS permissions. Same class of guarantee in practice; not the same mechanism, and not one
-to describe as a sandbox.
+to describe as a sandbox. One further limit, owned by the user's own code: pi runs `tool_call` handlers
+in load order and does not re-validate, so a later extension can rewrite `input.command` after this gate
+allowed it. `Object.freeze(event.input)` would close that and break every bash call for a user whose own
+extension mutates bash, so the limit stays.
 
 **The too-old trap this patch opens.** `piToolLimit` throws `AgentCliInstallationError.tooOld('pi', …)`
 below 1.0.4 (`rpc-launch.ts:102`), which could not fire while pi never looked around. Now an older
@@ -5119,8 +5127,8 @@ Claude's anywhere-read, but the first patch matches Claude rather than exceeding
 eleven call sites, which is exactly the divergence this patch avoids. Both are in the design note's open
 questions.
 
-Tests: `src/main/pi/fork-read-only-gate.test.ts` (the generated extension against the policy corpus, the
-launch args and the writer), `src/main/bots/bot-look-around-start-failure.test.ts` (a wrapped too-old
+Tests: `src/main/pi/fork-read-only-gate.test.ts` (the generated extension against every read path the
+policy declares, the pinned policy text, the launch args and the writer), `src/main/bots/bot-look-around-start-failure.test.ts` (a wrapped too-old
 refusal keeps its cause, a plain failure does not), `src/main/pi/rpc/launch/rpc-launch.test.ts` (the
 `read` mapping now names the extension — matched by `/orca-look-around-gate\.ts$/` rather than by
 literal path, because vitest's app environment installs its own `userData` and the absolute path is not
