@@ -39,7 +39,7 @@ export class BotLaunchTools {
     }
     const { origin, token } = await relay.grant(bot.botId, bot.folder)
     const tokenEnv = { [BOT_TOOLS_TOKEN_ENV]: token }
-    const shimEnv = await botGhShimEnv({ id: bot.botId, name: bot.name ?? bot.botId })
+    const shimEnv = await botGhShimEnv({ id: bot.botId, ...(bot.name ? { name: bot.name } : {}) })
     // Claude and Pi expand `${VAR}` in a server's headers, so their config names only the variable.
     const authorization = ENV_REFERENCING_AGENTS.has(bot.agent)
       ? `Bearer \${${BOT_TOOLS_TOKEN_ENV}}`

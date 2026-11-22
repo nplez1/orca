@@ -1,7 +1,7 @@
 // The marker every bot-written GitHub body carries, appended by a `gh` the bot cannot skip: a fork
 // shim first on the bot's PATH. Omission is the risk that matters — a forgotten marker wakes the bot
 // on its own output — so the marker is written by code, never remembered by the model.
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { delimiter, join } from 'node:path'
 import { botsRootFolder } from './bot-home'
 
@@ -11,9 +11,12 @@ export const BOT_GH_SHIM_DIR_ENV = 'ORCA_BOT_GH_SHIM_DIR'
 const MARKER_PREFIX = '<!-- orca-bot:'
 const MARKER_PATTERN = /<!--\s*orca-bot:([^>]*?)\s*-->/u
 
-/** The marker a body written as `botName` carries, invisible to anyone reading it rendered. */
+/** The marker a body written as `botName` carries, invisible to anyone reading it rendered. A name is
+ *  free text, so `>` and a doubled hyphen are taken out: one would break the read-back, the other ends
+ *  the HTML comment and renders the rest. */
 export function botGhMarker(botName: string): string {
-  return `${MARKER_PREFIX}${botName.trim()} -->`
+  const safe = botName.replace(/[<>]/g, ' ').replace(/-{2,}/g, '-').replace(/\s+/g, ' ').trim()
+  return `${MARKER_PREFIX}${safe || 'bot'} -->`
 }
 
 /** The bot a body says it was written by, or null when it carries no marker. */
@@ -29,13 +32,15 @@ function shellQuoted(value: string): string {
 }
 
 /**
- * The shim itself, in bash: `gh pr comment`, `gh issue comment` and `gh pr review` get the marker on
- * their body (inline, or a marked copy of `--body-file`), and every other call runs untouched.
+ * The shim itself, in bash: a body flag on a verb that posts one (`pr comment`, `issue comment`,
+ * `pr review`, and `pr create`/`pr edit`/`issue create`/`issue edit`) is replaced by one `--body`
+ * carrying the marker, and every other call runs untouched. The body travels as an argument — GitHub
+ * caps one at 65,536 characters — so nothing is written to a temp file that a signal could leak.
  */
 export function botGhShimScript(marker: string): string {
   return [
     '#!/usr/bin/env bash',
-    "# Orca: a bot's own gh. It appends the bot's marker to a comment or review body and passes",
+    "# Orca: a bot's own gh. It appends the bot's marker to any body this call posts, and passes",
     '# every other call through unchanged.',
     'set -u',
     '',
@@ -61,74 +66,103 @@ export function botGhShimScript(marker: string): string {
     '  exit 127',
     'fi',
     '',
-    'verb=',
-    'case ${1-} in',
-    '  pr|issue)',
-    '    case ${2-} in',
-    '      comment|review) verb="$1 $2" ;;',
-    '    esac',
-    '    ;;',
-    'esac',
-    'case $verb in',
-    '  "pr comment"|"issue comment"|"pr review") ;;',
+    'args=("$@")',
+    'count=${#args[@]}',
+    '',
+    "# The verb, skipping -R/--repo (persistent, so it may sit before the verb) and each flag's value.",
+    'group=',
+    'sub=',
+    'i=0',
+    'while [ "$i" -lt "$count" ]; do',
+    '  arg=${args[$i]}',
+    '  case $arg in',
+    '    -R|--repo|-b|--body|-F|--body-file) i=$((i + 2)); continue ;;',
+    '    --repo=*|--body=*|--body-file=*) i=$((i + 1)); continue ;;',
+    '    -*) i=$((i + 1)); continue ;;',
+    '  esac',
+    '  if [ -z "$group" ]; then',
+    '    group=$arg',
+    '  elif [ -z "$sub" ]; then',
+    '    sub=$arg',
+    '  fi',
+    '  i=$((i + 1))',
+    'done',
+    '',
+    'case "$group $sub" in',
+    '  "pr comment"|"issue comment"|"pr review"|"pr create"|"pr edit"|"issue create"|"issue edit") ;;',
     '  *) exec "$real_gh" "$@" ;;',
     'esac',
     '',
-    'args=("$@")',
-    'count=${#args[@]}',
-    'body_at=-1',
-    'file_at=-1',
+    '# The last body flag wins, as it does for gh; every one of them is dropped from the call.',
+    'drop=" "',
+    'body_file=0',
+    'body_value=',
     'i=0',
     'while [ "$i" -lt "$count" ]; do',
-    '  case ${args[$i]} in',
-    '    --body=*|--body|-b) [ "$body_at" -lt 0 ] && body_at=$i ;;',
-    '    --body-file=*|--body-file|-F) [ "$file_at" -lt 0 ] && file_at=$i ;;',
+    '  arg=${args[$i]}',
+    '  next=$((i + 1))',
+    '  case $arg in',
+    '    -b|--body)',
+    '      body_file=0',
+    '      body_value=${args[$next]-}',
+    '      drop="$drop$i $next "',
+    '      i=$((i + 2))',
+    '      continue',
+    '      ;;',
+    '    -F|--body-file)',
+    '      body_file=1',
+    '      body_value=${args[$next]-}',
+    '      drop="$drop$i $next "',
+    '      i=$((i + 2))',
+    '      continue',
+    '      ;;',
+    '    --body=*|-b=*|--body-file=*|-F=*)',
+    '      case $arg in',
+    '        --body=*|-b=*) body_file=0; body_value=${arg#*=} ;;',
+    '        *) body_file=1; body_value=${arg#*=} ;;',
+    '      esac',
+    '      drop="$drop$i "',
+    '      i=$((i + 1))',
+    '      continue',
+    '      ;;',
+    '    -b?*|--body?*|-F?*|--body-file?*)',
+    '      case $arg in',
+    '        -b?*|--body?*) body_file=0; body_value=${arg#-b} ;;',
+    '        *) body_file=1; body_value=${arg#-F} ;;',
+    '      esac',
+    '      drop="$drop$i "',
+    '      i=$((i + 1))',
+    '      continue',
+    '      ;;',
     '  esac',
     '  i=$((i + 1))',
     'done',
     '',
-    '# No body to mark (a review verdict, say): nothing to do.',
-    'if [ "$body_at" -lt 0 ] && [ "$file_at" -lt 0 ]; then',
+    'if [ "$body_file" = 1 ]; then',
+    '  if [ "$body_value" = - ]; then',
+    '    body_value=$(cat)',
+    '  elif [ -n "$body_value" ] && [ -r "$body_value" ]; then',
+    '    body_value=$(cat -- "$body_value")',
+    '  else',
+    '    exec "$real_gh" "$@"',
+    '  fi',
+    'fi',
+    '',
+    '# An empty body stays empty: a marker on its own would turn a refused comment into a blank one.',
+    'if [ -z "$body_value" ]; then',
     '  exec "$real_gh" "$@"',
     'fi',
     '',
-    'if [ "$body_at" -ge 0 ]; then',
-    '  arg=${args[$body_at]}',
-    '  case $arg in',
-    '    --body=*) args[$body_at]="--body=${arg#--body=}"$\'\\n\\n\'"$marker" ;;',
-    '    *)',
-    '      next=$((body_at + 1))',
-    '      [ "$next" -lt "$count" ] || exec "$real_gh" "$@"',
-    '      args[$next]=${args[$next]}$\'\\n\\n\'"$marker"',
-    '      ;;',
+    'kept=()',
+    'i=0',
+    'while [ "$i" -lt "$count" ]; do',
+    '  case "$drop" in',
+    '    *" $i "*) i=$((i + 1)); continue ;;',
     '  esac',
-    '  exec "$real_gh" "${args[@]}"',
-    'fi',
-    '',
-    "# --body-file: gh reads a marked copy, and the bot's own file is left as it was.",
-    'arg=${args[$file_at]}',
-    'case $arg in',
-    '  --body-file=*) path=${arg#--body-file=} ;;',
-    '  *) path=${args[$((file_at + 1))]:-} ;;',
-    'esac',
-    'marked=$(mktemp "${TMPDIR:-/tmp}/orca-gh-body.XXXXXXXX") || exec "$real_gh" "$@"',
-    'if [ "$path" = - ]; then',
-    '  cat > "$marked" || { rm -f -- "$marked"; exec "$real_gh" "$@"; }',
-    'elif [ -n "$path" ] && [ -r "$path" ]; then',
-    '  cat -- "$path" > "$marked" || { rm -f -- "$marked"; exec "$real_gh" "$@"; }',
-    'else',
-    '  rm -f -- "$marked"',
-    '  exec "$real_gh" "$@"',
-    'fi',
-    'printf \'\\n\\n%s\\n\' "$marker" >> "$marked"',
-    'case $arg in',
-    '  --body-file=*) args[$file_at]="--body-file=$marked" ;;',
-    '  *) args[$((file_at + 1))]=$marked ;;',
-    'esac',
-    '"$real_gh" "${args[@]}"',
-    'status=$?',
-    'rm -f -- "$marked"',
-    'exit $status',
+    '  kept+=("${args[$i]}")',
+    '  i=$((i + 1))',
+    'done',
+    'exec "$real_gh" "${kept[@]}" --body "$body_value"$\'\\n\\n\'"$marker"',
     ''
   ].join('\n')
 }
@@ -150,18 +184,25 @@ export async function installBotGhShim(bot: { id: string; name: string }): Promi
   const existing = await readFile(file, 'utf8').catch(() => null)
   if (existing !== script) {
     await mkdir(dir, { recursive: true })
-    await writeFile(file, script, { mode: 0o755 })
+    // A live session runs this file: write beside it and rename, so it never sees half a script.
+    const staged = `${file}.${process.pid}.tmp`
+    await writeFile(staged, script, { mode: 0o755 })
+    await rename(staged, file)
   }
   return dir
 }
 
-/** The bot's launch env carrying its shim folder, or an empty env when there is none to install. */
+/** The bot's launch env carrying its shim folder, or an empty env when there is none to install. A
+ *  launch that cannot name its bot installs none, rather than marking with something else. */
 export async function botGhShimEnv(bot: {
   id: string
-  name: string
+  name?: string
 }): Promise<Record<string, string>> {
+  if (!bot.name) {
+    return {}
+  }
   try {
-    const dir = await installBotGhShim(bot)
+    const dir = await installBotGhShim({ id: bot.id, name: bot.name })
     return dir ? { [BOT_GH_SHIM_DIR_ENV]: dir } : {}
   } catch (error) {
     console.warn('[bots] could not install the gh marker shim', error)

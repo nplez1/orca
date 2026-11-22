@@ -1,9 +1,12 @@
 // What each side of a bot request reads, worked out from Orca's record of it: who sent it and for whom,
 // how to answer and where the answer appears, and what the sender does when an answer comes back.
-import { CONNECTOR_SOURCE_NAMES } from '../../shared/connectors/external-conversation-link'
 import { BOT_QUIET_MARKER } from '../../shared/bot-quiet-result'
 import type { BotRequestConversation } from './bot-request-asker'
-import type { AutomationTriggeredBy, BotRequestAsker } from '../../shared/bots/bot-acts-for'
+import {
+  BOT_REQUEST_SOURCE_NAMES,
+  type AutomationTriggeredBy,
+  type BotRequestAsker
+} from '../../shared/bots/bot-acts-for'
 import type { BotRequestPurpose } from './bot-request-policy'
 import type { BotGroupPeerScope } from '../../shared/bots/bot-group-schema'
 import { AUTOMATION_EVENT_SOURCE_NAMES } from '../automations/automation-event-prompt'
@@ -62,7 +65,7 @@ export function botRequestAskerLabel(asker: BotRequestAsker): string {
     return 'your owner'
   }
   return asker.kind === 'person'
-    ? `${asker.name ?? 'someone'} on ${CONNECTOR_SOURCE_NAMES[asker.source]}`
+    ? `${asker.name ?? 'someone'} on ${BOT_REQUEST_SOURCE_NAMES[asker.source]}`
     : 'someone Orca cannot name'
 }
 

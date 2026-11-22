@@ -1,10 +1,16 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { BotChatRow } from '../../shared/bots/bot-chat-row'
 import type { RuntimeClient } from '../runtime/client'
-import { askSubject, BOT_ASK_HANDLERS, botAskChat, botOfSelector } from './bot-ask'
+import { RuntimeClientError } from '../runtime/connection/types'
+import { askSubject, BOT_ASK_HANDLERS, botAskChat, botOfSelector } from './fork-bot-ask'
 
 const SCOUT = { id: 'bot-1', name: 'Scout' }
 const DOCS = { id: 'bot-2', name: 'Docs' }
+
+afterEach(() => {
+  vi.unstubAllEnvs()
+  vi.restoreAllMocks()
+})
 
 function chatRow(overrides: Partial<BotChatRow> = {}): BotChatRow {
   return {
@@ -22,11 +28,21 @@ function chatRow(overrides: Partial<BotChatRow> = {}): BotChatRow {
 
 async function ask(
   flags: [string, string | boolean][],
-  chats: BotChatRow[] = [chatRow()]
+  chats: BotChatRow[] = [chatRow()],
+  terminal = 'term_ask'
 ): Promise<{ method: string; params: unknown }[]> {
+  if (terminal) {
+    vi.stubEnv('ORCA_TERMINAL_HANDLE', terminal)
+  } else {
+    vi.stubEnv('ORCA_TERMINAL_HANDLE', '')
+  }
   const calls: { method: string; params: unknown }[] = []
   const call = vi.fn(async (method: string, params?: unknown) => {
     calls.push({ method, params })
+    if (!['bots.list', 'bots.chats', 'orchestration.send'].includes(method)) {
+      // A shell outside Orca: nothing answers for a terminal, which is the case under test.
+      throw new RuntimeClientError('no_active_sender_terminal', 'no terminal here')
+    }
     const result =
       method === 'bots.list'
         ? { bots: [SCOUT, DOCS] }
@@ -50,8 +66,18 @@ async function ask(
 const sent = (calls: { method: string; params: unknown }[]) =>
   calls.filter((entry) => entry.method === 'orchestration.send')
 
+const refusal = async (run: () => Promise<unknown>): Promise<string> => {
+  try {
+    await run()
+  } catch (error) {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: RuntimeClientError carries its code as a string field.
+    return (error as { code?: string }).code ?? 'no code'
+  }
+  throw new Error('expected a refusal')
+}
+
 describe('bot ask', () => {
-  it('sends the ask to the bot as a question, in the Home Chat when no chat is named', async () => {
+  it('sends the ask to the bot by id, as a question, in the Home Chat when no chat is named', async () => {
     const calls = await ask([
       ['bot', 'Scout'],
       ['body', 'how is the release going?']
@@ -61,16 +87,32 @@ describe('bot ask', () => {
       {
         method: 'orchestration.send',
         params: expect.objectContaining({
-          to: 'bot:Scout',
+          to: 'bot:bot-1',
           body: 'how is the release going?',
-          type: 'question'
+          type: 'question',
+          // So the answer has somewhere to go, and the command can say where.
+          from: 'term_ask'
         })
       }
     ])
     expect(sent(calls)[0]!.params).not.toHaveProperty('chat')
   })
 
-  it('names the bot by id, in any case, and forwards the chat that takes mail', async () => {
+  it('sends without a from when the shell is not an Orca terminal, so the ask still lands', async () => {
+    const calls = await ask(
+      [
+        ['bot', 'Scout'],
+        ['body', 'hello']
+      ],
+      [chatRow()],
+      ''
+    )
+
+    expect(sent(calls)).toHaveLength(1)
+    expect(sent(calls)[0]!.params).not.toHaveProperty('from')
+  })
+
+  it('forwards the chat that takes mail, named by id', async () => {
     const calls = await ask(
       [
         ['bot', 'bot-2'],
@@ -82,7 +124,7 @@ describe('bot ask', () => {
     )
 
     expect(sent(calls)[0]!.params).toMatchObject({
-      to: 'bot:Docs',
+      to: 'bot:bot-2',
       chat: 'chat:work',
       subject: 'Release'
     })
@@ -99,26 +141,43 @@ describe('bot ask', () => {
     expect(sent(calls)[0]!.params).toMatchObject({ chat: 'new' })
   })
 
-  it('refuses a bot no name or id matches, naming the bots there are', async () => {
-    await expect(
-      ask([
-        ['bot', 'Nobody'],
-        ['body', 'hello']
-      ])
-    ).rejects.toThrow(/Scout, Docs/)
+  it('sends nothing to a bot no name or id matches', async () => {
+    expect(
+      await refusal(() =>
+        ask([
+          ['bot', 'Nobody'],
+          ['body', 'hello']
+        ])
+      )
+    ).toBe('bot_not_found')
   })
 
   it('refuses a name two bots answer to instead of picking one', () => {
-    expect(() => botOfSelector([SCOUT, { id: 'bot-3', name: 'scout' }], 'Scout')).toThrow(
-      /both answer to Scout/
-    )
+    expect(() => botOfSelector([SCOUT, { id: 'bot-3', name: 'scout' }], 'Scout')).toThrow()
+    expect(botOfSelector([SCOUT, DOCS], 'scout')).toBe(SCOUT)
   })
 
-  it('refuses a chat this bot does not have, and one that takes no mail now', () => {
-    expect(() => botAskChat('chat:gone', [chatRow()])).toThrow(/no chat chat:gone/)
-    expect(() => botAskChat('chat:home', [chatRow({ closed: true, reason: 'ended' })])).toThrow(
-      /takes no mail now \(ended\)/
+  it('refuses a chat this bot does not have, and one that takes no mail now', async () => {
+    const missing = await refusal(() =>
+      ask([
+        ['bot', 'Scout'],
+        ['chat', 'chat:gone'],
+        ['body', 'hello']
+      ])
     )
+    expect(missing).toBe('chat_not_found')
+
+    const closed = await refusal(() =>
+      ask(
+        [
+          ['bot', 'Scout'],
+          ['chat', 'chat:home'],
+          ['body', 'hello']
+        ],
+        [chatRow({ closed: true, reason: 'ended' })]
+      )
+    )
+    expect(closed).toBe('chat_closed')
     expect(botAskChat(undefined, [])).toBeUndefined()
   })
 

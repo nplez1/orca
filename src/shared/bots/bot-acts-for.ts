@@ -1,12 +1,22 @@
 // Who a bot's conversation acts for, as Orca recorded it when the conversation started: the owner, or
 // the people a teammate's request or automation came from. Every check on whom a bot may ask reads it.
-import type { ConnectorSource } from '../connectors/external-conversation-link'
+import {
+  CONNECTOR_SOURCE_NAMES,
+  type ConnectorSource
+} from '../connectors/external-conversation-link'
 import type { ConnectorAskerPlaceKind } from '../connectors/connector-cloud-contract'
+
+export type BotRequestPersonSource = ConnectorSource | 'local'
+
+export const BOT_REQUEST_SOURCE_NAMES: Record<BotRequestPersonSource, string> = {
+  ...CONNECTOR_SOURCE_NAMES,
+  local: 'this computer'
+}
 
 /** A person a request is for; `workspaceId` is null when Orca doesn't know which workspace they asked in. */
 export type BotRequestPerson = {
   kind: 'person'
-  source: ConnectorSource
+  source: BotRequestPersonSource
   userId: string
   name?: string
   workspaceId: string | null

@@ -9,7 +9,6 @@ import type { Bot } from '../../shared/bot-types'
 import {
   CONNECTOR_CLIENT_LIMITS,
   type ConnectorBotPostAnswer,
-  type ConnectorConversation,
   type ConnectorTurnFor
 } from '../../shared/connectors/connector-cloud-contract'
 import { botTurnFor } from './bot-turn-for'
@@ -41,7 +40,6 @@ import * as resultNote from './bot-run-result-note'
 import { writeStructuredAgentSessionOrcaNote } from '../native-chat/agent-session-wire/structured-agent-session-orca-note'
 import { resultPlaceValue } from '../automations/bot-automation-place-refs'
 import { watchBotTurnEnds, type BotRunUnavailable, type BotTurnEnd } from './bot-run-turn-watch'
-import { localAskAnswer, localAskConversation } from './fork-local-results'
 
 export type BotRunCompletion = Awaited<NonNullable<AutomationLaunch['completion']>>
 
@@ -67,7 +65,6 @@ export type BotRunDeliveryDependencies = BotOwnerNoticeDeps &
     ): Promise<ConnectorResult<{ notices?: string[] }>> | null
     /** Whom the run's conversation acts for, so its Slack post counts as them (bot-turn-for.ts). */
     turnForOf(sessionId: string): Promise<ConnectorTurnFor>
-    localAskOf?(sessionId: string): boolean
   }
 
 export type BotRunResult = {
@@ -158,15 +155,6 @@ export async function deliverBotRunResult(
       : null
   }
   const { resultsTo } = target
-  const local = await localAskAnswer(
-    deps,
-    result,
-    message,
-    runSender(result.sessionId, automation.name)
-  )
-  if (local) {
-    return { ...completed, ...local }
-  }
   if (message && !isQuietBotResult(message) && missedItsThread(automation, result.run, resultsTo)) {
     return { ...completed, error: COPY.notInThread }
   }
@@ -292,12 +280,11 @@ export function runtimeBotRunResults(runtime: OrcaRuntimeService): BotRunResults
               noteId,
               { kind: 'status', text }
             ),
-          replyInThread: (conversation: ConnectorConversation, replyId, text, turnFor) =>
+          replyInThread: (conversation, replyId, text, turnFor) =>
             runtime
               .getConnectorCloud()
               ?.reply({ replyId, conversation, turnId: Date.now(), text, turnFor }) ?? null,
           turnForOf: (sessionId) => botTurnFor(runtime, sessionId, undefined),
-          localAskOf: (sessionId) => localAskConversation(runtime, sessionId),
           ...runtimeBotOwnerNotice(runtime)
         },
         result

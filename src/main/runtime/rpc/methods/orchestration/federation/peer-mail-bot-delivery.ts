@@ -56,7 +56,12 @@ export async function deliverPeerMailToBot(
   admitting.add(params.messageId)
   try {
     const routed = await routeBotMail(
-      { runtime, orchestrationCaller: undefined, recordMutationReceipt: undefined },
+      {
+        runtime,
+        orchestrationCaller: undefined,
+        recordMutationReceipt: undefined,
+        callerScope: { kind: 'runtime-paired', grants: [] }
+      },
       {
         params: {
           subject: params.subject,

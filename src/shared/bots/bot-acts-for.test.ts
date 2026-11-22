@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { actsForOwner, ownerAsPerson, threadActsFor, OWNER_ACTS_FOR } from './bot-acts-for'
+import { actsForOwner, ownerAsPerson, threadActsFor } from './bot-acts-for'
 
 describe('the owner as a person', () => {
   it('is still the owner every check reads, and names them where a surface can', () => {
@@ -9,10 +9,6 @@ describe('the owner as a person', () => {
     expect(owner.name).toBe('nathanp')
     expect(actsForOwner([owner])).toBe(true)
     expect(threadActsFor([owner])).toBe('owner')
-  })
-
-  it('keeps a cloud turn on the bare owner, which knows no more than that', () => {
-    expect(OWNER_ACTS_FOR).toEqual([{ kind: 'owner' }])
   })
 
   it('leaves a teammate a member, never the owner', () => {

@@ -1,12 +1,14 @@
 # Talking to a bot without Orca Cloud — and whose identity it wears
 
 **Status:** design note, 2026-11-21, revised for identity. **Step 0 and Step 3 shipped** in
-`local(bots)` (`nplez1/talking-to-bots-2`): `orca bot ask` with the asker named, the `local` asker
-source, the owner recorded as a person on local asks, a local ask's answer routed back to its chat, and
-the `<!-- orca-bot:name -->` marker appended by a `gh` shim the bot cannot skip, with the own-PR guard
-reading it. **Step 1 (`POST /ask` on the loopback listener) and Step 2 (iMessage via Photon) are not
-built**, and the `Co-authored-by:` trailer is deferred. Where the body below says "nothing built", read
-it as the design's own state, not the tree's.
+`local(bots)` (`nplez1/talking-to-bots-2`): `orca bot ask` with the asker named (a `local` asker source,
+the owner recorded as a person, and only for a send from this computer's own shell — another computer's
+mail keeps the bare owner), and the `<!-- orca-bot:name -->` marker appended by a `gh` shim the bot cannot
+skip, with the own-PR guard reading it. **Reply routing is not part of it**: a local ask is mail, so the
+cloud-shaped hole in `bot-run-results.ts` — "Orca Cloud isn't connected, so the result wasn't posted" —
+**stays open**. **Step 1 (`POST /ask` on the loopback listener) and Step 2 (iMessage via Photon) are not
+built**, and the `Co-authored-by:` trailer is deferred. Where the body below says "nothing built", read it
+as the design's own state, not the tree's.
 **Why:** the fork now has a plan for work arriving (`local-webhooks.md`) and for a bot looking around
 unaided (`look-around-pi.md`). Neither lets a person _ask_ a bot anything. And in every design so far the
 bot wears the owner's identity — which is right on GitHub, where no second account or app is available at

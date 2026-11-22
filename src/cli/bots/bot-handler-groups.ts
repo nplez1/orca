@@ -9,7 +9,7 @@ export const BOT_HANDLER_GROUPS: HandlerGroup[] = [
   {
     name: 'bot-ask',
     keys: ['bot ask'],
-    load: async () => (await import('./bot-ask.js')).BOT_ASK_HANDLERS
+    load: async () => (await import('./fork-bot-ask.js')).BOT_ASK_HANDLERS
   },
   {
     name: 'bot-create',

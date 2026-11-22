@@ -1,29 +1,22 @@
-import { execFile } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { promisify } from 'node:util'
 import { afterEach, describe, expect, it } from 'vitest'
-import { botGhMarker, botGhMarkerOf, botGhShimScript, withBotGhShimOnPath } from './fork-gh-shim'
+import {
+  botGhMarker,
+  botGhMarkerOf,
+  botGhShimEnv,
+  botGhShimScript,
+  withBotGhShimOnPath
+} from './fork-gh-shim'
 
-const run = promisify(execFile)
 const POSIX = process.platform !== 'win32'
 
 // A fake gh that records its own argv, one per line, so a passthrough is compared byte for byte.
-const FAKE_GH = [
-  '#!/bin/sh',
-  'printf "%s\\n" "$#" "$@"',
-  '# FAKE_GH_DUMP: where to keep the body file gh was handed, before the shim cleans it up.',
-  'if [ -n "${FAKE_GH_DUMP:-}" ]; then',
-  '  prev=',
-  '  for arg in "$@"; do',
-  '    case $prev in --body-file|-F) cp -- "$arg" "$FAKE_GH_DUMP" ;; esac',
-  '    prev=$arg',
-  '  done',
-  'fi',
-  'exit ${FAKE_GH_STATUS:-0}',
-  ''
-].join('\n')
+const FAKE_GH = ['#!/bin/sh', 'printf "%s\\n" "$#" "$@"', 'exit ${FAKE_GH_STATUS:-0}', ''].join(
+  '\n'
+)
 
 const dirs: string[] = []
 
@@ -46,24 +39,36 @@ async function rig(): Promise<{ shim: string; shimDir: string; realDir: string; 
   return { shim, shimDir, realDir, body }
 }
 
-async function gh(
+/** The shim as a bot's shell runs it: its own argv, PATH, and whatever the call pipes in. */
+function gh(
   rigged: { shim: string; shimDir: string; realDir: string },
   args: string[],
-  env: Record<string, string> = {}
+  env: Record<string, string> = {},
+  input?: string
 ): Promise<{ lines: string[]; code: number }> {
   const path = [rigged.shimDir, rigged.realDir, '/usr/bin', '/bin'].join(':')
-  try {
-    const { stdout } = await run(rigged.shim, args, { env: { ...process.env, PATH: path, ...env } })
-    return { lines: stdout.split('\n').slice(0, -1), code: 0 }
-  } catch (error) {
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: execFile rejects with the child's own Error carrying stdout and the exit code.
-    const failed = error as { stdout?: string; code?: number }
-    return { lines: (failed.stdout ?? '').split('\n').slice(0, -1), code: failed.code ?? 1 }
-  }
+  return new Promise((resolve, reject) => {
+    const child = spawn(rigged.shim, args, { env: { ...process.env, PATH: path, ...env } })
+    let stdout = ''
+    child.stdout.setEncoding('utf8')
+    child.stdout.on('data', (chunk: string) => {
+      stdout += chunk
+    })
+    child.on('error', reject)
+    child.on('close', (code) =>
+      resolve({ lines: stdout.split('\n').slice(0, -1), code: code ?? 1 })
+    )
+    child.stdin.end(input)
+  })
 }
 
 const argsOf = (lines: string[]) => lines.slice(1)
-const bodyOf = (lines: string[]) => lines.slice(2).join('\n')
+/** The body gh was handed: every argument after the last `--body`. */
+const bodyOf = (lines: string[]) => {
+  const args = argsOf(lines)
+  const at = args.lastIndexOf('--body')
+  return at === -1 ? '' : args.slice(at + 1).join('\n')
+}
 
 describe.skipIf(!POSIX)('the bot gh shim', () => {
   it('marks a comment body given inline', async () => {
@@ -85,17 +90,65 @@ describe.skipIf(!POSIX)('the bot gh shim', () => {
     expect(bodyOf(lines)).toContain('<!-- orca-bot:Scout -->')
   })
 
-  it('hands gh a marked copy of --body-file, leaving the bot’s own file alone', async () => {
+  it('reads --body-file and hands gh the marked body as an argument, leaving the file alone', async () => {
     const rigged = await rig()
 
-    const kept = join(rigged.shimDir, '..', 'kept.md')
-    const { lines } = await gh(rigged, ['issue', 'comment', '12', '--body-file', rigged.body], {
-      FAKE_GH_DUMP: kept
-    })
+    const { lines } = await gh(rigged, ['issue', 'comment', '12', '--body-file', rigged.body])
 
-    expect(argsOf(lines)[4]).not.toBe(rigged.body)
-    expect(await readFile(kept, 'utf8')).toBe(`Reviewed the diff.\n\n<!-- orca-bot:Scout -->\n`)
+    expect(argsOf(lines).slice(0, 4)).toEqual(['issue', 'comment', '12', '--body'])
+    expect(bodyOf(lines)).toBe('Reviewed the diff.\n\n<!-- orca-bot:Scout -->')
     expect(await readFile(rigged.body, 'utf8')).toBe('Reviewed the diff.')
+  })
+
+  it('reads a body piped in with -F -, and the --body-file= spelling', async () => {
+    const rigged = await rig()
+
+    const piped = await gh(rigged, ['pr', 'comment', '7', '-F', '-'], {}, 'From stdin.\n')
+    expect(bodyOf(piped.lines)).toBe('From stdin.\n\n<!-- orca-bot:Scout -->')
+
+    const joined = await gh(rigged, ['issue', 'comment', '12', `--body-file=${rigged.body}`])
+    expect(bodyOf(joined.lines)).toBe('Reviewed the diff.\n\n<!-- orca-bot:Scout -->')
+  })
+
+  it('takes the attached short forms gh accepts', async () => {
+    const rigged = await rig()
+
+    const attached = await gh(rigged, ['pr', 'comment', '7', '-bLooks good.'])
+    expect(bodyOf(attached.lines)).toBe('Looks good.\n\n<!-- orca-bot:Scout -->')
+
+    const file = await gh(rigged, ['issue', 'comment', '12', `-F${rigged.body}`])
+    expect(bodyOf(file.lines)).toBe('Reviewed the diff.\n\n<!-- orca-bot:Scout -->')
+  })
+
+  it('marks the body gh would post when a body flag repeats', async () => {
+    const rigged = await rig()
+
+    const { lines } = await gh(rigged, ['pr', 'comment', '7', '-b', 'first', '-b', 'second'])
+
+    expect(argsOf(lines).slice(0, 4)).toEqual(['pr', 'comment', '7', '--body'])
+    expect(bodyOf(lines)).toBe('second\n\n<!-- orca-bot:Scout -->')
+  })
+
+  it('finds the verb past a persistent --repo, and marks a pull request body', async () => {
+    const rigged = await rig()
+
+    const short = await gh(rigged, ['pr', '-R', 'acme/web', 'comment', '7', '-b', 'Looks good.'])
+    expect(argsOf(short.lines).slice(0, 5)).toEqual(['pr', '-R', 'acme/web', 'comment', '7'])
+    expect(bodyOf(short.lines)).toContain('<!-- orca-bot:Scout -->')
+
+    const long = await gh(rigged, ['issue', '--repo=acme/web', 'edit', '12', '--body', 'Fixed.'])
+    expect(bodyOf(long.lines)).toBe('Fixed.\n\n<!-- orca-bot:Scout -->')
+
+    const created = await gh(rigged, ['pr', 'create', '--title', 'A fix', '--body', 'It fixes.'])
+    expect(bodyOf(created.lines)).toBe('It fixes.\n\n<!-- orca-bot:Scout -->')
+  })
+
+  it('marks nothing when the body is empty, which would post a blank comment', async () => {
+    const rigged = await rig()
+
+    const { lines } = await gh(rigged, ['pr', 'comment', '7', '-b', ''])
+
+    expect(argsOf(lines)).toEqual(['pr', 'comment', '7', '-b', ''])
   })
 
   it('passes every other call through untouched', async () => {
@@ -125,6 +178,24 @@ describe.skipIf(!POSIX)('the bot gh shim', () => {
     expect(botGhMarkerOf('looks good\n\n<!-- orca-bot:Scout -->\n')).toBe('Scout')
     expect(botGhMarkerOf('looks good')).toBeNull()
     expect(botGhMarkerOf(undefined)).toBeNull()
+  })
+
+  it('keeps a name from breaking the marker it writes or the comment it sits in', () => {
+    const marker = botGhMarker('Docs > nightly -- build')
+
+    expect(marker).toBe('<!-- orca-bot:Docs nightly - build -->')
+    // A `>` would break the read-back; `-->` would end the comment and render the rest.
+    expect(botGhMarkerOf(`body\n\n${marker}`)).toBe('Docs nightly - build')
+    expect(botGhMarker('')).toBe('<!-- orca-bot:bot -->')
+  })
+
+  it("writes a named bot's shim, and none for a launch that cannot name it", async () => {
+    const installed = await botGhShimEnv({ id: `test-${process.pid}`, name: 'Scout' })
+    const dir = installed.ORCA_BOT_GH_SHIM_DIR
+
+    expect(dir).toContain('.gh-shims')
+    expect(await readFile(join(dir!, 'gh'), 'utf8')).toBe(botGhShimScript(botGhMarker('Scout')))
+    expect(await botGhShimEnv({ id: `test-${process.pid}` })).toEqual({})
   })
 
   it('puts the shim first on PATH and takes its own key back out', () => {
