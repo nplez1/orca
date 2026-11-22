@@ -5006,6 +5006,7 @@ enough to the job's 50 that one step could take the whole job.
 `timeout-minutes: 20` line and its `(#446)` comment on the last step of
 `.github/workflows/fork-main-gates.yml`. Neither is a file upstream owns, so a sync cannot reintroduce
 the `spawnSync` timeout.
+
 ### `local(bots)`: look around on Pi, and the shell a look run needs
 
 `LOOK_AROUND_AGENTS` is the whole gate, and it listed `claude` and `codex`. Adding `'pi'` flips every
