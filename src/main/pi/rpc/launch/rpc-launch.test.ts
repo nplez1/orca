@@ -21,7 +21,16 @@ describe('Pi RPC launch for bots', () => {
   })
 
   it.each([
-    ['read', ['--tools', 'read,grep,find,ls', '--no-mcp']],
+    [
+      'read',
+      [
+        '--tools',
+        'read,grep,find,ls,bash',
+        '--no-mcp',
+        '--extension',
+        expect.stringMatching(/orca-look-around-gate\.ts$/)
+      ]
+    ],
     ['none', ['--no-tools', '--no-mcp']]
   ] as const)('limits a run to %s tools, resumed sessions included', (tools, args) => {
     expect(

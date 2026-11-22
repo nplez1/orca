@@ -7,6 +7,7 @@ import {
 } from '../../../native-chat/conversation-files/native-chat-visuals-delivery'
 import type { ProviderProcessLaunch } from '../../../provider-process/provider-process-launch'
 import type { ReadOnlySessionMode } from '../../../bots/bot-look-around-policy'
+import { piReadOnlyGateArgs } from '../../fork-read-only-gate'
 import { compareAppVersions } from '../../../../shared/app-lifecycle/identity/app-version'
 import type { AgentCliVersionCheck } from '../../../agent-launch/preflight/agent-cli-version-probe'
 import { AgentCliInstallationError } from '../../../native-chat/agent-launch/agent-cli-installation-error'
@@ -68,7 +69,7 @@ export function piRpcSessionlessEnvironment(env: Readonly<Record<string, string>
   }
 }
 
-const PI_READ_TOOLS = ['read', 'grep', 'find', 'ls'] as const
+const PI_READ_TOOLS = ['read', 'grep', 'find', 'ls', 'bash'] as const
 // A limited run is refused any other tool selection, which could widen it.
 const PI_TOOL_SELECTION_FLAGS = [
   '--tools',
@@ -175,7 +176,9 @@ export function buildPiRpcLaunch(options: PiRpcLaunchOptions): ProviderProcessLa
       ...(options.instructionsFile ? ['--append-system-prompt', options.instructionsFile] : []),
       ...(options.skillDirs ?? []).flatMap((dir) => ['--skill', dir]),
       // Plain names replace the whole selection, a resumed session's included, and leave MCP tools undeclared.
-      ...(options.tools === 'read' ? ['--tools', PI_READ_TOOLS.join(','), '--no-mcp'] : []),
+      ...(options.tools === 'read'
+        ? ['--tools', PI_READ_TOOLS.join(','), '--no-mcp', ...piReadOnlyGateArgs()]
+        : []),
       ...(options.tools === 'none' ? ['--no-tools', '--no-mcp'] : []),
       ...(options.backgroundWork ? ['--extension', options.backgroundWork.extension] : []),
       ...(options.botTools ? ['--extension', options.botTools.extension] : []),

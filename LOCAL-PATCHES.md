@@ -5006,3 +5006,99 @@ enough to the job's 50 that one step could take the whole job.
 `timeout-minutes: 20` line and its `(#446)` comment on the last step of
 `.github/workflows/fork-main-gates.yml`. Neither is a file upstream owns, so a sync cannot reintroduce
 the `spawnSync` timeout.
+### `local(bots)`: look around on Pi, and the shell a look run needs
+
+`LOOK_AROUND_AGENTS` is the whole gate, and it listed `claude` and `codex`. Six readers take their
+answer from it, so adding `'pi'` flips all of them at once: the setting is honoured
+(`bot-look-around-state.ts:311`), a slot can come due and `Look now` is allowed, a started look may
+continue, the CLI stops refusing, and — because `bot-memory-tidy-up-runner.ts:106` and
+`bot-memory-tidy-up.ts:162` read the same constant — **overnight memory tidy-up arrives with it**. That
+coupling is the reason this patch is not only about looking around: a reply-only run needs nothing more
+than `--no-tools --no-mcp`, so the easier half rides along rather than shipping separately. The long
+form, with the readers table and the open questions, is `local/design/look-around-pi.md`.
+
+The launch side was already done and tested; the gap was that nothing held a pi run to reads. A look
+prompt's entire job is shell reads (`gh pr view|checks|diff`, `orca worktree ps`, `git log|show|diff`,
+`bot-look-around-prompt.ts:25`), and `--tools read,grep,find,ls` offers no shell — so a pi look would
+read files in its own home, learn nothing about the owner's work, and suggest nothing. Claude and Codex
+each carry the guard per agent (an SDK `PreToolUse` hook; every approval answered from the allow-list
+instead of a person). Pi's `tool_call` event can block, so pi gets the same two layers:
+
+1. **The tool selection.** `bash` joins `PI_READ_TOOLS`, so a look run launches with
+   `--tools read,grep,find,ls,bash --no-mcp`. `PI_TOOL_SELECTION_FLAGS` still refuses any other tool
+   selection on a limited run, which is what keeps a user from widening it; that guard must grow with
+   the read set, not stay behind it.
+2. **The per-call gate.** A managed extension, written by the fork module below and passed as
+   `--extension`, answers every `bash` call from the read-only policy and returns
+   `{ block: true, reason: LOOK_AROUND_REFUSAL }` otherwise — pi's own contract, and the same refusal
+   text a blocked Claude run gives its owner. `read`/`grep`/`find`/`ls` are left alone: layer 1 already
+   bounded them. It is not installed for a reply-only session, where layer 1 means no tools at all.
+
+Anchors, each a bare line or word in a file upstream owns — the reason is here, never in the file:
+
+| File                                               | Line   | Change                                                                                               |
+| -------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------- |
+| `src/shared/bots/bot-look-around.ts`               | `:9`   | `'pi'` in `LOOK_AROUND_AGENTS`                                                                       |
+| `src/main/pi/rpc/launch/rpc-launch.ts`             | `:72`  | `'bash'` in `PI_READ_TOOLS`                                                                          |
+| `src/main/pi/rpc/launch/rpc-launch.ts`             | `:179` | spread `piReadOnlyGateArgs()` into a `tools === 'read'` run, beside `--no-mcp` (plus the one import) |
+| `src/main/runtime/rpc/methods/bots-look-around.ts` | `:75`  | the refusal names no agent: `'This bot’s agent cannot look around.'`                                 |
+| `src/main/bots/bot-look-around-runner.ts`          | `:265` | a too-old agent CLI keeps its cause in the recorded failure                                          |
+
+Read top to bottom the five are a word, a word, one spread, one string and one expression. The fork's
+whole hook on upstream's launch path is `...piReadOnlyGateArgs()`, which is the shape the rules ask for
+— the diff says a function name, not a paragraph.
+
+**Fork-owned, all the logic:**
+
+- `src/main/pi/fork-read-only-gate.ts` — the extension source as a template string (the shape of
+  `PI_BOT_TOOLS_EXTENSION_SOURCE`), a synchronous writer, `piReadOnlyGatePath()` and
+  `piReadOnlyGateArgs()`. Two things decide that shape. Pi loads the extension **in its own process**,
+  where Orca is not on the module path, so it imports nothing and carries its own copy of the policy;
+  and `buildPiRpcLaunch` is synchronous (it returns `ProviderProcessLaunch` directly) while the existing
+  `writePiExtensionFile` is `async`, so an async helper could not reach that call site at all. The write
+  is therefore a `writeFileSync` to a staged temp name plus `renameSync`, guarded by a
+  "already the right content" compare: Pi exits when an extension fails to load, so a concurrent launch
+  must never read a half-written file.
+- `src/main/pi/fork-read-only-gate.test.ts` — drives the **generated** extension (evaluated with
+  `new Function`, as Pi would load it) and compares it with `lookAroundCommandAllowed` over one command
+  corpus, so the duplicated policy cannot drift apart in silence. It also covers `user_bash` (nobody
+  types in a look run, but a command that arrives that way is held to the same policy), a bash call whose
+  command it cannot read, and the writer's idempotence.
+
+**Why the wiring is in the launch builder and not the resolution layer.** `backgroundWork` and
+`botTools` are wired in `rpc-launch-resolution.ts`, and that is the wrong file to touch: measured over
+180 days of `upstream/main`, it carries 11 commits against 6 for `rpc-launch.ts`, 2 for the runner and
+the shared constant, and 1 for the CLI method. It does not need to be there either —
+`buildPiRpcLaunch` already receives the mode as `options.tools` (`'read'` for a look), and the file the
+run has to name is a static fork asset, so the fork module writes it itself and hands back the
+arguments.
+
+**The honest limit, written down rather than implied.** For pi, `permissionMode: 'ask'` — which the
+shared composition sets for every read-only session
+(`structured-agent-launch-composition.ts:231`) — carries no weight: pi's structured chat is full access
+only (`rpc-launch.ts:113` throws otherwise), and `fullAccess` is resolved independently of `readOnly`
+(`rpc-launch-resolution.ts:231`). So unlike Claude, whose hook is backed by the CLI's own permission
+engine, pi's guarantee is two Orca-side guards inside the agent process, and the extension runs with the
+agent's full OS permissions. Same class of guarantee in practice; not the same mechanism, and not one
+to describe as a sandbox.
+
+**The too-old trap this patch opens.** `piToolLimit` throws `AgentCliInstallationError.tooOld('pi', …)`
+below 1.0.4 (`rpc-launch.ts:101`), which could not fire while pi never looked around. Now an older
+install fails _every_ look, the failure is counted, and ten in a row turn Look around off
+(`LOOK_FAILURES_TO_TURN_OFF`) — with the runner having dropped the cause, the owner sees "The last look
+couldn't start." ten times and no hint that pi needed updating. The runner therefore keeps the cause in
+the recorded failure when the error is an installation problem, so ten notices say _pi 1.0.3 is too
+old_. Making the setting's offer depend on the host's agent capabilities is the real fix and belongs
+upstream; this one line is the cheap fork version.
+
+**Deliberately not done here.** A read scoped to the bot's home folder would be strictly better than
+Claude's anywhere-read, but the first patch matches Claude rather than exceeding it. And
+`LOOK_AROUND_AGENTS` stays a list: turning it into a capability would need an edit in each of the six
+readers, which is exactly the divergence this patch avoids. Both are in the design note's open
+questions.
+
+Tests: `src/main/pi/fork-read-only-gate.test.ts` (the generated extension against the policy corpus, the
+launch args and the writer), `src/main/pi/rpc/launch/rpc-launch.test.ts` (the `read` mapping now names
+the extension — matched by `/orca-look-around-gate\.ts$/` rather than by literal path, because vitest's
+app environment installs its own `userData` and the absolute path is not stable there), and the existing
+bot look-around suites.

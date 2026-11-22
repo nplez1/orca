@@ -72,7 +72,7 @@ async function setLookAround(params: BotLookAroundSetParams, context: RpcContext
     throw new InvalidArgumentError('Name the bot with --bot, or run this from the bot’s chat.')
   }
   if (!lookAroundSupported(bot.agent)) {
-    throw new InvalidArgumentError('Look around needs a Claude Code or Codex bot.')
+    throw new InvalidArgumentError('This bot’s agent cannot look around.')
   }
   const { on, every, weekdaysOnly, focus } = params
   // Read as saved, inside the update queue, so an owner's edit in Settings is not undone.
