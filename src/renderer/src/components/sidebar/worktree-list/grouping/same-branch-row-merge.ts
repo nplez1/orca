@@ -1,24 +1,62 @@
 import type { Repo } from '../../../../../../shared/repository/repo-types'
-import type { ExecutionHostId } from '../../../../../../shared/execution-host/execution-host'
-import type { HostScopedWorktreeKey } from '../../../../../../shared/worktree/host-qualified-identity'
 import {
-  lineageIdentities,
-  type WorktreeLineageSource
-} from '../../../../../../shared/sidebar-list/worktree-lineage-range'
+  ALL_EXECUTION_HOSTS_SCOPE,
+  type ExecutionHostId,
+  type ExecutionHostScope
+} from '../../../../../../shared/execution-host/execution-host'
+import { getWorktreeLineageGroupKey } from '../../../../../../shared/sidebar-list/sections/group-keys'
 import { PINNED_GROUP_KEY } from '../../../../../../shared/sidebar-list/sections/group-keys'
 import type { ProjectGroupingIndex } from '../../../../../../shared/sidebar-list/sections/project-section-grouping'
 import type {
-  BranchGroupMember,
   Row,
+  WorktreeGroupBy,
   WorktreeRow
 } from '../../../../../../shared/sidebar-list/row-types'
+import type { HostSectionRow } from '../../../../../../shared/sidebar-list/hosts/host-section-rows'
 import { buildHostOrderedMembers, getBranchGroupKeyForWorktree } from './branch-groups'
+import { buildMergedRow, type BranchGroupMerge } from './same-branch-merged-row'
+import { buildRowForest, flattenRowForest, type RowNode } from './sidebar-row-forest'
 
-type BranchGroupMerge = {
-  primaryRow: WorktreeRow
-  members: BranchGroupMember[]
-  /** One row per member, in `members` order. */
-  memberRows: readonly WorktreeRow[]
+/**
+ * Whether same-branch rows may merge at all. Why: an explicit host scope or filter
+ * splits rows into host sections, where a cross-host card has no home.
+ */
+export function shouldMergeSameBranchCards(args: {
+  groupBy: WorktreeGroupBy
+  mergeSameBranchWorkspaces: boolean
+  workspaceHostScope: ExecutionHostScope
+  visibleWorkspaceHostIds: readonly ExecutionHostId[] | null
+}): boolean {
+  return (
+    args.groupBy === 'repo' &&
+    args.mergeSameBranchWorkspaces &&
+    args.workspaceHostScope === ALL_EXECUTION_HOSTS_SCOPE &&
+    !args.visibleWorkspaceHostIds
+  )
+}
+
+/** Which lineage groups a workspace's child chip folds, keyed by its lineage group key —
+ * several when its card merged hosts, since the chip folds them as one. */
+export function indexLineageFoldKeys(
+  rows: readonly HostSectionRow[]
+): Map<string, readonly string[]> {
+  const keys = new Map<string, readonly string[]>()
+  for (const row of rows) {
+    if (row.type !== 'item' || row.lineageChildCount <= 0) {
+      continue
+    }
+    const collapseKeys =
+      row.lineageCollapseKeys ?? (row.lineageGroupKey ? [row.lineageGroupKey] : [])
+    if (collapseKeys.length === 0) {
+      continue
+    }
+    // Why every member: the hosts a card absorbed render no row of their own, and their
+    // workspaces are exactly the ones a shortcut or a reveal arrives from.
+    for (const worktree of row.branchGroup?.map((member) => member.worktree) ?? [row.worktree]) {
+      keys.set(getWorktreeLineageGroupKey(worktree), collapseKeys)
+    }
+  }
+  return keys
 }
 
 function getRowBranchGroupKey(
@@ -26,9 +64,9 @@ function getRowBranchGroupKey(
   repoMap: ReadonlyMap<string, Repo>,
   projectIndex: ProjectGroupingIndex | null
 ): string | null {
-  // Why: a lineage child renders inside its parent's subtree, so only roots are
-  // candidates; a root with children stays one, or its hosts would split apart.
-  if (row.depth !== 0 || row.sectionKey === PINNED_GROUP_KEY) {
+  // Why only the pinned section: candidates are grouped among siblings at one level,
+  // so a card's own children can stack in turn; pinned rows render elsewhere.
+  if (row.sectionKey === PINNED_GROUP_KEY) {
     return null
   }
   return getBranchGroupKeyForWorktree(row.worktree, repoMap, projectIndex)
@@ -62,90 +100,101 @@ function buildBranchGroupMerge(
 
 const NO_COLLAPSED_GROUPS: ReadonlySet<string> = new Set()
 
-/** Rows nested under `rows[start]`; they end at the next row that is not deeper. */
-function subtreeEnd(rows: readonly Row[], start: number): number {
-  const startRow = rows[start]
-  const parentDepth =
-    startRow?.type === 'item' || startRow?.type === 'folder-workspace' ? startRow.depth : -1
-  let end = start + 1
-  while (end < rows.length) {
-    const row = rows[end]
-    const depth = row.type === 'item' || row.type === 'folder-workspace' ? row.depth : null
-    if (depth === null || depth <= parentDepth) {
-      break
-    }
-    end += 1
-  }
-  return end
-}
-
-/** Every member's children, so the merged card carries the group's whole subtree. */
-function unionChildWorktreeIds(memberRows: readonly WorktreeRow[]): readonly string[] {
-  const ids = new Set<string>()
-  for (const row of memberRows) {
-    for (const id of row.lineageChildWorktreeIds ?? []) {
-      ids.add(id)
-    }
-  }
-  return [...ids]
-}
-
-function unionDescendantIdentities(
-  memberRows: readonly WorktreeRow[]
-): WorktreeLineageSource | undefined {
-  const sources = memberRows.flatMap((row) =>
-    row.lineageDescendantIdentities ? [row.lineageDescendantIdentities] : []
-  )
-  if (sources.length <= 1) {
-    return sources[0]
-  }
-  const identities = new Set<HostScopedWorktreeKey>()
-  for (const source of sources) {
-    for (const identity of lineageIdentities(source)) {
-      identities.add(identity)
-    }
-  }
-  return [...identities]
-}
-
-function buildMergedRow(
-  merge: BranchGroupMerge,
-  branchGroupKey: string,
+type MergeContext = {
+  repoMap: ReadonlyMap<string, Repo>
+  projectIndex: ProjectGroupingIndex | null
+  defaultHostId: ExecutionHostId
+  hostLabelById: ReadonlyMap<string, string> | undefined
   collapsedGroups: ReadonlySet<string>
-): WorktreeRow {
-  const childWorktreeIds = unionChildWorktreeIds(merge.memberRows)
-  const childCount =
-    childWorktreeIds.length > 0
-      ? childWorktreeIds.length
-      : merge.memberRows.reduce((sum, row) => sum + row.lineageChildCount, 0)
-  const descendants = unionDescendantIdentities(merge.memberRows)
-  // Why: one card owns every member's children, so its chip folds all of their
-  // lineage groups at once — a half-collapsed union would strand rows.
-  const lineageCollapseKeys = merge.memberRows.flatMap((row) =>
-    row.lineageGroupKey ? [row.lineageGroupKey] : []
-  )
-  return {
-    ...merge.primaryRow,
-    // The dropdown names the host, so the mixed-host chip is redundant here.
-    hostContextLabel: undefined,
-    branchGroupKey,
-    branchGroup: merge.members,
-    lineageChildCount: childCount,
-    ...(childWorktreeIds.length > 0 ? { lineageChildWorktreeIds: childWorktreeIds } : {}),
-    ...(descendants ? { lineageDescendantIdentities: descendants } : {}),
-    ...(lineageCollapseKeys.length > 0
-      ? {
-          lineageGroupKey: merge.primaryRow.lineageGroupKey ?? lineageCollapseKeys[0],
-          lineageCollapsed: lineageCollapseKeys.some((key) => collapsedGroups.has(key)),
-          lineageCollapseKeys
-        }
-      : {})
+}
+
+type LevelMerge = {
+  merged: WorktreeRow
+  memberNodes: readonly RowNode[]
+  /** Every member row but the primary's: the rows the card replaces. */
+  consumedRowKeys: readonly string[]
+}
+
+/** Siblings of one branch on one level, keyed by the branch group they share. */
+function planLevelMerge(nodes: readonly RowNode[], ctx: MergeContext): Map<string, LevelMerge> {
+  const candidatesByBranch = new Map<string, { node: RowNode; row: WorktreeRow }[]>()
+  for (const node of nodes) {
+    const row = node.row
+    if (row.type !== 'item') {
+      continue
+    }
+    const key = getRowBranchGroupKey(row, ctx.repoMap, ctx.projectIndex)
+    if (!key) {
+      continue
+    }
+    const candidate = { node, row }
+    const existing = candidatesByBranch.get(key)
+    if (existing) {
+      existing.push(candidate)
+    } else {
+      candidatesByBranch.set(key, [candidate])
+    }
   }
+  const merges = new Map<string, LevelMerge>()
+  for (const [key, candidates] of candidatesByBranch) {
+    if (candidates.length < 2) {
+      continue
+    }
+    const merge = buildBranchGroupMerge(
+      candidates.map((candidate) => candidate.row),
+      ctx.repoMap,
+      ctx.defaultHostId,
+      ctx.hostLabelById
+    )
+    if (!merge) {
+      continue
+    }
+    merges.set(merge.primaryRow.rowKey, {
+      merged: buildMergedRow(merge, key, ctx.collapsedGroups),
+      // Why by row identity: buildBranchGroupMerge hands back the very rows it was given.
+      memberNodes: merge.memberRows.map(
+        (row) => candidates.find((candidate) => candidate.row === row)!.node
+      ),
+      consumedRowKeys: merge.memberRows
+        .filter((row) => row.rowKey !== merge.primaryRow.rowKey)
+        .map((row) => row.rowKey)
+    })
+  }
+  return merges
+}
+
+function mergeLevel(nodes: readonly RowNode[], ctx: MergeContext): RowNode[] {
+  const merges = planLevelMerge(nodes, ctx)
+  if (merges.size === 0) {
+    return nodes.map((node) => ({ row: node.row, children: mergeLevel(node.children, ctx) }))
+  }
+  const consumedRowKeys = new Set([...merges.values()].flatMap((merge) => merge.consumedRowKeys))
+  const result: RowNode[] = []
+  for (const node of nodes) {
+    if (node.row.type === 'item') {
+      const merge = merges.get(node.row.rowKey)
+      if (merge) {
+        // Why: the card stands in for every host it merged, so it draws their
+        // children as one subtree — the union — or none of them when folded.
+        const children =
+          merge.merged.lineageCollapsed === true
+            ? []
+            : merge.memberNodes.flatMap((member) => member.children)
+        result.push({ row: merge.merged, children: mergeLevel(children, ctx) })
+        continue
+      }
+      if (consumedRowKeys.has(node.row.rowKey)) {
+        continue
+      }
+    }
+    result.push({ row: node.row, children: mergeLevel(node.children, ctx) })
+  }
+  return result
 }
 
 /**
- * Consolidates same-branch worktree rows spanning two or more hosts into a
- * single row (Group by branch), drawing every member's children beneath it.
+ * Consolidates same-branch rows spanning two or more hosts into a single card
+ * (Group by branch) at every depth, so a stack inside a stack stays stacked.
  * Single-host and ambiguous branches are returned untouched, so turning the
  * setting off needs no inverse pass.
  */
@@ -157,91 +206,12 @@ export function mergeSameBranchRows(
   hostLabelById: ReadonlyMap<string, string> | undefined,
   collapsedGroups: ReadonlySet<string> = NO_COLLAPSED_GROUPS
 ): Row[] {
-  const candidatesByBranch = new Map<string, WorktreeRow[]>()
-  for (const row of rows) {
-    if (row.type !== 'item') {
-      continue
-    }
-    const key = getRowBranchGroupKey(row, repoMap, projectIndex)
-    if (!key) {
-      continue
-    }
-    const existing = candidatesByBranch.get(key)
-    if (existing) {
-      existing.push(row)
-    } else {
-      candidatesByBranch.set(key, [row])
-    }
+  const ctx: MergeContext = {
+    repoMap,
+    projectIndex,
+    defaultHostId,
+    hostLabelById,
+    collapsedGroups
   }
-  if (candidatesByBranch.size === 0) {
-    return [...rows]
-  }
-
-  const indexByRowKey = new Map<string, number>()
-  rows.forEach((row, index) => {
-    if (row.type === 'item') {
-      indexByRowKey.set(row.rowKey, index)
-    }
-  })
-
-  const mergesByPrimaryRowKey = new Map<
-    string,
-    { merged: WorktreeRow; memberRowKeys: readonly string[] }
-  >()
-  const consumedRowKeys = new Set<string>()
-  for (const [key, candidates] of candidatesByBranch) {
-    if (candidates.length < 2) {
-      continue
-    }
-    const merge = buildBranchGroupMerge(candidates, repoMap, defaultHostId, hostLabelById)
-    if (!merge) {
-      continue
-    }
-    const memberRowKeys = merge.memberRows.map((row) => row.rowKey)
-    if (memberRowKeys.some((rowKey) => !indexByRowKey.has(rowKey))) {
-      continue
-    }
-    mergesByPrimaryRowKey.set(merge.primaryRow.rowKey, {
-      merged: buildMergedRow(merge, key, collapsedGroups),
-      memberRowKeys
-    })
-    for (const rowKey of memberRowKeys) {
-      if (rowKey !== merge.primaryRow.rowKey) {
-        consumedRowKeys.add(rowKey)
-      }
-    }
-  }
-  if (mergesByPrimaryRowKey.size === 0) {
-    return [...rows]
-  }
-
-  const result: Row[] = []
-  for (let index = 0; index < rows.length; index += 1) {
-    const row = rows[index]
-    if (row.type === 'item') {
-      const merge = mergesByPrimaryRowKey.get(row.rowKey)
-      if (merge) {
-        result.push(merge.merged)
-        // Why: the card stands in for every host it merged, so it draws their
-        // children as one subtree — the union — or none of them when folded.
-        if (merge.merged.lineageCollapsed !== true) {
-          for (const memberRowKey of merge.memberRowKeys) {
-            const memberIndex = indexByRowKey.get(memberRowKey)!
-            const end = subtreeEnd(rows, memberIndex)
-            for (let child = memberIndex + 1; child < end; child += 1) {
-              result.push(rows[child])
-            }
-          }
-        }
-        index = subtreeEnd(rows, index) - 1
-        continue
-      }
-      if (consumedRowKeys.has(row.rowKey)) {
-        index = subtreeEnd(rows, index) - 1
-        continue
-      }
-    }
-    result.push(row)
-  }
-  return result
+  return flattenRowForest(mergeLevel(buildRowForest(rows), ctx))
 }

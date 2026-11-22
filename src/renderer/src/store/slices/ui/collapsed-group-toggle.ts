@@ -32,15 +32,15 @@ export function toggleCollapsedGroupSet(previous: ReadonlySet<string>, key: stri
   return recordCollapsedGroupChanges(previous, next, [key])
 }
 
-/** Folds or unfolds a key set as one: any key unfolded means the whole set folds.
- * A card standing in for several groups must never end up half collapsed. */
+/** Folds or unfolds a key set as one, following what the card shows: it reads folded while any
+ * key is folded, so a fold action is only taken when none is. */
 export function toggleCollapsedGroupKeysSet(
   previous: ReadonlySet<string>,
   keys: readonly string[]
 ): Set<string> {
   const unique = [...new Set(keys)]
   const next = new Set(previous)
-  const folding = unique.some((key) => !next.has(key))
+  const folding = unique.every((key) => !next.has(key))
   for (const key of unique) {
     if (folding) {
       next.add(key)

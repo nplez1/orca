@@ -53,7 +53,7 @@ type BuildArgs = {
     rowKey: string
   ) => void
   branchGroupSelection: Readonly<Record<string, ExecutionHostId>>
-  onSelectBranchGroupHost: (groupKey: string, hostId: ExecutionHostId) => void
+  onSelectBranchGroupHost: (rowKey: string, groupKey: string, hostId: ExecutionHostId) => void
 }
 
 export function buildWorktreeVirtualRowContext(args: BuildArgs): WorktreeVirtualRowContext {

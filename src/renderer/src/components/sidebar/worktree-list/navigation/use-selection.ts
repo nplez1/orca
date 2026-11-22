@@ -7,9 +7,11 @@ import type { PinnedWorktreeDisplayPolicy } from '../../../../../../shared/sideb
 import { getRenderedWorkspaceRowsInSidebarOrder } from './worktree-sidebar-row-preference'
 import { getWorktreeExecutionHostId } from '../../../../../../shared/execution-host/execution-host'
 import {
+  setVisibleLineageFoldKeys,
   setVisibleWorktreeIds,
   setVisibleWorktreeShortcutTargets
 } from '../listing/visible-worktrees'
+import { indexLineageFoldKeys } from '../grouping/same-branch-row-merge'
 import { useListMultiSelection } from '@/lib/list-interaction/use-list-multi-selection'
 import { useReusedArrayIdentity } from '../listing/use-reused-array-identity'
 import { useAppStore } from '@/store'
@@ -99,36 +101,21 @@ export function useSidebarWorktreeSelection(args: {
 
   // Why layout effect: the Cmd/Ctrl+1–9 handler can fire right after commit; publishing after paint would leave the shortcut cache stale.
   useLayoutEffect(() => {
-    const chipKeysByIdentity = new Map<string, readonly string[]>()
-    for (const row of sectionRows) {
-      if (row.type === 'item' && row.lineageChildCount > 0) {
-        // A Group by branch card folds every group it merged, so any member's
-        // workspace resolves to that card's whole key set.
-        const collapseKeys =
-          row.lineageCollapseKeys ?? (row.lineageGroupKey ? [row.lineageGroupKey] : [])
-        if (collapseKeys.length === 0) {
-          continue
-        }
-        for (const member of row.branchGroup ?? [{ worktree: row.worktree }]) {
-          chipKeysByIdentity.set(getWorktreeHostIdentity(member.worktree), collapseKeys)
-        }
-      }
-    }
     setVisibleWorktreeIds(renderedWorktreeIds)
     setVisibleWorktreeShortcutTargets(
-      renderedWorktrees.map((worktree) => {
-        const lineageCollapseKeys = chipKeysByIdentity.get(getWorktreeHostIdentity(worktree))
-        return {
-          id: worktree.id,
-          ...(worktree.hostId ? { executionHostId: worktree.hostId } : {}),
-          ...(lineageCollapseKeys ? { lineageCollapseKeys } : {})
-        }
-      })
+      renderedWorktrees.map((worktree) => ({
+        id: worktree.id,
+        ...(worktree.hostId ? { executionHostId: worktree.hostId } : {})
+      }))
     )
+    // Why its own channel: the folded keys cover the hosts a card absorbed, which
+    // render no row, so they cannot ride the shortcut order without renumbering it.
+    setVisibleLineageFoldKeys(indexLineageFoldKeys(sectionRows))
     // Why null, not []: [] is a real rendered order (all collapsed/filtered); null tells shortcuts the list is unmounted.
     return () => {
       setVisibleWorktreeIds(null)
       setVisibleWorktreeShortcutTargets(null)
+      setVisibleLineageFoldKeys(null)
     }
   }, [renderedWorktreeIds, renderedWorktrees, sectionRows])
 

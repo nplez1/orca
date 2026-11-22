@@ -17,9 +17,9 @@ import type {
   WorktreeGroupBy
 } from '../../../../../../shared/sidebar-list/row-types'
 import { planSidebarRows } from '../../../../../../shared/sidebar-list/sidebar-row-plan'
-import type { SidebarLineageParentIdentities } from '../../../../../../shared/sidebar-list/lineage/worktree-lineage-projection'
 import { buildProjectGroupingIndex } from '../../../../../../shared/sidebar-list/sections/project-section-grouping'
 import { getBranchGroupMembersForWorktree } from '../grouping/branch-groups'
+import type { SidebarLineageParentIdentities } from '../../../../../../shared/sidebar-list/lineage/worktree-lineage-projection'
 import { createSidebarPRGroupReader } from '../grouping/pr-group-key'
 
 export function getWorktreeRevealCollapsedGroupKeys(args: {
@@ -41,6 +41,8 @@ export function getWorktreeRevealCollapsedGroupKeys(args: {
   workspaceStatuses: readonly WorkspaceStatusDefinition[]
   projectGroups: readonly ProjectGroup[]
   projectGrouping?: ProjectGroupingModel
+  /** Whether same-branch rows merged; when they did, a card folds several groups as one. */
+  mergeSameBranchCards?: boolean
 }): string[] {
   const hostId = getWorktreeExecutionHostId(
     args.worktree,
@@ -77,24 +79,28 @@ export function getWorktreeRevealCollapsedGroupKeys(args: {
     return []
   }
   const keys = [`host:${hostId}`]
-  const projectIndex = buildProjectGroupingIndex(args.projectGrouping)
   // Why: a Group by branch card folds every member's lineage group together, so
-  // revealing a child has to unfold the whole card, not just its own host's group.
-  const foldKeysOf = (worktree: Worktree): readonly string[] => {
-    const members = getBranchGroupMembersForWorktree({
-      worktree,
-      worktrees: args.visibleWorktrees ?? args.worktrees,
-      repoMap: args.repoMap,
-      projectIndex,
-      defaultHostId: args.defaultHostId
-    })
+  // revealing a child unfolds the whole card, not just its own host's group.
+  const projectIndex = buildProjectGroupingIndex(args.projectGrouping)
+  const foldKeysOf = (ancestor: typeof occurrence): readonly string[] => {
+    const worktree = ancestor.row
+    const members =
+      args.mergeSameBranchCards && !ancestor.parent
+        ? getBranchGroupMembersForWorktree({
+            worktree,
+            worktrees: args.visibleWorktrees ?? args.worktrees,
+            repoMap: args.repoMap,
+            projectIndex,
+            defaultHostId: args.defaultHostId
+          })
+        : null
     return members
       ? members.map((member) => getWorktreeLineageGroupKey(member.worktree))
       : [getWorktreeLineageGroupKey(worktree)]
   }
   let ancestor = occurrence.parent
   while (ancestor) {
-    keys.push(...foldKeysOf(ancestor.row))
+    keys.push(...foldKeysOf(ancestor))
     ancestor = ancestor.parent
   }
   let path: typeof occurrence.sectionPath | undefined = occurrence.sectionPath

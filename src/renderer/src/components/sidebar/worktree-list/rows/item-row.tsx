@@ -35,7 +35,7 @@ export type WorktreeItemRowContext = {
   getLineageToggleHandler: (groupKeys: readonly string[]) => LineageToggleHandler
   /** Group by branch cards key their host choice by row key. */
   branchGroupSelection: Readonly<Record<string, ExecutionHostId>>
-  onSelectBranchGroupHost: (groupKey: string, hostId: ExecutionHostId) => void
+  onSelectBranchGroupHost: (rowKey: string, groupKey: string, hostId: ExecutionHostId) => void
   onSelectionGesture: (event: React.MouseEvent<HTMLElement>, worktree: Worktree) => boolean
   onWorktreeCardClick?: () => void
   onContextMenuSelect: (
@@ -165,7 +165,9 @@ export function renderWorktreeItemRow(
         branchGroup={itemRow.branchGroup}
         selectedBranchHostId={selectedBranchHostId}
         branchGroupKey={itemRow.branchGroupKey}
-        onSelectBranchHost={ctx.onSelectBranchGroupHost}
+        onSelectBranchHost={(groupKey, hostId) =>
+          ctx.onSelectBranchGroupHost(itemRow.rowKey, groupKey, hostId)
+        }
         onLineageToggle={
           lineageToggleKeys ? ctx.getLineageToggleHandler(lineageToggleKeys) : undefined
         }

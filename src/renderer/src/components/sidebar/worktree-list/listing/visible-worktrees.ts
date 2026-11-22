@@ -28,10 +28,12 @@ let _publishedVisibleIds: string[] | null = null
 export type VisibleWorktreeShortcutTarget = {
   id: string
   executionHostId?: Worktree['hostId']
-  /** The rendered child-toggle keys that own this workspace; several when a card merged hosts. */
-  lineageCollapseKeys?: readonly string[]
 }
 let _publishedVisibleShortcutTargets: VisibleWorktreeShortcutTarget[] | null = null
+
+/** Lineage groups each rendered workspace's child chip folds, keyed by host identity.
+ * Published separately from the shortcut order, which names rows only. */
+let _publishedLineageFoldKeys: ReadonlyMap<string, readonly string[]> | null = null
 
 export function setVisibleWorktreeIds(ids: string[] | null): void {
   _publishedVisibleIds = ids
@@ -47,6 +49,16 @@ export function getPublishedVisibleWorktreeShortcutTargets():
   | readonly VisibleWorktreeShortcutTarget[]
   | null {
   return _publishedVisibleShortcutTargets
+}
+
+export function setVisibleLineageFoldKeys(
+  keys: ReadonlyMap<string, readonly string[]> | null
+): void {
+  _publishedLineageFoldKeys = keys
+}
+
+export function getPublishedLineageFoldKeys(): ReadonlyMap<string, readonly string[]> | null {
+  return _publishedLineageFoldKeys
 }
 
 /** The unmounted list's visible rows in sidebar sort order, ranked per host copy like the mounted list. */

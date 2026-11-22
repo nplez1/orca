@@ -6,7 +6,15 @@ import { getWorktreeHostIdentity } from '../../../../../../shared/worktree/host-
 import type { Worktree } from '../../../../../../shared/worktree/types'
 import { getHoveredWorkspaceIdentity } from './hovered-workspace-identity'
 import { computeRenderedSidebarRows } from '../../worktree-list/listing/rendered-sidebar-worktree-order'
-import { getPublishedVisibleWorktreeShortcutTargets } from '../../worktree-list/listing/visible-worktrees'
+import { getPublishedLineageFoldKeys } from '../../worktree-list/listing/visible-worktrees'
+import {
+  indexLineageFoldKeys,
+  mergeSameBranchRows,
+  shouldMergeSameBranchCards
+} from '../../worktree-list/grouping/same-branch-row-merge'
+import { buildProjectGroupingIndex } from '../../../../../../shared/sidebar-list/sections/project-section-grouping'
+import { getProjectHostSetupProjectionFromState } from '@/store/projects/project-host-setup-selector'
+import { LOCAL_EXECUTION_HOST_ID } from '../../../../../../shared/execution-host/execution-host'
 import { computeVisibleWorktrees } from '../../worktree-list/listing/compute-visible-worktrees'
 import { buildVisibleWorktreeOptionsFromState } from '../../worktree-list/listing/visible-worktree-options-from-state'
 import { getWorktreeLineageGroupKey } from '../../../../../../shared/sidebar-list/sections/group-keys'
@@ -15,6 +23,7 @@ import {
   getWorktreeLineageAncestors
 } from '../../../../../../shared/sidebar-list/lineage/worktree-lineage-projection'
 import { selectWorktreesByRepo } from '@/store/workspaces/catalog/workspace-record-fields'
+import type { Row } from '../../../../../../shared/sidebar-list/row-types'
 
 type ChildWorkspacesToggleState = Pick<
   AppState,
@@ -77,43 +86,38 @@ export function resolveChildWorkspacesToggleGroupKeys(
   return parentKeys ?? null
 }
 
-/** Uses mounted rows so temporary reveal and drag policies match the existing chip.
- * Each rendered workspace maps to the keys its card folds, which is several when a
- * Group by branch card merged hosts. */
+/** Which keys each rendered workspace's chip folds; mounted rows so temporary reveal
+ * and drag policies match the chip the user sees. */
 export function getRenderedLineageChipKeys(
   state: AppState
 ): ReadonlyMap<string, readonly string[]> {
-  const publishedTargets = getPublishedVisibleWorktreeShortcutTargets()
-  if (publishedTargets !== null) {
-    const keys = new Map<string, readonly string[]>()
-    for (const target of publishedTargets) {
-      if (target.lineageCollapseKeys) {
-        keys.set(
-          getWorktreeLineageGroupKey({ id: target.id, hostId: target.executionHostId }),
-          target.lineageCollapseKeys
-        )
-      }
-    }
-    return keys
+  const published = getPublishedLineageFoldKeys()
+  if (published !== null) {
+    return published
   }
   const visibleWorktrees = computeVisibleWorktrees(
     selectWorktreesByRepo(state),
     [],
     buildVisibleWorktreeOptionsFromState(state, getIndexedRepoMap(state.repos))
   )
-  const keys = new Map<string, readonly string[]>()
-  for (const row of computeRenderedSidebarRows(state, visibleWorktrees)) {
-    if (row.type !== 'item' || row.lineageChildCount <= 0) {
-      continue
-    }
-    const collapseKeys =
-      row.lineageCollapseKeys ?? (row.lineageGroupKey ? [row.lineageGroupKey] : [])
-    if (collapseKeys.length === 0) {
-      continue
-    }
-    for (const member of row.branchGroup ?? [{ worktree: row.worktree }]) {
-      keys.set(getWorktreeLineageGroupKey(member.worktree), collapseKeys)
-    }
+  const rows = computeRenderedSidebarRows(state, visibleWorktrees)
+  if (!shouldMergeSameBranchCards(state)) {
+    return indexLineageFoldKeys(rows)
   }
-  return keys
+  const projection = getProjectHostSetupProjectionFromState(state)
+  return indexLineageFoldKeys(
+    // Why drop host headers: a merge groups siblings by depth, and a header is never one.
+    mergeSameBranchRows(
+      rows.filter((row): row is Row => row.type !== 'host-header'),
+      getIndexedRepoMap(state.repos),
+      buildProjectGroupingIndex({
+        projects: projection.projects,
+        projectHostSetups: projection.setups
+      }),
+      // Why the local constant: only member order depends on it, and this map holds keys.
+      LOCAL_EXECUTION_HOST_ID,
+      undefined,
+      state.collapsedGroups
+    )
+  )
 }

@@ -7,15 +7,15 @@ import type { BranchGroupMember } from '../../../../../../shared/sidebar-list/ro
 
 type BranchGroupHostTarget = { member: BranchGroupMember; rowKey: string }
 
-/** The row must be found by group key, not `worktree`: a merged row always holds
- *  its local-first member while the card can be showing any host. */
+/** The row must be found by its own key, not `worktree` or the branch group: a merged
+ *  row always holds its local-first member, and two levels of one branch share a group. */
 export function findBranchGroupHostTarget(
   rows: readonly HostSectionRow[],
-  groupKey: string,
+  rowKey: string,
   hostId: ExecutionHostId
 ): BranchGroupHostTarget | null {
   for (const row of rows) {
-    if (row.type !== 'item' || row.branchGroupKey !== groupKey) {
+    if (row.type !== 'item' || row.rowKey !== rowKey) {
       continue
     }
     const member = row.branchGroup?.find((candidate) => candidate.hostId === hostId)
@@ -39,16 +39,16 @@ export function useBranchGroupHostSelection(args: {
   rows: readonly HostSectionRow[]
   setBranchGroupHost: (groupKey: string, hostId: ExecutionHostId) => void
   onImmediateActivate: (worktreeId: string, rowKey: string | undefined) => void
-}): (groupKey: string, hostId: ExecutionHostId) => void {
+}): (rowKey: string, groupKey: string, hostId: ExecutionHostId) => void {
   const { rows, setBranchGroupHost, onImmediateActivate } = args
   const rowsRef = useRef(rows)
   useLayoutEffect(() => {
     rowsRef.current = rows
   }, [rows])
   return useCallback(
-    (groupKey: string, hostId: ExecutionHostId) => {
+    (rowKey: string, groupKey: string, hostId: ExecutionHostId) => {
       setBranchGroupHost(groupKey, hostId)
-      const target = findBranchGroupHostTarget(rowsRef.current, groupKey, hostId)
+      const target = findBranchGroupHostTarget(rowsRef.current, rowKey, hostId)
       if (!target) {
         return
       }
