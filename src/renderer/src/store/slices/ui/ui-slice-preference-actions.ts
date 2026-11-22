@@ -42,7 +42,7 @@ import {
 } from '../../../../../shared/workspace/status/workspace-statuses'
 import { createHostWorkspaceStatusActions } from './ui-slice-host-workspace-statuses'
 import { createUiBotPreferenceActions } from './ui-slice-bot-preference-actions'
-import { toggleCollapsedGroupSet } from './collapsed-group-toggle'
+import { toggleCollapsedGroupKeysSet, toggleCollapsedGroupSet } from './collapsed-group-toggle'
 
 /** Builds preference defaults and setters for the UI slice, leaving durable writes to the persistence layer. */
 export function createUiPreferenceActions(set: UISliceSet, get: UISliceGet): Partial<UISlice> {
@@ -192,6 +192,12 @@ export function createUiPreferenceActions(set: UISliceSet, get: UISliceGet): Par
     toggleCollapsedGroup: (key) =>
       set((s) => {
         const next = toggleCollapsedGroupSet(s.collapsedGroups, key)
+        window.api.ui.set({ collapsedGroups: [...next] }).catch(console.error)
+        return { collapsedGroups: next }
+      }),
+    toggleCollapsedGroups: (keys) =>
+      set((s) => {
+        const next = toggleCollapsedGroupKeysSet(s.collapsedGroups, keys)
         window.api.ui.set({ collapsedGroups: [...next] }).catch(console.error)
         return { collapsedGroups: next }
       }),

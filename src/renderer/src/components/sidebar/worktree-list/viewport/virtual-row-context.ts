@@ -44,7 +44,7 @@ type BuildArgs = {
   projectHeaderHostContexts: ReadonlyMap<string, ProjectHeaderHostContext>
   headerDrag: WorktreeSidebarHeaderDrag
   getCachedFolderWorkspacePathStatus: ReturnType<typeof useFolderWorkspacePathStatusRows>
-  getLineageToggleHandler: (groupKey: string) => LineageToggleHandler
+  getLineageToggleHandler: (groupKeys: readonly string[]) => LineageToggleHandler
   toggleGroupWithScrollAnchor: (groupKey: string) => void
   onRowClickCapture: (event: React.MouseEvent<HTMLDivElement>) => void
   onRowPointerDown: (

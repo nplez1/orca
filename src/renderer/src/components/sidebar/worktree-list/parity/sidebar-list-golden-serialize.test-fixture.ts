@@ -178,7 +178,7 @@ export function serializeShortcutTargets(
       .map(
         (target, index) =>
           `${index + 1}=${target.id}${target.executionHostId ? `@${target.executionHostId}` : ''}${
-            target.lineageGroupKey ? `#${target.lineageGroupKey}` : ''
+            target.lineageCollapseKeys ? `#${target.lineageCollapseKeys.join(',')}` : ''
           }`
       )
       .join(' ') || '-'

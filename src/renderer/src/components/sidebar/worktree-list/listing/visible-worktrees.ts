@@ -28,7 +28,8 @@ let _publishedVisibleIds: string[] | null = null
 export type VisibleWorktreeShortcutTarget = {
   id: string
   executionHostId?: Worktree['hostId']
-  lineageGroupKey?: string
+  /** The rendered child-toggle keys that own this workspace; several when a card merged hosts. */
+  lineageCollapseKeys?: readonly string[]
 }
 let _publishedVisibleShortcutTargets: VisibleWorktreeShortcutTarget[] | null = null
 

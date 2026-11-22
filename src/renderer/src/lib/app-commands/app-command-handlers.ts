@@ -12,7 +12,7 @@ import { canNavigateWorktreeHistory } from '../../app-shell/chrome/titlebar-work
 import { TOGGLE_WORKSPACE_BOARD_EVENT } from '../../components/sidebar/workspace-board/surface/useWorkspaceBoardPanel'
 import {
   getRenderedLineageChipKeys,
-  resolveChildWorkspacesToggleGroupKey
+  resolveChildWorkspacesToggleGroupKeys
 } from '../../components/sidebar/workspace-card/identity/child-workspaces-toggle-target'
 import { requestTerminalTabRename } from '../../components/tab-bar/terminal-tabs/terminal-tab-rename-request'
 import { useAppStore } from '../../store/index'
@@ -171,18 +171,18 @@ export function createAppCommandHandlers(
         ) {
           return false
         }
-        const groupKey = resolveChildWorkspacesToggleGroupKey(
+        const groupKeys = resolveChildWorkspacesToggleGroupKeys(
           store,
           getRenderedLineageChipKeys(store)
         )
-        if (!groupKey) {
+        if (!groupKeys) {
           return false
         }
         return claim('sidebar.childWorkspaces.toggle', () => {
-          const expanding = store.collapsedGroups.has(groupKey)
+          const expanding = groupKeys.every((key) => store.collapsedGroups.has(key))
           // Match chip-click scroll anchoring to avoid viewport jumps.
           requestVirtualizedScrollAnchorRecord('[data-worktree-sidebar]')
-          store.toggleCollapsedGroup(groupKey)
+          store.toggleCollapsedGroups(groupKeys)
           if (expanding) {
             store.setSidebarOpen(true)
           }

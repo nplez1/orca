@@ -11,16 +11,11 @@ import {
   composeWorktreeHostIdentity,
   getWorktreeHostIdentity
 } from '../../../../../../shared/worktree/host-qualified-identity'
-import { PINNED_GROUP_KEY } from '../../../../../../shared/sidebar-list/sections/group-keys'
 import {
   getProjectGroupingForRepo,
   type ProjectGroupingIndex
 } from '../../../../../../shared/sidebar-list/sections/project-section-grouping'
-import type {
-  BranchGroupMember,
-  Row,
-  WorktreeRow
-} from '../../../../../../shared/sidebar-list/row-types'
+import type { BranchGroupMember } from '../../../../../../shared/sidebar-list/row-types'
 
 // `|` is legal inside a branch, so the section and branch need a separator that
 // cannot appear in either.
@@ -68,7 +63,7 @@ export function getBranchGroupKeyForWorktree(
  * consolidated. Two checkouts of one branch on the same host are ambiguous —
  * hiding one behind the dropdown — so that branch keeps its own rows.
  */
-function buildHostOrderedMembers(
+export function buildHostOrderedMembers(
   candidates: readonly { worktree: Worktree; repo: Repo | undefined }[],
   repoMap: ReadonlyMap<string, Repo>,
   defaultHostId: ExecutionHostId,
@@ -123,117 +118,6 @@ export function getBranchGroupMembersForWorktree(args: {
     .filter((candidate) => getBranchGroupKeyForWorktree(candidate, repoMap, projectIndex) === key)
     .map((candidate) => ({ worktree: candidate, repo: repoMap.get(candidate.repoId) }))
   return buildHostOrderedMembers(candidates, repoMap, defaultHostId, hostLabelById)
-}
-
-type BranchGroupMerge = { primaryRow: WorktreeRow; members: BranchGroupMember[] }
-
-function getRowBranchGroupKey(
-  row: WorktreeRow,
-  repoMap: ReadonlyMap<string, Repo>,
-  projectIndex: ProjectGroupingIndex | null
-): string | null {
-  // Why: a lineage child renders inside its parent's card; merging it would
-  // detach it from that subtree and misplace the collapse toggle.
-  if (row.depth !== 0 || row.lineageChildCount > 0 || row.sectionKey === PINNED_GROUP_KEY) {
-    return null
-  }
-  return getBranchGroupKeyForWorktree(row.worktree, repoMap, projectIndex)
-}
-
-function buildBranchGroupMerge(
-  candidates: readonly WorktreeRow[],
-  repoMap: ReadonlyMap<string, Repo>,
-  defaultHostId: ExecutionHostId,
-  hostLabelById: ReadonlyMap<string, string> | undefined
-): BranchGroupMerge | null {
-  const members = buildHostOrderedMembers(
-    candidates.map((row) => ({ worktree: row.worktree, repo: row.repo })),
-    repoMap,
-    defaultHostId,
-    hostLabelById
-  )
-  if (!members) {
-    return null
-  }
-  const primaryWorktree = members[0].worktree
-  const primaryRow = candidates.find((row) => row.worktree === primaryWorktree)
-  return primaryRow ? { primaryRow, members } : null
-}
-
-/**
- * Consolidates same-branch worktree rows spanning two or more hosts into a
- * single row (Group by branch). Single-host and ambiguous branches are returned
- * untouched, so turning the setting off needs no inverse pass.
- */
-export function mergeSameBranchRows(
-  rows: readonly Row[],
-  repoMap: ReadonlyMap<string, Repo>,
-  projectIndex: ProjectGroupingIndex | null,
-  defaultHostId: ExecutionHostId,
-  hostLabelById: ReadonlyMap<string, string> | undefined
-): Row[] {
-  const candidatesByBranch = new Map<string, WorktreeRow[]>()
-  for (const row of rows) {
-    if (row.type !== 'item') {
-      continue
-    }
-    const key = getRowBranchGroupKey(row, repoMap, projectIndex)
-    if (!key) {
-      continue
-    }
-    const existing = candidatesByBranch.get(key)
-    if (existing) {
-      existing.push(row)
-    } else {
-      candidatesByBranch.set(key, [row])
-    }
-  }
-  if (candidatesByBranch.size === 0) {
-    return [...rows]
-  }
-
-  const mergedByPrimaryRowKey = new Map<string, WorktreeRow>()
-  const consumedRowKeys = new Set<string>()
-  for (const [key, candidates] of candidatesByBranch) {
-    if (candidates.length < 2) {
-      continue
-    }
-    const merge = buildBranchGroupMerge(candidates, repoMap, defaultHostId, hostLabelById)
-    if (!merge) {
-      continue
-    }
-    mergedByPrimaryRowKey.set(merge.primaryRow.rowKey, {
-      ...merge.primaryRow,
-      // The dropdown names the host, so the mixed-host chip is redundant here.
-      hostContextLabel: undefined,
-      branchGroupKey: key,
-      branchGroup: merge.members
-    })
-    for (const candidate of candidates) {
-      if (candidate.rowKey !== merge.primaryRow.rowKey) {
-        consumedRowKeys.add(candidate.rowKey)
-      }
-    }
-  }
-  if (mergedByPrimaryRowKey.size === 0) {
-    return [...rows]
-  }
-
-  const result: Row[] = []
-  for (const row of rows) {
-    if (row.type === 'item') {
-      if (consumedRowKeys.has(row.rowKey)) {
-        continue
-      }
-      const merged = mergedByPrimaryRowKey.get(row.rowKey)
-      if (merged) {
-        result.push(merged)
-        continue
-      }
-    }
-    result.push(row)
-  }
-  return result
 }
 
 export type BranchGroupSelection = {

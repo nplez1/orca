@@ -3,9 +3,13 @@ import type { Repo } from '../../../../../../shared/repository/repo-types'
 import type { Worktree } from '../../../../../../shared/worktree/types'
 import { LOCAL_EXECUTION_HOST_ID } from '../../../../../../shared/execution-host/execution-host'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host/execution-host'
-import { mergeSameBranchRows, resolveBranchGroupSelection } from './branch-groups'
+import { resolveBranchGroupSelection } from './branch-groups'
+import { mergeSameBranchRows } from './same-branch-row-merge'
 import { buildProjectGroupingIndex } from '../../../../../../shared/sidebar-list/sections/project-section-grouping'
-import { PINNED_GROUP_KEY } from '../../../../../../shared/sidebar-list/sections/group-keys'
+import {
+  PINNED_GROUP_KEY,
+  getWorktreeLineageGroupKey
+} from '../../../../../../shared/sidebar-list/sections/group-keys'
 import type {
   BranchGroupMember,
   Row,
@@ -49,15 +53,137 @@ const hostLabels = new Map([
   ['ssh:gpu-vm', 'GPU VM']
 ])
 
-function merge(rows: readonly Row[]): Row[] {
+function merge(rows: readonly Row[], collapsedGroups?: ReadonlySet<string>): Row[] {
   return mergeSameBranchRows(
     rows,
     projectRepoMap,
     projectIndex,
     LOCAL_EXECUTION_HOST_ID,
-    hostLabels
+    hostLabels,
+    collapsedGroups
   )
 }
+
+const LOCAL_PARENT_GROUP = getWorktreeLineageGroupKey(worktree)
+const REMOTE_PARENT_GROUP = getWorktreeLineageGroupKey(remoteWorktree)
+
+function childRow(parent: Worktree, childId: string): WorktreeRow {
+  return itemRow({
+    worktree: { ...parent, id: childId },
+    rowKey: `project:p1:${childId}`,
+    depth: 1
+  })
+}
+
+function parentRow(
+  parent: Worktree,
+  childIds: readonly string[],
+  overrides: Partial<WorktreeRow> = {}
+): WorktreeRow {
+  return itemRow({
+    worktree: parent,
+    rowKey: `project:p1:${parent.id}`,
+    lineageChildCount: childIds.length,
+    lineageChildWorktreeIds: childIds,
+    ...(childIds.length > 0
+      ? { lineageGroupKey: getWorktreeLineageGroupKey(parent), lineageCollapsed: false }
+      : {}),
+    ...overrides
+  })
+}
+
+describe('mergeSameBranchRows with lineage children', () => {
+  // The M5/Win report: one host's main workspace gained a child and the pair split
+  // into two rows, losing the host selector.
+  const localChild = childRow(worktree, 'wt-1-child')
+  const remoteChildA = childRow(remoteWorktree, 'wt-remote-child-a')
+  const remoteChildB = childRow(remoteWorktree, 'wt-remote-child-b')
+  const localParent = parentRow(worktree, ['wt-1-child'])
+  const remoteParent = parentRow(remoteWorktree, ['wt-remote-child-a', 'wt-remote-child-b'])
+
+  it('stacks the hosts even when one side has children', () => {
+    const result = merge([localParent, localChild, remoteParent, remoteChildA, remoteChildB])
+
+    expect(result).toHaveLength(4)
+    const merged = result[0]
+    expect(merged.type).toBe('item')
+    if (merged.type !== 'item') {
+      return
+    }
+    expect(merged.worktree.id).toBe(worktree.id)
+    expect(merged.branchGroup?.map((member) => member.hostId)).toEqual([
+      LOCAL_EXECUTION_HOST_ID,
+      'ssh:gpu-vm'
+    ])
+    expect(result.slice(1).map((row) => (row.type === 'item' ? row.rowKey : row.type))).toEqual([
+      localChild.rowKey,
+      remoteChildA.rowKey,
+      remoteChildB.rowKey
+    ])
+  })
+
+  it('carries the union of every member child under the merged card', () => {
+    const result = merge([localParent, localChild, remoteParent, remoteChildA, remoteChildB])
+    const merged = result[0]
+    if (merged.type !== 'item') {
+      throw new Error('expected the merged card')
+    }
+
+    expect(merged.lineageChildCount).toBe(3)
+    expect(merged.lineageChildWorktreeIds).toEqual([
+      'wt-1-child',
+      'wt-remote-child-a',
+      'wt-remote-child-b'
+    ])
+    expect(merged.lineageCollapseKeys).toEqual([LOCAL_PARENT_GROUP, REMOTE_PARENT_GROUP])
+    expect(merged.lineageGroupKey).toBe(LOCAL_PARENT_GROUP)
+    expect(merged.lineageCollapsed).toBe(false)
+    expect(merged.hostContextLabel).toBeUndefined()
+  })
+
+  it('moves the other host children up under the merged card', () => {
+    // The remote row sorts first here, so its subtree must travel to the card.
+    const result = merge([remoteParent, remoteChildA, remoteChildB, localParent, localChild])
+
+    expect(result.map((row) => (row.type === 'item' ? row.rowKey : row.type))).toEqual([
+      localParent.rowKey,
+      localChild.rowKey,
+      remoteChildA.rowKey,
+      remoteChildB.rowKey
+    ])
+  })
+
+  it('keeps the union count when the only children sit on the non-primary host', () => {
+    const childlessLocal = parentRow(worktree, [])
+    const result = merge([childlessLocal, remoteParent, remoteChildA, remoteChildB])
+    const merged = result[0]
+    if (merged.type !== 'item') {
+      throw new Error('expected the merged card')
+    }
+
+    expect(result).toHaveLength(3)
+    expect(merged.lineageChildCount).toBe(2)
+    // The childless primary owns no group of its own, so the card borrows the one that has children.
+    expect(merged.lineageGroupKey).toBe(REMOTE_PARENT_GROUP)
+    expect(merged.lineageCollapseKeys).toEqual([REMOTE_PARENT_GROUP])
+  })
+
+  it('folds every member child when the card is collapsed', () => {
+    const rows = [localParent, localChild, remoteParent, remoteChildA, remoteChildB]
+    const result = merge(rows, new Set([LOCAL_PARENT_GROUP]))
+
+    expect(result).toHaveLength(1)
+    const merged = result[0]
+    expect(merged.type === 'item' && merged.lineageCollapsed).toBe(true)
+    expect(merged.type === 'item' && merged.lineageChildCount).toBe(3)
+  })
+
+  it('treats any collapsed member as the whole card folded', () => {
+    const rows = [localParent, localChild, remoteParent, remoteChildA, remoteChildB]
+
+    expect(merge(rows, new Set([REMOTE_PARENT_GROUP]))).toHaveLength(1)
+  })
+})
 
 describe('mergeSameBranchRows', () => {
   it('collapses the same branch on two hosts into one row, local first', () => {
@@ -117,11 +243,8 @@ describe('mergeSameBranchRows', () => {
     expect(merge(rows)).toHaveLength(2)
   })
 
-  it('never merges a lineage parent or child', () => {
-    const rows = [
-      itemRow({ worktree, lineageChildCount: 2 }),
-      itemRow({ worktree: remoteWorktree, depth: 1 })
-    ]
+  it('never merges a lineage child row', () => {
+    const rows = [itemRow({ worktree, depth: 1 }), itemRow({ worktree: remoteWorktree, depth: 1 })]
 
     expect(merge(rows)).toHaveLength(2)
   })

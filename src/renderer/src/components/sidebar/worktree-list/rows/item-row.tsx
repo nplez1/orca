@@ -32,7 +32,7 @@ export type WorktreeItemRowContext = {
   selectedWorktreeIds: ReadonlySet<string>
   selectedWorktrees: readonly Worktree[]
   getActiveSurfaceVariant: (row: WorktreeItemRow) => ActiveSurfaceVariant
-  getLineageToggleHandler: (groupKey: string) => LineageToggleHandler
+  getLineageToggleHandler: (groupKeys: readonly string[]) => LineageToggleHandler
   /** Group by branch cards key their host choice by row key. */
   branchGroupSelection: Readonly<Record<string, ExecutionHostId>>
   onSelectBranchGroupHost: (groupKey: string, hostId: ExecutionHostId) => void
@@ -91,6 +91,9 @@ export function renderWorktreeItemRow(
       worktreeId: ctx.activeWorktreeId,
       hostId: ctx.activeWorkspaceExecutionHostId ?? null
     })
+  // A plain parent folds its own lineage group; a merged card folds every member's.
+  const lineageToggleKeys =
+    itemRow.lineageCollapseKeys ?? (itemRow.lineageGroupKey ? [itemRow.lineageGroupKey] : null)
   return (
     <div
       key={itemRow.rowKey}
@@ -164,7 +167,7 @@ export function renderWorktreeItemRow(
         branchGroupKey={itemRow.branchGroupKey}
         onSelectBranchHost={ctx.onSelectBranchGroupHost}
         onLineageToggle={
-          itemRow.lineageGroupKey ? ctx.getLineageToggleHandler(itemRow.lineageGroupKey) : undefined
+          lineageToggleKeys ? ctx.getLineageToggleHandler(lineageToggleKeys) : undefined
         }
       />
     </div>

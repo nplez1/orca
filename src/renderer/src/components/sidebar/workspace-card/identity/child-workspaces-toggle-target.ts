@@ -59,41 +59,60 @@ function getParentWorktree(
   return getWorktreeLineageAncestors(target, lineageById, worktreeMap)[0]
 }
 
-export function resolveChildWorkspacesToggleGroupKey(
+export function resolveChildWorkspacesToggleGroupKeys(
   state: ChildWorkspacesToggleState,
-  renderedChipKeys: ReadonlySet<string>,
+  renderedChipKeys: ReadonlyMap<string, readonly string[]>,
   doc: HoverDocument = document
-): string | null {
+): readonly string[] | null {
   const target = resolveTargetWorktree(state, doc)
   if (!target || target.isArchived) {
     return null
   }
-  const ownKey = getWorktreeLineageGroupKey(target)
-  if (renderedChipKeys.has(ownKey)) {
-    return ownKey
+  const ownKeys = renderedChipKeys.get(getWorktreeLineageGroupKey(target))
+  if (ownKeys) {
+    return ownKeys
   }
   const parent = getParentWorktree(state, target)
-  const parentKey = parent ? getWorktreeLineageGroupKey(parent) : null
-  return parentKey && renderedChipKeys.has(parentKey) ? parentKey : null
+  const parentKeys = parent ? renderedChipKeys.get(getWorktreeLineageGroupKey(parent)) : undefined
+  return parentKeys ?? null
 }
 
-/** Uses mounted rows so temporary reveal and drag policies match the existing chip. */
-export function getRenderedLineageChipKeys(state: AppState): Set<string> {
+/** Uses mounted rows so temporary reveal and drag policies match the existing chip.
+ * Each rendered workspace maps to the keys its card folds, which is several when a
+ * Group by branch card merged hosts. */
+export function getRenderedLineageChipKeys(
+  state: AppState
+): ReadonlyMap<string, readonly string[]> {
   const publishedTargets = getPublishedVisibleWorktreeShortcutTargets()
   if (publishedTargets !== null) {
-    return new Set(
-      publishedTargets.flatMap((target) => (target.lineageGroupKey ? [target.lineageGroupKey] : []))
-    )
+    const keys = new Map<string, readonly string[]>()
+    for (const target of publishedTargets) {
+      if (target.lineageCollapseKeys) {
+        keys.set(
+          getWorktreeLineageGroupKey({ id: target.id, hostId: target.executionHostId }),
+          target.lineageCollapseKeys
+        )
+      }
+    }
+    return keys
   }
   const visibleWorktrees = computeVisibleWorktrees(
     selectWorktreesByRepo(state),
     [],
     buildVisibleWorktreeOptionsFromState(state, getIndexedRepoMap(state.repos))
   )
-  const keys = new Set<string>()
+  const keys = new Map<string, readonly string[]>()
   for (const row of computeRenderedSidebarRows(state, visibleWorktrees)) {
-    if (row.type === 'item' && row.lineageGroupKey && row.lineageChildCount > 0) {
-      keys.add(row.lineageGroupKey)
+    if (row.type !== 'item' || row.lineageChildCount <= 0) {
+      continue
+    }
+    const collapseKeys =
+      row.lineageCollapseKeys ?? (row.lineageGroupKey ? [row.lineageGroupKey] : [])
+    if (collapseKeys.length === 0) {
+      continue
+    }
+    for (const member of row.branchGroup ?? [{ worktree: row.worktree }]) {
+      keys.set(getWorktreeLineageGroupKey(member.worktree), collapseKeys)
     }
   }
   return keys
