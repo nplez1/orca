@@ -972,8 +972,43 @@ did. OMP and prime-agent are untouched — no emission, no fold.
 
 Tests: `src/main/pi/agent-status-scheduled-work.test.ts` drives the real generated source into the real
 listener, `providers/pi-pane-hold-evidence.test.ts` pins the reader and the fold,
-`server-program-status-hook-yield.test.ts` pins the silence fallback, and
-`agent-hook-listener-pi-compatible.test.ts` pins the restatement.
+`server/testing/providers/pi/server-pi-subagent-hold-precedence.test.ts` pins the silence fallback, and
+`agent-hook-listener-descendant-lifecycle.test.ts` pins the restatement.
+
+**Follow-up, 2026-11-21 — the revamped roster.** pi-config's `/loop` and pi-subagents grew one
+model-facing door (`manage_schedules`) over both homes, with `pause`/`resume`, bounds and `run`, and
+that changed what the two channels answer. Two shapes the lane read wrongly:
+
+- **A paused job is listed and arms nothing.** `/loop` keeps a paused loop's id, prompt and cadence
+  and only unarms it, so `loop:rpc:schedules:list` returns it with `paused: true` and no `nextAt` —
+  the same shape as a self-paced loop waiting for its wakeup, which is why presence was enough
+  before. Presence is now filtered by what each extension knows before a fire: `!paused` and
+  `enabled !== false` on both homes, plus — on the cold home only — `runCount` under an unspent
+  `maxRuns` and an `until` neither passed nor at or before the armed fire. Those bounds are cold-only
+  on purpose: the scheduler moves `runCount` in the same step it disables the job, so a firing cold
+  job is never dropped, while `/loop` moves `runs` when it arms the fire and starts the turn
+  afterwards, so the same test would release a live pane mid-fire. The inventory's no-fire-time case
+  still holds, because a dynamic loop between wakeups genuinely is armed.
+- **`loop:state` is the armed set `/loop` publishes itself, whenever that set changes.** The lane
+  bound only pi-subagents' two events, so a loop armed, paused or re-armed between turns
+  had no post to ride: `/loop` typed at an idle prompt, or a `manage_schedules` call that lands after
+  the turn ended, left the pane `done` with the loop armed until the first fire. It is now a third
+  subscribed channel, and it also covers the session-start order case — a restored loop's emit is
+  caught when Orca's extension loads first, and Orca's own `session_start` ask catches it when the
+  `loop` extension loads first. The set holds only jobs with an armed fire, so a dynamic loop between
+  wakeups is invisible to it — pausing or ending one of those moves nothing, which over-holds rather
+  than releasing early, and the ≤60s re-check is the bound.
+
+The events list carries a third entry rather than replacing one: the two pi-subagents channels still
+announce cold work, and `/loop`'s create/remove request channels are still deliberately not bound
+(binding them reads the inventory before the change lands).
+
+**Known uncovered, on purpose.** `plugins/pi-codex-goal` schedules its own re-entry —
+`provider-limit-auto-resume` five minutes after a provider limit, `continuation-scheduler`
+sub-second after a turn — and emits **nothing** on `pi.events`. During the five-minute wait the pane
+reads `done` while the session will resume itself. Covering it needs that extension to publish the
+pending continuation first (a `goals:state`-style channel naming the resume instant); it is not the
+job/loop surface, so the lane is left as it is until that signal exists.
 
 ### `local(skills)`: re-track the three agent skills the internal move removed
 

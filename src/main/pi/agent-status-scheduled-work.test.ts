@@ -15,18 +15,31 @@ const LIVE_LIST = 'loop:rpc:schedules:list'
 const COLD_LIST = 'subagents:rpc:schedules:list'
 const SCHEDULED_EVENT = 'subagents:scheduled'
 const SCHEDULER_READY = 'subagents:scheduler_ready'
+const LOOP_STATE = 'loop:state'
 
 /** A live `/loop` job as the loop extension lists it. */
 type LiveJob = {
   id: string
   prompt: string
-  mode: 'fixed' | 'dynamic'
+  mode: 'fixed' | 'dynamic' | 'once'
   nextAt?: number
   runs: number
+  paused?: boolean
+  maxRuns?: number
+  until?: number
 }
 
 /** A cold scheduler job as pi-subagents lists it. */
-type ColdJob = { id: string; schedule: string; prompt: string; enabled: boolean; nextRun?: string }
+type ColdJob = {
+  id: string
+  schedule: string
+  prompt: string
+  enabled: boolean
+  nextRun?: string
+  runCount?: number
+  maxRuns?: number
+  until?: string
+}
 
 type Inventory = { live: LiveJob[]; cold: ColdJob[] }
 
@@ -233,6 +246,151 @@ describe('pi scheduled work holds the pane as monitoring', () => {
     // Why: a paused job will not fire, so it holds nothing.
     expect(harness.posted.at(-1)?.scheduled_work).toBeUndefined()
     expect(harness.accepted.at(-1)?.state).toBe('done')
+  })
+
+  it('holds nothing for a paused live loop, whose id outlives its armed state', async () => {
+    const inventory: Inventory = { live: [], cold: [] }
+    const harness = createHarness({ inventory })
+    await startTurn(harness)
+    // Why: `pause` keeps the id, the prompt and the cadence and only unarms the timer, so a paused loop is
+    // still listed with no `nextAt` — the shape a self-paced loop has while it waits for its wakeup.
+    inventory.live.push(liveLoop({ paused: true, nextAt: undefined }))
+
+    await drive(harness, 'agent_end', {})
+
+    expect(harness.posted.at(-1)?.scheduled_work).toBeUndefined()
+    expect(harness.accepted.at(-1)?.state).toBe('done')
+    expect(harness.accepted.at(-1)?.workingMode).toBeUndefined()
+  })
+
+  it('re-checks when the loop extension publishes its armed set between turns', async () => {
+    const inventory: Inventory = { live: [], cold: [] }
+    const harness = createHarness({ inventory })
+    await startTurn(harness)
+    await drive(harness, 'agent_end', {})
+    expect(harness.accepted.at(-1)?.state).toBe('done')
+
+    // Why: a `/loop` typed at an idle prompt, or a `manage_schedules` call that lands after the turn, moves
+    // the inventory with no turn to carry it — `loop:state` is the only thing that announces it.
+    inventory.live.push(liveLoop())
+    harness.emitPiEvent(LOOP_STATE, { jobs: [{ id: 'loop-1', nextAt: Date.now() + 300_000 }] })
+    await flush()
+
+    expect(harness.accepted.at(-1)?.state).toBe('working')
+    expect(harness.accepted.at(-1)?.workingMode).toBe('monitoring')
+
+    // Why both directions: a pause at an idle prompt must release the hold the same way. `/loop` filters
+    // a paused loop out of its own armed set, so the release arrives as an empty one.
+    inventory.live[0].paused = true
+    harness.emitPiEvent(LOOP_STATE, { jobs: [] })
+    await flush()
+
+    expect(harness.accepted.at(-1)?.state).toBe('done')
+    expect(harness.accepted.at(-1)?.workingMode).toBeUndefined()
+  })
+
+  it('keeps holding a live loop whose last fire is already armed and in flight', async () => {
+    const inventory: Inventory = { live: [], cold: [] }
+    const harness = createHarness({ inventory })
+    await startTurn(harness)
+    const now = Date.now()
+    // Why these hold: `/loop` moves `runs` when it arms the fire and starts the turn only after it has
+    // published the new armed set, so a live job at or over its bound is mid-fire, not finished — dropping
+    // it here would read `done` for the gap before `before_agent_start` arrives.
+    inventory.live.push(
+      liveLoop({ id: 'loop-spent', mode: 'once', runs: 1, nextAt: undefined }),
+      liveLoop({ id: 'loop-maxed', runs: 2, maxRuns: 2 }),
+      liveLoop({ id: 'loop-past-until', runs: 1, until: now - 1_000 })
+    )
+
+    await drive(harness, 'agent_end', {})
+
+    expect(harness.posted.at(-1)?.scheduled_work).toEqual({
+      jobs: [
+        { id: 'loop-spent', kind: 'live' },
+        { id: 'loop-maxed', kind: 'live', next_in_ms: 300_000 },
+        { id: 'loop-past-until', kind: 'live', next_in_ms: 300_000 }
+      ]
+    })
+    expect(harness.accepted.at(-1)?.workingMode).toBe('monitoring')
+  })
+
+  it('holds nothing for a cold job whose bound was already reached', async () => {
+    const inventory: Inventory = { live: [], cold: [] }
+    const harness = createHarness({ inventory })
+    await startTurn(harness)
+    const now = Date.now()
+    const until = now + 60_000
+    // Why the cold home may drop these: the scheduler moves `runCount` in the same step it disables the
+    // job, so a job at or over its bound (or armed past it) has no fire left and cannot be mid-fire.
+    inventory.cold.push(
+      coldJob({ id: 'job-maxed', runCount: 3, maxRuns: 3 }),
+      coldJob({ id: 'job-expired', until: new Date(now - 1_000).toISOString() }),
+      coldJob({
+        id: 'job-bound-before-fire',
+        until: new Date(until).toISOString(),
+        nextRun: new Date(until + 1_000).toISOString()
+      }),
+      coldJob({
+        id: 'job-fires-before-bound',
+        until: new Date(until).toISOString(),
+        nextRun: new Date(until - 1_000).toISOString()
+      })
+    )
+
+    await drive(harness, 'agent_end', {})
+
+    expect(harness.posted.at(-1)?.scheduled_work).toEqual({
+      jobs: [{ id: 'job-fires-before-bound', kind: 'cold', next_in_ms: 59_000 }]
+    })
+    expect(harness.accepted.at(-1)?.workingMode).toBe('monitoring')
+  })
+
+  it('holds an armed one-shot that has not fired yet', async () => {
+    const inventory: Inventory = { live: [], cold: [] }
+    const harness = createHarness({ inventory })
+    await startTurn(harness)
+    inventory.live.push(
+      liveLoop({ id: 'loop-once', mode: 'once', runs: 0, nextAt: Date.now() + 600_000 })
+    )
+
+    await drive(harness, 'agent_end', {})
+
+    expect(harness.posted.at(-1)?.scheduled_work).toEqual({
+      jobs: [{ id: 'loop-once', kind: 'live', next_in_ms: 600_000 }]
+    })
+    expect(harness.accepted.at(-1)?.workingMode).toBe('monitoring')
+  })
+
+  it('reads the whole revamped roster: only the jobs that can still fire hold', async () => {
+    const inventory: Inventory = { live: [], cold: [] }
+    const harness = createHarness({ inventory })
+    await startTurn(harness)
+    inventory.live.push(
+      // A `jobView()` from `/loop`: armed, cadence kept.
+      liveLoop({ id: 'loop-armed' }),
+      // Paused by `manage_schedules pause` or `/loop pause`: listed, cadence kept, nothing armed.
+      liveLoop({ id: 'loop-paused', paused: true, nextAt: undefined }),
+      // Self-paced and between wakeups: present with no deadline, which is exactly a paused shape
+      // minus the flag — the flag is the whole difference.
+      liveLoop({ id: 'loop-dynamic', mode: 'dynamic', nextAt: undefined, paused: false })
+    )
+    inventory.cold.push(
+      coldJob({ id: 'job-enabled' }),
+      // The scheduler's word for paused, and what a job disabled by `maxRuns`/`until` looks like.
+      coldJob({ id: 'job-disabled', enabled: false, nextRun: undefined })
+    )
+
+    await drive(harness, 'agent_end', {})
+
+    expect(harness.posted.at(-1)?.scheduled_work).toEqual({
+      jobs: [
+        { id: 'loop-armed', kind: 'live', next_in_ms: 300_000 },
+        { id: 'loop-dynamic', kind: 'live' },
+        { id: 'job-enabled', kind: 'cold', next_in_ms: 3_600_000 }
+      ]
+    })
+    expect(harness.accepted.at(-1)?.workingMode).toBe('monitoring')
   })
 
   it('settles to done once the last job is stopped, off the poll that no event announces', async () => {
