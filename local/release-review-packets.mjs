@@ -28,19 +28,25 @@ import { join, resolve } from 'node:path'
 import { REVIEWER } from './pr-body-claims.mjs'
 import { manifestPath, reviewNeutralOnly, validateManifest } from './release-review-gate.mjs'
 import { loadCoverageContext } from './review-packets/exclusions.mjs'
+import { prepareAdjudication } from './review-packets/adjudicate.mjs'
+import { prepareSweep, readSweepReport, recordSweep, sweepDirOf } from './review-packets/sweep.mjs'
 import { buildManifest, openFindings, reviewState } from './review-packets/manifest.mjs'
 import {
   DEFAULT_BUDGET_KB,
   git,
   headSyncMerge,
+  loadPacket,
   prepareDelta,
   prepareSync,
   syncPacketDir
 } from './review-packets/packet.mjs'
 import { runSlices } from './review-packets/run.mjs'
+import { readReport } from './review-packets/verdict.mjs'
 
 const repoRoot = git(join(import.meta.dirname, '..'), ['rev-parse', '--show-toplevel']).trim()
-const MODES = ['prepare', 'run', 'status', 'print', 'write']
+const MODES = ['prepare', 'run', 'status', 'print', 'write', 'record-sweep']
+/** Modes that are flags rather than a mode: `--prepare --sweep`. */
+const FLAGS = ['sweep', 'adjudicate']
 const VALUED = [
   'merge',
   'budget-kb',
@@ -51,11 +57,21 @@ const VALUED = [
   'max-budget-usd',
   'max-estimate-usd',
   'timeout-min',
-  'packet'
+  'packet',
+  'sweep-kb',
+  'answers',
+  'reviewer'
 ]
 /** Why validated: `--timeout-min x` becomes `setTimeout(NaN)`, which fires at once and kills every
  * slice, and `--concurrency x` starts no worker at all — both after paying for the packet. */
-const NUMERIC = ['budget-kb', 'concurrency', 'max-budget-usd', 'max-estimate-usd', 'timeout-min']
+const NUMERIC = [
+  'budget-kb',
+  'concurrency',
+  'max-budget-usd',
+  'max-estimate-usd',
+  'timeout-min',
+  'sweep-kb'
+]
 
 const short = (sha) => String(sha).slice(0, 12)
 
@@ -63,7 +79,9 @@ export function parseArgs(argv) {
   const options = { mode: null }
   for (let i = 0; i < argv.length; i += 1) {
     const name = argv[i].replace(/^--/, '')
-    if (MODES.includes(name)) {
+    if (FLAGS.includes(name)) {
+      options[name] = true
+    } else if (MODES.includes(name)) {
       if (options.mode) {
         throw new Error(`pick one of --${MODES.join(', --')}`)
       }
@@ -78,6 +96,10 @@ export function parseArgs(argv) {
         throw new Error('--timeout-min is capped at 1440 (one day)')
       }
       i += 1
+    } else if (options.mode === 'record-sweep' && !argv[i].startsWith('--') && !options.answers) {
+      // Why positional: `--record-sweep <answers.json>` reads as one command, and the file is the mode's
+      // whole argument.
+      options.answers = argv[i]
     } else {
       throw new Error(`unknown argument: ${argv[i]}`)
     }
@@ -166,6 +188,55 @@ function reportEstimate(slices, maxUsd) {
 function prepare(options) {
   const context = loadCoverageContext(repoRoot)
   const budgetBytes = Math.round(Number(options['budget-kb'] ?? DEFAULT_BUDGET_KB) * 1024)
+  const merge = options.merge ?? headSyncMerge(repoRoot)
+  if (options.sweep) {
+    if (!merge) {
+      throw new Error('HEAD has no merge on its first-parent line; pass --merge <sha>')
+    }
+    const { dir, packet } = prepareSweep({
+      root: repoRoot,
+      syncDir: syncDirFor(options),
+      merge,
+      budgetBytes: options['sweep-kb'] ? Number(options['sweep-kb']) * 1024 : null,
+      context
+    })
+    console.log(`sweep: ${dir}`)
+    console.log(
+      `  ${packet.slices.length} slice(s) over ${packet.reviewed.bytes} bytes in ${packet.reviewed.files} files, ${Math.round(packet.budgetBytes / 1024)} KB a slice`
+    )
+    // Why a different estimate: the sweep never reaches the reviewer, so the reviewer's cost model does
+    // not apply to it. Measured on 2026-11-21: $0.012 a fine slice on the cheap tier.
+    console.log(
+      `  estimate: ~$${(packet.slices.length * 0.02).toFixed(0)} on the cheap tier (measured $0.048 for 4 fine slices); fan the prompts out, then --record-sweep <answers.json>`
+    )
+    return 0
+  }
+  if (options.adjudicate) {
+    const state = reviewState(syncDirFor(options))
+    const findings = options.findings
+      ? readFindings(options.findings)
+      : [
+          ...state.sweepFindings.map((finding) => ({
+            id: finding.id,
+            severity: finding.severity,
+            file: finding.file,
+            summary: finding.summary,
+            why: finding.why
+          })),
+          ...openFindings(state).filter((finding) => !String(finding.id).startsWith('S-'))
+        ]
+    const { dir, packet } = prepareAdjudication({
+      root: repoRoot,
+      syncDir: syncDirFor(options),
+      merge: state.rounds[0].packet.merge,
+      findings
+    })
+    console.log(`adjudication: ${dir}`)
+    console.log(
+      `  ${packet.slices.length} packet(s), ${findings.length} finding(s) to judge, ${packet.slices.reduce((total, slice) => total + slice.files, 0)} file(s) of resolution hunks`
+    )
+    return reportEstimate(packet.slices, options['max-estimate-usd'])
+  }
   if (options.delta) {
     const parentDir = syncDirFor(options)
     const findings = options.findings
@@ -185,7 +256,6 @@ function prepare(options) {
     )
     return reportEstimate(packet.slices, options['max-estimate-usd'])
   }
-  const merge = options.merge ?? headSyncMerge(repoRoot)
   if (!merge) {
     throw new Error('HEAD has no merge on its first-parent line; pass --merge <sha>')
   }
@@ -214,6 +284,35 @@ function prepare(options) {
     )
   }
   return reportEstimate(packet.slices, options['max-estimate-usd'])
+}
+
+/** One packet's slices, by the reader that packet's tier uses. */
+function statusPacket(dir, packet) {
+  const read = packet.kind === 'sweep' ? readSweepReport : derivedReadReport(packet)
+  let missing = 0
+  for (const slice of packet.slices) {
+    const report = read(dir, slice.id)
+    if (report.status !== 'reported') {
+      missing += 1
+    }
+    const counts = report.counts
+      ? ` ${report.counts.blockers}B/${report.counts.shouldFix}S/${report.counts.minors}M/${report.counts.nits}N`
+      : ''
+    console.log(
+      `  ${slice.id}: ${report.status}${counts}${report.problem ? ` — ${report.problem}` : ''}${report.warning ? ` (${report.warning})` : ''}`
+    )
+  }
+  return missing ? 1 : 0
+}
+
+function derivedReadReport(packet) {
+  return (dir, id) => {
+    const slice = packet.slices.find((candidate) => candidate.id === id)
+    if (!slice) {
+      return { status: 'not-run', problem: `no slice ${id} in this packet` }
+    }
+    return readReport(dir, id)
+  }
 }
 
 function status(state) {
@@ -276,10 +375,24 @@ function runProblems(packet) {
   return problems
 }
 
+/**
+ * Why a packet can be run directly: the adjudication round is a packet of its own kind, prepared from
+ * the sweep's findings rather than from a diff range, so `--run --packet <…/adjudicate-<merge>>` drives
+ * it through the same runner, the same tools and the same verdict contract as a diff round.
+ */
 async function run(options) {
   const syncDir = syncDirFor(options)
-  const state = reviewState(syncDir)
-  const blocked = runProblems(state.rounds.at(-1).packet)
+  const packetKind = loadPacket(syncDir).kind
+  if (packetKind === 'sweep') {
+    console.error(
+      'release-review: the sweep is driven by the orchestrating agent on the cheap tier, not by this runner'
+    )
+    console.error('  fan the prompt files out, then record the answers with --record-sweep <file>')
+    return 2
+  }
+  const state = packetKind === 'sync' ? reviewState(syncDir) : null
+  const packet = state ? state.rounds.at(-1).packet : loadPacket(syncDir)
+  const blocked = runProblems(packet)
   if (blocked.length) {
     for (const problem of blocked) {
       console.error(`release-review: refusing to run — ${problem}`)
@@ -287,9 +400,9 @@ async function run(options) {
     return 1
   }
   const only = options.slices ? new Set(options.slices.split(',')) : null
-  const jobs = state.slices
-    .filter((entry) => !only || only.has(entry.slice.id))
-    .map((entry) => ({ id: entry.slice.id, dir: entry.dir, addDirs: [entry.dir] }))
+  const jobs = packet.slices
+    .filter((slice) => !only || only.has(slice.id))
+    .map((slice) => ({ id: slice.id, dir: syncDir, addDirs: [syncDir] }))
   console.error(`release-review: ${jobs.length} slice(s) in ${syncDir}`)
   await runSlices({
     jobs,
@@ -299,7 +412,7 @@ async function run(options) {
     timeoutMs: Number(options['timeout-min'] ?? 90) * 60_000,
     maxBudgetUsd: options['max-budget-usd'] ? Number(options['max-budget-usd']) : null
   })
-  return status(reviewState(syncDir))
+  return state ? status(reviewState(syncDir)) : statusPacket(syncDir, packet)
 }
 
 /**
@@ -310,6 +423,38 @@ async function run(options) {
  * The gate's `reviewedRevision` then accepts only review-neutral commits after the revision named
  * here, which is the same rule the hand-written manifests were held to.
  */
+/**
+ * Folds the cheap tier's answers into the sweep packet. The file is `[{ "id": "A", "answer": "<the
+ * reply, verdict block included>" }]`, and the block is re-parsed by the same validator the CLI path
+ * uses, so a malformed reply is recorded as `no-report` and the gate refuses it by name.
+ */
+function recordSweepMode(options) {
+  if (!options.answers) {
+    throw new Error('--record-sweep takes the answers file: --record-sweep <answers.json>')
+  }
+  const dir = sweepDirOf(syncDirFor(options))
+  const packet = loadPacket(dir)
+  const parsed = JSON.parse(readFileSync(options.answers, 'utf8'))
+  const answers = Array.isArray(parsed) ? parsed : (parsed.answers ?? [])
+  const { recorded, problems } = recordSweep({
+    dir,
+    packet,
+    answers,
+    reviewer: options.reviewer ?? 'cheap-tier'
+  })
+  for (const problem of problems) {
+    console.error(`  ${problem}`)
+  }
+  const owed = packet.slices.map((slice) => slice.id).filter((id) => !recorded.includes(id))
+  console.log(`recorded ${recorded.length}/${packet.slices.length} sweep slice(s) in ${dir}`)
+  if (owed.length) {
+    console.log(
+      `  ${owed.length} slice(s) still owe an answer, first ${owed.slice(0, 8).join(', ')}${owed.length > 8 ? ', …' : ''}`
+    )
+  }
+  return owed.length ? 1 : 0
+}
+
 export function reviewCoverage(state) {
   let end = state.rounds[0].packet.merge
   const gaps = []
@@ -390,7 +535,12 @@ async function main(argv) {
       return await run(options)
     }
     if (options.mode === 'status') {
-      return status(reviewState(syncDirFor(options)))
+      const dir = syncDirFor(options)
+      const packet = loadPacket(dir)
+      return packet.kind === 'sync' ? status(reviewState(dir)) : statusPacket(dir, packet)
+    }
+    if (options.mode === 'record-sweep') {
+      return recordSweepMode(options)
     }
     if (options.mode === 'write') {
       return print(options, true)

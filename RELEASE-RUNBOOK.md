@@ -178,16 +178,41 @@ diff cut into six equal line ranges, a hand-written prompt, six `claude -p … &
 first time because the sandbox refused `/tmp` and `git show --remerge-diff`, two hand-written delta prompts,
 and a manifest assembled by hand. 62% of that diff was generated or mechanical content.
 
+The review runs in **two tiers**: a fine sweep that FINDS on the cheap tier, and REVIEWER's adjudication that
+JUDGES every finding it raised. Measured on 2026-11-21 against the 2026-11-20 sync: the sweep is 153 slices
+of ~24 KB for a few dollars, the adjudication is one packet per 12 findings for ~$2.50, and the pair beats
+the 435-slice Opus review that cost $351.65 — nine consolidated Opus slices alone found 3 of the 10 blocking
+defects, and the cheap tier at fine granularity found 4 of 4 of the ones they dropped.
+
 ```bash
-node local/release-review-packets.mjs --prepare              # HEAD's sync: diff, filter, slice, prompts
-node local/release-review-packets.mjs --run                  # every slice with no report yet, in parallel
-node local/release-review-packets.mjs --status               # per slice: reported / no-report / not-run
+node local/release-review-packets.mjs --prepare              # the reviewer round's packet: diff, filter, slice
+node local/release-review-packets.mjs --prepare --sweep      # the fine sweep packet (24 KB a slice)
+#   fan the sweep's prompt-<id>.txt out to cheap-tier subagents, then record their replies:
+node local/release-review-packets.mjs --record-sweep ~/answers.json
+node local/release-review-packets.mjs --prepare --adjudicate # REVIEWER judges every sweep finding
+node local/release-review-packets.mjs --run --packet "<git dir>/orca-review/sync-<merge>/adjudicate"
 # fix the blocking findings, commit, then re-check the fix as a delta round:
 node local/release-review-packets.mjs --prepare --delta <R1>..<R2>   # findings default to the open ones
 node local/release-review-packets.mjs --run                  # runs only the new delta slice
 node local/release-review-packets.mjs --write                # records the manifest for the revision it covers
 node local/release-review-gate.mjs                           # still the authority
 ```
+
+- **`--prepare --sweep`** cuts the same reviewed diff at `--sweep-kb` (default 24) into
+  `<sync packet>/sweep/`. The slices are small because that is where the defects are: a 380 KB slice reads
+  past a dropped `clearPendingClone` that a 5 KB one catches. Sweep the whole diff, not a subset — a fine
+  slice costs $0.012 on the cheap tier.
+- **`--record-sweep ~/answers.json`** takes `[{ "id": "A", "answer": "<the reply, verdict block included>" }]`
+  and writes one record per slice. The verdict block is re-parsed by the same validator the CLI path uses, so
+  a malformed reply is recorded as `no-report` and the gate refuses it by name. An id the packet never
+  planned, or a second answer for the same slice, is refused rather than written.
+- **`--prepare --adjudicate`** builds one packet per 12 findings: the findings, plus the resolution hunks of
+  the files they name. REVIEWER answers, for every finding, real-or-not, at what severity, with the fix —
+  and then is asked what the sweep missed in those files. One packet of 10 findings cost $2.50 and dismissed
+  one with evidence (it checked the fork tip and found the test had been deleted a sync earlier, so the
+  finding was not real).
+- **The gate refuses** a release whose sweep has a silent slice, whose sweep finding nobody adjudicated, or
+  whose adjudicated BLOCKER/SHOULD-FIX is neither fixed nor dismissed with a reason.
 
 - **`--prepare`** writes `git show --remerge-diff` of HEAD's sync (the newest first-parent merge, or
   `--merge <sha>`) into `<git dir>/orca-review/sync-<merge>/`, never `/tmp`. It leaves out content another gate
@@ -235,13 +260,20 @@ The 2026-11-20 review cost 35% of a week's Claude budget for one reason: a packe
 when the estimate looks wrong, suspect the plan, not the reviewer: a median slice under 8 KB now warns and
 `--max-estimate-usd <n>` refuses.
 
-**Granularity, not just the model, decides what the review finds.** Re-run blind against that merge on
-2026-11-21: the nine consolidated Opus slices ($47.90) found 3 of the 10 blocking findings; the 435
-fine-grained slices ($352) found all 10; the cheap tier on nine consolidated slices ($0.40) found 1, and got
-one of them flatly wrong. The cheap tier at _fine_ granularity found 4 of 4 of the ones consolidation
-dropped, for $0.048 on four slices. So the shape to aim for is fine slices on a cheap tier for breadth, a
-consolidated Opus round for judgment across the whole diff, and Opus on every delta round — roughly $50–60
-for a sync this size instead of $352.
+**Granularity decides what is FOUND; the model decides how it is JUDGED.** Re-run blind against that merge
+on 2026-11-21: the nine consolidated Opus slices ($47.90) found 3 of the 10 blocking findings; the 435
+fine-grained slices ($352) found all 10; the cheap tier on nine consolidated slices ($0.40) found 1, and
+called a real dropped `clearPendingClone` correct and a real mobile merge regression a NIT. The cheap tier at
+_fine_ granularity found 4 of 4 of the ones consolidation dropped, for $0.048 on four slices.
+
+That is why the review is two tiers and not one. A sync this size now costs roughly: **sweep ~$3, round 1
+~$48, adjudication ~$2.50 a packet, deltas ~$1.50 each — about $55–60 against $352**, with better recall than
+the expensive review, and inside one 5-hour window. Round 1 is kept because it and the sweep find different
+things: it reads the whole diff at a scale where only Opus can hold the context, and it raised two
+SHOULD-FIX defects the sweep did not (an await gap opened by making `applyHostSettingsReplication` async, and
+a deleted spec that took the fork's setup-runner state) while the sweep raised two it did not (a fork-only
+runtime name-filter suite and a fork-only updater lifecycle test, both deleted by the resolution). Dropping
+either tier leaves a class of defect with no reader.
 
 ## Step 2 — publish the first signed release
 

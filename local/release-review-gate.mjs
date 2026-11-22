@@ -36,6 +36,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { REVIEWER } from './pr-body-claims.mjs'
+import { BLOCKING, SEVERITIES } from './review-packets/verdict.mjs'
 
 const repoRoot = join(import.meta.dirname, '..')
 const MANIFEST_DIR = 'local/sync/release-review'
@@ -109,6 +110,83 @@ function reviewerProblem(reviewer) {
 }
 
 /**
+ * Why the manifest carries two tiers. On 2026-11-21 the same 3.06 MB sync was reviewed twice: nine
+ * consolidated Opus slices ($47.90) found 3 of the 10 blocking defects, the 435 fine slices ($351.65)
+ * found all 10, and the cheap tier at fine granularity found 4 of 4 of the ones consolidation dropped
+ * for $0.048. Granularity decides what is found; the model decides how it is judged. So a release now
+ * needs BOTH: a fine sweep that finds, and REVIEWER's adjudication of every finding it raised.
+ *
+ * These rules are what make the cheap tier load-bearing rather than advisory — a sweep slice that never
+ * answered fails, a finding nobody judged fails, and a BLOCKER neither fixed nor dismissed fails.
+ */
+function sweepProblems(manifest) {
+  const problems = []
+  const sweep = manifest.sweep
+  if (!sweep || !Array.isArray(sweep.slices) || !sweep.slices.length) {
+    problems.push(
+      'no fine sweep recorded: the sweep is what finds the defects a consolidated slice reads past'
+    )
+    return problems
+  }
+  for (const slice of sweep.slices) {
+    if (slice?.verdict !== REPORTED) {
+      problems.push(
+        `sweep slice ${slice?.id ?? '(unnamed)'} has no verdict (got ${JSON.stringify(slice?.verdict ?? null)})`
+      )
+    }
+  }
+  const adjudication = manifest.adjudication
+  if (!adjudication || !Array.isArray(adjudication.slices) || !adjudication.slices.length) {
+    problems.push(
+      `no adjudication recorded: the sweep's findings were never judged by ${REVIEWER.name}`
+    )
+    return problems
+  }
+  for (const slice of adjudication.slices) {
+    if (slice?.verdict !== REPORTED) {
+      problems.push(
+        `adjudication ${slice?.id ?? '(unnamed)'} has no report (got ${JSON.stringify(slice?.verdict ?? null)})`
+      )
+    }
+  }
+  const judged = new Map()
+  for (const entry of Array.isArray(adjudication.judged) ? adjudication.judged : []) {
+    const id = String(entry?.id ?? '')
+    if (!id) {
+      continue
+    }
+    if (judged.has(id)) {
+      problems.push(`finding ${id} was judged more than once`)
+    }
+    judged.set(id, entry)
+  }
+  for (const slice of sweep.slices) {
+    for (const finding of Array.isArray(slice?.findings) ? slice.findings : []) {
+      const judgement = judged.get(String(finding.id))
+      if (!judgement) {
+        problems.push(`sweep finding ${finding.id} was never adjudicated`)
+        continue
+      }
+      const real = judgement.real !== false
+      if (real && !SEVERITIES.includes(judgement.severity)) {
+        problems.push(
+          `sweep finding ${finding.id} was judged real with severity ${JSON.stringify(judgement.severity ?? null)}`
+        )
+      }
+      if (!real && !String(judgement.why ?? '').trim()) {
+        problems.push(`sweep finding ${finding.id} was dismissed with no reason`)
+      }
+      if (real && BLOCKING.has(judgement.severity) && finding.status === 'open') {
+        problems.push(
+          `sweep finding ${finding.id} is ${judgement.severity} and neither fixed nor dismissed`
+        )
+      }
+    }
+  }
+  return problems
+}
+
+/**
  * Every reason this manifest does not clear the gate. Returned as a list rather than thrown one at a
  * time, because a reader who is told all four problems fixes them in one pass instead of four.
  */
@@ -131,6 +209,7 @@ export function validateManifest(manifest, { revision } = {}) {
   if (!slices.length) {
     problems.push('no slices recorded: a review with no slice list cannot be shown to be complete')
   }
+  problems.push(...sweepProblems(manifest))
   const waived = manifest.waiver && String(manifest.waiver.reason ?? '').trim()
   for (const slice of slices) {
     const id = slice?.id ?? '(unnamed)'
@@ -254,8 +333,10 @@ function main(argv) {
   }
 
   const waived = Boolean(manifest.waiver?.reason)
+  const sweepCount = (manifest.sweep?.slices ?? []).length
+  const judgedCount = (manifest.adjudication?.judged ?? []).length
   console.log(
-    `release-review-gate: PASS — ${reported}/${slices.length} slices reported, ${REVIEWER.name} at ${REVIEWER.thinking}, revision ${reviewed.slice(0, 12)}`
+    `release-review-gate: PASS — ${reported}/${slices.length} slices reported, ${sweepCount} swept, ${judgedCount} finding(s) adjudicated by ${REVIEWER.name} at ${REVIEWER.thinking}, revision ${reviewed.slice(0, 12)}`
   )
   if (found.behind.length) {
     console.log(

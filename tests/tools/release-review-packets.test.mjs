@@ -241,9 +241,21 @@ describe('reports', () => {
 })
 
 describe('manifest', () => {
-  function packets() {
+  const slice = (id) => ({ id, scope: `src/${id}`, files: 1, bytes: 10 })
+  const record = (dir, id, answer, reviewer = 'cheap-tier') =>
+    writeFileSync(
+      join(dir, `sweep-${id}.json`),
+      JSON.stringify({ slice: id, reviewer, answer, costUsd: 0.01 })
+    )
+  const answer = (verdict) => verdictAnswer(verdict)
+
+  /**
+   * The two tiers the gate now requires: a fine sweep that finds, and an adjudication that judges every
+   * finding it raised. `judged` overrides what the adjudication said about `S-A-1`, so a test can hold a
+   * finding open, dismiss it, or confirm it.
+   */
+  function packets({ judged } = {}) {
     const sync = scratch()
-    const slice = (id) => ({ id, scope: `src/${id}`, files: 1, bytes: 10 })
     writeFileSync(
       join(sync, 'packet.json'),
       JSON.stringify({
@@ -261,21 +273,62 @@ describe('manifest', () => {
     const blocking = { severity: 'SHOULD-FIX', file: 'src/A/x.ts', summary: 'dropped a side' }
     writeRun(sync, 'A', { result: success({ findings: [blocking] }, 2) })
     writeRun(sync, 'B', { result: success({ findings: [] }, 3) })
+
+    const sweep = join(sync, 'sweep')
+    mkdirSync(sweep)
+    writeFileSync(
+      join(sweep, 'packet.json'),
+      JSON.stringify({
+        kind: 'sweep',
+        merge: 'm'.repeat(40),
+        reviewer: { name: 'deepseek-flash', model: 'deepseek/deepseek-flash-auto' },
+        budgetBytes: 4096,
+        slices: [slice('A'), slice('B')]
+      })
+    )
+    record(sweep, 'A', answer({ findings: [{ ...blocking, why: 'the fork side is gone' }] }))
+    record(sweep, 'B', answer({ findings: [] }))
+
+    const adjudicate = join(sync, 'adjudicate')
+    mkdirSync(adjudicate)
+    writeFileSync(
+      join(adjudicate, 'packet.json'),
+      JSON.stringify({
+        kind: 'adjudicate',
+        merge: 'm'.repeat(40),
+        reviewer: REVIEWER,
+        findings: ['S-A-1'],
+        slices: [{ id: 'adj-1', scope: 'adjudication 1 of 1', files: 1, bytes: 5 }]
+      })
+    )
+    writeRun(adjudicate, 'adj-1', {
+      result: success({
+        findings: [],
+        judged: judged ?? [
+          {
+            id: 'S-A-1',
+            real: true,
+            severity: 'SHOULD-FIX',
+            why: 'the mobile caller passes the boolean for both slots'
+          }
+        ]
+      })
+    })
     return sync
   }
-  const addDelta = (sync, resolved) => {
+  const addDelta = (sync, resolved, ids = ['A-1']) => {
     const delta = join(sync, 'delta-1-aaaaaaaaaaaa-bbbbbbbbbbbb')
-    mkdirSync(delta)
+    mkdirSync(delta, { recursive: true })
     writeFileSync(
       join(delta, 'packet.json'),
       JSON.stringify({
         kind: 'delta',
-        findings: ['A-1'],
+        findings: ids,
         slices: [{ id: 'delta-1', scope: 'delta a..b', files: 1, bytes: 5 }]
       })
     )
     writeRun(delta, 'delta-1', {
-      result: success({ resolved: [{ id: 'A-1', resolved }], findings: [] }, 1)
+      result: success({ resolved: ids.map((id) => ({ id, resolved })), findings: [] }, 1)
     })
   }
 
@@ -285,17 +338,20 @@ describe('manifest', () => {
     const before = buildManifest(reviewState(sync), { revision })
     expect(before.slices.map((s) => [s.id, s.verdict, s.shouldFix, s.unresolved])).toEqual([
       ['A', 'reported', 1, 1],
-      ['B', 'reported', 0, 0]
+      ['B', 'reported', 0, 0],
+      ['adj-1', 'reported', 0, 0]
     ])
     expect(validateManifest(before, { revision })).toEqual([
+      'sweep finding S-A-1 is SHOULD-FIX and neither fixed nor dismissed',
       'slice A carries 1 unresolved blocking finding(s)'
     ])
 
-    addDelta(sync, true)
+    addDelta(sync, true, ['A-1', 'S-A-1'])
     const after = buildManifest(reviewState(sync), { revision })
     expect(after.slices.map((s) => [s.id, s.unresolved])).toEqual([
       ['A', 0],
       ['B', 0],
+      ['adj-1', 0],
       ['delta-1', 0]
     ])
     expect(after.slices[0].findings[0].status).toBe('resolved (delta-1)')

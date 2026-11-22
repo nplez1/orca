@@ -129,7 +129,14 @@ const writePatch = (dir, name, entries) => {
 }
 
 /** Round 1: the remerge diff of a sync merge, sliced, with a prompt per slice. */
-export function prepareSync({ root, merge, budgetBytes, context, dir: into = null }) {
+export function prepareSync({
+  root,
+  merge,
+  budgetBytes,
+  context,
+  kind = 'sync',
+  dir: into = null
+}) {
   const sha = full(root, merge)
   const parents = git(root, ['rev-list', '--parents', '-n', '1', sha]).trim().split(' ').slice(1)
   if (parents.length < 2) {
@@ -179,7 +186,7 @@ export function prepareSync({ root, merge, budgetBytes, context, dir: into = nul
     writeFileSync(outputPaths(dir, slice.id).prompt, prompt)
   }
   const packet = {
-    kind: 'sync',
+    kind,
     merge: sha,
     base: parents[0],
     upstream: parents[1],

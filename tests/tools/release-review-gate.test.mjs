@@ -4,10 +4,28 @@ import { validateManifest, reviewNeutralOnly } from '../../local/release-review-
 
 const REVISION = '0e24285da2b3fa18b4abc7ae84dbb959f399cb97'
 
+/**
+ * The two tiers a release now needs, in their smallest passing shape: one swept slice that raised nothing
+ * and one adjudication packet that judged nothing. `release-review-tiers.test.mjs` pins the rules that
+ * make an unanswered sweep or an unjudged finding refuse.
+ */
+const clearedTiers = () => ({
+  sweep: {
+    reviewer: { name: 'cheap-tier' },
+    slices: [{ id: 'S', verdict: 'reported', findings: [] }]
+  },
+  adjudication: {
+    reviewer: { ...REVIEWER },
+    slices: [{ id: 'adj-1', verdict: 'reported' }],
+    judged: []
+  }
+})
+
 const manifest = (slices, extra = {}) => ({
   revision: REVISION,
   reviewer: { ...REVIEWER },
   slices,
+  ...clearedTiers(),
   waiver: null,
   ...extra
 })
