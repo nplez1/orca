@@ -4963,9 +4963,9 @@ step. Intermittent: neighbouring pushes were green in 4–17 minutes.
 Three properties of the gate turned one hung child into that. `runStep` used
 `spawnSync(..., { timeout })`, whose timeout kills the **direct child** — but a `pnpm run` step runs the
 real linter one level down, and a grandchild that inherits the output pipe keeps it open, so the wait
-outlives the kill. The gate printed a step **only after it finished**, so the log could not name the one
-that never did. And `spawnSync` blocks the event loop, so even a line printed before the spawn sat
-queued and unflushed for exactly as long as the hang lasted. `DEFAULT_TIMEOUT_MS` was 30 minutes, close
+outlives the kill. And the gate printed a step **only after it finished**, so the log could not name the
+one that never did at all — a line printed before the spawn would only have helped where a pipe write is
+queued rather than synchronous, and nothing printed one. `DEFAULT_TIMEOUT_MS` was 30 minutes, close
 enough to the job's 50 that one step could take the whole job.
 
 **What changed** — `local/gate-lint.mjs`, fork-owned, so no sync can revert it:
@@ -4976,10 +4976,15 @@ enough to the job's 50 that one step could take the whole job.
   `{ id, command, exitCode, signal, output, tail, timedOut, seconds }`, so a hang is a result the verdict
   can name. A second deadline (`KILL_GRACE_MS`, 5 s) settles the step even if a grandchild left the group
   via `setsid` and would otherwise hold the pipe forever — the gate must not be able to wait on a stream
-  at all.
-- **The step is named before it runs.** `runSteps` awaits a flushed `running [i/N] <id> — <command>`
-  line before each spawn (a promise-wrapped `stream.write`, not `console.log`, which to a pipe is only
-  queued), keeps the completion line, and on a timeout prints
+  at all. A step that _exits_ while a leftover child holds its pipe is drained for `DRAIN_GRACE_MS` (5 s)
+  from its exit, then settled with **its own** exit code: a step that answered is not a hang, and two of
+  them must not eat the workflow's step bound without a verdict. Output is kept per stream and joined
+  stdout-then-stderr, as `spawnSync` gave it — a chunk boundary that falls mid-line must not splice a
+  `::error::` line into something no parser here reads. `detached` removes the step from the gate's
+  process group, so `SIGINT`/`SIGTERM`/`SIGHUP` are forwarded to the tree before the gate exits.
+- **The step is named before it runs.** `runSteps` awaits a `running [i/N] <id> — <command>` line before
+  each spawn (a promise-wrapped `stream.write`, so the line is ordered ahead of the step's own output
+  where a pipe write is queued), keeps the completion line, and on a timeout prints
   `::error::lint step <id> timed out after <n>s (--timeout-ms <ms>) …` followed by the last 8 output
   lines, so both the CI log and the annotation name the step and quote what it printed.
 - **The gate is bounded.** `DEFAULT_TIMEOUT_MS` 30 → 10 minutes, `--timeout-ms` still overrides. A
@@ -4992,9 +4997,10 @@ enough to the job's 50 that one step could take the whole job.
   line, exit 1, and that the **grandchild pid is gone** (`kill(pid, 0)` → `ESRCH`) rather than merely
   that a kill was called.
 - **`fork-main-gates.yml` gains `timeout-minutes: 20` on `Lint ratchet verdict`.** The group kill is the
-  fix; the step timeout is the backstop, sized at twice the per-step bound so one hung step fails the
-  step, named, in 20 minutes instead of consuming the 50-minute job. The job timeout stays the outer
-  bound for the `pnpm tc` step above it.
+  fix; the step timeout is the backstop. Measured at the fix: the whole 54-step gate takes **92 s** on
+  this 18-core host, so 20 minutes is a runner's normal run plus the 10-minute per-step bound plus
+  margin — one hung step fails the step, named, in 20 minutes instead of consuming the 50-minute job.
+  The job timeout stays the outer bound for the `pnpm tc` step above it.
 
 **Anchors:** `runStep`/`runSteps`/`killTree`/`finalize` in `local/gate-lint.mjs`; the
 `timeout-minutes: 20` line and its `(#446)` comment on the last step of

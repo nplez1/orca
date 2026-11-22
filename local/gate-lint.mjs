@@ -39,15 +39,20 @@ const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000
 // Why a deadline past the kill: SIGKILL on the group is enough unless a grandchild left it, in which
 // case the pipe stays open and `close` never fires — the hang this gate exists to fix.
 const KILL_GRACE_MS = 5 * 1000
+// Why after `exit` and not at the deadline: a step that finished in 20 s must not hold the gate for
+// ten minutes because a child it left kept the pipe open.
+const DRAIN_GRACE_MS = 5 * 1000
 const MAX_OUTPUT_BYTES = 256 * 1024 * 1024
 const TAIL_LINES = 8
+/** `setTimeout` overflows above this, firing at 1 ms instead of the requested deadline. */
+const MAX_TIMEOUT_MS = 2147483647
 
 /**
  * A line the CI log has to have *before* the next step starts.
  *
- * Why a promise and not `console.log`: to a pipe a log line is queued, and the write that names a step
- * is only worth having if it lands while that step runs. `spawnSync` blocked the loop that would have
- * drained it, which is why a hung step left no name behind (#446).
+ * Why awaited: the gate used to print a step only after it finished, so a step that never finished left
+ * no name behind (#446). Awaiting the write is also what orders the line ahead of the step's own output
+ * where a pipe write is queued rather than synchronous.
  */
 function writer(stream) {
   return (line) =>
@@ -105,6 +110,10 @@ function parseArgs(argv) {
   }
   if (!Number.isSafeInteger(options.timeoutMs) || options.timeoutMs <= 0) {
     console.error('--timeout-ms must be a positive integer')
+    process.exit(2)
+  }
+  if (options.timeoutMs > MAX_TIMEOUT_MS) {
+    console.error(`--timeout-ms must not exceed ${MAX_TIMEOUT_MS}`)
     process.exit(2)
   }
   return options
@@ -482,7 +491,13 @@ function killTree(child, signal = 'SIGKILL') {
 export function runStep(step, timeoutMs, { cwd = ROOT } = {}) {
   return new Promise((resolve) => {
     const startedAt = process.hrtime.bigint()
-    const chunks = []
+    // Why one list per stream plus one in arrival order: a chunk boundary can fall mid-line, so a
+    // failure line spliced with the other stream's bytes is a line no parser here would read — and a
+    // real red would then pass. `spawnSync` gave stdout then stderr and never split a line; the
+    // arrival order is kept only for the tail quoted on a timeout.
+    const stdoutChunks = []
+    const stderrChunks = []
+    const orderedChunks = []
     let buffered = 0
     let truncated = false
     let timedOut = false
@@ -490,6 +505,7 @@ export function runStep(step, timeoutMs, { cwd = ROOT } = {}) {
     let settled = false
     let timer = null
     let graceTimer = null
+    let drainTimer = null
     let exited = null
     const [program, ...args] = step.argv
     const settleAs = (output) =>
@@ -520,29 +536,59 @@ export function runStep(step, timeoutMs, { cwd = ROOT } = {}) {
       return
     }
 
-    const collect = (chunk) => {
+    const collect = (sink) => (chunk) => {
       const room = Math.max(0, MAX_OUTPUT_BYTES - buffered)
       truncated ||= chunk.length > room
       if (room > 0) {
         const kept = chunk.subarray(0, room)
-        chunks.push(kept)
+        sink.push(kept)
+        orderedChunks.push(kept)
         buffered += kept.length
       }
     }
-    child.stdout.on('data', collect)
-    child.stderr.on('data', collect)
+    child.stdout.on('data', collect(stdoutChunks))
+    child.stderr.on('data', collect(stderrChunks))
+
+    // Why forwarded: `detached` takes the step out of the terminal's foreground group, so without this
+    // a Ctrl-C would leave the step running after the gate had gone.
+    const interrupts = [
+      ['SIGINT', 130],
+      ['SIGTERM', 143],
+      ['SIGHUP', 129]
+    ].map(([signal, code]) => ({
+      signal,
+      handler: () => {
+        killTree(child)
+        process.exit(code)
+      }
+    }))
+    for (const { signal, handler } of interrupts) {
+      process.once(signal, handler)
+    }
+
+    const stop = () => {
+      clearTimeout(timer)
+      clearTimeout(graceTimer)
+      clearTimeout(drainTimer)
+      for (const { signal, handler } of interrupts) {
+        process.off(signal, handler)
+      }
+      child.stdout?.destroy()
+      child.stderr?.destroy()
+      // Why: the gate has already reported this step, so a child that outlived the kill must not keep
+      // the process alive and turn a verdict into another wait.
+      child.unref()
+    }
 
     const settle = (code, signal) => {
       if (settled) {
         return
       }
       settled = true
-      clearTimeout(timer)
-      clearTimeout(graceTimer)
-      process.off('SIGINT', interrupt)
-      process.off('SIGTERM', terminate)
-      const text = Buffer.concat(chunks).toString('utf8')
-      const output = `${text}${truncated ? `\n[gate: output truncated at ${MAX_OUTPUT_BYTES} bytes]` : ''}${spawnError ? `\n${spawnError.message}` : ''}`
+      stop()
+      const stdoutText = Buffer.concat(stdoutChunks).toString('utf8')
+      const stderrText = Buffer.concat(stderrChunks).toString('utf8')
+      const banner = `${truncated ? `\n[gate: output truncated at ${MAX_OUTPUT_BYTES} bytes]` : ''}${spawnError ? `\n${spawnError.message}` : ''}`
       resolve({
         id: step.id,
         command: step.command,
@@ -550,48 +596,35 @@ export function runStep(step, timeoutMs, { cwd = ROOT } = {}) {
         // `timedOut` is what says why.
         exitCode: timedOut ? 1 : (code ?? 1),
         signal: signal ?? null,
-        output,
-        tail: tailLines(output),
+        output: `${stdoutText}${stderrText}${banner}`,
+        tail: tailLines(`${Buffer.concat(orderedChunks).toString('utf8')}${banner}`),
         timedOut,
         seconds: Number(process.hrtime.bigint() - startedAt) / 1e9
       })
     }
 
-    // Why forwarded: `detached` takes the step out of the terminal's foreground group, so without this
-    // a Ctrl-C would leave the step running after the gate had gone.
-    const interrupt = () => {
-      killTree(child)
-      process.exit(130)
-    }
-    const terminate = () => {
-      killTree(child)
-      process.exit(143)
-    }
-    process.once('SIGINT', interrupt)
-    process.once('SIGTERM', terminate)
-
     child.once('exit', (code, signal) => {
       exited = { code, signal }
+      // Why on exit rather than at the deadline: the step is done, and only a child it left behind can
+      // still be holding the pipe. Waiting the full deadline for it would stall the gate for minutes
+      // on a step that already answered.
+      drainTimer = setTimeout(() => {
+        killTree(child)
+        settle(code, signal)
+      }, DRAIN_GRACE_MS)
     })
 
     timer = setTimeout(() => {
-      // Why the exit test: a step that finished while an orphan it left held its pipe is not a hang,
-      // and reporting one would be a red the step did not earn. Only a step still running times out.
+      // Why the exit test: the drain timer normally settles this first, and a step that finished keeps
+      // its own exit code rather than being reported as a hang it did not have.
       if (exited !== null) {
-        // Why still kill: a leftover child holding the log pipe is the same class of orphan (#446).
         killTree(child)
-        child.stdout?.destroy()
-        child.stderr?.destroy()
         settle(exited.code, exited.signal)
         return
       }
       timedOut = true
       killTree(child)
-      graceTimer = setTimeout(() => {
-        child.stdout?.destroy()
-        child.stderr?.destroy()
-        settle(null, null)
-      }, KILL_GRACE_MS)
+      graceTimer = setTimeout(() => settle(null, null), KILL_GRACE_MS)
     }, timeoutMs)
 
     child.once('close', (code, signal) => settle(code, signal))
