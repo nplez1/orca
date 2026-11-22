@@ -20,21 +20,25 @@ describe('Pi RPC launch for bots', () => {
     ])
   })
 
-  it.each([
-    ['read', ['--tools', 'read,grep,find,ls,bash', '--no-mcp']],
-    ['none', ['--no-tools', '--no-mcp']]
-  ] as const)('limits a run to %s tools, resumed sessions included', (tools, args) => {
-    expect(
-      buildPiRpcLaunch({ ...options, tools, sessionFile: '/host/session.jsonl' }).args
-    ).toEqual(['--mode', 'rpc', ...args, '--session', '/host/session.jsonl'])
+  it('refuses a read run that names no gate, so bash cannot be offered ungated', () => {
+    expect(() => buildPiRpcLaunch({ ...options, tools: 'read' })).toThrow(
+      'A limited Pi run needs its read-only gate'
+    )
   })
 
-  it('loads the read-only gate beside a look run', () => {
+  it('limits a reply-only run, resumed sessions included', () => {
+    expect(
+      buildPiRpcLaunch({ ...options, tools: 'none', sessionFile: '/host/session.jsonl' }).args
+    ).toEqual(['--mode', 'rpc', '--no-tools', '--no-mcp', '--session', '/host/session.jsonl'])
+  })
+
+  it('loads the read-only gate beside a look run, resumed sessions included', () => {
     expect(
       buildPiRpcLaunch({
         ...options,
         tools: 'read',
-        readOnlyGate: { extension: '/host/pi-native-chat/orca-look-around-gate.ts' }
+        readOnlyGate: { extension: '/host/pi-native-chat/orca-look-around-gate.ts' },
+        sessionFile: '/host/session.jsonl'
       }).args
     ).toEqual([
       '--mode',
@@ -43,16 +47,23 @@ describe('Pi RPC launch for bots', () => {
       'read,grep,find,ls,bash',
       '--no-mcp',
       '--extension',
-      '/host/pi-native-chat/orca-look-around-gate.ts'
+      '/host/pi-native-chat/orca-look-around-gate.ts',
+      '--session',
+      '/host/session.jsonl'
     ])
   })
 
   it.each([['--tools', 'bash'], ['-t=bash'], ['--exclude-tools', 'edit']])(
     'refuses a tool selection of its own on a limited run: %j',
     (...extraArgs) => {
-      expect(() => buildPiRpcLaunch({ ...options, tools: 'read', extraArgs })).toThrow(
-        'conflicts with a limited tool launch'
-      )
+      expect(() =>
+        buildPiRpcLaunch({
+          ...options,
+          tools: 'read',
+          readOnlyGate: { extension: '/host/gate.ts' },
+          extraArgs
+        })
+      ).toThrow('conflicts with a limited tool launch')
       expect(() =>
         buildPiRpcLaunch({ ...options, tools: 'none', prefixArgs: ['/pi/cli.js', ...extraArgs] })
       ).toThrow('conflicts with a limited tool launch')

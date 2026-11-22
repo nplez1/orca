@@ -75,6 +75,36 @@ const REFUSED_ARGUMENT: Record<string, string> = {
 
 const refusedFor = (path: string): string => `${path} ${REFUSED_ARGUMENT[path.split(' ')[0]]}`
 
+/**
+ * One case per alternative in each program's `REFUSED_ARGUMENTS` rule and in `ghStaysOnGitHub`'s
+ * `-w`/`-Rvalue` bundle, each on a path that is otherwise allowed — so the argument is what refuses it,
+ * not the path lookup. A re-mirror that loses an alternative goes red here.
+ */
+const REFUSED_ARGUMENT_CASES = [
+  ['orca slack find', '--join general'],
+  ['orca slack find', '--download general'],
+  ['orca slack find', '--out general'],
+  ['orca slack find', '--offer general'],
+  ['gh pr view', '--method POST'],
+  ['gh pr view', '--input body.json'],
+  ['gh pr view', '--field title'],
+  ['gh pr view', '--raw-field title'],
+  ['gh pr view', '-XPOST'],
+  ['gh pr view', '-if'],
+  ['gh pr view', '-F'],
+  ['gh pr view', '-w'],
+  ['gh pr view', '-Rother/repo'],
+  ['git log', '-c core.pager=less'],
+  ['git log', '-o /tmp/out'],
+  ['git log', '--output=/tmp/out'],
+  ['git log', '--exec=cat'],
+  ['git log', '--ext-diff'],
+  ['git log', '--textconv'],
+  ['git log', '--upload-pack=cat'],
+  ['git log', '--receive-pack=cat'],
+  ['git log', ':src/main/a.ts']
+] as const
+
 /** Commands that reach a program or a shell feature the policy has no read path for. */
 const REFUSED_COMMANDS = [
   'gh pr merge 12',
@@ -160,6 +190,15 @@ describe('the look-around gate Pi loads', () => {
     expect(lookAroundCommandAllowed(refusedFor(path))).toBe(false)
     expect(await blocks(refusedFor(path))).toBe(true)
   })
+
+  it.each(REFUSED_ARGUMENT_CASES)(
+    '%s refuses %j while the path alone is a read',
+    async (path, argument) => {
+      expect(lookAroundCommandAllowed(path)).toBe(true)
+      expect(lookAroundCommandAllowed(`${path} ${argument}`)).toBe(false)
+      expect(await blocks(`${path} ${argument}`)).toBe(true)
+    }
+  )
 
   it.each(OTHER_READS)('%j is read exactly as the policy reads it', async (command) => {
     expect(lookAroundCommandAllowed(command)).toBe(true)

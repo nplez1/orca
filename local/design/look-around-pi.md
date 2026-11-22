@@ -79,8 +79,8 @@ const PI_READ_TOOLS = ['read', 'grep', 'find', 'ls', 'bash'] as const     // :72
 const PI_LIMITED_TOOLS_MINIMUM_VERSION = '1.0.4'                         // :89
 export function piToolLimit(readOnly, launchVersion): PiToolLimit | null  // :92
 //   'reply-only' → 'none'   ·  'look-around' → 'read'  ·  else null
-...(options.tools === 'read' ? ['--tools', PI_READ_TOOLS.join(','), '--no-mcp'] : [])   // :180
-...(options.readOnlyGate ? ['--extension', options.readOnlyGate.extension] : [])   // :183
+...(options.tools === 'read' ? ['--tools', PI_READ_TOOLS.join(','), '--no-mcp'] : [])   // :182
+...(options.readOnlyGate ? ['--extension', options.readOnlyGate.extension] : [])   // :186
 ...(options.tools === 'none' ? ['--no-tools', '--no-mcp'] : [])
 ```
 
@@ -89,7 +89,9 @@ export function piToolLimit(readOnly, launchVersion): PiToolLimit | null  // :92
   is also what feeds `readOnlySession` (`bot-structured-session-wiring.ts:304`).
 - `PI_TOOL_SELECTION_FLAGS` already refuses any other tool selection on a limited run, "which could widen
   it" — that guard must stay, and must grow if the read set grows.
-- The unit test pins both mappings (`rpc-launch.test.ts:25`: `['read', ['--tools', 'read,grep,find,ls,bash', '--no-mcp', '--extension', <gate>]]`).
+- The unit test pins the mapping without the gate and the gate as its own extension case
+  (`rpc-launch.test.ts:24`, `:42`), and `buildPiRpcLaunch` refuses a `'read'` run that names no gate — so a
+  sync that drops the resolution layer's write cannot ship a look run with ungated bash.
 - **A reply-only run needs nothing more**: `--no-tools --no-mcp` is the whole of tidy-up's requirement,
   so tidy-up could ship on its own before look-around does.
 
@@ -208,7 +210,8 @@ shape is ever worth fixing, it is worth fixing upstream — as a follow-up PR, n
 | ------------------------------------------ | ----------------------------------------------------- | --------------------- |
 | `'pi'` in the gate                         | `src/shared/bots/bot-look-around.ts:9`                | 1 word                |
 | `'bash'` in the read set                   | `src/main/pi/rpc/launch/rpc-launch.ts:72`             | 1 word                |
-| Spread the gate as `--extension`           | `src/main/pi/rpc/launch/rpc-launch.ts:183`            | 1 line + option field |
+| Spread the gate as `--extension`           | `src/main/pi/rpc/launch/rpc-launch.ts:186`            | 1 line + option field |
+| Refuse a `'read'` run that names no gate   | `src/main/pi/rpc/launch/rpc-launch.ts:133`            | 3 lines               |
 | Write it for a look run, beside `botTools` | `src/main/pi/rpc/launch/rpc-launch-resolution.ts:257` | 1 property + import   |
 
 **Fork-owned — all the logic, the extension source and the rationale.**
@@ -246,16 +249,17 @@ No file is drawn from a PR branch's ownership, and no fork-only path is added ou
 
 ## Verification
 
-- Unit: `piToolLimit` maps `'look-around'` → `['--tools','read,grep,find,ls,bash','--no-mcp', gate]` and
-  `'reply-only'` → `['--no-tools','--no-mcp']`; `PI_TOOL_SELECTION_FLAGS` still refuses `--tools` on a
-  limited run.
+- Unit: `piToolLimit` maps `'look-around'` → `'read'` and `'reply-only'` → `'none'`; the launch turns
+  `'read'` into `--tools read,grep,find,ls,bash --no-mcp` plus the gate's `--extension`, refuses a
+  `'read'` run that names no gate, and `PI_TOOL_SELECTION_FLAGS` still refuses `--tools` on a limited run.
 - Unit: every `READ_COMMANDS` path is allowed and loses one refused argument in both copies; the shell
   prefix, `bash -lc` wrappers, repositories and URLs agree; `gh pr merge`, `git push`, shell syntax and an
   unparsable command are blocked; a tool neither layer bounded is blocked; and the policy text is pinned.
 - Recorded against the real CLI (`pi` 1.6.0): with the generated gate loaded and
   `--tools read,grep,find,ls,bash`, `git log --oneline -1` runs and returns its output; `git push
-  --dry-run origin main` and `git diff --output=… HEAD~1` are both refused with the gate's own words; and
-  an `-e` path that does not exist stops the launch (exit 1), which is what the atomic rename in
+  --dry-run origin main` (no read path) and `git diff --output=<temp> HEAD` (an argument the policy
+  refuses, on a path that is otherwise a read) are both refused with the gate's own words and neither ran;
+  and an `-e` path that does not exist stops the launch (exit 1), which is what the atomic rename in
   `writePiExtensionFile` depends on.
 - Not driven: a whole bot look run (`Look now` → one suggestion in Up next) against a real pi bot. The
   transcripts above are the CLI half of it.

@@ -130,6 +130,9 @@ export function buildPiRpcLaunch(options: PiRpcLaunchOptions): ProviderProcessLa
   if (selection) {
     throw new Error(`Pi ${selection.split('=')[0]} conflicts with a limited tool launch`)
   }
+  if (options.tools === 'read' && !options.readOnlyGate) {
+    throw new Error('A limited Pi run needs its read-only gate')
+  }
   let provider = false
   let model = false
   for (let index = 0; index < args.length; index++) {

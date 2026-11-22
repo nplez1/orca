@@ -5047,14 +5047,19 @@ Anchors, each a bare line or word in a file upstream owns — the reason is here
 | -------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------- |
 | `src/shared/bots/bot-look-around.ts`               | `:9`   | `'pi'` in `LOOK_AROUND_AGENTS`                                                                                |
 | `src/main/pi/rpc/launch/rpc-launch.ts`             | `:72`  | `'bash'` in `PI_READ_TOOLS`                                                                                   |
-| `src/main/pi/rpc/launch/rpc-launch.ts`             | `:183` | one spread: `options.readOnlyGate` becomes `--extension`, beside the three extensions upstream already passes |
+| `src/main/pi/rpc/launch/rpc-launch.ts`             | `:133` | 3 lines: a `'read'` run with no gate throws, so dropping the write below cannot ship ungated bash             |
+| `src/main/pi/rpc/launch/rpc-launch.ts`             | `:186` | one spread: `options.readOnlyGate` becomes `--extension`, beside the three extensions upstream already passes |
 | `src/main/pi/rpc/launch/rpc-launch-resolution.ts`  | `:257` | the write itself, one property beside `botTools` (plus one import)                                            |
 | `src/main/runtime/rpc/methods/bots-look-around.ts` | `:75`  | the refusal names no agent: `'This bot’s agent cannot look around.'`                                          |
 | `src/main/bots/bot-look-around-runner.ts`          | `:264` | one import and one expression: `lookStartFailureWords(error, LOOK_FAILURES.couldNotStart)`                    |
 
-Read top to bottom: a word, a word, one spread of a shape the file already repeats, one write that
-mirrors `botTools`, one string, and one import plus one expression. The read line itself
-(`rpc-launch.ts:180`) is upstream's own again — the fork no longer adds anything to it.
+Read top to bottom: a word, a word, one three-line guard, one spread of a shape the file already repeats,
+one write that mirrors `botTools`, one string, and one import plus one expression. The read line itself
+(`rpc-launch.ts:182`) is upstream's own again — the fork no longer adds anything to it. The guard is the
+one piece of the feature that is structural rather than tested-in-place: every current path is gated
+(`rpc-session-adapter.ts` only launches from the resolver, which awaits the write, and the catalog probe
+never sets `tools`), but a sync that drops the resolution layer's property, or a future caller that builds
+`'read'` args itself, now fails loudly instead of shipping pi look runs with unrestricted `bash`.
 
 **Fork-owned, all the logic:**
 
@@ -5105,7 +5110,9 @@ agent's full OS permissions. Same class of guarantee in practice; not the same m
 to describe as a sandbox. One further limit, owned by the user's own code: pi runs `tool_call` handlers
 in load order and does not re-validate, so a later extension can rewrite `input.command` after this gate
 allowed it. `Object.freeze(event.input)` would close that and break every bash call for a user whose own
-extension mutates bash, so the limit stays.
+extension mutates bash, so the limit stays. The gate is the last extension in the argument list, after
+`backgroundWork` and `botTools`, so Orca's own extensions run before it and cannot rewrite a command the
+gate has already seen; the residual risk is the user's own extensions, which load after the launch's.
 
 **The too-old trap this patch opens.** `piToolLimit` throws `AgentCliInstallationError.tooOld('pi', …)`
 below 1.0.4 (`rpc-launch.ts:102`), which could not fire while pi never looked around. Now an older
@@ -5129,9 +5136,8 @@ eleven call sites, which is exactly the divergence this patch avoids. Both are i
 questions.
 
 Tests: `src/main/pi/fork-read-only-gate.test.ts` (the generated extension against every read path the
-policy declares and the pinned policy text), `src/main/pi/rpc/launch/rpc-launch.test.ts` (`bash` in the
-read set, and `readOnlyGate` becoming `--extension`), `src/main/bots/bot-look-around-start-failure.test.ts` (a wrapped too-old
-refusal keeps its cause, a plain failure does not), `src/main/pi/rpc/launch/rpc-launch.test.ts` (the
-`read` mapping now names the extension — matched by `/orca-look-around-gate\.ts$/` rather than by
-literal path, because vitest's app environment installs its own `userData` and the absolute path is not
-stable there), and the existing bot look-around suites.
+policy declares, one case per `REFUSED_ARGUMENTS` alternative on an allowed path, and the pinned policy
+text), `src/main/pi/rpc/launch/rpc-launch.test.ts` (`bash` in the read set, `readOnlyGate` becoming
+`--extension`, and the throw for a `'read'` run with no gate), `src/main/bots/bot-look-around-start-failure.test.ts`
+(a wrapped too-old refusal keeps its cause, a plain failure does not), and the existing bot look-around
+suites.
