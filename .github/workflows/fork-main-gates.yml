@@ -111,8 +111,18 @@ jobs:
       # `fork-pr-gates.yml`; here they must not depend on a remote ref a shallow checkout may lack, and
       # a gate red for a missing ref rather than for a finding is the failure this lane exists to
       # prevent.
+      #
+      # Why a step-level timeout (#446): between 2026-11-16 and 2026-11-17 two pushes sat in this step
+      # for 48 minutes, `in_progress` with no conclusion, and the whole job only ended at its own
+      # 50-minute bound — so the alert named the workflow and the commit but never the step. The gate
+      # now bounds each step at 10 minutes and kills the step's whole process group, which is the fix;
+      # this is the outer backstop, sized at a runner's normal run plus that bound: one hung step fails
+      # here, named, in 20 minutes instead of consuming the job. For scale, the whole 54-step gate took
+      # 92 s on the 18-core host this was written on. The job timeout stays the outer bound for the
+      # typecheck above it.
       - name: Lint ratchet verdict
         if: ${{ !cancelled() }}
+        timeout-minutes: 20
         env:
           ORCA_CODE_QUALITY_BASE: HEAD
         run: node local/gate-lint.mjs

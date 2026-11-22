@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -6,12 +6,15 @@ import {
   classifyRun,
   entryProblem,
   extractFailureLines,
+  finalize,
   FORK_LINT_STEPS,
   matchesEntry,
   resolveGateSteps,
   resolveLintSteps,
+  runSteps,
   unaccountedFailureLines
 } from '../../local/gate-lint.mjs'
+import { readWorkflow } from './workflow-file.mjs'
 
 const REPO_ROOT = join(import.meta.dirname, '..', '..')
 
@@ -361,5 +364,118 @@ describe('a failure the parser could only partly attribute', () => {
       ])
     ).toEqual([])
     expect(unaccountedFailureLines('panel note: nothing to do here')).toEqual([])
+  })
+})
+
+// The 48-minute hang in #446: `pnpm run` puts the linter one level down, so a timeout aimed at the
+// direct child left a grandchild holding the output pipe and the gate waited for a stream that could
+// not close — with the step never named, because the gate printed a step only after it finished.
+const HANGING_GRANDCHILD = `
+process.on('SIGTERM', () => {})
+// Why it prints its own pid: the test needs to prove *this* process died, and a line on the step's
+// inherited stdout is also what kept the gate waiting for a pipe that could not close.
+process.stdout.write(\`grandchild \${process.pid}\\n\`)
+setInterval(() => {}, 1000)
+`
+
+const HANGING_STEP = `
+import { spawn } from 'node:child_process'
+// Why 'inherit': the grandchild then holds the step's stdout pipe, which is what kept the gate waiting.
+spawn(process.execPath, [process.argv[2]], { stdio: ['ignore', 'inherit', 'inherit'] })
+process.stdout.write('step started\\n')
+setInterval(() => {}, 1000)
+`
+
+/** Poll for a pid to disappear: a killed process is reaped by its own parent, not by this test. */
+async function goneWithin(pid, ms) {
+  for (const deadline = Date.now() + ms; Date.now() < deadline;) {
+    try {
+      process.kill(pid, 0)
+    } catch {
+      return true
+    }
+    await new Promise((done) => setTimeout(done, 25))
+  }
+  return false
+}
+
+describe('a step that hangs past its deadline (#446)', () => {
+  const TIMEOUT_MS = 3000
+
+  /** Why a fixture tree: the hang has to be reproducible without the real lint chain or a 10m wait. */
+  const runHang = async () => {
+    const root = mkdtempSync(join(tmpdir(), 'lint-gate-hang-'))
+    const lines = []
+    const out = async (line) => lines.push({ stream: 'out', line })
+    const err = async (line) => lines.push({ stream: 'err', line })
+    const step = {
+      id: 'hang-fixture',
+      command: `node ${join(root, 'step.mjs')}`,
+      argv: [process.execPath, join(root, 'step.mjs'), join(root, 'grandchild.mjs')]
+    }
+    try {
+      writeFileSync(join(root, 'grandchild.mjs'), HANGING_GRANDCHILD)
+      writeFileSync(join(root, 'step.mjs'), HANGING_STEP)
+      const results = await runSteps([step], { timeoutMs: TIMEOUT_MS, out, err })
+      const code = await finalize(results, [], [step.id], { out, err })
+      return { results, code, lines }
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  }
+
+  it('kills the whole tree, names the step and fails the gate', async () => {
+    const { results, code, lines } = await runHang()
+    const [result] = results
+    const grandchildPid = Number(/^grandchild (\d+)$/m.exec(result.output)?.[1])
+    try {
+      expect(result.timedOut).toBe(true)
+      expect(result.id).toBe('hang-fixture')
+      expect(result.seconds).toBeGreaterThanOrEqual(TIMEOUT_MS / 1000)
+      expect(result.tail).toContain('step started')
+
+      // The line that has to reach the log before the hang, not after it.
+      const running = lines.find(({ line }) => line.startsWith('running [1/1] hang-fixture'))
+      expect(running?.stream).toBe('out')
+      expect(lines.indexOf(running)).toBe(0)
+
+      // The timeout names the step in the CI log, with the output the step managed to print.
+      const named = lines.filter(({ stream }) => stream === 'err').map(({ line }) => line)
+      expect(named).toContainEqual(
+        expect.stringContaining(
+          `::error::lint step hang-fixture timed out after ${(TIMEOUT_MS / 1000).toFixed(1)}s`
+        )
+      )
+      expect(named).toContainEqual(expect.stringContaining('| step started'))
+      expect(named).toContainEqual(
+        expect.stringContaining('::error::new lint red hang-fixture: timed out')
+      )
+      expect(code).toBe(1)
+
+      // Why the grandchild and not the step's own exit: a kill that reaches only the direct child
+      // leaves the grandchild holding the pipe, which is exactly the #446 hang.
+      expect(grandchildPid).toBeGreaterThan(0)
+      expect(await goneWithin(grandchildPid, 5000)).toBe(true)
+    } finally {
+      // Why: an assertion above must not leave a spinner behind on the box.
+      try {
+        process.kill(grandchildPid, 'SIGKILL')
+      } catch {
+        // already gone
+      }
+    }
+  })
+})
+
+describe('the CI step that runs the gate is bounded (#446)', () => {
+  it('gives the lint verdict its own timeout, under the job bound', () => {
+    const job = readWorkflow('.github/workflows/fork-main-gates.yml').jobs.gates
+    const verdict = job.steps.find((step) => (step.run ?? '').includes('node local/gate-lint.mjs'))
+    const bound = verdict?.['timeout-minutes']
+
+    // Why not the literal: the number is the CI backstop's, and a step timeout that outlives the job
+    // is not a step timeout — that relation is what has to hold, at any value the workflow chooses.
+    expect(bound).toBeGreaterThan(0)
+    expect(bound).toBeLessThan(job['timeout-minutes'])
   })
 })
