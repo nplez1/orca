@@ -7,6 +7,7 @@ import { botOfAddress, parseBotAddress } from '../../../../../../shared/bot-rost
 import { isFinalAutomationRunStatus } from '../../../../../../shared/automations/history/automation-run'
 import { isConnectorSource } from '../../../../../../shared/automation-event-triggers'
 import { botOfSession } from '../../../../../bots/bot-session-tabs'
+import { localOwnerTurn } from '../../../../../bots/fork-local-owner'
 import { requireStructuredHost } from '../../../../../bots/bot-chat-session'
 import { readBotConversationActsFor } from '../../../../../bots/bot-conversation-acts-for'
 import {
@@ -249,7 +250,7 @@ export async function readActingSender(
     }
   }
   if (!callerSessionId) {
-    return { sessionId: null, bot: null, turn: OWNER_TURN, conversation: null }
+    return { sessionId: null, bot: null, turn: localOwnerTurn(OWNER_TURN), conversation: null }
   }
   const bot = botOfSession(runtime.bots, callerSessionId)
   const read = await readBotTurn(runtime, db, callerSessionId)

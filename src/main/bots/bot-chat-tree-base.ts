@@ -204,7 +204,8 @@ export function buildBotChatBase(
   }
   for (const link of inputs.links) {
     // Discord has no mark of its own; its threads show as side chats.
-    const origin: BotChatOrigin = link.source === 'discord' ? 'side' : link.source
+    const origin: BotChatOrigin =
+      link.source === 'discord' || link.source === 'local' ? 'side' : link.source
     originBySessionId.set(rootOf(link.sessionId), {
       origin,
       ...(link.place ? { label: link.place } : {}),

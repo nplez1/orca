@@ -1,8 +1,14 @@
 # Talking to a bot without Orca Cloud — and whose identity it wears
 
-**Status:** design note, 2026-11-21, revised for identity. Nothing built.
+**Status:** design note, 2026-11-21, revised for identity. **Step 0 and Step 3 shipped** in
+`local(bots)` (`nplez1/talking-to-bots-2`): `orca bot ask` with the asker named, the `local` asker
+source, the owner recorded as a person on local asks, a local ask's answer routed back to its chat, and
+the `<!-- orca-bot:name -->` marker appended by a `gh` shim the bot cannot skip, with the own-PR guard
+reading it. **Step 1 (`POST /ask` on the loopback listener) and Step 2 (iMessage via Photon) are not
+built**, and the `Co-authored-by:` trailer is deferred. Where the body below says "nothing built", read
+it as the design's own state, not the tree's.
 **Why:** the fork now has a plan for work arriving (`local-webhooks.md`) and for a bot looking around
-unaided (`look-around-pi.md`). Neither lets a person *ask* a bot anything. And in every design so far the
+unaided (`look-around-pi.md`). Neither lets a person _ask_ a bot anything. And in every design so far the
 bot wears the owner's identity — which is right on GitHub, where no second account or app is available at
 work, and wrong everywhere else.
 **Placement:** fork patch (`local(bots)` / `local(cli)`), no public endpoint and no account.
@@ -16,31 +22,31 @@ work, and wrong everywhere else.
 > exception: everything there is you, the bot.**
 
 So attribution is already per-surface and already inconsistent, and where the bot cannot be itself the
-guide falls back to *text*: "end what you write with \"asked by <name> via <you>\"" (`bots.md:55`). A
+guide falls back to _text_: "end what you write with \"asked by <name> via <you>\"" (`bots.md:55`). A
 sentence in a comment is not an identity; it is a disclaimer a reader has to trust.
 
 ## Identity is two axes, not one
 
 The current design conflates them, which is why "act as the owner" sounds like one decision:
 
-| Axis | Question | Today | Should be |
-|---|---|---|---|
-| **Authority** | whose credentials, permissions and money does the work use? | the owner | **the owner** — unchanged. A bot must not carry ambient authority it can leak in a turn. |
-| **Attribution** | who does it look like, who is addressed, and where does a reply go? | owner on GitHub, Linear and mail; the bot in Slack and in the app | **the bot everywhere it can be**, and the asker named as a person |
+| Axis            | Question                                                            | Today                                                             | Should be                                                                                |
+| --------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| **Authority**   | whose credentials, permissions and money does the work use?         | the owner                                                         | **the owner** — unchanged. A bot must not carry ambient authority it can leak in a turn. |
+| **Attribution** | who does it look like, who is addressed, and where does a reply go? | owner on GitHub, Linear and mail; the bot in Slack and in the app | **the bot everywhere it can be**, and the asker named as a person                        |
 
 Keeping authority with the owner is not a compromise: it is what makes an unattended run safe. A bot
 presenting as itself is a separate question, and on most surfaces it costs nothing.
 
 ### What each surface presents today
 
-| Surface | Presents as | Evidence |
-|---|---|---|
-| App chat (Home, side chats, Items) | **the bot** | local native chat; name, avatar, `SOUL.md` |
-| Slack | **the bot** | `BotSlackAppSchema` — "The bot's own Slack app" (`src/shared/bot-types.ts:86`); cloud-only |
-| Linear | the owner | "through Orca's one shared Linear app" (`bot-types.ts:89`) |
-| GitHub | the owner | "Orca's one shared GitHub app", and `gh` as you (`bot-types.ts:97`) |
-| Gmail / Calendar / Drive / Docs | the owner | local Google, acts as you |
-| Local ask (this design) | **nobody** — the earlier draft carried no asker identity at all | — |
+| Surface                            | Presents as                                                     | Evidence                                                                                   |
+| ---------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| App chat (Home, side chats, Items) | **the bot**                                                     | local native chat; name, avatar, `SOUL.md`                                                 |
+| Slack                              | **the bot**                                                     | `BotSlackAppSchema` — "The bot's own Slack app" (`src/shared/bot-types.ts:86`); cloud-only |
+| Linear                             | the owner                                                       | "through Orca's one shared Linear app" (`bot-types.ts:89`)                                 |
+| GitHub                             | the owner                                                       | "Orca's one shared GitHub app", and `gh` as you (`bot-types.ts:97`)                        |
+| Gmail / Calendar / Drive / Docs    | the owner                                                       | local Google, acts as you                                                                  |
+| Local ask (this design)            | **nobody** — the earlier draft carried no asker identity at all | —                                                                                          |
 
 The local surfaces are the easiest to fix and the most important, because they are the ones the fork is
 about to invent from scratch: get identity wrong there and it is wrong by construction.
@@ -52,7 +58,7 @@ The machinery already exists and is almost right. `BotRequestPerson`
 `placeKind`, and `sameActsFor`/`actsForOwner` reason over it.
 
 The gap is that **the owner arrives as a bare `{ kind: 'owner' }`** with no identity at all
-(`OWNER_ACTS_FOR`, `:21`). A bot can therefore tell "the owner" from "a teammate" but cannot tell *which*
+(`OWNER_ACTS_FOR`, `:21`). A bot can therefore tell "the owner" from "a teammate" but cannot tell _which_
 person is talking when the owner is the one talking, and has nothing to address a reply to.
 
 So a local surface must mint the owner as a person:
@@ -69,20 +75,20 @@ it: today the preamble says "your owner"; it should say who, when the surface kn
 
 A second GitHub account and a GitHub App are both unavailable **at work** — an account has to be
 org-provisioned and approved, an app install is an admin decision with a security review. That is still true,
-and it is why owner-identity is now the *fallback* rather than the design.
+and it is why owner-identity is now the _fallback_ rather than the design.
 
 It is not the design because a GitHub App already run for `agent:auto` has a bot user of its own, opens and
 merges pull requests as itself, and — the property that matters most here — carries **per-installation
 permissions**. This doc previously recorded permission separation as genuinely lost. In app mode it is not,
 so the record changes:
 
-| | **App mode** (a repo whose app installation you can reach) | **Owner mode** (work repos, no app) |
-|---|---|---|
-| Who authors the write | the app's bot user, a distinct visible identity | you |
-| Actor filtering ("don't wake on your own output") | exact: `sender.type` / the app's slug | the body marker, a convention that can be spoofed |
-| Permission separation | real: `issues: write` + `pull_requests: write` without `contents: write` cannot push; merging can be withheld while commenting stays allowed | none — merging and commenting share `Pull requests: Read/Write` |
-| Secret exposure to the model | nil for the app key: the host mints a one-hour installation token per run | the `gh` OAuth session holds no secret in env |
-| What controls a merge | installation permissions plus branch protection | staging and review convention only |
+|                                                   | **App mode** (a repo whose app installation you can reach)                                                                                   | **Owner mode** (work repos, no app)                             |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| Who authors the write                             | the app's bot user, a distinct visible identity                                                                                              | you                                                             |
+| Actor filtering ("don't wake on your own output") | exact: `sender.type` / the app's slug                                                                                                        | the body marker, a convention that can be spoofed               |
+| Permission separation                             | real: `issues: write` + `pull_requests: write` without `contents: write` cannot push; merging can be withheld while commenting stays allowed | none — merging and commenting share `Pull requests: Read/Write` |
+| Secret exposure to the model                      | nil for the app key: the host mints a one-hour installation token per run                                                                    | the `gh` OAuth session holds no secret in env                   |
+| What controls a merge                             | installation permissions plus branch protection                                                                                              | staging and review convention only                              |
 
 The fork supports both and picks per repo, by whether an app installation is reachable. Most of this doc
 describes **owner mode**, because it is the harder case and the one that needs designing; app mode is mostly
@@ -105,22 +111,22 @@ repo**, and three things follow from it:
 The rest of the pipeline is identical across modes: same `prompt`, same `precheck`, same worktree per run, same
 `resultsTo` and history. Only three things differ, and they are the whole difference:
 
-| | App mode | Owner mode |
-|---|---|---|
-| The token in the run's env | installation token minted per run | the owner's existing `gh` session |
-| Attribution | the app's own bot user | visible line + invisible marker, below |
-| What stops a merge | permission or branch protection | **nothing technical** — see below |
+|                            | App mode                          | Owner mode                             |
+| -------------------------- | --------------------------------- | -------------------------------------- |
+| The token in the run's env | installation token minted per run | the owner's existing `gh` session      |
+| Attribution                | the app's own bot user            | visible line + invisible marker, below |
+| What stops a merge         | permission or branch protection   | **nothing technical** — see below      |
 
 ### Clear signals in owner mode, and the one thing to be honest about
 
 "Clear signals that the work came from a particular bot" needs two different audiences satisfied, and the
 marker only satisfies one. So every bot-authored GitHub body carries both:
 
-| Signal | Seen by | Example |
-|---|---|---|
-| First line of the body | people reading the PR or comment | `🤖 **Scout** · Orca bot · acting for @nathanp` |
-| `Co-authored-by:` trailer | GitHub's own commit and PR rendering | `Co-authored-by: Scout (Orca bot) <bot+scout@…>` |
-| `<!-- orca-bot:scout -->` | event rules only, invisible to readers | — |
+| Signal                    | Seen by                                | Example                                          |
+| ------------------------- | -------------------------------------- | ------------------------------------------------ |
+| First line of the body    | people reading the PR or comment       | `🤖 **Scout** · Orca bot · acting for @nathanp`  |
+| `Co-authored-by:` trailer | GitHub's own commit and PR rendering   | `Co-authored-by: Scout (Orca bot) <bot+scout@…>` |
+| `<!-- orca-bot:scout -->` | event rules only, invisible to readers | —                                                |
 
 The first line is new and it is the one that matters to a human: the HTML marker is invisible in a rendered
 comment, so a reader at work would otherwise see only you. Appending both comes from the same code path (the
@@ -159,30 +165,30 @@ instead of assumed.
 ## Owner mode: the bot acts as you
 
 **On a repo with no app, the bot acts as the owner on GitHub. Full stop.** What is left to design is not
-*whose* identity appears; it is (a) the bot being itself everywhere it legitimately can, which is every local
+_whose_ identity appears; it is (a) the bot being itself everywhere it legitimately can, which is every local
 surface, and (b) making the owner's voice on GitHub recognisably the bot's, which is what today's discretionary
 one-liner fails at.
 
-`service-account` and `machine-user` are recorded in *Deferred* as one line of launcher work
+`service-account` and `machine-user` are recorded in _Deferred_ as one line of launcher work
 (`GH_TOKEN` + `GH_CONFIG_DIR`) to revisit only if an org ever provisions an account. They are not built.
 
 ### What makes owner-identity tolerable
 
 GitHub renders authorship from data the bot already writes, so attribution does not need a second identity:
 
-| Mechanism | What it buys | Cost |
-|---|---|---|
-| `Co-authored-by: Scout <…>` trailer | GitHub renders the co-author's name and avatar on the commit and the PR's commits tab | needs an email; the sanctioned mechanism, and safe under DCO/CLA rules |
-| Commit author (`git -c user.name="Scout (Orca bot)"`) | the commit shows the bot's name as an unlinked author; pushes still authenticate as you | breaks where the org requires signed commits or a CLA the bot can't sign |
-| Orca's own work ledger, no naming convention | `isBotWorkPullRequest` matches a PR's head branch against the branch a live bot worker's workspace or a bot-home worktree actually holds (`src/main/runtime/orca-runtime-bots.ts:229`) — so identification works under any naming scheme, including a repo that requires `nathanp/…` | none; once the worker is gone, the body marker is what remains |
-| An HTML marker in every bot-written body, `<!-- orca-bot:scout -->` | machine-readable after the fact, invisible to readers, greppable by event rules | a convention, not a control |
-| Draft PRs (`gh pr create --draft`) and **pending reviews** | the bot stages work; you submit it | caveats below |
-| A structured trailer line instead of the current sentence | "asked by <name> via <bot>" becomes the same fixed form every time, so it is checkable and filterable, not discretionary | none — it is already the mandated text, just unstructured |
+| Mechanism                                                           | What it buys                                                                                                                                                                                                                                                                         | Cost                                                                     |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| `Co-authored-by: Scout <…>` trailer                                 | GitHub renders the co-author's name and avatar on the commit and the PR's commits tab                                                                                                                                                                                                | needs an email; the sanctioned mechanism, and safe under DCO/CLA rules   |
+| Commit author (`git -c user.name="Scout (Orca bot)"`)               | the commit shows the bot's name as an unlinked author; pushes still authenticate as you                                                                                                                                                                                              | breaks where the org requires signed commits or a CLA the bot can't sign |
+| Orca's own work ledger, no naming convention                        | `isBotWorkPullRequest` matches a PR's head branch against the branch a live bot worker's workspace or a bot-home worktree actually holds (`src/main/runtime/orca-runtime-bots.ts:229`) — so identification works under any naming scheme, including a repo that requires `nathanp/…` | none; once the worker is gone, the body marker is what remains           |
+| An HTML marker in every bot-written body, `<!-- orca-bot:scout -->` | machine-readable after the fact, invisible to readers, greppable by event rules                                                                                                                                                                                                      | a convention, not a control                                              |
+| Draft PRs (`gh pr create --draft`) and **pending reviews**          | the bot stages work; you submit it                                                                                                                                                                                                                                                   | caveats below                                                            |
+| A structured trailer line instead of the current sentence           | "asked by <name> via <bot>" becomes the same fixed form every time, so it is checkable and filterable, not discretionary                                                                                                                                                             | none — it is already the mandated text, just unstructured                |
 
 Pending reviews are the useful one: a review created without an `event` stays pending, visible only to the
 authenticated user until they submit it and pick the verdict in the UI. That is a genuine "prepare, don't
 act" control that exists under one identity. Two caveats — a [known GitHub
-bug](https://github.com/orgs/community/discussions/213044) leaves the pending review's *body* out of the
+bug](https://github.com/orgs/community/discussions/213044) leaves the pending review's _body_ out of the
 "Finish your review" dialog (inline comments survive), so the summary belongs in the first inline comment;
 and creating the review needs `pull_requests: write`, the same permission as merging.
 
@@ -190,7 +196,7 @@ and creating the review needs `pull_requests: write`, the same permission as mer
 
 **No permission-level separation.** A fine-grained PAT cannot separate "comment on a PR" from "merge it" —
 both need `Pull requests: Read/Write`; `Contents: Read/Write` alone returns 403 on merge. So scopes buy
-least privilege on *contents* (read-only, no pushes) and *issues*, and nothing on reviews. "The bot cannot
+least privilege on _contents_ (read-only, no pushes) and _issues_, and nothing on reviews. "The bot cannot
 merge however it is prompted" is only true if it also cannot comment on PRs. On one identity, the merge
 control is staging and review convention, not permissions, and the UI should say so rather than imply a
 guarantee.
@@ -213,20 +219,20 @@ orca automations create --bot Scout --on 'webhook.call where=action=created' --p
 ```
 
 That is a convention, and anyone who can comment can spoof it. **Decided: accepted, because it fails in the
-safe direction.** A forged marker makes a rule *ignore* a comment that a person really did write — the bot
+safe direction.** A forged marker makes a rule _ignore_ a comment that a person really did write — the bot
 misses work, it does not do wrong work. Nothing escalates: the marker never grants an action, it only
 withholds one. The larger cost of this mode stays the one already named — with one login the bot cannot
 tell your comment from a teammate's.
 
-**The risk that does matter is omission, not spoofing.** A bot write that *forgets* the marker makes a rule
+**The risk that does matter is omission, not spoofing.** A bot write that _forgets_ the marker makes a rule
 wake on the bot's own output, and that is a feedback loop. So the marker is not something the model is
 told to remember: it is appended by code the bot cannot skip.
 
-| Where | How |
-|---|---|
-| Any `gh` comment or review body | a fork-owned `gh` shim first on the bot's `PATH` in its launch env: it appends the marker to `--body`, and for `--body-file` writes a marked copy and substitutes the path, passing every other invocation through untouched |
-| Pull requests | already structural — the head-branch convention `own-pr-trigger-guard.ts` reads today |
-| `orca bot reply` and the local surfaces | the fork's own reply path appends it, since it owns the write |
+| Where                                   | How                                                                                                                                                                                                                          |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Any `gh` comment or review body         | a fork-owned `gh` shim first on the bot's `PATH` in its launch env: it appends the marker to `--body`, and for `--body-file` writes a marked copy and substitutes the path, passing every other invocation through untouched |
+| Pull requests                           | already structural — the head-branch convention `own-pr-trigger-guard.ts` reads today                                                                                                                                        |
+| `orca bot reply` and the local surfaces | the fork's own reply path appends it, since it owns the write                                                                                                                                                                |
 
 A shim is the same trick this machine already uses for `pnpm`, and it moves the guarantee from "the model
 complies" to "the write cannot happen without it". Its cost is a launch-env entry and a passthrough that
@@ -241,13 +247,13 @@ built, because it needs a write ledger consulted at match time and the shim remo
 
 The gap is narrower than "no integrations":
 
-| Surface | State |
-|---|---|
-| Desktop: Home Chat, side chats (`--chat new`), Items asks/replies | works |
-| Phone: bot chat over a paired host | works (pairing, not cloud) |
+| Surface                                                                | State                                                              |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Desktop: Home Chat, side chats (`--chat new`), Items asks/replies      | works                                                              |
+| Phone: bot chat over a paired host                                     | works (pairing, not cloud)                                         |
 | Agent → bot: `orca orchestration send --to bot:<name> --type question` | works — local RPC, no cloud reference in `message-send-handler.ts` |
-| Owner's own mail/calendar/Drive/Docs | works — local Google |
-| GitHub as the owner: `gh pr comment`, `gh issue comment` | works — your own `gh` auth |
+| Owner's own mail/calendar/Drive/Docs                                   | works — local Google                                               |
+| GitHub as the owner: `gh pr comment`, `gh issue comment`               | works — your own `gh` auth                                         |
 
 What does not work is any third-party conversational channel — and, in consequence, the two things that
 make one useful: `orca bot reply` refuses anywhere that is not a cloud thread
@@ -260,18 +266,18 @@ WhatsApp, Discord" **stay behind** — "Not available here yet." (`references/bo
 
 No public inbound endpoint, so a channel is only cheap if it connects **outbound** or needs no third party:
 
-| Candidate | Reaches the fork how | Identity it gives the bot | Reusable code |
-|---|---|---|---|
-| **iMessage via Photon** | **outbound gRPC stream — no public endpoint, no signing secret** | **the bot's own line: a genuinely separate sender** | none — no Photon or iMessage code exists in Orca today |
-| Loopback HTTP `ask` | no third party | whatever the payload asserts — so make it a person record | the listener `local-webhooks.md` already builds |
-| Gmail | outbound poll | **the owner's address** — attribution only via a display name or a `+bot` alias | `gmail.new_email` trigger, `orca gmail draft\|send` |
-| GitHub @mentions | outbound poll of `gh` | the owner, unless option A ships first | replies already work via `gh pr comment` |
-| Telegram | outbound long-poll | **a genuinely separate bot identity**, by construction | none |
-| Slack (Socket Mode) | outbound websocket | **the bot's own user**, exactly as today's cloud app does | none — Socket Mode appears nowhere in this repo |
-| Discord | outbound gateway | a separate bot identity | none |
+| Candidate               | Reaches the fork how                                             | Identity it gives the bot                                                       | Reusable code                                          |
+| ----------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| **iMessage via Photon** | **outbound gRPC stream — no public endpoint, no signing secret** | **the bot's own line: a genuinely separate sender**                             | none — no Photon or iMessage code exists in Orca today |
+| Loopback HTTP `ask`     | no third party                                                   | whatever the payload asserts — so make it a person record                       | the listener `local-webhooks.md` already builds        |
+| Gmail                   | outbound poll                                                    | **the owner's address** — attribution only via a display name or a `+bot` alias | `gmail.new_email` trigger, `orca gmail draft\|send`    |
+| GitHub @mentions        | outbound poll of `gh`                                            | the owner, unless option A ships first                                          | replies already work via `gh pr comment`               |
+| Telegram                | outbound long-poll                                               | **a genuinely separate bot identity**, by construction                          | none                                                   |
+| Slack (Socket Mode)     | outbound websocket                                               | **the bot's own user**, exactly as today's cloud app does                       | none — Socket Mode appears nowhere in this repo        |
+| Discord                 | outbound gateway                                                 | a separate bot identity                                                         | none                                                   |
 
 Note how the identity requirement reorders the earlier ranking: Photon's iMessage line and Telegram and Slack
-each give the bot a *separate* sender by construction, mail structurally cannot, and the loopback surface is
+each give the bot a _separate_ sender by construction, mail structurally cannot, and the loopback surface is
 a design choice because it has no identity unless the fork supplies one. Photon wins on being the channel
 already in daily use, on every device, needing no new app.
 
@@ -303,11 +309,11 @@ rather than shipping on its own.
 
 Both answer paths are cloud-shaped today; the pieces to reuse:
 
-| Need | Existing piece |
-|---|---|
-| Capture the bot's final message for a run | `automation-run-message-capture.ts` |
-| Decide where a result goes | `bot-run-results.ts` — a fork-owned variant, since its `cloudOff` branch is the hole |
-| A result line the agent never receives itself | `bot-automation-result-note.ts` |
+| Need                                              | Existing piece                                                                                   |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Capture the bot's final message for a run         | `automation-run-message-capture.ts`                                                              |
+| Decide where a result goes                        | `bot-run-results.ts` — a fork-owned variant, since its `cloudOff` branch is the hole             |
+| A result line the agent never receives itself     | `bot-automation-result-note.ts`                                                                  |
 | Chat rows for a conversation that isn't Home Chat | `bot-chat-tree.ts`; `BotChatOrigin` is `home \| slack \| linear \| github \| automation \| side` |
 
 **The chat-origin decision:** a local conversation wants a seventh origin (`local`) so the sidebar can say
@@ -317,19 +323,19 @@ insufficient. A trade-off, not an oversight.
 
 ## Edit list
 
-| Change | File | Kind |
-|---|---|---|
-| `bot ask` spec + handler, carrying the asker | `src/cli/specs/bot.ts`, new `src/cli/bots/bot-ask.ts` | 1 line upstream, rest new |
-| Teach the command, or the drift test fails | `bot-preamble.ts` start-here rule, `references/bots.md` | upstream, 1 line each |
-| A `local` (and `gmail`) asker source | `src/shared/connectors/external-conversation-link.ts` | upstream, one union member |
-| Owner recorded as a person on local asks | `src/shared/bots/bot-acts-for.ts` (`OWNER_ACTS_FOR` stays for cloud turns) | upstream, additive |
-| `POST /ask` + ask→chat adapter | fork listener module; thin adapter over `bot-automation-sessions.ts` (`startConversation` `:74`, `sendToChat` `:110`) | fork-owned |
-| Reply → surface | new `src/main/bots/fork-local-results.ts`, one call site at run end | fork-owned + 1 hunk |
-| Marker appended by the bot's own write path, not by instruction | new `src/main/bots/fork-gh-shim.ts`, one `PATH` entry in the bot's launch env | fork-owned + 1 line |
-| The marker as a second own-work signal | `src/main/connector-cloud/own-pr-trigger-guard.ts` | upstream, 1 condition |
-| Commit attribution appended the same way (`git commit --trailer "Co-authored-by: …"`) | the same fork shim family | fork-owned, optional |
+| Change                                                                                | File                                                                                                                  | Kind                       |
+| ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| `bot ask` spec + handler, carrying the asker                                          | `src/cli/specs/bot.ts`, new `src/cli/bots/bot-ask.ts`                                                                 | 1 line upstream, rest new  |
+| Teach the command, or the drift test fails                                            | `bot-preamble.ts` start-here rule, `references/bots.md`                                                               | upstream, 1 line each      |
+| A `local` (and `gmail`) asker source                                                  | `src/shared/connectors/external-conversation-link.ts`                                                                 | upstream, one union member |
+| Owner recorded as a person on local asks                                              | `src/shared/bots/bot-acts-for.ts` (`OWNER_ACTS_FOR` stays for cloud turns)                                            | upstream, additive         |
+| `POST /ask` + ask→chat adapter                                                        | fork listener module; thin adapter over `bot-automation-sessions.ts` (`startConversation` `:74`, `sendToChat` `:110`) | fork-owned                 |
+| Reply → surface                                                                       | new `src/main/bots/fork-local-results.ts`, one call site at run end                                                   | fork-owned + 1 hunk        |
+| Marker appended by the bot's own write path, not by instruction                       | new `src/main/bots/fork-gh-shim.ts`, one `PATH` entry in the bot's launch env                                         | fork-owned + 1 line        |
+| The marker as a second own-work signal                                                | `src/main/connector-cloud/own-pr-trigger-guard.ts`                                                                    | upstream, 1 condition      |
+| Commit attribution appended the same way (`git commit --trailer "Co-authored-by: …"`) | the same fork shim family                                                                                             | fork-owned, optional       |
 
-`src/cli/specs/bot-command-drift.test.ts` is the trap: every command the preamble or the guides *teach*
+`src/cli/specs/bot-command-drift.test.ts` is the trap: every command the preamble or the guides _teach_
 must parse, so a new command must be taught in both places or the suite is red.
 
 ## Verification
@@ -364,7 +370,7 @@ must parse, so a new command must be taught in both places or the suite is red.
   already rely on it. The safer default is "open, comment, request review, never merge", with `contents: write`
   withheld from the installation that runs automations and granted only to a second one that merges on an
   explicit `agent:merge` label.
-- Should the bot's *own* actions carry `role: 'bot'` rather than `'member'`, so a rule can distinguish the
+- Should the bot's _own_ actions carry `role: 'bot'` rather than `'member'`, so a rule can distinguish the
   bot's work from a teammate's?
 - The marker is spoofable by anyone who can comment. **Decided: accepted** — it fails toward ignoring a
   real comment, never toward acting on a false one. The open half is only whether the id-ledger fallback

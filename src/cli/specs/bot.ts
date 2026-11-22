@@ -42,6 +42,19 @@ export const BOT_COMMAND_SPECS: CommandSpec[] = [
     ]
   },
   {
+    path: ['bot', 'ask'],
+    summary:
+      'Ask a bot on this computer a question, and read its answer in the chat the ask landed in',
+    usage: 'orca bot ask <name> [--chat <id|new>] --body <text> [--subject <text>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'bot', 'chat', 'body', 'body-file', 'subject'],
+    positionalArgs: ['bot'],
+    notes: [
+      ...BOT_NOTES,
+      'It is the same mail `orca orchestration send --to bot:<name>` sends, so the bot sees who asked; with no --chat it lands in the Home Chat. --chat takes a chat id `orca bot chats` prints, and only one that takes mail now, or new for a chat of its own.',
+      '--subject is optional: the ask\u2019s first line becomes it.'
+    ]
+  },
+  {
     path: ['bot', 'chats'],
     summary:
       "List a bot's chats: each one's id, title, last activity, and what it was last asked and said",

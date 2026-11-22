@@ -20,6 +20,17 @@ export type BotRequestAsker = { kind: 'owner' } | BotRequestPerson | { kind: 'un
 
 export const OWNER_ACTS_FOR: readonly BotRequestAsker[] = [{ kind: 'owner' }]
 
+export function ownerAsPerson(owner: { userId: string; name?: string }): BotRequestPerson {
+  return {
+    kind: 'person',
+    source: 'local',
+    userId: owner.userId,
+    ...(owner.name ? { name: owner.name } : {}),
+    workspaceId: null,
+    role: 'owner'
+  }
+}
+
 /** Whether every person named is the bots' owner, by Orca's record or the cloud's verdict. */
 export function actsForOwner(askers: readonly BotRequestAsker[]): boolean {
   return (

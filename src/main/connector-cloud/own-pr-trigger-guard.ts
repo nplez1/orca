@@ -8,9 +8,10 @@ import { takesOwnEvents, type AutomationRunEvent } from '../../shared/automation
 import type { ConnectorDelivery } from '../../shared/connectors/connector-cloud-contract'
 import type { EventStartGate } from '../automations/automation-trigger-runs'
 import type { BotWorkPrHead } from '../bots/bot-work-pr-branch'
+import { botGhMarkerOf } from '../bots/fork-gh-shim'
 
 type TriggerDelivery = Extract<ConnectorDelivery, { kind: 'trigger' }>
-type OwnPrRun = Pick<AutomationRunEvent, 'source' | 'event' | 'fromOwner' | 'place'>
+type OwnPrRun = Pick<AutomationRunEvent, 'source' | 'event' | 'fromOwner' | 'place' | 'text'>
 
 export type OwnPullRequest = BotWorkPrHead
 
@@ -76,6 +77,9 @@ export async function ownPrRefusal(
   }
   if (pr === 'unknown') {
     return 'no_head'
+  }
+  if (botGhMarkerOf(run.text)) {
+    return 'bot_work'
   }
   return (await deps.isBotWork(pr)) ? 'bot_work' : null
 }
