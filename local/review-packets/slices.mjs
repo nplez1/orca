@@ -66,9 +66,17 @@ export function groupBySubsystem(entries, budget, depth = 0, prefix = '') {
     buckets.set(key, [...(buckets.get(key) ?? []), entry])
   }
   if (buckets.size < 2) {
-    // Why stop: nothing left to split by, and recursing on one unchanged bucket never terminates —
-    // a delete plus an add of the same path puts both sections in one bucket forever.
-    return [{ prefix, entries, bytes }]
+    // Why descend instead of stop: every entry sharing one *segment* is not the same as nothing left
+    // to split by. `src/renderer/**` splits to a single `src/renderer/src/` bucket and stops there,
+    // which leaves a 1 MB group that `pack` then exploded into one slice per file — 428 slices of
+    // ~1.5 KB on the 2026-11-20 sync, ~$352 of review.
+    const [only] = buckets.values()
+    const identical = only.every((entry) => entry.path === only[0].path)
+    // Why stop here and only here: a delete plus an add of the same path share a bucket at every
+    // depth, so descending on identical paths never terminates.
+    return identical
+      ? [{ prefix, entries, bytes }]
+      : groupBySubsystem(only, budget, depth + 1, prefix)
   }
   return [...buckets].flatMap(([key, bucket]) => groupBySubsystem(bucket, budget, depth + 1, key))
 }
@@ -161,10 +169,20 @@ function pack(groups, budget, cap) {
   }
   for (const group of groups) {
     if (group.bytes > budget) {
-      flush()
+      // Why packed rather than one slice each: an unsplittable group is still subject to the cap, and
+      // a reviewer's fixed cost is paid per slice whatever its size, so 3 KB of patch must never cost
+      // a whole reviewer boot of its own.
       for (const entry of group.entries) {
         for (const part of splitEntry(entry, budget)) {
-          slices.push({ prefixes: [group.prefix], entries: [part], bytes: part.bytes })
+          if (current && current.bytes + part.bytes > cap) {
+            flush()
+          }
+          current ??= { prefixes: [], entries: [], bytes: 0 }
+          if (!current.prefixes.includes(group.prefix)) {
+            current.prefixes.push(group.prefix)
+          }
+          current.entries.push(part)
+          current.bytes += part.bytes
         }
       }
       continue

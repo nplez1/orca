@@ -49,12 +49,13 @@ const VALUED = [
   'slices',
   'concurrency',
   'max-budget-usd',
+  'max-estimate-usd',
   'timeout-min',
   'packet'
 ]
 /** Why validated: `--timeout-min x` becomes `setTimeout(NaN)`, which fires at once and kills every
  * slice, and `--concurrency x` starts no worker at all — both after paying for the packet. */
-const NUMERIC = ['budget-kb', 'concurrency', 'max-budget-usd', 'timeout-min']
+const NUMERIC = ['budget-kb', 'concurrency', 'max-budget-usd', 'max-estimate-usd', 'timeout-min']
 
 const short = (sha) => String(sha).slice(0, 12)
 
@@ -108,6 +109,60 @@ function readFindings(file) {
   return list.map((finding, index) => ({ id: finding.id ?? `F-${index + 1}`, ...finding }))
 }
 
+/**
+ * What a plan will cost on the reviewer, from the two measurements there are.
+ *
+ * Two terms, and which dominates depends on the slice. Every slice is a fresh reviewer session that
+ * writes its ~89k-token context at the cache-write rate — 88% of the 2026-11-20 review's $351.65 over
+ * 435 slices, so a 1.5 KB slice still cost $0.78. A large slice pays for turns instead: each one
+ * re-reads the whole growing context, so nine consolidated slices of the same 3.06 MB diff read 103.6M
+ * tokens and cost $47.90 ($4.17 to $7.65 each).
+ *
+ * So: cost ≈ $0.75 a slice + $14 a MB. That predicts $5.5 for a 340 KB slice, $0.77 for a 1.5 KB one,
+ * and $49 for the nine-slice plan — the three measurements. It over-counts a plan of hundreds of tiny
+ * slices by ~5%, which is the safe direction for a guard.
+ */
+export function estimateReviewCostUsd(slices) {
+  if (!slices.length) {
+    return 0
+  }
+  const bytes = slices.reduce((total, slice) => total + slice.bytes, 0)
+  return slices.length * 0.75 + (bytes / (1024 * 1024)) * 14
+}
+
+/** Why a warning and not a refusal: a pathological plan is almost always a packing bug upstream of
+ * the release, and the reader needs to see it before `--run` spends anything. */
+function estimateProblems(slices) {
+  const problems = []
+  const sized = slices.map((slice) => slice.bytes).sort((a, b) => a - b)
+  if (sized.length && sized[Math.floor(sized.length / 2)] < 8192) {
+    problems.push(
+      `the median slice is ${String(Math.round(sized[Math.floor(sized.length / 2)]))} bytes — slices this small pay a whole reviewer boot for a few KB; suspect the packer`
+    )
+  }
+  return problems
+}
+
+/** Prints the estimate, and refuses when it is over `--max-estimate-usd`. Returns an exit code. */
+function reportEstimate(slices, maxUsd) {
+  const estimate = estimateReviewCostUsd(slices)
+  const lines = [
+    `  estimate: ${String(slices.length)} slice(s), ~$${estimate.toFixed(0)} on ${REVIEWER.name} at ${REVIEWER.thinking} (measured: $0.75 a slice + $14 a MB)`
+  ]
+  const problems = estimateProblems(slices)
+  for (const problem of problems) {
+    lines.push(`  WARNING: ${problem}`)
+  }
+  const over = maxUsd && estimate > maxUsd
+  if (over) {
+    lines.push(
+      `  REFUSE: the estimate is over --max-estimate-usd ${String(maxUsd)}; re-plan with a larger --budget-kb, narrow the scope, or run the tail on a cheaper tier`
+    )
+  }
+  process.stderr.write(`${lines.join('\n')}\n`)
+  return over ? 1 : 0
+}
+
 function prepare(options) {
   const context = loadCoverageContext(repoRoot)
   const budgetBytes = Math.round(Number(options['budget-kb'] ?? DEFAULT_BUDGET_KB) * 1024)
@@ -128,7 +183,7 @@ function prepare(options) {
     console.log(
       `  ${packet.slices[0].files} file(s), ${packet.slices[0].bytes} bytes; ${findings.length} finding(s) to re-check`
     )
-    return 0
+    return reportEstimate(packet.slices, options['max-estimate-usd'])
   }
   const merge = options.merge ?? headSyncMerge(repoRoot)
   if (!merge) {
@@ -158,7 +213,7 @@ function prepare(options) {
       `  slice ${slice.id}: ${slice.bytes} bytes, ${slice.files} file(s) — ${slice.scope}`
     )
   }
-  return 0
+  return reportEstimate(packet.slices, options['max-estimate-usd'])
 }
 
 function status(state) {

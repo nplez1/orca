@@ -220,6 +220,29 @@ node local/release-review-gate.mjs                           # still the authori
 `node local/release-review-gate.mjs --print` still prints the bare manifest shape, for a waiver or a review
 run some other way.
 
+#### What the review costs, and the number to watch
+
+`--prepare` ends with an estimate. Read it before `--run`, because the reviewer's cost is **per slice
+first, per byte second**: every slice is a fresh `claude -p` session that writes its ~89k-token context at
+the cache-write rate, then reads the code around its hunks, and each turn re-reads the whole growing
+context. On a 1.5 KB slice the boot dominates ($0.78, 89% cache writes); on a 340 KB slice the reads do
+(11.5M cache-read tokens, $4–7.65 a slice). Measured twice: **$0.75 a slice + $14 a MB** — a 1.5 KB slice
+cost $0.78, and the same 3.06 MB diff consolidated into nine slices cost $47.90.
+
+The 2026-11-20 review cost 35% of a week's Claude budget for one reason: a packer bug sent the 1 MB
+`src/renderer/**` group through the over-budget path, which emitted one slice per file — 428 slices averaging
+1.5 KB — and 411 of the 435 slices were under 10 KB. The same diff is 9 slices at the default budget, so
+when the estimate looks wrong, suspect the plan, not the reviewer: a median slice under 8 KB now warns and
+`--max-estimate-usd <n>` refuses.
+
+**Granularity, not just the model, decides what the review finds.** Re-run blind against that merge on
+2026-11-21: the nine consolidated Opus slices ($47.90) found 3 of the 10 blocking findings; the 435
+fine-grained slices ($352) found all 10; the cheap tier on nine consolidated slices ($0.40) found 1, and got
+one of them flatly wrong. The cheap tier at _fine_ granularity found 4 of 4 of the ones consolidation
+dropped, for $0.048 on four slices. So the shape to aim for is fine slices on a cheap tier for breadth, a
+consolidated Opus round for judgment across the whole diff, and Opus on every delta round — roughly $50–60
+for a sync this size instead of $352.
+
 ## Step 2 — publish the first signed release
 
 ```bash

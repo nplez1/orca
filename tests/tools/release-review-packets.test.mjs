@@ -139,6 +139,41 @@ describe('slicing', () => {
     expect(slices.map((s) => s.bytes)).toEqual([120, 140])
   })
 
+  it('keeps splitting through a single shared segment instead of abandoning the budget', () => {
+    // The 2026-11-20 sync's shape: everything under src/renderer/src/, so the first split yields one
+    // bucket and the group went to `pack` at 1 MB — 428 slices of ~1.5 KB, $352 of review.
+    const entries = []
+    for (const area of ['components', 'lib', 'store', 'runtime']) {
+      for (let index = 0; index < 5; index += 1) {
+        entries.push(entry(`src/renderer/src/${area}/f${String(index)}.tsx`, 60))
+      }
+    }
+    const slices = planSlices(entries, 200)
+    expect(slices.length).toBeLessThanOrEqual(7)
+    for (const slice of slices) {
+      expect(slice.files).toBeGreaterThan(1)
+    }
+    expect(slices.reduce((total, slice) => total + slice.bytes, 0)).toBe(1200)
+  })
+
+  it('packs an unsplittable group to the cap rather than one slice per file', () => {
+    // Identical paths are the only thing that cannot be split further (a delete plus an add), and the
+    // budget still has to be honoured: a slice costs a reviewer boot whatever its size.
+    const header = (path) => `diff --git a/${path} b/${path}\n--- a/${path}\n+++ b/${path}\n`
+    const hunk = `@@ -1,1 +1,1 @@\n-${'x'.repeat(40)}\n+${'y'.repeat(40)}\n`
+    const entries = Array.from({ length: 6 }, (_, index) => ({
+      ...entry('src/deep/same.ts', 100),
+      text: header(`src/deep/same.ts`) + hunk,
+      part: index + 1
+    }))
+    const slices = planSlices(entries, 500)
+    // Two ~240-byte entries fit a 500-byte slice; one slice per entry is what this forbids.
+    expect(slices).toHaveLength(3)
+    for (const slice of slices) {
+      expect(slice.bytes).toBeLessThanOrEqual(500)
+    }
+  })
+
   it('splits a file bigger than the budget at hunk boundaries, each part carrying the header', () => {
     const header = 'diff --git a/big.ts b/big.ts\n--- a/big.ts\n+++ b/big.ts\n'
     const hunk = (n) => `@@ -${n},1 +${n},1 @@\n-${'x'.repeat(40)}\n+${'y'.repeat(40)}\n`
