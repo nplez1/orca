@@ -43,14 +43,14 @@ export const BOT_COMMAND_SPECS: CommandSpec[] = [
   },
   {
     path: ['bot', 'ask'],
-    summary:
-      'Ask a bot on this computer a question, and read its answer in the chat the ask landed in',
+    summary: 'Ask a bot on this computer a question, and read its answer here or in its chat',
     usage: 'orca bot ask <name> [--chat <id|new>] --body <text> [--subject <text>] [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'bot', 'chat', 'body', 'body-file', 'subject'],
     positionalArgs: ['bot'],
     notes: [
       ...BOT_NOTES,
       'It is the same mail `orca orchestration send --to bot:<name>` sends, so the bot sees who asked; with no --chat it lands in the Home Chat. --chat takes a chat id `orca bot chats` prints, and only one that takes mail now, or new for a chat of its own.',
+      'Run from an Orca terminal, the answer is typed into that terminal and read with `orca orchestration check --terminal <its handle>`; from any other shell it lands in the chat the ask went to. A shell Orca did not start has no terminal of its own, and none is guessed.',
       '--subject is optional: the ask\u2019s first line becomes it.'
     ]
   },

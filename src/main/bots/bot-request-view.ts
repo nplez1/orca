@@ -42,6 +42,18 @@ const CHANNELS = new Set(['public_channel', 'private_channel', 'channel'])
 const askedByOf = (record: Pick<BotRequestRecord, 'askers' | 'askedBy'>): BotRequestAsker[] =>
   record.askedBy ?? record.askers
 
+export function askedFromShell(record: {
+  fromBotId?: string | null
+  askers?: readonly BotRequestAsker[]
+  askedBy?: readonly BotRequestAsker[]
+}): boolean {
+  const asked = record.askedBy ?? record.askers ?? []
+  return (
+    (record.fromBotId ?? null) === null &&
+    asked.some((asker) => asker.kind === 'person' && asker.source === 'local')
+  )
+}
+
 /** The Slack thread a handed-over job is answered in, as the receiving bot itself; null anywhere
  *  else (a DM is the asker's with the sender's own app; Linear and GitHub share one app), where the
  *  answer goes back to the sender to pass on. */
@@ -72,12 +84,12 @@ export function botRequestAskerLabel(asker: BotRequestAsker): string {
 const askersOf = (record: BotRequestRecord): string =>
   askedByOf(record).map(botRequestAskerLabel).join(', ')
 
-/** Who sent it, as the receiving bot reads it. */
 export function botRequestSenderName(
-  record: Pick<BotRequestRecord, 'fromBotName' | 'fromWorker'>
+  record: Pick<BotRequestRecord, 'fromBotName' | 'fromWorker'> &
+    Partial<Pick<BotRequestRecord, 'askers' | 'askedBy' | 'fromBotId'>>
 ): string {
   if (!record.fromBotName) {
-    return "your owner's agent"
+    return askedFromShell(record) ? "your owner at this computer's shell" : "your owner's agent"
   }
   return record.fromWorker ? `${record.fromBotName}'s worker` : record.fromBotName
 }
@@ -165,7 +177,9 @@ export function botRequestView(
     answer: reply('<your answer>'),
     answerAppears:
       record.purpose === 'question'
-        ? `${sender}'s conversation, waking it to finish the job`
+        ? askedFromShell(record)
+          ? `back to ${sender}, where they read it with orca orchestration check`
+          : `${sender}'s conversation, waking it to finish the job`
         : askedInOwnersChat(record)
           ? `${sender}'s conversation, where your owner reads it`
           : `${sender}'s conversation, which passes it on to ${askers}`

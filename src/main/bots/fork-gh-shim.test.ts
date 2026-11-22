@@ -45,18 +45,23 @@ function gh(
   args: string[],
   env: Record<string, string> = {},
   input?: string
-): Promise<{ lines: string[]; code: number }> {
+): Promise<{ lines: string[]; stderr: string; code: number }> {
   const path = [rigged.shimDir, rigged.realDir, '/usr/bin', '/bin'].join(':')
   return new Promise((resolve, reject) => {
     const child = spawn(rigged.shim, args, { env: { ...process.env, PATH: path, ...env } })
     let stdout = ''
+    let stderr = ''
     child.stdout.setEncoding('utf8')
+    child.stderr.setEncoding('utf8')
     child.stdout.on('data', (chunk: string) => {
       stdout += chunk
     })
+    child.stderr.on('data', (chunk: string) => {
+      stderr += chunk
+    })
     child.on('error', reject)
     child.on('close', (code) =>
-      resolve({ lines: stdout.split('\n').slice(0, -1), code: code ?? 1 })
+      resolve({ lines: stdout.split('\n').slice(0, -1), stderr, code: code ?? 1 })
     )
     child.stdin.end(input)
   })
@@ -141,6 +146,65 @@ describe.skipIf(!POSIX)('the bot gh shim', () => {
 
     const created = await gh(rigged, ['pr', 'create', '--title', 'A fix', '--body', 'It fixes.'])
     expect(bodyOf(created.lines)).toBe('It fixes.\n\n<!-- orca-bot:Scout -->')
+  })
+
+  it("marks the body of gh's own `new` alias for create", async () => {
+    const rigged = await rig()
+
+    const { lines } = await gh(rigged, ['pr', 'new', '--title', 'A fix', '-b', 'It fixes.'])
+
+    // gh still receives the verb the bot typed; only the marker's decision reads it as create.
+    expect(argsOf(lines).slice(0, 2)).toEqual(['pr', 'new'])
+    expect(bodyOf(lines)).toBe('It fixes.\n\n<!-- orca-bot:Scout -->')
+  })
+
+  it('refuses the shapes whose body it cannot mark, instead of posting them unmarked', async () => {
+    const rigged = await rig()
+
+    for (const argv of [
+      ['pr', 'create', '--title', 'A fix', '--fill'],
+      ['pr', 'create', '--title', 'A fix', '--fill-first'],
+      ['pr', 'create', '--title', 'A fix', '-T', 'bug.md'],
+      ['pr', 'create', '--title', 'A fix', '-db', 'Body.'],
+      ['pr', 'create', '--title', 'A fix', '-dF', 'bug.md']
+    ]) {
+      const { lines, stderr, code } = await gh(rigged, argv)
+      expect(code).toBe(2)
+      expect(lines).toEqual([])
+      expect(stderr).toContain('--body')
+    }
+  })
+
+  it('takes a template when the body is given too, which is what gh needs', async () => {
+    const rigged = await rig()
+
+    const { lines } = await gh(rigged, [
+      'pr',
+      'create',
+      '--title',
+      'A fix',
+      '-T',
+      'bug.md',
+      '-b',
+      'x'
+    ])
+
+    expect(bodyOf(lines)).toBe('x\n\n<!-- orca-bot:Scout -->')
+  })
+
+  it('leaves the calls gh would refuse alone, so its own error stands', async () => {
+    const rigged = await rig()
+
+    for (const argv of [
+      // Not a body flag at all.
+      ['pr', 'comment', '7', '--bodyfoo', 'x'],
+      // gh refuses both together; marking either would post what it would not.
+      ['pr', 'comment', '7', '-b', 'inline', '--body-file', rigged.body]
+    ]) {
+      const { lines, code } = await gh(rigged, argv)
+      expect(code).toBe(0)
+      expect(argsOf(lines)).toEqual(argv)
+    }
   })
 
   it('marks nothing when the body is empty, which would post a blank comment', async () => {

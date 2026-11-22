@@ -83,15 +83,21 @@ export function botAskChat(
   return chat
 }
 
-/** The terminal this ask comes from, so its answer has somewhere to go; a shell that is not one of
- *  Orca's has no mailbox, and its ask still lands in the bot's chat. */
+/** The terminal this ask comes from, so its answer has somewhere to go. Only a terminal Orca started
+ *  can be that: inferring one from the working folder would let an ask typed in any shell speak as a
+ *  sibling pane, take its mail, and be answered into its agent. */
 async function askerTerminal(
   flags: Map<string, string | boolean>,
   cwd: string,
   client: RuntimeClient
 ): Promise<string | undefined> {
+  if (!process.env.ORCA_TERMINAL_HANDLE) {
+    return undefined
+  }
   try {
-    return await resolveOrchestrationTerminalHandle(flags, cwd, client, 'from')
+    return await resolveOrchestrationTerminalHandle(flags, cwd, client, 'from', {
+      validateEnvHandle: true
+    })
   } catch (error) {
     if (error instanceof RuntimeClientError && error.code === 'no_active_sender_terminal') {
       return undefined

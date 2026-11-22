@@ -1,6 +1,7 @@
 // The marker every bot-written GitHub body carries, appended by a `gh` the bot cannot skip: a fork
 // shim first on the bot's PATH. Omission is the risk that matters — a forgotten marker wakes the bot
 // on its own output — so the marker is written by code, never remembered by the model.
+import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { delimiter, join } from 'node:path'
 import { botsRootFolder } from './bot-home'
@@ -32,10 +33,11 @@ function shellQuoted(value: string): string {
 }
 
 /**
- * The shim itself, in bash: a body flag on a verb that posts one (`pr comment`, `issue comment`,
- * `pr review`, and `pr create`/`pr edit`/`issue create`/`issue edit`) is replaced by one `--body`
- * carrying the marker, and every other call runs untouched. The body travels as an argument — GitHub
- * caps one at 65,536 characters — so nothing is written to a temp file that a signal could leak.
+ * The shim itself, in bash. On a verb that posts a body (`pr`/`issue` `comment`, `create`, `edit`, and
+ * `pr review`, `new` being gh's own alias for `create`) a body flag is replaced by one `--body` carrying
+ * the marker, and every other call runs untouched. Shapes it cannot mark — `--fill*`, a template with no
+ * body, a combined short flag hiding `-b`/`-F` — are refused with exit 2 instead of posting unmarked.
+ * The body travels as an argument (GitHub caps one at 65,536 characters), so no temp file can leak.
  */
 export function botGhShimScript(marker: string): string {
   return [
@@ -88,15 +90,34 @@ export function botGhShimScript(marker: string): string {
     '  i=$((i + 1))',
     'done',
     '',
+    '# gh aliases new to create; the marker follows the verb gh actually runs.',
+    'if [ "$sub" = new ]; then',
+    '  sub=create',
+    'fi',
     'case "$group $sub" in',
     '  "pr comment"|"issue comment"|"pr review"|"pr create"|"pr edit"|"issue create"|"issue edit") ;;',
     '  *) exec "$real_gh" "$@" ;;',
     'esac',
     '',
+    '# Refused rather than posted unmarked: gh writes these bodies itself, so there is nothing to mark.',
+    'refuse() {',
+    '  printf \'orca gh shim: %s %s %s. Pass --body <text>.\\n\' "$group" "$sub" "$1" >&2',
+    '  exit 2',
+    '}',
+    'template=0',
+    'for arg in "$@"; do',
+    '  case $arg in',
+    '    --fill|--fill-first|--fill-verbose) refuse "writes a body from commits, which this shim cannot mark" ;;',
+    '    -T|--template|--template=*) template=1 ;;',
+    '  esac',
+    'done',
+    '',
     '# The last body flag wins, as it does for gh; every one of them is dropped from the call.',
     'drop=" "',
     'body_file=0',
     'body_value=',
+    'saw_body=0',
+    'saw_file=0',
     'i=0',
     'while [ "$i" -lt "$count" ]; do',
     '  arg=${args[$i]}',
@@ -104,6 +125,7 @@ export function botGhShimScript(marker: string): string {
     '  case $arg in',
     '    -b|--body)',
     '      body_file=0',
+    '      saw_body=1',
     '      body_value=${args[$next]-}',
     '      drop="$drop$i $next "',
     '      i=$((i + 2))',
@@ -111,6 +133,7 @@ export function botGhShimScript(marker: string): string {
     '      ;;',
     '    -F|--body-file)',
     '      body_file=1',
+    '      saw_file=1',
     '      body_value=${args[$next]-}',
     '      drop="$drop$i $next "',
     '      i=$((i + 2))',
@@ -118,25 +141,39 @@ export function botGhShimScript(marker: string): string {
     '      ;;',
     '    --body=*|-b=*|--body-file=*|-F=*)',
     '      case $arg in',
-    '        --body=*|-b=*) body_file=0; body_value=${arg#*=} ;;',
-    '        *) body_file=1; body_value=${arg#*=} ;;',
+    '        --body=*|-b=*) body_file=0; saw_body=1; body_value=${arg#*=} ;;',
+    '        *) body_file=1; saw_file=1; body_value=${arg#*=} ;;',
     '      esac',
     '      drop="$drop$i "',
     '      i=$((i + 1))',
     '      continue',
     '      ;;',
-    '    -b?*|--body?*|-F?*|--body-file?*)',
+    '    -b?*|-F?*)',
     '      case $arg in',
-    '        -b?*|--body?*) body_file=0; body_value=${arg#-b} ;;',
-    '        *) body_file=1; body_value=${arg#-F} ;;',
+    '        -b?*) body_file=0; saw_body=1; body_value=${arg#-b} ;;',
+    '        *) body_file=1; saw_file=1; body_value=${arg#-F} ;;',
     '      esac',
     '      drop="$drop$i "',
     '      i=$((i + 1))',
     '      continue',
+    '      ;;',
+    '    -[A-Za-z][A-Za-z]*)',
+    '      # A combined short flag can hide -b/-F, so a group holding one is refused, not guessed at.',
+    '      case $arg in',
+    '        -*b*|-*F*) refuse "hides --body or --body-file in a combined short flag" ;;',
+    '      esac',
     '      ;;',
     '  esac',
     '  i=$((i + 1))',
     'done',
+    '',
+    'if [ "$template" = 1 ] && [ "$body_value" = "" ]; then',
+    '  refuse "writes a body from a template, which this shim cannot mark"',
+    'fi',
+    '# gh refuses both together, so this does too, rather than posting whichever came last.',
+    'if [ "$saw_body" = 1 ] && [ "$saw_file" = 1 ]; then',
+    '  exec "$real_gh" "$@"',
+    'fi',
     '',
     'if [ "$body_file" = 1 ]; then',
     '  if [ "$body_value" = - ]; then',
@@ -185,7 +222,7 @@ export async function installBotGhShim(bot: { id: string; name: string }): Promi
   if (existing !== script) {
     await mkdir(dir, { recursive: true })
     // A live session runs this file: write beside it and rename, so it never sees half a script.
-    const staged = `${file}.${process.pid}.tmp`
+    const staged = `${file}.${randomUUID()}.tmp`
     await writeFile(staged, script, { mode: 0o755 })
     await rename(staged, file)
   }

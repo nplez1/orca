@@ -4,6 +4,12 @@ import type { RuntimeClient } from '../runtime/client'
 import { RuntimeClientError } from '../runtime/connection/types'
 import { askSubject, BOT_ASK_HANDLERS, botAskChat, botOfSelector } from './fork-bot-ask'
 
+const { resolveActive } = vi.hoisted(() => ({ resolveActive: vi.fn() }))
+// The resolver that infers a terminal from the working folder: the ask must never reach it.
+vi.mock('../orchestration/identity/terminal-identity', () => ({
+  resolveOrchestrationTerminalHandle: resolveActive
+}))
+
 const SCOUT = { id: 'bot-1', name: 'Scout' }
 const DOCS = { id: 'bot-2', name: 'Docs' }
 
@@ -36,6 +42,8 @@ async function ask(
   } else {
     vi.stubEnv('ORCA_TERMINAL_HANDLE', '')
   }
+  resolveActive.mockReset()
+  resolveActive.mockResolvedValue('term_inferred')
   const calls: { method: string; params: unknown }[] = []
   const call = vi.fn(async (method: string, params?: unknown) => {
     calls.push({ method, params })
@@ -91,14 +99,14 @@ describe('bot ask', () => {
           body: 'how is the release going?',
           type: 'question',
           // So the answer has somewhere to go, and the command can say where.
-          from: 'term_ask'
+          from: 'term_inferred'
         })
       }
     ])
     expect(sent(calls)[0]!.params).not.toHaveProperty('chat')
   })
 
-  it('sends without a from when the shell is not an Orca terminal, so the ask still lands', async () => {
+  it('sends no from from a shell Orca did not start, even when a pane could be inferred', async () => {
     const calls = await ask(
       [
         ['bot', 'Scout'],
@@ -108,8 +116,22 @@ describe('bot ask', () => {
       ''
     )
 
+    // Another pane's handle would take its mail and type the answer into its agent.
+    expect(resolveActive).not.toHaveBeenCalled()
     expect(sent(calls)).toHaveLength(1)
     expect(sent(calls)[0]!.params).not.toHaveProperty('from')
+  })
+
+  it('re-mints a stale handle rather than using it', async () => {
+    const calls = await ask([
+      ['bot', 'Scout'],
+      ['body', 'hello']
+    ])
+
+    expect(resolveActive).toHaveBeenCalledWith(expect.anything(), '/', expect.anything(), 'from', {
+      validateEnvHandle: true
+    })
+    expect(sent(calls)[0]!.params).toMatchObject({ from: 'term_inferred' })
   })
 
   it('forwards the chat that takes mail, named by id', async () => {
