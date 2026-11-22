@@ -4983,8 +4983,8 @@ enough to the job's 50 that one step could take the whole job.
   `::error::` line into something no parser here reads. `detached` removes the step from the gate's
   process group, so `SIGINT`/`SIGTERM`/`SIGHUP` are forwarded to the tree before the gate exits.
 - **The step is named before it runs.** `runSteps` awaits a `running [i/N] <id> — <command>` line before
-  each spawn (a promise-wrapped `stream.write`, so the line is ordered ahead of the step's own output
-  where a pipe write is queued), keeps the completion line, and on a timeout prints
+  each spawn (a promise-wrapped `stream.write`, so the line is in the pipe before the step can hang and a
+  runner that kills the step still has it), keeps the completion line, and on a timeout prints
   `::error::lint step <id> timed out after <n>s (--timeout-ms <ms>) …` followed by the last 8 output
   lines, so both the CI log and the annotation name the step and quote what it printed.
 - **The gate is bounded.** `DEFAULT_TIMEOUT_MS` 30 → 10 minutes, `--timeout-ms` still overrides. A
@@ -4997,10 +4997,10 @@ enough to the job's 50 that one step could take the whole job.
   line, exit 1, and that the **grandchild pid is gone** (`kill(pid, 0)` → `ESRCH`) rather than merely
   that a kill was called.
 - **`fork-main-gates.yml` gains `timeout-minutes: 20` on `Lint ratchet verdict`.** The group kill is the
-  fix; the step timeout is the backstop. Measured at the fix: the whole 54-step gate takes **92 s** on
-  this 18-core host, so 20 minutes is a runner's normal run plus the 10-minute per-step bound plus
-  margin — one hung step fails the step, named, in 20 minutes instead of consuming the 50-minute job.
-  The job timeout stays the outer bound for the `pnpm tc` step above it.
+  fix; the step timeout is the backstop, sized at a runner's normal run plus the 10-minute per-step
+  bound — one hung step fails the step, named, in 20 minutes instead of consuming the 50-minute job. For
+  scale, the whole 54-step gate took **92 s** on the 18-core host this was written on. The job timeout
+  stays the outer bound for the `pnpm tc` step above it.
 
 **Anchors:** `runStep`/`runSteps`/`killTree`/`finalize` in `local/gate-lint.mjs`; the
 `timeout-minutes: 20` line and its `(#446)` comment on the last step of

@@ -39,8 +39,8 @@ const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000
 // Why a deadline past the kill: SIGKILL on the group is enough unless a grandchild left it, in which
 // case the pipe stays open and `close` never fires — the hang this gate exists to fix.
 const KILL_GRACE_MS = 5 * 1000
-// Why after `exit` and not at the deadline: a step that finished in 20 s must not hold the gate for
-// ten minutes because a child it left kept the pipe open.
+// Why after `exit` and not at the deadline: a step that finished must not hold the gate for its whole
+// deadline because a child it left kept the pipe open (`KILL_GRACE_MS` is that same window, post-kill).
 const DRAIN_GRACE_MS = 5 * 1000
 const MAX_OUTPUT_BYTES = 256 * 1024 * 1024
 const TAIL_LINES = 8
@@ -51,8 +51,8 @@ const MAX_TIMEOUT_MS = 2147483647
  * A line the CI log has to have *before* the next step starts.
  *
  * Why awaited: the gate used to print a step only after it finished, so a step that never finished left
- * no name behind (#446). Awaiting the write is also what orders the line ahead of the step's own output
- * where a pipe write is queued rather than synchronous.
+ * no name behind (#446). Awaiting puts the line in the pipe before the step can hang, so a runner that
+ * kills the step still has it in the log.
  */
 function writer(stream) {
   return (line) =>
@@ -605,9 +605,6 @@ export function runStep(step, timeoutMs, { cwd = ROOT } = {}) {
 
     child.once('exit', (code, signal) => {
       exited = { code, signal }
-      // Why on exit rather than at the deadline: the step is done, and only a child it left behind can
-      // still be holding the pipe. Waiting the full deadline for it would stall the gate for minutes
-      // on a step that already answered.
       drainTimer = setTimeout(() => {
         killTree(child)
         settle(code, signal)
