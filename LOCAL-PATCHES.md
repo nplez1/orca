@@ -4950,3 +4950,53 @@ Restored in this pass, all import-path-only ports that pass at HEAD:
 - `terminal-tab-actions-unified-close.test.ts` (5 cases: the `closeTerminalTab` unified-close contract,
   including the fork's #96 case that an emptied worktree stays selected) moved to
   `src/renderer/src/components/terminal/tab-lifecycle/terminal-tab-actions.test.ts`.
+
+### `local(ci)`: a hung lint step is killed, named and bounded (#446)
+
+**The gap, measured from two pushes.** Runs
+[44057634767](https://github.com/nplez1/orca/actions/runs/44057634767) (`31a3268`, 2026-11-17) and
+[43825293066](https://github.com/nplez1/orca/actions/runs/43825293066) (`5930d49`, 2026-11-16) each sat
+in `Lint ratchet verdict` for ~48 minutes with **no conclusion on the step** — steps 1–11 green, the job
+ending only at its own 50-minute bound, so the alert named the workflow and the commit and never the
+step. Intermittent: neighbouring pushes were green in 4–17 minutes.
+
+Three properties of the gate turned one hung child into that. `runStep` used
+`spawnSync(..., { timeout })`, whose timeout kills the **direct child** — but a `pnpm run` step runs the
+real linter one level down, and a grandchild that inherits the output pipe keeps it open, so the wait
+outlives the kill. The gate printed a step **only after it finished**, so the log could not name the one
+that never did. And `spawnSync` blocks the event loop, so even a line printed before the spawn sat
+queued and unflushed for exactly as long as the hang lasted. `DEFAULT_TIMEOUT_MS` was 30 minutes, close
+enough to the job's 50 that one step could take the whole job.
+
+**What changed** — `local/gate-lint.mjs`, fork-owned, so no sync can revert it:
+
+- **`runStep` spawns instead of blocking, and kills the tree.** `spawn` with `detached: true` makes the
+  step a process-group leader; a timeout sends `SIGKILL` to `-child.pid` with a `child.kill('SIGKILL')`
+  fallback, and `taskkill /T /F` plus the same fallback on Windows. It resolves (never rejects) with
+  `{ id, command, exitCode, signal, output, tail, timedOut, seconds }`, so a hang is a result the verdict
+  can name. A second deadline (`KILL_GRACE_MS`, 5 s) settles the step even if a grandchild left the group
+  via `setsid` and would otherwise hold the pipe forever — the gate must not be able to wait on a stream
+  at all.
+- **The step is named before it runs.** `runSteps` awaits a flushed `running [i/N] <id> — <command>`
+  line before each spawn (a promise-wrapped `stream.write`, not `console.log`, which to a pipe is only
+  queued), keeps the completion line, and on a timeout prints
+  `::error::lint step <id> timed out after <n>s (--timeout-ms <ms>) …` followed by the last 8 output
+  lines, so both the CI log and the annotation name the step and quote what it printed.
+- **The gate is bounded.** `DEFAULT_TIMEOUT_MS` 30 → 10 minutes, `--timeout-ms` still overrides. A
+  timeout is already classified ahead of every allowlist lookup in `classifyRun` (it can only ever be a
+  new red); `finalize` now also prints an explicit "a timeout is never a known red, re-run with
+  `--only <id>`" line, and the gate exits 1 with its FAIL verdict.
+- **The verdict is testable.** `runSteps` and `finalize` moved out of `main` so
+  `tests/tools/lint-gate.test.mjs` drives the whole path against a fixture step that spawns a
+  `SIGTERM`-ignoring grandchild holding the pipe: it asserts `timedOut`, the named step, the `::error::`
+  line, exit 1, and that the **grandchild pid is gone** (`kill(pid, 0)` → `ESRCH`) rather than merely
+  that a kill was called.
+- **`fork-main-gates.yml` gains `timeout-minutes: 20` on `Lint ratchet verdict`.** The group kill is the
+  fix; the step timeout is the backstop, sized at twice the per-step bound so one hung step fails the
+  step, named, in 20 minutes instead of consuming the 50-minute job. The job timeout stays the outer
+  bound for the `pnpm tc` step above it.
+
+**Anchors:** `runStep`/`runSteps`/`killTree`/`finalize` in `local/gate-lint.mjs`; the
+`timeout-minutes: 20` line and its `(#446)` comment on the last step of
+`.github/workflows/fork-main-gates.yml`. Neither is a file upstream owns, so a sync cannot reintroduce
+the `spawnSync` timeout.

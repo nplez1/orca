@@ -12,22 +12,61 @@
  * rule: `LOCAL-PATCHES.md` stays the evidence, `local/lint-known-red.json` stays the assertion, and
  * both change in the commit that adds or removes an entry.
  *
+ * Every step runs under a deadline that reaches its whole process tree, and the step is named before
+ * it can hang: `pnpm run` puts the real linter one level down, so a kill aimed at the direct child
+ * left a grandchild holding the output pipe and the gate waited ~48 minutes for a stream that could
+ * not close (#446). See `runStep`.
+ *
  * Usage: node local/gate-lint.mjs [--allowlist PATH] [--only id,id] [--timeout-ms N] [--prune]
  *                                 [--verbose]
  *
  *   --only     run just these step ids, for iterating on one ratchet.
  *   --prune    drop entries that no longer reproduce and the steps that no longer exist.
+ *   --timeout-ms N   per-step deadline, default 10 minutes; an overrun fails the gate.
  *
- * Exit: 0 pass, 1 new red, 2 usage or environment problem.
+ * Exit: 0 pass, 1 new red or a step that timed out, 2 usage or environment problem.
  */
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 import { compileMatch } from './lib/known-red.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
 const DEFAULT_ALLOWLIST = join(ROOT, 'local', 'lint-known-red.json')
-const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000
+// Why 10 and not 30: a lint step that has not answered in ten minutes is hung, not slow, and the job
+// around this gate has 50 minutes for ~55 steps (#446).
+const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000
+// Why a deadline past the kill: SIGKILL on the group is enough unless a grandchild left it, in which
+// case the pipe stays open and `close` never fires — the hang this gate exists to fix.
+const KILL_GRACE_MS = 5 * 1000
+const MAX_OUTPUT_BYTES = 256 * 1024 * 1024
+const TAIL_LINES = 8
+
+/**
+ * A line the CI log has to have *before* the next step starts.
+ *
+ * Why a promise and not `console.log`: to a pipe a log line is queued, and the write that names a step
+ * is only worth having if it lands while that step runs. `spawnSync` blocked the loop that would have
+ * drained it, which is why a hung step left no name behind (#446).
+ */
+function writer(stream) {
+  return (line) =>
+    new Promise((done) => {
+      stream.write(`${line}\n`, () => done())
+    })
+}
+
+const writeOut = writer(process.stdout)
+const writeErr = writer(process.stderr)
+
+/** The last lines a hung step managed to print, which is all the `::error::` line can quote. */
+export function tailLines(output, limit = TAIL_LINES) {
+  return output
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .filter((line) => line.trim().length > 0)
+    .slice(-limit)
+}
 
 function usage() {
   return 'usage: node local/gate-lint.mjs [--allowlist PATH] [--only id,id] [--timeout-ms N] [--prune] [--verbose]'
@@ -399,26 +438,301 @@ function git(args) {
   return result.status === 0 ? result.stdout.trim() : null
 }
 
-function runStep(step, timeoutMs) {
-  const startedAt = process.hrtime.bigint()
-  const result = spawnSync(step.argv[0], step.argv.slice(1), {
-    cwd: ROOT,
-    encoding: 'utf8',
-    maxBuffer: 256 * 1024 * 1024,
-    timeout: timeoutMs
-  })
-  const seconds = Number(process.hrtime.bigint() - startedAt) / 1e9
-  return {
-    id: step.id,
-    exitCode: result.error ? 1 : (result.status ?? 1),
-    output: `${result.stdout ?? ''}${result.stderr ?? ''}${result.error ? `\n${result.error.message}` : ''}`,
-    // A killed step reported nothing complete, so its entries cannot be said to apply.
-    timedOut: result.error?.code === 'ETIMEDOUT',
-    seconds
+/**
+ * Kill a step's whole process tree, not just the direct child.
+ *
+ * Why the process group: `pnpm run` puts the real linter one level down, so a kill aimed at the direct
+ * child leaves a grandchild holding the output pipe — the gate then waits on a stream that cannot
+ * close, which is the 48-minute hang in #446. `detached: true` makes the child a group leader so the
+ * negative pid reaches everything it spawned.
+ */
+function killTree(child, signal = 'SIGKILL') {
+  if (!child.pid) {
+    return
+  }
+  if (process.platform === 'win32') {
+    // Why taskkill: Windows has no process groups, and `/T` is the only tree kill it offers.
+    spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' })
+    try {
+      child.kill(signal)
+    } catch {
+      // already gone
+    }
+    return
+  }
+  try {
+    process.kill(-child.pid, signal)
+  } catch {
+    // Why the fallback: a child that exited before becoming its own group leader, or one spawned
+    // without `detached`, has no group to signal.
+    try {
+      child.kill(signal)
+    } catch {
+      // already gone
+    }
   }
 }
 
-function main(argv = process.argv.slice(2)) {
+/**
+ * Run one step under a deadline that reaches its grandchildren.
+ *
+ * Resolves — never rejects — with `{ id, command, exitCode, signal, output, tail, timedOut, seconds }`,
+ * so a step that hangs is a result the verdict can name rather than a wait with no output.
+ */
+export function runStep(step, timeoutMs, { cwd = ROOT } = {}) {
+  return new Promise((resolve) => {
+    const startedAt = process.hrtime.bigint()
+    const chunks = []
+    let buffered = 0
+    let truncated = false
+    let timedOut = false
+    let spawnError = null
+    let settled = false
+    let timer = null
+    let graceTimer = null
+    let exited = null
+    const [program, ...args] = step.argv
+    const settleAs = (output) =>
+      resolve({
+        id: step.id,
+        command: step.command,
+        exitCode: 1,
+        signal: null,
+        output,
+        tail: tailLines(output),
+        timedOut: false,
+        seconds: Number(process.hrtime.bigint() - startedAt) / 1e9
+      })
+    let child
+    try {
+      child = spawn(program, args, {
+        cwd,
+        // Why POSIX only: it is what makes the child a process-group leader, and Windows has no
+        // equivalent — `taskkill /T` covers the tree there.
+        detached: process.platform !== 'win32',
+        // Why stdin ignored: a step that reads it would wait for a TTY that never speaks.
+        stdio: ['ignore', 'pipe', 'pipe']
+      })
+    } catch (error) {
+      // Why here and not as a rejection: every caller reads a result, and a step that could not start
+      // is a red with evidence, not an unhandled throw halfway through the chain.
+      settleAs(error.message)
+      return
+    }
+
+    const collect = (chunk) => {
+      const room = Math.max(0, MAX_OUTPUT_BYTES - buffered)
+      truncated ||= chunk.length > room
+      if (room > 0) {
+        const kept = chunk.subarray(0, room)
+        chunks.push(kept)
+        buffered += kept.length
+      }
+    }
+    child.stdout.on('data', collect)
+    child.stderr.on('data', collect)
+
+    const settle = (code, signal) => {
+      if (settled) {
+        return
+      }
+      settled = true
+      clearTimeout(timer)
+      clearTimeout(graceTimer)
+      process.off('SIGINT', interrupt)
+      process.off('SIGTERM', terminate)
+      const text = Buffer.concat(chunks).toString('utf8')
+      const output = `${text}${truncated ? `\n[gate: output truncated at ${MAX_OUTPUT_BYTES} bytes]` : ''}${spawnError ? `\n${spawnError.message}` : ''}`
+      resolve({
+        id: step.id,
+        command: step.command,
+        // Why 1 rather than a signal's null status: the verdict reads non-zero as "it failed", and
+        // `timedOut` is what says why.
+        exitCode: timedOut ? 1 : (code ?? 1),
+        signal: signal ?? null,
+        output,
+        tail: tailLines(output),
+        timedOut,
+        seconds: Number(process.hrtime.bigint() - startedAt) / 1e9
+      })
+    }
+
+    // Why forwarded: `detached` takes the step out of the terminal's foreground group, so without this
+    // a Ctrl-C would leave the step running after the gate had gone.
+    const interrupt = () => {
+      killTree(child)
+      process.exit(130)
+    }
+    const terminate = () => {
+      killTree(child)
+      process.exit(143)
+    }
+    process.once('SIGINT', interrupt)
+    process.once('SIGTERM', terminate)
+
+    child.once('exit', (code, signal) => {
+      exited = { code, signal }
+    })
+
+    timer = setTimeout(() => {
+      // Why the exit test: a step that finished while an orphan it left held its pipe is not a hang,
+      // and reporting one would be a red the step did not earn. Only a step still running times out.
+      if (exited !== null) {
+        // Why still kill: a leftover child holding the log pipe is the same class of orphan (#446).
+        killTree(child)
+        child.stdout?.destroy()
+        child.stderr?.destroy()
+        settle(exited.code, exited.signal)
+        return
+      }
+      timedOut = true
+      killTree(child)
+      graceTimer = setTimeout(() => {
+        child.stdout?.destroy()
+        child.stderr?.destroy()
+        settle(null, null)
+      }, KILL_GRACE_MS)
+    }, timeoutMs)
+
+    child.once('close', (code, signal) => settle(code, signal))
+    child.once('error', (error) => {
+      spawnError = error
+      // Why the pid test: on a live child this event is a failed kill, not a failed spawn, and the
+      // `close` that settles it is still coming.
+      if (!child.pid) {
+        settle(null, null)
+      }
+    })
+  })
+}
+
+/**
+ * Run steps in order, naming each one before it can hang.
+ *
+ * Why the `running` line is awaited: the gate used to print a step only after it finished, so a step
+ * that never finished left the CI log and the alert email with no step name at all (#446).
+ */
+export async function runSteps(
+  steps,
+  {
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+    verbose = false,
+    cwd = ROOT,
+    out = writeOut,
+    err = writeErr
+  } = {}
+) {
+  const results = []
+  for (const [index, step] of steps.entries()) {
+    const position = `[${index + 1}/${steps.length}]`
+    await out(`running ${position} ${step.id} — ${step.command}`)
+    const result = await runStep(step, timeoutMs, { cwd })
+    results.push(result)
+    const status = result.exitCode === 0 ? 'ok  ' : 'FAIL'
+    await out(`  ${position} ${status} ${result.id} — ${result.seconds.toFixed(1)}s`)
+    if (result.timedOut) {
+      await err(
+        `::error::lint step ${result.id} timed out after ${(timeoutMs / 1000).toFixed(1)}s (--timeout-ms ${timeoutMs}) and its process tree was killed; last output:`
+      )
+      for (const line of result.tail.length > 0 ? result.tail : ['(no output)']) {
+        await err(`  | ${line}`)
+      }
+    }
+    if (verbose && result.exitCode !== 0) {
+      await out(result.output.trimEnd())
+    }
+  }
+  return results
+}
+
+/**
+ * Turn results into the printed verdict and the exit code.
+ *
+ * Split out of `main` so a test can drive the whole verdict — including the exit code a hung step
+ * produces — without parsing arguments or spawning the real lint chain.
+ */
+export async function finalize(
+  results,
+  entries,
+  chainSteps,
+  {
+    revision = 'unknown',
+    dirty = false,
+    prune = false,
+    allowlist = DEFAULT_ALLOWLIST,
+    manifest = {},
+    out = writeOut,
+    err = writeErr
+  } = {}
+) {
+  const { known, unexpected, staleEntries, staleSteps, entryProblems } = classifyRun(
+    results,
+    entries,
+    chainSteps
+  )
+  const revisionLabel = `lint gate @${revision}${dirty ? '+dirty' : ''}`
+
+  if (prune) {
+    // Why only the entries this run could answer for: a --only run says nothing about the steps it
+    // did not run, and pruning those would quietly un-allow a red nobody looked at.
+    const kept = entries.filter(
+      (entry) => !staleEntries.includes(entry) && !staleSteps.includes(entry)
+    )
+    writeFileSync(allowlist, `${JSON.stringify({ ...manifest, entries: kept }, null, 2)}\n`)
+    await out(`pruned ${entries.length - kept.length} stale known-red entr(y/ies)`)
+  }
+
+  const totalSeconds = results.reduce((sum, result) => sum + result.seconds, 0)
+  const failed = results.filter((result) => result.exitCode !== 0).length
+  const summary =
+    `${results.length - failed} green, ${failed} failing: ${known.length} known red, ` +
+    `${unexpected.length} new; ${results.length} steps; ${totalSeconds.toFixed(1)} s`
+
+  for (const { step, line, entry } of known) {
+    await out(
+      `known red ${step}: ${line} [${entry.class ?? 'unclassified'} / ${entry.owner ?? 'unattributed'}]`
+    )
+  }
+  for (const { step, line } of unexpected) {
+    await err(`::error::new lint red ${step}: ${line}`)
+  }
+  for (const result of results.filter((row) => row.timedOut)) {
+    // Why its own line: a timeout is the one failure mode whose evidence is a missing report, so the
+    // verdict has to say out loud that it is not, and can never be, a known red (#446).
+    await err(
+      `lint step ${result.id} timed out — a timeout is never a known red. Re-run it alone: node local/gate-lint.mjs --only ${result.id}`
+    )
+  }
+  for (const problem of entryProblems) {
+    await err(`::error::unusable known-red entry: ${problem}`)
+  }
+  // Why not ::error:: here: a stale entry is not a failure, and the runner reads that prefix as one.
+  for (const entry of staleEntries) {
+    await out(
+      `stale known-red entry (prune it): ${entry.step}${entry.match ? ` /${entry.match}/` : ''}`
+    )
+  }
+  for (const entry of staleSteps) {
+    await err(`known-red entry for a step that no longer exists: ${entry.step}`)
+  }
+  if (unexpected.length > 0 || staleSteps.length > 0 || entryProblems.length > 0) {
+    await err(`${revisionLabel}: FAIL — ${summary}`)
+    if (unexpected.length > 0) {
+      await err(
+        'A new red is a real failure to fix, or a foreign one: record it in local/lint-known-red.json with its evidence and a LOCAL-PATCHES.md line, in the same commit.'
+      )
+    }
+    return 1
+  }
+  if (staleEntries.length > 0) {
+    await out(`${revisionLabel}: PASS (stale entries: run --prune) — ${summary}`)
+    return 0
+  }
+  await out(`${revisionLabel}: PASS — ${summary}`)
+  return 0
+}
+
+async function main(argv = process.argv.slice(2)) {
   const options = parseArgs(argv)
   const manifest = readManifest(options.allowlist)
   const steps = resolveGateSteps(
@@ -434,84 +748,38 @@ function main(argv = process.argv.slice(2)) {
 
   const revision = git(['rev-parse', '--short', 'HEAD']) ?? 'unknown'
   const dirty = Boolean(git(['status', '--porcelain']))
-  console.log(
+  await writeOut(
     `lint gate @${revision}${dirty ? '+dirty' : ''}: running ${selected.length}/${steps.length} steps`
   )
 
-  const results = []
-  for (const [index, step] of selected.entries()) {
-    const result = runStep(step, options.timeoutMs)
-    results.push(result)
-    const status = result.exitCode === 0 ? 'ok  ' : 'FAIL'
-    console.log(
-      `  [${index + 1}/${selected.length}] ${status} ${result.id} — ${result.seconds.toFixed(1)}s`
-    )
-    if (options.verbose && result.exitCode !== 0) {
-      console.log(result.output.trimEnd())
-    }
-  }
-
-  const { known, unexpected, staleEntries, staleSteps, entryProblems } = classifyRun(
+  const results = await runSteps(selected, {
+    timeoutMs: options.timeoutMs,
+    verbose: options.verbose
+  })
+  return finalize(
     results,
     entries,
-    steps.map((step) => step.id)
-  )
-
-  if (options.prune) {
-    // Why only the entries this run could answer for: a --only run says nothing about the steps it
-    // did not run, and pruning those would quietly un-allow a red nobody looked at.
-    const kept = entries.filter(
-      (entry) => !staleEntries.includes(entry) && !staleSteps.includes(entry)
-    )
-    writeFileSync(options.allowlist, `${JSON.stringify({ ...manifest, entries: kept }, null, 2)}\n`)
-    console.log(`pruned ${entries.length - kept.length} stale known-red entr(y/ies)`)
-  }
-
-  const totalSeconds = results.reduce((sum, result) => sum + result.seconds, 0)
-  const failed = results.filter((result) => result.exitCode !== 0).length
-  const summary =
-    `${results.length - failed} green, ${failed} failing: ${known.length} known red, ` +
-    `${unexpected.length} new; ${results.length} steps; ${totalSeconds.toFixed(1)} s`
-
-  for (const { step, line, entry } of known) {
-    console.log(
-      `known red ${step}: ${line} [${entry.class ?? 'unclassified'} / ${entry.owner ?? 'unattributed'}]`
-    )
-  }
-  for (const { step, line } of unexpected) {
-    console.error(`::error::new lint red ${step}: ${line}`)
-  }
-  for (const problem of entryProblems) {
-    console.error(`::error::unusable known-red entry: ${problem}`)
-  }
-  // Why not ::error:: here: a stale entry is not a failure, and the runner reads that prefix as one.
-  for (const entry of staleEntries) {
-    console.log(
-      `stale known-red entry (prune it): ${entry.step}${entry.match ? ` /${entry.match}/` : ''}`
-    )
-  }
-  for (const entry of staleSteps) {
-    console.error(`known-red entry for a step that no longer exists: ${entry.step}`)
-  }
-  if (unexpected.length > 0 || staleSteps.length > 0 || entryProblems.length > 0) {
-    console.error(`lint gate @${revision}${dirty ? '+dirty' : ''}: FAIL — ${summary}`)
-    if (unexpected.length > 0) {
-      console.error(
-        'A new red is a real failure to fix, or a foreign one: record it in local/lint-known-red.json with its evidence and a LOCAL-PATCHES.md line, in the same commit.'
-      )
+    steps.map((step) => step.id),
+    {
+      revision,
+      dirty,
+      prune: options.prune,
+      allowlist: options.allowlist,
+      manifest,
+      out: writeOut,
+      err: writeErr
     }
-    return 1
-  }
-  if (staleEntries.length > 0) {
-    console.log(
-      `lint gate @${revision}${dirty ? '+dirty' : ''}: PASS (stale entries: run --prune) — ${summary}`
-    )
-    return 0
-  }
-  console.log(`lint gate @${revision}${dirty ? '+dirty' : ''}: PASS — ${summary}`)
-  return 0
+  )
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === resolve(import.meta.filename)) {
-  process.exit(main())
+  main().then(
+    (code) => {
+      process.exitCode = code
+    },
+    (error) => {
+      console.error(error)
+      process.exitCode = 2
+    }
+  )
 }
