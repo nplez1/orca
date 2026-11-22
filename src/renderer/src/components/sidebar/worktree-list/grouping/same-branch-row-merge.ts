@@ -163,31 +163,47 @@ function planLevelMerge(nodes: readonly RowNode[], ctx: MergeContext): Map<strin
   return merges
 }
 
+/** Counts the rows a level renders, so a card's chip agrees with the cards below it. */
+function withRenderedChildCount(row: Row, children: readonly RowNode[]): Row {
+  if (row.type !== 'item' && row.type !== 'folder-workspace') {
+    return row
+  }
+  // Why not when folded: the rows are hidden by design, so the chip still counts them.
+  if (row.lineageCollapsed === true || children.length === 0) {
+    return row
+  }
+  return row.lineageChildCount === children.length
+    ? row
+    : { ...row, lineageChildCount: children.length }
+}
+
 function mergeLevel(nodes: readonly RowNode[], ctx: MergeContext): RowNode[] {
   const merges = planLevelMerge(nodes, ctx)
-  if (merges.size === 0) {
-    return nodes.map((node) => ({ row: node.row, children: mergeLevel(node.children, ctx) }))
-  }
   const consumedRowKeys = new Set([...merges.values()].flatMap((merge) => merge.consumedRowKeys))
   const result: RowNode[] = []
   for (const node of nodes) {
-    if (node.row.type === 'item') {
-      const merge = merges.get(node.row.rowKey)
-      if (merge) {
-        // Why: the card stands in for every host it merged, so it draws their
-        // children as one subtree — the union — or none of them when folded.
-        const children =
-          merge.merged.lineageCollapsed === true
-            ? []
-            : merge.memberNodes.flatMap((member) => member.children)
-        result.push({ row: merge.merged, children: mergeLevel(children, ctx) })
-        continue
-      }
-      if (consumedRowKeys.has(node.row.rowKey)) {
-        continue
-      }
+    const merge = node.row.type === 'item' ? merges.get(node.row.rowKey) : undefined
+    if (merge) {
+      // Why: the card stands in for every host it merged, so it draws their
+      // children as one subtree — the union — or none of them when folded.
+      const children =
+        merge.merged.lineageCollapsed === true
+          ? []
+          : merge.memberNodes.flatMap((member) => member.children)
+      const mergedChildren = mergeLevel(children, ctx)
+      result.push({
+        row: withRenderedChildCount(merge.merged, mergedChildren),
+        children: mergedChildren
+      })
+      continue
     }
-    result.push({ row: node.row, children: mergeLevel(node.children, ctx) })
+    if (node.row.type === 'item' && consumedRowKeys.has(node.row.rowKey)) {
+      continue
+    }
+    const children = mergeLevel(node.children, ctx)
+    // Why after the children: a level that merged draws one card for several
+    // workspaces, so the chip must count cards, not workspaces.
+    result.push({ row: withRenderedChildCount(node.row, children), children })
   }
   return result
 }

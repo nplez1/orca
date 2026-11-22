@@ -114,7 +114,8 @@ export function getRenderedLineageChipKeys(
         projects: projection.projects,
         projectHostSetups: projection.setups
       }),
-      // Why the local constant: only member order depends on it, and this map holds keys.
+      // Why the local constant: this map holds keys, and ordering only needs a
+      // reference host. A workspace with no host of its own is local anyway.
       LOCAL_EXECUTION_HOST_ID,
       undefined,
       state.collapsedGroups

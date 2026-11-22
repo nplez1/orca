@@ -108,7 +108,13 @@ describe('mergeSameBranchRows with lineage children', () => {
   // The M5/Win report: one host's main workspace gained a child and the pair split
   // into two rows, losing the host selector. The children are on branches of their
   // own, so only the parents merge here.
-  const localChild = rowFor(worktreeOn(worktree, 'wt-1-child', 'child'), { depth: 1 })
+  const localChild = rowFor(
+    worktreeOn(worktree, 'wt-1-child', 'child'),
+    { depth: 1 },
+    {
+      childIds: ['wt-1-grandchild']
+    }
+  )
   const remoteChildA = rowFor(worktreeOn(remoteWorktree, 'wt-remote-child-a', 'child-a'), {
     depth: 1
   })
@@ -241,10 +247,11 @@ describe('mergeSameBranchRows with the same hierarchy on both hosts', () => {
     }
   })
 
-  it('counts the union of child workspaces at each level', () => {
+  it('counts the cards it draws, not the workspaces behind them', () => {
     const result = merge(rowsWithLeaves)
 
-    expect(itemAt(result, 0).lineageChildCount).toBe(2)
+    // Two mid workspaces merge into one card, so the root has one child on screen.
+    expect(itemAt(result, 0).lineageChildCount).toBe(1)
     expect(itemAt(result, 0).lineageChildWorktreeIds).toEqual(['wt-m5-mid', 'wt-win-mid'])
     expect(itemAt(result, 1).lineageChildWorktreeIds).toEqual(['wt-m5-leaf', 'wt-win-leaf'])
     expect(itemAt(result, 2).lineageChildCount).toBe(0)
@@ -297,14 +304,24 @@ describe('mergeSameBranchRows with the same hierarchy on both hosts', () => {
 })
 
 describe('mergeSameBranchRows with children on different branches', () => {
-  const localChild = rowFor(worktreeOn(worktree, 'wt-1-child', 'child'), { depth: 1 })
+  const localChild = rowFor(
+    worktreeOn(worktree, 'wt-1-child', 'child'),
+    { depth: 1 },
+    {
+      childIds: ['wt-1-grandchild']
+    }
+  )
   const localGrandchild = rowFor(worktreeOn(worktree, 'wt-1-grandchild', 'child-ui'), {
     depth: 2,
     isLastLineageChild: true
   })
-  const remoteChild = rowFor(worktreeOn(remoteWorktree, 'wt-remote-child', 'other-child'), {
-    depth: 1
-  })
+  const remoteChild = rowFor(
+    worktreeOn(remoteWorktree, 'wt-remote-child', 'other-child'),
+    {
+      depth: 1
+    },
+    { childIds: ['wt-remote-grandchild'] }
+  )
   const remoteGrandchild = rowFor(
     worktreeOn(remoteWorktree, 'wt-remote-grandchild', 'other-child-ui'),
     { depth: 2, isLastLineageChild: true }

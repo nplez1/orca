@@ -11,7 +11,10 @@ import { getHostSectionCollapseKey } from '../../../../../../shared/sidebar-list
 import { getWorktreeHostIdentity } from '../../../../../../shared/worktree/host-qualified-identity'
 import { getWorktreeLineageGroupKey } from '../../../../../../shared/sidebar-list/sections/group-keys'
 import type { ProjectGroupingModel } from '../../../../../../shared/sidebar-list/sections/project-section-grouping'
-import type { WorktreeOccurrencePlan } from '../../../../../../shared/sidebar-list/lineage/worktree-occurrence-plan'
+import type {
+  WorktreeOccurrence,
+  WorktreeOccurrencePlan
+} from '../../../../../../shared/sidebar-list/lineage/worktree-occurrence-plan'
 import type {
   PinnedWorktreeDisplayPolicy,
   WorktreeGroupBy
@@ -21,6 +24,16 @@ import { buildProjectGroupingIndex } from '../../../../../../shared/sidebar-list
 import { getBranchGroupMembersForWorktree } from '../grouping/branch-groups'
 import type { SidebarLineageParentIdentities } from '../../../../../../shared/sidebar-list/lineage/worktree-lineage-projection'
 import { createSidebarPRGroupReader } from '../grouping/pr-group-key'
+
+/** The rows the merge treats as siblings of `occurrence`: its level's worktrees. */
+function siblingsAtLevel(
+  plan: WorktreeOccurrencePlan<Worktree>,
+  occurrence: WorktreeOccurrence<Worktree>
+): Worktree[] {
+  return [...plan.preferredByIdentity.values()]
+    .filter((candidate) => candidate.parent?.key === occurrence.parent?.key)
+    .map((candidate) => candidate.row)
+}
 
 export function getWorktreeRevealCollapsedGroupKeys(args: {
   occurrencePlan?: WorktreeOccurrencePlan<Worktree>
@@ -80,20 +93,21 @@ export function getWorktreeRevealCollapsedGroupKeys(args: {
   }
   const keys = [`host:${hostId}`]
   // Why: a Group by branch card folds every member's lineage group together, so
-  // revealing a child unfolds the whole card, not just its own host's group.
+  // revealing a child unfolds the whole card, not just its own host's group. The
+  // members are the same-branch siblings of the ancestor at its own level, which is
+  // what the merge grouped — roots only would leave a nested card folded.
   const projectIndex = buildProjectGroupingIndex(args.projectGrouping)
   const foldKeysOf = (ancestor: typeof occurrence): readonly string[] => {
     const worktree = ancestor.row
-    const members =
-      args.mergeSameBranchCards && !ancestor.parent
-        ? getBranchGroupMembersForWorktree({
-            worktree,
-            worktrees: args.visibleWorktrees ?? args.worktrees,
-            repoMap: args.repoMap,
-            projectIndex,
-            defaultHostId: args.defaultHostId
-          })
-        : null
+    const members = args.mergeSameBranchCards
+      ? getBranchGroupMembersForWorktree({
+          worktree,
+          worktrees: siblingsAtLevel(plan, ancestor),
+          repoMap: args.repoMap,
+          projectIndex,
+          defaultHostId: args.defaultHostId
+        })
+      : null
     return members
       ? members.map((member) => getWorktreeLineageGroupKey(member.worktree))
       : [getWorktreeLineageGroupKey(worktree)]

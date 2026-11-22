@@ -13,18 +13,19 @@ export function buildRowForest(rows: readonly Row[]): RowNode[] {
   for (const row of rows) {
     const node: RowNode = { row, children: [] }
     const depth = depthOf(row)
-    if (depth !== null) {
-      while (open.length > 0 && open.at(-1)!.depth >= depth) {
-        open.pop()
-      }
+    if (depth === null) {
+      // Why the root and a closed stack: a section header separates sections, so
+      // nothing above it may keep the rows below as its children.
+      open.length = 0
+      roots.push(node)
+      continue
     }
-    // Why the open top, not the roots: a depth-less row (header, card) keeps the
-    // level it appears on, so flattening cannot move a section under a workspace.
+    while (open.length > 0 && open.at(-1)!.depth >= depth) {
+      open.pop()
+    }
     const siblings = open.at(-1)?.node.children ?? roots
     siblings.push(node)
-    if (depth !== null) {
-      open.push({ depth, node })
-    }
+    open.push({ depth, node })
   }
   return roots
 }
