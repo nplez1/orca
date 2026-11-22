@@ -7,7 +7,6 @@ import {
 } from '../../../native-chat/conversation-files/native-chat-visuals-delivery'
 import type { ProviderProcessLaunch } from '../../../provider-process/provider-process-launch'
 import type { ReadOnlySessionMode } from '../../../bots/bot-look-around-policy'
-import { piReadOnlyGateArgs } from '../../fork-read-only-gate'
 import { compareAppVersions } from '../../../../shared/app-lifecycle/identity/app-version'
 import type { AgentCliVersionCheck } from '../../../agent-launch/preflight/agent-cli-version-probe'
 import { AgentCliInstallationError } from '../../../native-chat/agent-launch/agent-cli-installation-error'
@@ -35,6 +34,7 @@ export type PiRpcLaunchOptions = {
   backgroundWork?: PiBackgroundWorkLaunch
   /** The extension that registers a bot's own tools, and the servers it reads; absent: none. */
   botTools?: { extension: string; servers: string }
+  readOnlyGate?: { extension: string }
 }
 
 const CALLER_ENV_TO_DELETE = [
@@ -176,12 +176,11 @@ export function buildPiRpcLaunch(options: PiRpcLaunchOptions): ProviderProcessLa
       ...(options.instructionsFile ? ['--append-system-prompt', options.instructionsFile] : []),
       ...(options.skillDirs ?? []).flatMap((dir) => ['--skill', dir]),
       // Plain names replace the whole selection, a resumed session's included, and leave MCP tools undeclared.
-      ...(options.tools === 'read'
-        ? ['--tools', PI_READ_TOOLS.join(','), '--no-mcp', ...piReadOnlyGateArgs()]
-        : []),
+      ...(options.tools === 'read' ? ['--tools', PI_READ_TOOLS.join(','), '--no-mcp'] : []),
       ...(options.tools === 'none' ? ['--no-tools', '--no-mcp'] : []),
       ...(options.backgroundWork ? ['--extension', options.backgroundWork.extension] : []),
       ...(options.botTools ? ['--extension', options.botTools.extension] : []),
+      ...(options.readOnlyGate ? ['--extension', options.readOnlyGate.extension] : []),
       ...(options.sessionFile ? ['--session', options.sessionFile] : []),
       ...(options.forkFile ? ['--fork', options.forkFile] : [])
     ],

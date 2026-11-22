@@ -21,21 +21,30 @@ describe('Pi RPC launch for bots', () => {
   })
 
   it.each([
-    [
-      'read',
-      [
-        '--tools',
-        'read,grep,find,ls,bash',
-        '--no-mcp',
-        '--extension',
-        expect.stringMatching(/orca-look-around-gate\.ts$/)
-      ]
-    ],
+    ['read', ['--tools', 'read,grep,find,ls,bash', '--no-mcp']],
     ['none', ['--no-tools', '--no-mcp']]
   ] as const)('limits a run to %s tools, resumed sessions included', (tools, args) => {
     expect(
       buildPiRpcLaunch({ ...options, tools, sessionFile: '/host/session.jsonl' }).args
     ).toEqual(['--mode', 'rpc', ...args, '--session', '/host/session.jsonl'])
+  })
+
+  it('loads the read-only gate beside a look run', () => {
+    expect(
+      buildPiRpcLaunch({
+        ...options,
+        tools: 'read',
+        readOnlyGate: { extension: '/host/pi-native-chat/orca-look-around-gate.ts' }
+      }).args
+    ).toEqual([
+      '--mode',
+      'rpc',
+      '--tools',
+      'read,grep,find,ls,bash',
+      '--no-mcp',
+      '--extension',
+      '/host/pi-native-chat/orca-look-around-gate.ts'
+    ])
   })
 
   it.each([['--tools', 'bash'], ['-t=bash'], ['--exclude-tools', 'edit']])(

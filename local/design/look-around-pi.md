@@ -17,7 +17,7 @@ Three of the fork's own rules decide the shape, so they come first:
   So every touch on an upstream file is a bare line, and every _reason_ lives in
   `LOCAL-PATCHES.md` and in the fork-owned module.
 - **A fork hook names an exported function in a fork module, not a prose block.** Same rule, read from
-  the other end: the upstream diff should say `...piReadOnlyGateArgs()` and nothing else.
+  the other end: the upstream diff should say `options.readOnlyGate` and nothing else.
 - **Prefer the file upstream touches least.** Measured over the last 180 days of `upstream/main`:
 
   | File                                               | Upstream commits | Verdict                 |
@@ -28,16 +28,23 @@ Three of the fork's own rules decide the shape, so they come first:
   | `src/main/pi/rpc/launch/rpc-launch.ts`             | 6                | take the wiring here    |
   | `src/main/pi/rpc/launch/rpc-launch-resolution.ts`  | 11               | **avoid: the hot file** |
 
-That last row is why the gate is not wired in the resolution layer, where `backgroundWork` and
-`botTools` are wired. It does not need to be: `buildPiRpcLaunch` already receives
-the mode as `options.tools` (`'read'` for a look run), and the file it has to name is a static fork asset,
-so the fork module can write it itself and hand back the arguments.
+**Where the write happens, and the one place this note was wrong.** The first build wrote the extension
+from `buildPiRpcLaunch`, on the reasoning that the launch builder already receives the mode as
+`options.tools` (`'read'` for a look run) and the file is a static fork asset. `buildPiRpcLaunch` is
+synchronous, so that write had to be `writeFileSync` — and two upstream ratchets charge it:
+`check:main-sync-fs-ratchet` counts every `*Sync` fs call on the main thread, and
+`check:main-blocking-helper-ratchet` charges **every caller** of a helper that makes one, which made
+`buildPiRpcLaunch`, the model-catalog probe and the session adapter blocking too. Both are right: a look
+launch happens in the main process.
 
-One constraint that decides where the write happens: **`buildPiRpcLaunch` is synchronous** (it returns
-`ProviderProcessLaunch` directly), while the existing `writePiExtensionFile` is `async`. The fork module
-therefore writes synchronously (a `writeFileSync` guarded by the same "already the right content"
-compare) and returns `['--extension', path]`. An async helper here would not compile into that call site,
-which is worth knowing before someone reaches for the existing one.
+So the write moved to the async layer that already writes `botTools` — one property beside it, calling
+`writePiReadOnlyGate(directory)` in the fork module (the same `writePiExtensionFile`: staged temp file
+plus rename) — and `rpc-launch.ts` only spreads the option it is handed, beside the three extensions it
+already passes. That does touch `rpc-launch-resolution.ts`, the hot file the churn table says to avoid:
+the alternative was a permanent sync-fs exemption with reviewer sign-off on every sync. The file also
+sits exactly on the 300-line `max-lines` budget, whose ratchet only shrinks, which is why the helper
+lives in the fork module and the resolution layer's diff is four lines rather than fourteen. The trade
+is deliberate, and its cost is one row in the churn table.
 
 ## The gate, and everything it silently controls
 
@@ -72,8 +79,8 @@ const PI_READ_TOOLS = ['read', 'grep', 'find', 'ls', 'bash'] as const     // :72
 const PI_LIMITED_TOOLS_MINIMUM_VERSION = '1.0.4'                         // :89
 export function piToolLimit(readOnly, launchVersion): PiToolLimit | null  // :92
 //   'reply-only' → 'none'   ·  'look-around' → 'read'  ·  else null
-...(options.tools === 'read'                                                  // :180
-  ? ['--tools', PI_READ_TOOLS.join(','), '--no-mcp', ...piReadOnlyGateArgs()] : [])
+...(options.tools === 'read' ? ['--tools', PI_READ_TOOLS.join(','), '--no-mcp'] : [])   // :180
+...(options.readOnlyGate ? ['--extension', options.readOnlyGate.extension] : [])   // :183
 ...(options.tools === 'none' ? ['--no-tools', '--no-mcp'] : [])
 ```
 
@@ -116,7 +123,7 @@ from inside a pi run.
 ## Design
 
 **pi's `tool_call` event can block**, and Orca already ships managed pi extensions: `backgroundWork` and
-`botTools` are each a file passed as `--extension <file>` at launch (`rpc-launch.ts:183-184`), and the
+`botTools` are each a file passed as `--extension <file>` at launch (`rpc-launch.ts:181-182`), and the
 status and titlebar extensions are installed into pi's agent dir instead. So the guard is a managed
 extension, in the same two-layer shape as Claude:
 
@@ -166,7 +173,7 @@ should be written down rather than implied.
 ## Two things that will bite if ignored
 
 **1. pi older than 1.0.4.** `piToolLimit` throws `AgentCliInstallationError.tooOld('pi', …)`
-(`rpc-launch.ts:101`). Until this patch that could not fire, because look-around never ran for pi. Now
+(`rpc-launch.ts:102`). Until this patch that could not fire, because look-around never ran for pi. Now
 an older install fails _every_ look; the failure is recorded against the run
 (`LOOK_FAILURES`, `bot-look-around-runner.ts:46`), and **ten in a row turn look-around off**
 (`bot-look-around-failures.ts:8`, `LOOK_FAILURES_TO_TURN_OFF`). The owner would see a feature that
@@ -195,19 +202,20 @@ shape is ever worth fixing, it is worth fixing upstream — as a follow-up PR, n
 
 ## Edit list
 
-**Mandatory — the feature does not work without these three.**
+**Mandatory — the feature does not work without these.**
 
-| Change                                                       | File                                       | Lines           |
-| ------------------------------------------------------------ | ------------------------------------------ | --------------- |
-| `'pi'` in the gate                                           | `src/shared/bots/bot-look-around.ts:9`     | 1 word          |
-| `'bash'` in the read set                                     | `src/main/pi/rpc/launch/rpc-launch.ts:72`  | 1 word          |
-| Spread the gate into a limited run's args, beside `--no-mcp` | `src/main/pi/rpc/launch/rpc-launch.ts:180` | 1 line + import |
+| Change                                     | File                                                  | Lines                 |
+| ------------------------------------------ | ----------------------------------------------------- | --------------------- |
+| `'pi'` in the gate                         | `src/shared/bots/bot-look-around.ts:9`                | 1 word                |
+| `'bash'` in the read set                   | `src/main/pi/rpc/launch/rpc-launch.ts:72`             | 1 word                |
+| Spread the gate as `--extension`           | `src/main/pi/rpc/launch/rpc-launch.ts:183`            | 1 line + option field |
+| Write it for a look run, beside `botTools` | `src/main/pi/rpc/launch/rpc-launch-resolution.ts:257` | 1 property + import   |
 
 **Fork-owned — all the logic, the extension source and the rationale.**
 
 | Piece                                                                  | Path                                                              |
 | ---------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| Gate extension source + sync writer + `piReadOnlyGateArgs()`           | new `src/main/pi/fork-read-only-gate.ts`                          |
+| Gate extension source, its file name and its async write helper        | new `src/main/pi/fork-read-only-gate.ts`                          |
 | Unit tests for the gate module, the per-path corpus and the policy pin | `src/main/pi/fork-read-only-gate.test.ts`                         |
 | The recorded start failure, and its words                              | new `src/main/bots/bot-look-around-start-failure.ts` + `.test.ts` |
 | The `local(bots)` record with anchors and churn                        | `LOCAL-PATCHES.md`                                                |
@@ -247,13 +255,15 @@ No file is drawn from a PR branch's ownership, and no fork-only path is added ou
 - Recorded against the real CLI (`pi` 1.6.0): with the generated gate loaded and
   `--tools read,grep,find,ls,bash`, `git log --oneline -1` runs and returns its output; `git push
   --dry-run origin main` and `git diff --output=… HEAD~1` are both refused with the gate's own words; and
-  an `-e` path that does not exist stops the launch (exit 1), which is what the synchronous writer's
-  atomic rename depends on.
+  an `-e` path that does not exist stops the launch (exit 1), which is what the atomic rename in
+  `writePiExtensionFile` depends on.
 - Not driven: a whole bot look run (`Look now` → one suggestion in Up next) against a real pi bot. The
   transcripts above are the CLI half of it.
-- Gate: `pnpm run check:code-quality:changed`, `pnpm tc:node`, and
+- Gate: `pnpm run check:code-quality:changed`, `pnpm tc:node`,
   `node local/check-upstream-file-comments.mjs` — the last one is the one that will fail first if a fork
-  comment slips into an upstream file. Then the fork PR path (`local/open-pr.mjs`).
+  comment slips into an upstream file — and the two ratchets a look launch can trip,
+  `check:main-sync-fs-ratchet` and `check:main-blocking-helper-ratchet`, which is how the sync writer was
+  caught. Then the fork PR path (`local/open-pr.mjs`).
 
 ## Open questions
 

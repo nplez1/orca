@@ -5043,31 +5043,27 @@ instead of a person). Pi's `tool_call` event can block, so pi gets the same two 
 
 Anchors, each a bare line or word in a file upstream owns — the reason is here, never in the file:
 
-| File                                               | Line   | Change                                                                                               |
-| -------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------- |
-| `src/shared/bots/bot-look-around.ts`               | `:9`   | `'pi'` in `LOOK_AROUND_AGENTS`                                                                       |
-| `src/main/pi/rpc/launch/rpc-launch.ts`             | `:72`  | `'bash'` in `PI_READ_TOOLS`                                                                          |
-| `src/main/pi/rpc/launch/rpc-launch.ts`             | `:180` | spread `piReadOnlyGateArgs()` into a `tools === 'read'` run, beside `--no-mcp` (plus the one import) |
-| `src/main/runtime/rpc/methods/bots-look-around.ts` | `:75`  | the refusal names no agent: `'This bot’s agent cannot look around.'`                                 |
-| `src/main/bots/bot-look-around-runner.ts`          | `:264` | one import and one expression: `lookStartFailureWords(error, LOOK_FAILURES.couldNotStart)`           |
+| File                                               | Line   | Change                                                                                                        |
+| -------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------- |
+| `src/shared/bots/bot-look-around.ts`               | `:9`   | `'pi'` in `LOOK_AROUND_AGENTS`                                                                                |
+| `src/main/pi/rpc/launch/rpc-launch.ts`             | `:72`  | `'bash'` in `PI_READ_TOOLS`                                                                                   |
+| `src/main/pi/rpc/launch/rpc-launch.ts`             | `:183` | one spread: `options.readOnlyGate` becomes `--extension`, beside the three extensions upstream already passes |
+| `src/main/pi/rpc/launch/rpc-launch-resolution.ts`  | `:257` | the write itself, one property beside `botTools` (plus one import)                                            |
+| `src/main/runtime/rpc/methods/bots-look-around.ts` | `:75`  | the refusal names no agent: `'This bot’s agent cannot look around.'`                                          |
+| `src/main/bots/bot-look-around-runner.ts`          | `:264` | one import and one expression: `lookStartFailureWords(error, LOOK_FAILURES.couldNotStart)`                    |
 
-Read top to bottom: a word, a word, one spread, one string, and one import plus one expression. The
-fork's whole hook on upstream's launch path is `...piReadOnlyGateArgs()`, which is the shape the rules
-ask for — the diff says a function name, not a paragraph.
+Read top to bottom: a word, a word, one spread of a shape the file already repeats, one write that
+mirrors `botTools`, one string, and one import plus one expression. The read line itself
+(`rpc-launch.ts:180`) is upstream's own again — the fork no longer adds anything to it.
 
 **Fork-owned, all the logic:**
 
-- `src/main/pi/fork-read-only-gate.ts` — the extension source as a template string (the shape of
-  `PI_BOT_TOOLS_EXTENSION_SOURCE`), a synchronous writer, `piReadOnlyGatePath()` and
-  `piReadOnlyGateArgs()`. Two things decide that shape. Pi loads the extension **in its own process**,
-  where Orca is not on the module path, so it imports nothing and carries its own copy of the policy;
-  and `buildPiRpcLaunch` is synchronous (it returns `ProviderProcessLaunch` directly) while the existing
-  `writePiExtensionFile` is `async`, so an async helper could not reach that call site at all. The write
-  is therefore a `writeFileSync` to a staged temp name plus `renameSync`, guarded by a
-  "already the right content" compare: Pi exits when an extension fails to load, so a concurrent launch
-  must never read a half-written file. A rename that Windows refuses because another process holds the
-  old file open falls back to that file only when it already holds this source — another launch's write,
-  not a running Pi's older copy, which still fails closed.
+- `src/main/pi/fork-read-only-gate.ts` — the extension source as a template string, its file name (the
+  shape of `PI_BOT_TOOLS_EXTENSION_FILE`/`_SOURCE`), and `writePiReadOnlyGate(directory)`, which is
+  `writePiExtensionFile` with those two arguments bound. Pi loads the extension **in its own process**,
+  where Orca is not on the module path, so the template imports nothing and carries its own copy of the
+  policy. Keeping the helper here is what makes the resolution layer's diff four lines — the file sits
+  on the 300-line `max-lines` budget, whose ratchet only shrinks.
 - `src/main/pi/fork-read-only-gate.test.ts` — drives the **generated** extension (evaluated with
   `new Function`, as Pi would load it) against `lookAroundCommandAllowed`, one allowed case and one
   refused-argument case for **every** `READ_COMMANDS` path, plus the shapes a bot actually writes
@@ -5086,13 +5082,18 @@ ask for — the diff says a function name, not a paragraph.
   error's cause chain while `errorMessage` reads only the outermost error, so formatting the found
   problem with `agentCliTooOldWords` is what actually surfaces a wrapped too-old refusal.
 
-**Why the wiring is in the launch builder and not the resolution layer.** `backgroundWork` and
-`botTools` are wired in `rpc-launch-resolution.ts`, and that is the wrong file to touch: measured over
-180 days of `upstream/main`, it carries 11 commits against 6 for `rpc-launch.ts`, 2 for the runner and
-the shared constant, and 1 for the CLI method. It does not need to be there either —
-`buildPiRpcLaunch` already receives the mode as `options.tools` (`'read'` for a look), and the file the
-run has to name is a static fork asset, so the fork module writes it itself and hands back the
-arguments.
+**Why the write is in the resolution layer, and not the launch builder.** The first version wrote the
+extension from `buildPiRpcLaunch`, which is synchronous, so the write had to be `writeFileSync` — and two
+upstream ratchets charged it: `check:main-sync-fs-ratchet` counts every `*Sync` fs call on the main
+thread, and `check:main-blocking-helper-ratchet` charges **every caller** of a helper that makes one, so
+one sync writer made `buildPiRpcLaunch`, the model-catalog probe and the session adapter blocking too.
+Both are right: a look launch happens in the main process. So the write moved to the async layer that
+already writes `botTools`, through `writePiReadOnlyGate` (the same `writePiExtensionFile`: staged temp
+file plus rename), and `rpc-launch.ts` only spreads the option it is handed. That costs one property in
+`rpc-launch-resolution.ts`, measured at 11 upstream commits in 180 days against 6 for `rpc-launch.ts` —
+the hot file this patch originally avoided. The trade is deliberate: a sync write there would be a
+permanent ratchet exemption with reviewer sign-off on every sync, and the property is shaped exactly like
+the three next to it.
 
 **The honest limit, written down rather than implied.** For pi, `permissionMode: 'ask'` — which the
 shared composition sets for every read-only session
@@ -5128,7 +5129,8 @@ eleven call sites, which is exactly the divergence this patch avoids. Both are i
 questions.
 
 Tests: `src/main/pi/fork-read-only-gate.test.ts` (the generated extension against every read path the
-policy declares, the pinned policy text, the launch args and the writer), `src/main/bots/bot-look-around-start-failure.test.ts` (a wrapped too-old
+policy declares and the pinned policy text), `src/main/pi/rpc/launch/rpc-launch.test.ts` (`bash` in the
+read set, and `readOnlyGate` becoming `--extension`), `src/main/bots/bot-look-around-start-failure.test.ts` (a wrapped too-old
 refusal keeps its cause, a plain failure does not), `src/main/pi/rpc/launch/rpc-launch.test.ts` (the
 `read` mapping now names the extension — matched by `/orca-look-around-gate\.ts$/` rather than by
 literal path, because vitest's app environment installs its own `userData` and the absolute path is not

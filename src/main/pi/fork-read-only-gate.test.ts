@@ -1,21 +1,16 @@
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { LOOK_AROUND_REFUSAL, lookAroundCommandAllowed } from '../bots/bot-look-around-policy'
-import {
-  PI_LOOK_AROUND_GATE_EXTENSION_FILE,
-  piReadOnlyGatePath,
-  piReadOnlyGateSource,
-  piReadOnlyGateArgs
-} from './fork-read-only-gate'
+import { PI_LOOK_AROUND_GATE_EXTENSION_SOURCE } from './fork-read-only-gate'
 
 type Handler = (event: unknown) => unknown
 
 /** The extension as Pi loads it: evaluated here, so the test drives the artifact and not a copy. */
 function gate(): { toolCall: Handler; userBash: Handler } {
   const loaded: unknown = new Function(
-    piReadOnlyGateSource().replace('export default ', 'return ')
+    PI_LOOK_AROUND_GATE_EXTENSION_SOURCE.replace('export default ', 'return ')
   )()
   if (typeof loaded !== 'function') {
     throw new Error('The generated gate extension registers nothing')
@@ -213,14 +208,5 @@ describe('the look-around gate Pi loads', () => {
       result: { output: LOOK_AROUND_REFUSAL, exitCode: 1, cancelled: true, truncated: false }
     })
     expect(await userBash({})).toMatchObject({ result: { exitCode: 1 } })
-  })
-})
-
-describe('the gate file a limited launch names', () => {
-  it('writes the extension and names it with --extension', () => {
-    expect(piReadOnlyGateArgs()).toEqual(['--extension', piReadOnlyGatePath()])
-    expect(piReadOnlyGatePath().endsWith(PI_LOOK_AROUND_GATE_EXTENSION_FILE)).toBe(true)
-    expect(existsSync(piReadOnlyGatePath())).toBe(true)
-    expect(readFileSync(piReadOnlyGatePath(), 'utf8')).toBe(piReadOnlyGateSource())
   })
 })

@@ -48,6 +48,7 @@ import {
   PI_BOT_TOOLS_EXTENSION_SOURCE,
   piBotToolsConfig
 } from '../../../bots/bot-tools-pi'
+import { writePiReadOnlyGate } from '../../fork-read-only-gate'
 import { writePiExtensionFile } from './pi-extension-file'
 
 export type PiRpcResolvedLaunch = PiRpcLaunchOptions & {
@@ -251,6 +252,9 @@ export function piRpcLaunchPart(
                 servers: botServers
               }
             }
+          : {}),
+        ...(tools === 'read'
+          ? { readOnlyGate: { extension: await writePiReadOnlyGate(deps.dataDirectory) } }
           : {}),
         ...(launchVersion.status === 'ready' &&
         hasReachedAppVersion(launchVersion.version, PI_SHRINKS_EVERY_IMAGE_VERSION)

@@ -3,29 +3,26 @@
 // policy allows the bash call. Pi runs the extension in its own process, so it carries its own copy of
 // the policy; the unit test runs it against `lookAroundCommandAllowed` for every read path the policy
 // declares and pins the policy text it mirrors, so a tightening upstream trips a red here.
-import { randomUUID } from 'node:crypto'
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
-import { getAppEnvironment } from '../../shared/app-lifecycle/app-environment'
 import { LOOK_AROUND_REFUSAL } from '../bots/bot-look-around-policy'
+import { writePiExtensionFile } from './rpc/launch/pi-extension-file'
 
 export const PI_LOOK_AROUND_GATE_EXTENSION_FILE = 'orca-look-around-gate.ts'
 
-/** Where Pi's per-chat extensions live, under userData because the launch builder gets no state dir. */
-export function piReadOnlyGateDirectory(): string {
-  return join(getAppEnvironment().getPath('userData'), 'pi-native-chat')
-}
-
-export function piReadOnlyGatePath(): string {
-  return join(piReadOnlyGateDirectory(), PI_LOOK_AROUND_GATE_EXTENSION_FILE)
+/** Writes the gate for a look launch and returns its path; async, so nothing blocks the main thread. */
+export function writePiReadOnlyGate(directory: string): Promise<string> {
+  return writePiExtensionFile(
+    directory,
+    PI_LOOK_AROUND_GATE_EXTENSION_FILE,
+    PI_LOOK_AROUND_GATE_EXTENSION_SOURCE
+  )
 }
 
 /**
- * The extension Pi loads beside a look run. Self-contained on purpose: it must not import Orca, which
- * is not on Pi's module path once packaged, so the policy it applies is written out here in full.
+ * The extension Pi loads beside a look run, written by the resolution layer like the bot-tools one.
+ * Self-contained on purpose: it must not import Orca, which is not on Pi's module path once packaged,
+ * so the policy it applies is written out here in full.
  */
-export function piReadOnlyGateSource(): string {
-  return `// Written by Orca for one look-around run. Refuses anything but a read; do not edit.
+export const PI_LOOK_AROUND_GATE_EXTENSION_SOURCE = `// Written by Orca for one look-around run. Refuses anything but a read; do not edit.
 const REFUSAL = ${JSON.stringify(LOOK_AROUND_REFUSAL)}
 
 const READ_COMMANDS = {
@@ -163,40 +160,3 @@ export default function (pi) {
   })
 }
 `
-}
-
-/** The extension arguments for a limited run: the path is stable, the content is what may change. */
-export function piReadOnlyGateArgs(): string[] {
-  return ['--extension', writePiReadOnlyGateSync()]
-}
-
-function writePiReadOnlyGateSync(): string {
-  const directory = piReadOnlyGateDirectory()
-  const path = piReadOnlyGatePath()
-  const source = piReadOnlyGateSource()
-  const current = (): string | null => {
-    try {
-      return readFileSync(path, 'utf8')
-    } catch {
-      return null
-    }
-  }
-  if (current() === source) {
-    return path
-  }
-  // Pi exits when an extension fails to load, so a concurrent launch must never read a partial file.
-  mkdirSync(directory, { recursive: true })
-  const staged = `${path}.${randomUUID()}.tmp`
-  try {
-    writeFileSync(staged, source)
-    renameSync(staged, path)
-  } catch (error) {
-    rmSync(staged, { force: true })
-    // Windows refuses to replace a file Pi holds open; if it already holds this source, use it.
-    if (current() === source) {
-      return path
-    }
-    throw error
-  }
-  return path
-}
