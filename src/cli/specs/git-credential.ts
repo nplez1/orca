@@ -13,7 +13,7 @@ export const GIT_CREDENTIAL_COMMAND_SPECS: CommandSpec[] = [
     allowedFlags: [...GLOBAL_FLAGS, 'repo'],
     notes: [
       REPO_FLAG_NOTE,
-      'git runs this itself through credential.helper; a person never needs to. git appends its own get/erase/store operation, and a project with no App bound is refused rather than answered as your own login.'
+      'git runs this itself through credential.helper; a person never needs to. git appends its own get/erase/store operation. A request that names no host, another host, no repository, or a repository this project does not have is answered with nothing at all, and a project with no App bound is refused rather than answered as your own login.'
     ],
     hidden: true
   },

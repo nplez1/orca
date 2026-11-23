@@ -16,6 +16,7 @@ import type { BotChatRow } from '../../shared/bots/bot-chat-row'
 import { soulSpecialty } from '../../shared/bot-roster'
 import type { BotLookAroundStore } from './bot-look-around-store'
 import { botSessionToolServers, currentBotToolsRevision } from './bot-tools-file'
+import { botLaunchRepos, type LaunchRepoStore } from './bot-launch-repos'
 import { botLaunchToolsChecks, type BotLaunchedTools } from './bot-tools-revision'
 import { botOfHomeWorkspace } from '../../shared/bots/bot-homes'
 import { createBotTurnContext } from './bot-turn-context'
@@ -50,7 +51,7 @@ export type WiredBot = Bot
 
 export function botStructuredSessionWiring(deps: {
   /** The host's bots, and its projects, which bots link for skills. */
-  store: () => { getBots?: () => readonly Bot[]; getRepos: () => readonly Repo[] }
+  store: () => { getBots?: () => readonly Bot[]; getRepos: () => readonly Repo[] } & LaunchRepoStore
   /** First-run setup's end, and each bot's MEMORY.md as Orca last recorded it. */
   bots: Pick<BotController, 'endFirstRun' | 'memory'>
   /** The bot's chats as a turn end reads them. */
@@ -213,12 +214,13 @@ export function botStructuredSessionWiring(deps: {
       }
     },
     resolveSessionToolServers: async (record, launchDirectory) => {
+      const store = deps.store()
       const { tools, launched } = await botSessionToolServers(
         bots(),
         record,
         launchDirectory,
         undefined,
-        deps.store().getRepos()
+        botLaunchRepos(store.getRepos(), store)
       )
       if (launched) {
         launchedTools.set(record.sessionId, launched)

@@ -91,13 +91,14 @@ export async function validateGhAccountBinding(
     return { ok: false, error: 'gh_bound_account_unavailable' }
   }
 
-  const inventory = await listGhAccountBindingInventory(localGitOptions, { requiredHost })
+  // fork-comment-ok: an App binding skips gh's version probe and keyring entirely, which the call below cannot say.
   if (isAppGhAccountBinding(binding)) {
-    const offered = (inventory.apps ?? []).some(
-      (entry) => entry.host === binding.host && entry.user === binding.user
-    )
+    const { apps } = await connectedApps(requiredHost, localGitOptions)
+    const offered = apps.some((entry) => entry.host === binding.host && entry.user === binding.user)
     return offered ? { ok: true, binding } : { ok: false, error: 'github_app_unavailable' }
   }
+
+  const inventory = await listGhAccountBindingInventory(localGitOptions, { requiredHost })
   if (inventory.capability === 'unsupported') {
     return { ok: false, error: 'gh_multi_account_unsupported' }
   }

@@ -11,7 +11,8 @@ vi.mock('../network/http-client', () => ({
   getMainHttpClient: () => ({ fetch: fetchMock, proxySession: () => null })
 }))
 
-const { botGithubAppLaunch } = await import('./bot-gh-app-identity')
+const { botGithubAppLaunch, githubRepoFullNameOfLaunch, launchRepoOf } =
+  await import('./bot-gh-app-identity')
 
 const privateKeyPem = generateKeyPairSync('rsa', { modulusLength: 2048 })
   .privateKey.export({ type: 'pkcs1', format: 'pem' })
@@ -76,5 +77,25 @@ describe('a bot launch acting as the connected App', () => {
     expect(launch.env).toEqual({})
     expect(launch.installationId).toBeNull()
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('the project a launch sits in', () => {
+  const project = {
+    path: '/Code/orca',
+    worktreePaths: ['/orca/worktrees/app-push'],
+    gitRemoteIdentity: { canonicalKey: 'github.com/nplez1/orca' }
+  }
+
+  it('counts a project’s worktree as that project, which lives outside its checkout', () => {
+    expect(launchRepoOf([project], '/orca/worktrees/app-push/src')?.path).toBe('/Code/orca')
+  })
+
+  it('names the repository a worktree launch is in, not merely the first installation', () => {
+    expect(githubRepoFullNameOfLaunch([project], '/orca/worktrees/app-push')).toBe('nplez1/orca')
+  })
+
+  it('leaves a launch outside every project with no repository at all', () => {
+    expect(launchRepoOf([project], '/Users/someone/.orca/bots/lab')).toBeUndefined()
   })
 })

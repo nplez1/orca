@@ -64,10 +64,15 @@ export async function botGithubAppLaunch(
   }
 }
 
-/** A repo as far as this needs it: where it is on disk, the remote key that names it on GitHub, and the
- *  account bound to it, so a push typed in a bot's terminal acts as the same identity its gh does. */
+/** A repo as far as this needs it: where it is on disk, the worktrees it owns, the remote key that names it on
+ *  GitHub, the distro its git runs inside, and the account bound to it, so a push typed in a bot's terminal
+ *  acts as the same identity its gh does. */
 export type LaunchRepo = {
   path: string
+  /** Registered worktree folders, which live outside `path`: a launch there is still this project. */
+  worktreePaths?: readonly string[]
+  /** The distro this project's git runs inside, where Orca's own helper cannot run. */
+  wslDistro?: string
   gitRemoteIdentity?: { canonicalKey: string } | null
   ghAccount?: GhAccountBinding
 }
@@ -96,18 +101,35 @@ export function botGithubAppIdentityOutdated(
 }
 
 /**
- * The `owner/name` of the repository a launch directory sits in, when Orca already knows one. A bot's own
- * home is not in a repository, so this is usually nothing — and then the App's first installation is used.
+ * The repos a launch directory sits in, deepest first. A project's worktrees live outside its own folder, so
+ * its registered worktrees count as it: a bot working in one is working in that project.
  */
+function launchReposOf(
+  repos: readonly LaunchRepo[],
+  launchDirectory: string
+): readonly LaunchRepo[] {
+  return (
+    repos
+      .map((repo) => ({
+        repo,
+        depth: [repo.path, ...(repo.worktreePaths ?? [])]
+          .filter((folder) => folder && isPathInsideOrEqual(folder, launchDirectory))
+          .reduce((deepest, folder) => Math.max(deepest, folder.length), 0)
+      }))
+      .filter((entry) => entry.depth > 0)
+      // The deepest match wins: a repository inside another one's folder is the one being worked in.
+      .sort((a, b) => b.depth - a.depth)
+      .map((entry) => entry.repo)
+  )
+}
+
+/** The `owner/name` of the repository a launch directory sits in, when Orca already knows one. A bot's own
+ *  home is not in a repository, so this is usually nothing — and then the App's first installation is used. */
 export function githubRepoFullNameOfLaunch(
   repos: readonly LaunchRepo[],
   launchDirectory: string
 ): string | undefined {
-  const candidates = repos
-    .filter((repo) => repo.path && isPathInsideOrEqual(repo.path, launchDirectory))
-    // The deepest match wins: a repository inside another one's folder is the one being worked in.
-    .sort((a, b) => b.path.length - a.path.length)
-  for (const repo of candidates) {
+  for (const repo of launchReposOf(repos, launchDirectory)) {
     const fullName = githubRepoFullNameFromRemoteKey(repo.gitRemoteIdentity?.canonicalKey)
     if (fullName) {
       return fullName
@@ -121,7 +143,5 @@ export function launchRepoOf(
   repos: readonly LaunchRepo[],
   launchDirectory: string
 ): LaunchRepo | undefined {
-  return repos
-    .filter((repo) => repo.path && isPathInsideOrEqual(repo.path, launchDirectory))
-    .sort((a, b) => b.path.length - a.path.length)[0]
+  return launchReposOf(repos, launchDirectory)[0]
 }

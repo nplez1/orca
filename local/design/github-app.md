@@ -110,21 +110,36 @@ one, through git's own credential protocol:
 
 - `orca git-credential get --repo <folder>` reads git's `key=value` request and answers
   `username=`/`password=` with a token minted at that moment through the runtime RPC. Nothing is
-  written down, and no token reaches argv or the environment.
+  written down, and no token reaches argv or the environment. It answers only a request that names
+  `https`, `host=github.com`, and a repository; anything else gets no answer at all, so git fails there
+  instead of falling back to your own login.
 - The child git runs with `GIT_TERMINAL_PROMPT=0` and `GIT_CONFIG_COUNT`/`KEY_n`/`VALUE_n` carrying
   `credential.helper=` (emptied, so a configured helper cannot answer first), then
-  `credential.helper=!orca git-credential --repo <folder>`, and `url.https://github.com/.insteadOf`
-  for `git@github.com:` and `ssh://git@github.com/` — so an SSH remote is fetched and pushed over
-  HTTPS for this binding only, and a user binding's SSH login is untouched.
+  `credential.helper=!orca git-credential --repo <folder>`, `credential.https://github.com.useHttpPath`
+  (so git's request carries the repository, which the helper needs to refuse another one), and
+  `url.https://github.com/.insteadOf` for every SSH spelling of github.com — `git@github.com:`,
+  `git@ssh.github.com:`, `ssh://git@github.com/`, `ssh://git@github.com:22/`,
+  `ssh://git@ssh.github.com/` and `ssh://git@ssh.github.com:443/` — so an SSH remote is fetched and
+  pushed over HTTPS for this binding only, and a user binding's SSH login is untouched.
+- Orca's own push reads the URL git will actually use back out (`git remote get-url --push`) and refuses
+  when it is not `https://github.com/…`. A rewrite cannot be trusted on its own: a user's
+  `url.git@github.com:.pushInsteadOf=https://github.com/` is applied to the original URL and the result
+  is _not_ rewritten again, so that rule wins over the App's `insteadOf` and the push would go over SSH
+  as you. Refusing names the remote and the URL, and says what to change.
 - A bot session's launch env needs the credential, not just Orca's own pushes. It gets the same
   directives as a generated config file plus `GIT_CONFIG_GLOBAL`, because agent CLIs scrub
   key/token-shaped environment names from what their commands see and `GIT_CONFIG_KEY_n` would then
   leave git a count with no keys (#26594).
 
 The token is minted for the installation covering the repository's owner, so one App installed on two
-organisations works. No App connected, or no installation covering that owner, **fails** the push and
-the `gh` call with `gh_bound_account_unavailable` and a message naming the host or the owner: falling
-back to the user's login would author the commit as someone else.
+organisations works. An installation token acts on _every_ repository the installation covers, so the
+helper is scoped by repository rather than by host: the runtime resolves the project's own remote keys
+and refuses a request for any other repository, which is what stops a bot session's config — it applies
+to every repository that session touches — from pushing or cloning something else as the App. A project
+with no github.com remote is refused too, because no owner means no installation to mint for. No App
+connected, or no installation covering that owner, **fails** the push and the `gh` call with
+`gh_bound_account_unavailable` and a message naming the host or the owner: falling back to the user's
+login would author the commit as someone else.
 
 ## Limits — not done here
 
@@ -138,8 +153,36 @@ back to the user's login would author the commit as someone else.
   Settings and this note say so instead of it being a surprise at push time.
 - **A bot session's whole `git` is scoped to the bound project, not to the project's remote.** The
   config file it launches with rewrites every github.com SSH remote and names the helper for the bound
-  project, so a second repository pushed from inside that session is refused rather than pushed as the
-  bound App — loudly, naming the project, and it is the one place a bound session differs from a
-  plain one. Scoping by `includeIf gitdir:` was rejected: a linked worktree's gitdir lives under the
-  main checkout's `.git/worktrees`, so the pattern that matches the checkout does not match the worktree
-  a bot actually works in.
+  project, and the helper answers only that project's own repositories — so a second repository pushed
+  or cloned from inside that session is refused rather than acted on as the bound App, loudly, naming
+  the project. A bot launch whose folder is one of the project's worktrees counts as that project, not
+  only a launch inside the checkout: Orca keeps worktrees outside the main one, so both are matched.
+  Scoping by `includeIf gitdir:` was rejected instead: a linked worktree's gitdir lives under the main
+  checkout's `.git/worktrees`, so the pattern that matches the checkout does not match the worktree a bot
+  actually works in. The list is the project's own remote keys as last read, so a fork push target Orca
+  materializes afterwards is refused until the project's remotes are re-read — the same refusal, not a
+  silent push as you.
+- **A bot's terminal cannot be verified ahead of time.** Orca's own pushes check the URL git will use,
+  but a `git push` typed in a bot's session is the session's git, and Orca is not in that loop. Two
+  things therefore still reach GitHub as the person signed in there: an SSH host alias in
+  `~/.ssh/config` (a remote spelled `gh-work:owner/repo`), which no `insteadOf` can enumerate, and a
+  user-level `pushInsteadOf` for the same URL. Settings says the App pushes for the project, not that a
+  hand-typed push in a session is verified.
+- **WSL is refused, not half-supported.** Orca's helper is a command on this host and a distro's git
+  cannot run it, so an App-bound project whose git runs inside a distro fails with a message naming the
+  distro instead of pushing as that distro's own GitHub login. `gh` in a bot session is unaffected —
+  its token crosses into WSL through `WSLENV` — but a push is not.
+- **The generated config file replaces the session's global config.** `GIT_CONFIG_GLOBAL` points at a
+  file Orca writes, and that file re-includes the user's own global configs by path so their settings
+  survive. What does not survive: a write to the global config during the session (a tool that edits
+  `~/.gitconfig` edits the generated file, and the next launch overwrites it), a repo-level helper that
+  expected to receive git's `store` operation (the helper Orca names answers `store` by keeping
+  nothing), and the files themselves, which are never cleaned up after a bot is deleted.
+- **The credential RPC is `workspace`-scoped, not `accounts-admin`.** It mints no new authority — the
+  project's own binding names the identity, and the repository has to be one of that project's own — but
+  a paired client holding workspace permission can ask for a token for that project's repository. An
+  installation token cannot be narrowed to one repository on GitHub's side, so the only scope is the
+  repository check, not the token.
+- **`erase` keeps nothing, so it cannot revoke.** git calls `erase` after a request it gave up on, and
+  there is no per-request token to drop: the token lives in the installation cache until its hour is up
+  or the App is disconnected, which is what revokes it.

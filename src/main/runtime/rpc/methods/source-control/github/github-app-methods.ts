@@ -72,6 +72,7 @@ export const GITHUB_APP_METHODS = [
     name: 'github.app.gitCredential',
     permission: 'workspace',
     params: GithubAppGitCredential,
-    handler: async ({ repo }, { runtime }) => answered(() => runtime.appGitCredential(repo))
+    handler: async ({ repo, path }, { runtime }) =>
+      answered(() => runtime.appGitCredential(repo, path))
   })
 ]

@@ -7,6 +7,9 @@ import { quotePosixShellUnlessPlain } from '../../../shared/shell/launch/shell-a
 import { getOrcaCliCommandNameForPlatform } from '../../../shared/cli/orca-cli-command-name'
 import { GITHUB_APP_HOST } from './github-app-bound-token'
 
+/** Marks the env `appBoundGitEnv` built, so the push site knows the URL rewrite has to be verified. */
+export const APP_BOUND_GIT_ENV_MARKER = 'ORCA_GITHUB_APP_GIT'
+
 /** The `orca` a child runs the helper with: the launcher when the app knows one, else the command name. */
 function orcaCommand(env: NodeJS.ProcessEnv): string {
   const launcher = env.ORCA_CLI_COMMAND?.trim()
@@ -18,13 +21,29 @@ export function appGitCredentialHelper(
   repoFolder: string,
   env: NodeJS.ProcessEnv = process.env
 ): string {
-  return `!${quotePosixShellUnlessPlain(orcaCommand(env))} git-credential --repo ${quotePosixShellUnlessPlain(repoFolder)}`
+  return `!${quotePosixShellUnlessPlain(orcaCommand(env))} git-credential --repo ${quotePosixShellUnlessPlain(singleLine(repoFolder))}`
 }
 
-/** The remotes this rewrites: an SSH push would otherwise use the user's key, which is not the App. */
-const APP_SSH_REMOTE_PREFIXES = [`git@${GITHUB_APP_HOST}:`, `ssh://git@${GITHUB_APP_HOST}/`]
+/**
+ * The remotes this rewrites: an SSH push would otherwise use the user's key, which is not the App.
+ * `ssh.github.com:443` is github.com to git and to Orca, so a remote spelled that way is rewritten too.
+ */
+const APP_SSH_REMOTE_PREFIXES = [
+  `git@${GITHUB_APP_HOST}:`,
+  `git@ssh.${GITHUB_APP_HOST}:`,
+  `ssh://git@${GITHUB_APP_HOST}/`,
+  `ssh://git@${GITHUB_APP_HOST}:22/`,
+  `ssh://git@ssh.${GITHUB_APP_HOST}/`,
+  `ssh://git@ssh.${GITHUB_APP_HOST}:443/`
+]
 
 type GitConfigEntry = [key: string, value: string]
+
+/** Without it git's request carries no repository, so the helper cannot tell which one is being pushed. */
+const APP_CREDENTIAL_USE_HTTP_PATH: GitConfigEntry = [
+  `credential.https://${GITHUB_APP_HOST}.useHttpPath`,
+  'true'
+]
 
 /** Emptying `credential.helper` first is what stops a configured helper answering before Orca's. */
 export function appGitConfigEntries(
@@ -35,6 +54,7 @@ export function appGitConfigEntries(
   return [
     ['credential.helper', ''],
     ['credential.helper', appGitCredentialHelper(repoFolder, env)],
+    APP_CREDENTIAL_USE_HTTP_PATH,
     ...APP_SSH_REMOTE_PREFIXES.map((prefix): GitConfigEntry => [`url.${url}.insteadOf`, prefix])
   ]
 }
@@ -59,6 +79,7 @@ export function appBoundGitEnv(input: {
     next[`GIT_CONFIG_VALUE_${index}`] = value
   })
   next.GIT_TERMINAL_PROMPT = '0'
+  next[APP_BOUND_GIT_ENV_MARKER] = '1'
   return next
 }
 
@@ -70,14 +91,16 @@ export function appGitConfigFile(input: {
   const env = input.baseEnv ?? process.env
   const globalConfigs = gitGlobalConfigCandidates(env)
   return [
-    `# Orca: git acts as the GitHub App bound to ${input.repoFolder}`,
+    `# Orca: git acts as the GitHub App bound to ${singleLine(input.repoFolder)}`,
     '# The token is minted when git asks for one, never stored here.',
     ...(globalConfigs.length > 0
-      ? ['[include]', ...globalConfigs.map((p) => `\tpath = ${p}`)]
+      ? ['[include]', ...globalConfigs.map((p) => `\tpath = ${configFileQuoted(p)}`)]
       : []),
     '[credential]',
     '\thelper =',
     `\thelper = ${configFileQuoted(appGitCredentialHelper(input.repoFolder, env))}`,
+    `[credential "https://${GITHUB_APP_HOST}"]`,
+    `\tuseHttpPath = ${APP_CREDENTIAL_USE_HTTP_PATH[1]}`,
     `[url "https://${GITHUB_APP_HOST}/"]`,
     ...APP_SSH_REMOTE_PREFIXES.map((prefix) => `\tinsteadOf = ${prefix}`),
     ''
@@ -92,17 +115,22 @@ function gitGlobalConfigCandidates(env: NodeJS.ProcessEnv): string[] {
   const explicit = env.GIT_CONFIG_GLOBAL?.trim()
   const home = env.HOME?.trim() || env.USERPROFILE?.trim() || homedir()
   if (explicit) {
-    return /^(?:\/dev\/null|nul)$/i.test(explicit) ? [] : [toGitConfigPath(explicit)]
+    return /^(?:\/dev\/null|nul)$/i.test(explicit) ? [] : [explicit]
   }
   const xdg = env.XDG_CONFIG_HOME?.trim() || join(home, '.config')
-  return [join(xdg, 'git', 'config'), join(home, '.gitconfig')].map(toGitConfigPath)
+  return [join(xdg, 'git', 'config'), join(home, '.gitconfig')]
 }
 
-function toGitConfigPath(value: string): string {
-  return value.replace(/\\/g, '/')
+/** A config file is line-oriented: a folder with a newline would end the directive, or the header comment. */
+function singleLine(value: string): string {
+  return value.replace(/[\r\n]+/g, '')
 }
+
+const WINDOWS_PATH = /^[A-Za-z]:[\\/]|^\\\\/
 
 /** A config-file value: double-quoted, with the escapes git's own reader understands. */
 function configFileQuoted(value: string): string {
-  return `"${toGitConfigPath(value).replace(/"/g, '\\"')}"`
+  // git runs the helper through a POSIX shell, so only a Windows path needs its separators translated.
+  const text = WINDOWS_PATH.test(value) ? value.replace(/\\/g, '/') : value
+  return `"${text.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
 }

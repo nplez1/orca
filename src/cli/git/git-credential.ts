@@ -7,13 +7,10 @@ import type { GithubAppGitCredentialResult } from '../../shared/rpc-contract/git
 import { GITHUB_APP_HOST } from '../../shared/github/app/github-app-identity'
 import { RuntimeClientError } from '../runtime/connection/types'
 
-/**
- * git writes `key=value` lines then a blank line. Only `host` is read: the project's binding picks the
- * identity, but a helper answers for every host git contacts, and the App's token belongs to one.
- */
-export async function readCredentialRequestHost(
+/** git writes `key=value` lines then a blank line; the first block is the request, and later ones are not. */
+export async function readCredentialRequest(
   stream: NodeJS.ReadableStream
-): Promise<string | undefined> {
+): Promise<Record<string, string>> {
   stream.setEncoding('utf8')
   let buffer = ''
   for await (const chunk of stream) {
@@ -22,29 +19,42 @@ export async function readCredentialRequestHost(
       break
     }
   }
-  for (const line of buffer.split('\n')) {
-    const [key, ...rest] = line.split('=')
-    if (key === 'host') {
-      return rest.join('=').trim().toLowerCase()
+  const fields: Record<string, string> = {}
+  const end = buffer.indexOf('\n\n')
+  for (const line of (end === -1 ? buffer : buffer.slice(0, end)).split('\n')) {
+    const separator = line.indexOf('=')
+    if (separator > 0) {
+      fields[line.slice(0, separator).trim()] = line.slice(separator + 1).trim()
     }
   }
-  return undefined
+  return fields
 }
 
-/** A request for another host gets no answer: git then fails to authenticate there instead of leaking the App's token. */
-export function answersCredentialHost(host: string | undefined): boolean {
-  return host === undefined || host.length === 0 || host === GITHUB_APP_HOST
+/**
+ * Whether the App can answer this request at all. It has to name github.com over https, and the repository:
+ * the installation token acts on every repository the installation covers, and a request that names none
+ * cannot be scoped to the project's own.
+ */
+export function answersCredentialRequest(request: Record<string, string>): boolean {
+  return request.protocol === 'https' && request.host === GITHUB_APP_HOST && Boolean(request.path)
 }
 
-const answer: CommandHandler = async ({ client, flags, cwd }) => {
-  if (!answersCredentialHost(await readCredentialRequestHost(process.stdin))) {
+export type GitCredentialAnswer = {
+  request: Record<string, string>
+  folder: string
+  call: (params: { repo: string; path: string }) => Promise<GithubAppGitCredentialResult>
+  write: (text: string) => void
+}
+
+/** Answers `get` on stdout, or answers nothing at all: git then fails rather than falling back to the user. */
+export async function answerGitCredentialRequest(input: GitCredentialAnswer): Promise<void> {
+  if (!answersCredentialRequest(input.request)) {
     return
   }
-  const folder = resolve(cwd, getRequiredStringFlag(flags, 'repo'))
-  const response = await client.call<GithubAppGitCredentialResult>('github.app.gitCredential', {
-    repo: `path:${folder}`
+  const { username, password } = await input.call({
+    repo: `path:${input.folder}`,
+    path: input.request.path
   })
-  const { username, password } = response.result
   if (!password) {
     // An empty password makes git report the push as unauthenticated instead of retrying as the user.
     throw new RuntimeClientError(
@@ -52,12 +62,23 @@ const answer: CommandHandler = async ({ client, flags, cwd }) => {
       'Orca answered git with no App token, so this push cannot act as the GitHub App.'
     )
   }
-  process.stdout.write(`username=${username}\npassword=${password}\n`)
+  input.write(`username=${username}\npassword=${password}\n`)
+}
+
+const answer: CommandHandler = async ({ client, flags, cwd }) => {
+  const request = await readCredentialRequest(process.stdin)
+  await answerGitCredentialRequest({
+    request,
+    folder: resolve(cwd, getRequiredStringFlag(flags, 'repo')),
+    call: async (params) =>
+      (await client.call<GithubAppGitCredentialResult>('github.app.gitCredential', params)).result,
+    write: (text) => process.stdout.write(text)
+  })
 }
 
 /** git calls `store` after a successful request and `erase` after one it gave up on; both keep nothing. */
 const keepNothing = (): CommandHandler => async () => {
-  await readCredentialRequestHost(process.stdin)
+  await readCredentialRequest(process.stdin)
 }
 
 export const GIT_CREDENTIAL_HANDLERS: Record<string, CommandHandler> = {

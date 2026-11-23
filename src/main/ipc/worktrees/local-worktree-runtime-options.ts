@@ -95,6 +95,12 @@ export async function getLocalRemoteSyncGitOptions(
 ): Promise<GitRuntimeOptions> {
   const options = getLocalGitOptionsForRegisteredWorktree(store, worktreePath, resolvedWorktreePath)
   const repo = getLocalRepoForRegisteredWorktree(store, worktreePath, resolvedWorktreePath)
-  const env = repo ? await appBoundRepoGitEnv(repo) : undefined
+  // fork-comment-ok: a distro's git cannot run Orca's helper, so the binding is refused rather than pushed as its login.
+  const env = repo
+    ? await appBoundRepoGitEnv({
+        ...repo,
+        ...(options.wslDistro ? { wslDistro: options.wslDistro } : {})
+      })
+    : undefined
   return env ? { ...options, env } : options
 }

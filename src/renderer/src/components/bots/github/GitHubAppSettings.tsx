@@ -163,7 +163,7 @@ function ConnectedApp({
         <p className="text-xs text-muted-foreground">
           {t(
             'bots.github.app.contentsUnknown',
-            'GitHub did not report this installation’s permissions, so Orca cannot tell whether a push as the App will be allowed. Refresh reads them again.'
+            'Orca has not read this installation’s permissions yet, so it cannot tell whether a push as the App will be allowed. Refresh to read them.'
           )}
         </p>
       ) : null}

@@ -16,8 +16,15 @@ export const GithubAppConnect = z.object({
 
 export type GithubAppConnectParams = z.infer<typeof GithubAppConnect>
 
-/** `github.app.gitCredential`: git's credential helper asks, so a push mints the token at push time. */
-export const GithubAppGitCredential = RepoSelector.extend({})
+/**
+ * `github.app.gitCredential`: git's credential helper asks, so a push mints the token at push time. `path`
+ * is the repository git is asking about, which the runtime checks against the project's own remotes.
+ */
+export const GithubAppGitCredential = RepoSelector.extend({
+  path: requiredString(
+    'git’s credential request names no repository, so Orca cannot tell which one it is for'
+  )
+})
 
 export type GithubAppGitCredentialParams = z.infer<typeof GithubAppGitCredential>
 

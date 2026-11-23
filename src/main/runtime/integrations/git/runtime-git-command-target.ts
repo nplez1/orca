@@ -98,7 +98,11 @@ export function requireRuntimeGitProvider(
 export async function runtimeRemoteSyncGitEnv(
   target: RuntimeGitTarget
 ): Promise<NodeJS.ProcessEnv | undefined> {
-  return target.repo ? await appBoundRepoGitEnv(target.repo) : undefined
+  if (!target.repo) {
+    return undefined
+  }
+  const { wslDistro } = localGitOptionsForTarget(target)
+  return await appBoundRepoGitEnv({ ...target.repo, ...(wslDistro ? { wslDistro } : {}) })
 }
 
 export function localGitOptionsForTarget(target: RuntimeGitTarget): GitRuntimeOptions {

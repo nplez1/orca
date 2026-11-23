@@ -1547,7 +1547,7 @@
         "allRepositories": "All repositories",
         "connectedAs": "Bots act on GitHub as this App, not as your GitHub account.",
         "contentsMissing": "This installation has no Contents: write, so a push as the App will be rejected. Give the App that permission on GitHub, then Refresh.",
-        "contentsUnknown": "GitHub did not report this installation’s permissions, so Orca cannot tell whether a push as the App will be allowed. Refresh reads them again.",
+        "contentsUnknown": "Orca has not read this installation’s permissions yet, so it cannot tell whether a push as the App will be allowed. Refresh to read them.",
         "description": "Optional. Let your bots act on GitHub as an App you own, instead of as your GitHub account.",
         "descriptionConnected": "Your bots act on GitHub as {{login}}, so their comments, reviews and pull requests are theirs.",
         "descriptionOnHost": "Optional. Let the bots on {{host}} act on GitHub as an App you own, instead of as your GitHub account.",

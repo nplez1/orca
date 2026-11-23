@@ -85,6 +85,19 @@ export function githubRepoOwner(repoFullName: string | null | undefined): string
 }
 
 /**
+ * The `owner/name` a credential request's `path` names, or null when it names no single repository. git
+ * sends the URL path without its leading slash, with whatever `.git` suffix the remote was written with.
+ */
+export function githubRepoFullNameFromCredentialPath(
+  path: string | null | undefined
+): string | null {
+  const trimmed = path?.trim().replace(/^\/+|\/+$/g, '') ?? ''
+  const name = trimmed.toLowerCase().endsWith('.git') ? trimmed.slice(0, -'.git'.length) : trimmed
+  const [owner, repo, ...rest] = name.split('/')
+  return owner && repo && rest.length === 0 ? `${owner}/${repo}`.toLowerCase() : null
+}
+
+/**
  * The installation a bot acts as: the one covering `repoFullName` when that repo is known, else the first,
  * which is the only answer a Settings read can give.
  */

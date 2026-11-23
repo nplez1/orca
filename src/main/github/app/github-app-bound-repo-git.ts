@@ -14,7 +14,26 @@ import { resolvePathEnvKey } from '../../pty/environment/windows-path-segment-me
 import { readGithubAppCredentials } from './github-app-credentials'
 import { appBoundGitEnv, appGitConfigFile } from './github-app-git-credential-env'
 
-type AppBoundRepo = { path: string; ghAccount?: GhAccountBinding }
+type AppBoundRepo = {
+  path: string
+  ghAccount?: GhAccountBinding
+  /** The distro this project's git runs inside, when that is not the host's own git. */
+  wslDistro?: string | null
+}
+
+/**
+ * Orca's helper is a command on this host, and a distro's git cannot run it, so a bound project there would
+ * push as the distro's own GitHub login. Refused by name instead of being discovered at push time.
+ */
+function assertAppBoundRepoNotWsl(repo: AppBoundRepo, binding: GhAccountBinding): void {
+  if (!repo.wslDistro) {
+    return
+  }
+  throw createGhBoundAccountUnavailableError(
+    binding,
+    `This project runs git inside the WSL distro ${repo.wslDistro}, where Orca’s credential helper cannot run, so a push would use that distro’s own GitHub login. Move the project off WSL, or clear this project’s GitHub account.`
+  )
+}
 
 /**
  * Whether this repository expects git to act as its bound App.
@@ -26,6 +45,7 @@ export async function isAppBoundGitRepo(repo: AppBoundRepo): Promise<boolean> {
   if (!repo.ghAccount || !isAppGhAccountBinding(repo.ghAccount)) {
     return false
   }
+  assertAppBoundRepoNotWsl(repo, repo.ghAccount)
   if (await readGithubAppCredentials()) {
     return true
   }
@@ -78,9 +98,11 @@ export async function appBoundRepoGitLaunchEnv(input: {
   botId: string
   baseEnv?: NodeJS.ProcessEnv
 }): Promise<Record<string, string>> {
-  if (!isAppGhAccountBinding(input.repo.ghAccount)) {
+  const binding = input.repo.ghAccount
+  if (!binding || !isAppGhAccountBinding(binding)) {
     return {}
   }
+  assertAppBoundRepoNotWsl(input.repo, binding)
   const path = join(
     botsRootFolder(),
     '.git-config',

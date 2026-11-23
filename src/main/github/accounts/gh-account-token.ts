@@ -20,7 +20,6 @@ import {
   type GhCapabilityTarget
 } from './gh-capability-state'
 import { githubRepoOwner } from '../../../shared/github/app/github-app-identity'
-import { appIdentityEpoch } from '../app/github-app-identity-epoch'
 import { githubAppBoundToken } from '../app/github-app-bound-token'
 import { readGithubAppCredentials } from '../app/github-app-credentials'
 import { getMainHttpClient } from '../../network/http-client'
@@ -42,18 +41,13 @@ const AMBIENT_GH_ENV_KEYS = [
 ] as const
 
 type TokenCacheEntry =
-  | { kind: 'positive'; token: string; expiresAt: number; epoch?: number }
-  | { kind: 'negative'; expiresAt: number; epoch?: number }
+  | { kind: 'positive'; token: string; expiresAt: number }
+  | { kind: 'negative'; expiresAt: number }
 
 const tokenCache = new Map<string, TokenCacheEntry>()
 
-function tokenCacheKey(
-  binding: GhAccountBinding,
-  target: GhCapabilityTarget,
-  repoFullName?: string
-): string {
-  const repo = isAppGhAccountBinding(binding) ? `\0${repoFullName ?? ''}` : ''
-  return `${getGhExecutionHostKey(target)}\0${binding.host}\0${binding.user}${repo}`
+function tokenCacheKey(binding: GhAccountBinding, target: GhCapabilityTarget): string {
+  return `${getGhExecutionHostKey(target)}\0${binding.host}\0${binding.user}`
 }
 
 function isTransientTokenResolveFailure(error: unknown): boolean {
@@ -115,7 +109,8 @@ export async function resolveGhAccountToken(
 
   const normalizedTarget = normalizeGhCapabilityTarget(target)
   if (isAppGhAccountBinding(binding)) {
-    return resolveAppGhAccountToken(binding, repoFullName, nowMs)
+    // fork-comment-ok: not cached here, because installationToken already shares one mint and refreshes early.
+    return resolveAppGhAccountToken(binding, repoFullName)
   }
 
   const capability = await getGhMultiAccountCapability(normalizedTarget, nowMs, hooks)
@@ -194,35 +189,16 @@ export async function resolveGhAccountToken(
 
 async function resolveAppGhAccountToken(
   binding: GhAccountBinding,
-  repoFullName: string | undefined,
-  nowMs: number
+  repoFullName: string | undefined
 ): Promise<string> {
   const owner = githubRepoOwner(repoFullName)
-  pruneTokenCache(nowMs)
-  const key = tokenCacheKey(binding, {}, repoFullName)
-  const cached = tokenCache.get(key)
-  if (cached && cached.epoch === appIdentityEpoch() && cached.expiresAt > nowMs) {
-    if (cached.kind === 'positive') {
-      return cached.token
-    }
-    throw createGhBoundAccountUnavailableError(binding)
-  }
   try {
     const minted = await githubAppBoundToken({
       host: binding.host,
       owner,
       credentials: await readGithubAppCredentials(),
-      fetch: getMainHttpClient().fetch,
-      nowMs
+      fetch: getMainHttpClient().fetch
     })
-    const expiresAt = Math.max(minted.expiresAtMs, nowMs + NEGATIVE_TTL_MS)
-    tokenCache.set(key, {
-      kind: 'positive',
-      token: minted.token,
-      expiresAt,
-      epoch: appIdentityEpoch()
-    })
-    pruneTokenCache(nowMs)
     return minted.token
   } catch (error) {
     if (
@@ -231,12 +207,6 @@ async function resolveAppGhAccountToken(
       'code' in error &&
       error.code === 'gh_bound_account_unavailable'
     ) {
-      tokenCache.set(key, {
-        kind: 'negative',
-        expiresAt: nowMs + NEGATIVE_TTL_MS,
-        epoch: appIdentityEpoch()
-      })
-      pruneTokenCache(nowMs)
       throw error
     }
     throw createGhBoundAccountUnavailableError(
