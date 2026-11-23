@@ -61,7 +61,6 @@ export function useEffectiveCollapsedGroups(args: {
   const mergeSameBranchWorkspaces = useAppStore((s) => s.mergeSameBranchWorkspaces)
   const workspaceHostScope = useAppStore((s) => s.workspaceHostScope)
   const visibleWorkspaceHostIds = useAppStore((s) => s.visibleWorkspaceHostIds)
-  // Why: a merged card folds every member's lineage group, so a reveal must clear them all.
   const mergeSameBranchCards = shouldMergeSameBranchCards({
     groupBy,
     mergeSameBranchWorkspaces,

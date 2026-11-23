@@ -105,9 +105,6 @@ function itemAt(rows: readonly Row[], index: number): WorktreeRow {
 }
 
 describe('mergeSameBranchRows with lineage children', () => {
-  // The M5/Win report: one host's main workspace gained a child and the pair split
-  // into two rows, losing the host selector. The children are on branches of their
-  // own, so only the parents merge here.
   const localChild = rowFor(
     worktreeOn(worktree, 'wt-1-child', 'child'),
     { depth: 1 },
@@ -164,7 +161,6 @@ describe('mergeSameBranchRows with lineage children', () => {
   })
 
   it('moves the other host children up under the merged card', () => {
-    // The remote row sorts first here, so its subtree must travel to the card.
     const result = merge([remoteParent, remoteChildA, remoteChildB, localParent, localChild])
 
     expect(rowKeys(result)).toEqual([
@@ -182,7 +178,6 @@ describe('mergeSameBranchRows with lineage children', () => {
 
     expect(result).toHaveLength(3)
     expect(merged.lineageChildCount).toBe(2)
-    // The childless primary owns no group of its own, so the card borrows the one that has children.
     expect(merged.lineageGroupKey).toBe(getWorktreeLineageGroupKey(remoteWorktree))
     expect(merged.lineageCollapseKeys).toEqual([getWorktreeLineageGroupKey(remoteWorktree)])
   })
@@ -205,8 +200,6 @@ describe('mergeSameBranchRows with lineage children', () => {
 })
 
 describe('mergeSameBranchRows with the same hierarchy on both hosts', () => {
-  // One three-level hierarchy, present on both hosts with the same branches:
-  // main -> feature -> feature-ui. Every level should stack, leaving one tree.
   const localMid = rowFor(
     worktreeOn(worktree, 'wt-m5-mid', 'feature'),
     { depth: 1 },
@@ -250,7 +243,6 @@ describe('mergeSameBranchRows with the same hierarchy on both hosts', () => {
   it('counts the cards it draws, not the workspaces behind them', () => {
     const result = merge(rowsWithLeaves)
 
-    // Two mid workspaces merge into one card, so the root has one child on screen.
     expect(itemAt(result, 0).lineageChildCount).toBe(1)
     expect(itemAt(result, 0).lineageChildWorktreeIds).toEqual(['wt-m5-mid', 'wt-win-mid'])
     expect(itemAt(result, 1).lineageChildWorktreeIds).toEqual(['wt-m5-leaf', 'wt-win-leaf'])
@@ -272,7 +264,6 @@ describe('mergeSameBranchRows with the same hierarchy on both hosts', () => {
       })
     )
 
-    // Why: the dropdown switches agents and terminals, never the children under it.
     expect(perHost.map((selection) => selection.selectedHostId)).toEqual([
       LOCAL_EXECUTION_HOST_ID,
       'ssh:gpu-vm'
@@ -372,7 +363,6 @@ describe('mergeSameBranchRows with children on different branches', () => {
       remoteGrandchild
     ])
 
-    // Depth-1 children only: a grandchild belongs to its parent's subtree, not the card.
     expect(itemAt(result, 0).lineageChildCount).toBe(2)
     expect(itemAt(result, 0).lineageChildWorktreeIds).toEqual(['wt-1-child', 'wt-remote-child'])
   })
@@ -451,8 +441,6 @@ describe('mergeSameBranchRows with children on different branches', () => {
     expect(result).toHaveLength(1)
   })
 
-  // Accepted: one workspace nesting under a parent on *each* host draws twice, and the
-  // user prefers that to guessing which host's parentage wins.
   it('keeps both rows when one workspace nests under a parent on each host', () => {
     const sharedLocal = rowFor(worktreeOn(worktree, 'wt-shared-child', 'shared-child'), {
       depth: 1
@@ -531,7 +519,6 @@ describe('mergeSameBranchRows', () => {
   })
 
   it('never merges a child with its parent', () => {
-    // Same branch, one nested in the other: different levels, so no card.
     const rows = [itemRow({ worktree }), itemRow({ worktree: remoteWorktree, depth: 1 })]
 
     expect(merge(rows)).toHaveLength(2)

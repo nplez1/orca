@@ -112,7 +112,6 @@ export type UISlicePreferences = {
   setAgentsGroupBy: (v: ActivityGroupBy) => void
   collapsedGroups: Set<string>
   toggleCollapsedGroup: (key: string) => void
-  /** Folds or unfolds several groups as one, for a card that merged them. */
   toggleCollapsedGroups: (keys: readonly string[]) => void
   setCollapsedGroups: (keys: Set<string>) => void
   worktreeCardProperties: WorktreeCardProperty[]

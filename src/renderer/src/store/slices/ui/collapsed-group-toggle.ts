@@ -32,8 +32,6 @@ export function toggleCollapsedGroupSet(previous: ReadonlySet<string>, key: stri
   return recordCollapsedGroupChanges(previous, next, [key])
 }
 
-/** Folds or unfolds a key set as one, following what the card shows: it reads folded while any
- * key is folded, so a fold action is only taken when none is. */
 export function toggleCollapsedGroupKeysSet(
   previous: ReadonlySet<string>,
   keys: readonly string[]

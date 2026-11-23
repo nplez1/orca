@@ -86,8 +86,6 @@ export function resolveChildWorkspacesToggleGroupKeys(
   return parentKeys ?? null
 }
 
-/** Which keys each rendered workspace's chip folds; mounted rows so temporary reveal
- * and drag policies match the chip the user sees. */
 export function getRenderedLineageChipKeys(
   state: AppState
 ): ReadonlyMap<string, readonly string[]> {
@@ -106,7 +104,6 @@ export function getRenderedLineageChipKeys(
   }
   const projection = getProjectHostSetupProjectionFromState(state)
   return indexLineageFoldKeys(
-    // Why drop host headers: a merge groups siblings by depth, and a header is never one.
     mergeSameBranchRows(
       rows.filter((row): row is Row => row.type !== 'host-header'),
       getIndexedRepoMap(state.repos),
@@ -114,8 +111,6 @@ export function getRenderedLineageChipKeys(
         projects: projection.projects,
         projectHostSetups: projection.setups
       }),
-      // Why the local constant: this map holds keys, and ordering only needs a
-      // reference host. A workspace with no host of its own is local anyway.
       LOCAL_EXECUTION_HOST_ID,
       undefined,
       state.collapsedGroups

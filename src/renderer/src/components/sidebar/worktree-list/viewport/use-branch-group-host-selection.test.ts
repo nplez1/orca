@@ -69,8 +69,6 @@ describe('findBranchGroupHostTarget', () => {
     expect(target?.rowKey).toBe('row-1')
   })
 
-  // Why the row, not the branch group: two levels of one branch share a group key,
-  // and picking a host on the child must not activate the parent.
   it('ignores rows for another row key or a missing host', () => {
     expect(findBranchGroupHostTarget([makeRow()], 'row-2', 'ssh:gpu-vm')).toBeNull()
     expect(findBranchGroupHostTarget([makeRow()], 'row-1', 'ssh:missing')).toBeNull()

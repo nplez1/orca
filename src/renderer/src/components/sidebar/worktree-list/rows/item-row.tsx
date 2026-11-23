@@ -91,7 +91,6 @@ export function renderWorktreeItemRow(
       worktreeId: ctx.activeWorktreeId,
       hostId: ctx.activeWorkspaceExecutionHostId ?? null
     })
-  // A plain parent folds its own lineage group; a merged card folds every member's.
   const lineageToggleKeys =
     itemRow.lineageCollapseKeys ?? (itemRow.lineageGroupKey ? [itemRow.lineageGroupKey] : null)
   return (

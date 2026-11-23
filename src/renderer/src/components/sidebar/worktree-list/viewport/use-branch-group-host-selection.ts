@@ -7,8 +7,6 @@ import type { BranchGroupMember } from '../../../../../../shared/sidebar-list/ro
 
 type BranchGroupHostTarget = { member: BranchGroupMember; rowKey: string }
 
-/** The row must be found by its own key, not `worktree` or the branch group: a merged
- *  row always holds its local-first member, and two levels of one branch share a group. */
 export function findBranchGroupHostTarget(
   rows: readonly HostSectionRow[],
   rowKey: string,

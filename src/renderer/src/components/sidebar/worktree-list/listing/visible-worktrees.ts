@@ -31,8 +31,6 @@ export type VisibleWorktreeShortcutTarget = {
 }
 let _publishedVisibleShortcutTargets: VisibleWorktreeShortcutTarget[] | null = null
 
-/** Lineage groups each rendered workspace's child chip folds, keyed by host identity.
- * Published separately from the shortcut order, which names rows only. */
 let _publishedLineageFoldKeys: ReadonlyMap<string, readonly string[]> | null = null
 
 export function setVisibleWorktreeIds(ids: string[] | null): void {

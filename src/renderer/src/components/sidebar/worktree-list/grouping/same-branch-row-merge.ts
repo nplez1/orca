@@ -4,8 +4,10 @@ import {
   type ExecutionHostId,
   type ExecutionHostScope
 } from '../../../../../../shared/execution-host/execution-host'
-import { getWorktreeLineageGroupKey } from '../../../../../../shared/sidebar-list/sections/group-keys'
-import { PINNED_GROUP_KEY } from '../../../../../../shared/sidebar-list/sections/group-keys'
+import {
+  PINNED_GROUP_KEY,
+  getWorktreeLineageGroupKey
+} from '../../../../../../shared/sidebar-list/sections/group-keys'
 import type { ProjectGroupingIndex } from '../../../../../../shared/sidebar-list/sections/project-section-grouping'
 import type {
   Row,

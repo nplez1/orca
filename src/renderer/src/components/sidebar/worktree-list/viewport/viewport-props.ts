@@ -46,7 +46,6 @@ export type VirtualizedWorktreeViewportProps = {
   pinnedDisplayPolicy: PinnedWorktreeDisplayPolicy
   projectOrderBy: ProjectOrderBy
   toggleGroup: (key: string) => void
-  /** Folds or unfolds a merged card's groups as one. */
   toggleGroups: (keys: readonly string[]) => void
   onToggleAllProjects?: () => void
   collapsedGroups: Set<string>

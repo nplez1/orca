@@ -108,8 +108,6 @@ export function useSidebarWorktreeSelection(args: {
         ...(worktree.hostId ? { executionHostId: worktree.hostId } : {})
       }))
     )
-    // Why its own channel: the folded keys cover the hosts a card absorbed, which
-    // render no row, so they cannot ride the shortcut order without renumbering it.
     setVisibleLineageFoldKeys(indexLineageFoldKeys(sectionRows))
     // Why null, not []: [] is a real rendered order (all collapsed/filtered); null tells shortcuts the list is unmounted.
     return () => {

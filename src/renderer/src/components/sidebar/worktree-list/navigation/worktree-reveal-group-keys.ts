@@ -22,11 +22,6 @@ import { buildHostOrderedMembers, getBranchGroupKeyForWorktree } from '../groupi
 import type { SidebarLineageParentIdentities } from '../../../../../../shared/sidebar-list/lineage/worktree-lineage-projection'
 import { createSidebarPRGroupReader } from '../grouping/pr-group-key'
 
-/**
- * The lineage groups each ancestor card folds, root first. Mirrors the merge's
- * grouping level by level: a card's members are the same-branch rows among the
- * previous level's members' children, so a nested card unfolds with its parent.
- */
 function foldKeysByAncestor(args: {
   plan: WorktreeOccurrencePlan<Worktree>
   ancestors: readonly Worktree[]
@@ -64,8 +59,6 @@ function foldKeysByAncestor(args: {
       .map((worktree) => ({ worktree, repo: args.repoMap.get(worktree.repoId) }))
     const members = buildHostOrderedMembers(sameBranch, args.repoMap, args.defaultHostId, undefined)
     const memberWorktrees = members?.map((member) => member.worktree) ?? []
-    // Why: a pinned ancestor is never one of the merge's candidates, and its own key
-    // still hides the target — so it stands alone at its level rather than vanishing.
     const ancestorIdentity = getWorktreeHostIdentity(ancestor)
     const levelWorktrees = memberWorktrees.some(
       (worktree) => getWorktreeHostIdentity(worktree) === ancestorIdentity
@@ -100,7 +93,6 @@ export function getWorktreeRevealCollapsedGroupKeys(args: {
   workspaceStatuses: readonly WorkspaceStatusDefinition[]
   projectGroups: readonly ProjectGroup[]
   projectGrouping?: ProjectGroupingModel
-  /** Whether same-branch rows merged; when they did, a card folds several groups as one. */
   mergeSameBranchCards?: boolean
 }): string[] {
   const hostId = getWorktreeExecutionHostId(
@@ -138,10 +130,6 @@ export function getWorktreeRevealCollapsedGroupKeys(args: {
     return []
   }
   const keys = [`host:${hostId}`]
-  // Why all of a card's keys: a Group by branch card folds every member's lineage
-  // group together, so revealing a child must unfold the whole card, at any depth.
-  // Why by key: a parent the plan kept only as a key still names an ancestor, and
-  // the plan's own occurrence carries the row this walk needs.
   const occurrenceByKey = new Map(
     [...plan.preferredByIdentity.values()].map((candidate) => [candidate.key, candidate])
   )

@@ -74,7 +74,6 @@ export type WorktreeRow = {
   branchGroup?: readonly BranchGroupMember[]
   /** Stable key shared with the tab strip's host selection. */
   branchGroupKey?: string
-  /** Every lineage group a merged card owns, so its chip folds the whole union at once. */
   lineageCollapseKeys?: readonly string[]
   showProjectName?: boolean
 }
