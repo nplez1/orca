@@ -80,7 +80,7 @@ export function GitHubAppSetupSteps({
         <p className="text-xs text-muted-foreground">
           {t(
             'bots.github.app.step.createOrg',
-            'For an organization’s repositories, open https://github.com/organizations/<org>/settings/apps/new for that organization instead: an App created under your personal account cannot be installed on an organization.'
+            'For an organization’s repositories, either create the App under that organization (https://github.com/organizations/<org>/settings/apps/new) or, when creating it under your personal account, choose “Any account” so the organization can install it. “Only on this account” cannot be installed on an organization.'
           )}
         </p>
         <p className="text-xs text-muted-foreground">
@@ -152,7 +152,7 @@ export function GitHubAppSetupSteps({
         <p className="text-xs text-muted-foreground">
           {t(
             'bots.github.app.step.optionalPermissions',
-            'Add Contents: Read and write and Workflows: Read and write only if you also want a bot’s git pushes to run as the App. Nothing here needs them: pushes still use your own git login.'
+            'Leave Contents: Read and write and Workflows: Read and write off. Orca does not use them yet: a bot’s comments, reviews and pull requests need only the permissions above, and git pushes still use your own login.'
           )}
         </p>
       </Step>

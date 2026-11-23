@@ -37,7 +37,6 @@ export type GithubAppCredentials = {
   installations: readonly GithubAppInstallation[]
 }
 
-/** The App's login. Derived rather than stored, so a renamed App is not two identities. */
 export function githubAppLogin(slug: string): string {
   return githubAppBotLogin(slug)
 }
@@ -68,7 +67,6 @@ function unseal(envelope: string): string {
 
 const UNREADABLE = 'github-app: the stored App credentials are not readable; connect the App again'
 
-/** The stored App, or null when none is connected. Throws when a file exists but does not parse. */
 export async function readGithubAppCredentials(): Promise<GithubAppCredentials | null> {
   let text: string
   try {
@@ -117,7 +115,6 @@ export async function writeGithubAppCredentials(credentials: GithubAppCredential
   }
 }
 
-/** Disconnecting must leave nothing behind: the file holds the only sealed copy of the key. */
 export async function removeGithubAppCredentials(): Promise<void> {
   await rm(githubAppCredentialsPath(), { force: true })
 }

@@ -29,11 +29,8 @@ export function botToolsRevision(version: string, epoch: number): string {
 
 /** The GitHub App a launch's `gh` acted as: the identity epoch it launched under, and that installation. */
 export type BotLaunchedAppIdentity = {
-  /** `appIdentityEpoch()` at launch: a connect or disconnect after it makes the session stale. */
   epoch: number
-  /** The installation it minted a token for; null when no App was connected. */
   installationId: number | null
-  /** When that token dies; null when no App was connected. */
   expiresAtMs: number | null
 }
 
@@ -45,7 +42,6 @@ export type BotLaunchedTools = {
   appIdentity: BotLaunchedAppIdentity
 }
 
-/** A chat's tools against what its next launch would get: a changed file, Orca's own write, or a stale App. */
 function botLaunchedToolsOutdated(launched: BotLaunchedTools, revision?: string): boolean {
   return (
     botGithubAppIdentityOutdated(launched.appIdentity) ||
@@ -54,7 +50,6 @@ function botLaunchedToolsOutdated(launched: BotLaunchedTools, revision?: string)
   )
 }
 
-/** The two checks a host's delivery loop asks of a chat's launch; absent means it never refreshes. */
 export function botLaunchToolsChecks(
   launchedOf: (sessionId: string) => BotLaunchedTools | undefined,
   revisionOf: (folder: string) => Promise<string>

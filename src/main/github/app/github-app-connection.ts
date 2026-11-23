@@ -31,7 +31,6 @@ import {
 
 const PRIVATE_KEY_HEADER = /-----BEGIN (?:RSA )?PRIVATE KEY-----/
 
-/** A pasted key arrives without the file's trailing newline, and a picked one may carry blank lines. */
 function normalizePrivateKey(raw: string): string {
   const trimmed = raw.trim()
   if (!PRIVATE_KEY_HEADER.test(trimmed)) {
@@ -67,7 +66,6 @@ class GithubAppOperationSuperseded extends Error {
   }
 }
 
-/** The installation a bot acts as when no repository is known: the first, which Settings can name. */
 function installationInUse(credentials: GithubAppCredentials): GithubAppInstallation | null {
   return githubAppInstallationFor(credentials.installations)
 }
@@ -105,7 +103,6 @@ export async function githubAppStatus(): Promise<GithubAppStatus> {
   }
 }
 
-/** Which repos a `selected` installation covers: only an installation token can list them. */
 async function coveredRepositories(input: {
   appId: number
   privateKeyPem: string
@@ -121,7 +118,6 @@ async function coveredRepositories(input: {
   return listInstallationRepositories({ token, fetch: input.fetch })
 }
 
-/** What GitHub says the App is now: its identity, where it may act, and which repos each install covers. */
 async function readAppFromGithub(input: {
   appId: number
   privateKeyPem: string
@@ -213,5 +209,6 @@ export async function disconnectGithubApp(input: { fetch: GithubAppFetch }): Pro
   await removeGithubAppCredentials()
   forgetInstallationTokens()
   advanceAppIdentityEpoch()
-  await Promise.allSettled(revocations)
+  // Not awaited: the App is already gone here, and a stalled revoke must not hold the Settings action open.
+  void Promise.allSettled(revocations)
 }

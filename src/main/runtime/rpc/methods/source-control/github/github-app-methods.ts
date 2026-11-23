@@ -6,7 +6,7 @@ import {
   githubAppStatus,
   refreshGithubApp
 } from '../../../../../github/app/github-app-connection'
-import { electronHttpClient } from '../../../../../host/electron-http-client'
+import { getMainHttpClient } from '../../../../../network/http-client'
 import { defineMethod } from '../../../core'
 
 /** Main tags its own messages `github-app:` for the log; a person reading one needs it without. */
@@ -49,19 +49,19 @@ export const GITHUB_APP_METHODS = [
     permission: 'accounts-admin',
     params: GithubAppConnect,
     handler: async ({ appId, privateKey }) =>
-      answered(() => connectGithubApp({ appId, privateKey, fetch: electronHttpClient.fetch }))
+      answered(() => connectGithubApp({ appId, privateKey, fetch: getMainHttpClient().fetch }))
   }),
   // A repository added to an installation, or a second installation, without a second paste.
   defineMethod({
     name: 'github.app.refresh',
     permission: 'accounts-admin',
     params: null,
-    handler: async () => answered(() => refreshGithubApp({ fetch: electronHttpClient.fetch }))
+    handler: async () => answered(() => refreshGithubApp({ fetch: getMainHttpClient().fetch }))
   }),
   defineMethod({
     name: 'github.app.disconnect',
     permission: 'accounts-admin',
     params: null,
-    handler: async () => answered(() => disconnectGithubApp({ fetch: electronHttpClient.fetch }))
+    handler: async () => answered(() => disconnectGithubApp({ fetch: getMainHttpClient().fetch }))
   })
 ]

@@ -11,10 +11,6 @@ const inFlight = new Map<number, Promise<CachedToken>>()
 /** Bumped by `forgetInstallationTokens`, so a mint in flight during a disconnect is not cached afterwards. */
 let generation = 0
 
-/**
- * The token for one installation. The credential and the clock are inputs so this stays testable and so a
- * caller that just changed the App's key cannot be served a token minted with the old one.
- */
 export async function installationToken(input: {
   credentials: GithubAppCredentials
   installationId: number
@@ -38,17 +34,16 @@ export async function installationToken(input: {
     privateKeyPem: input.credentials.privateKeyPem,
     fetch: input.fetch,
     nowMs
-  }).then(({ token, expiresAtMs }) => ({ token, expiresAtMs }))
+  }).then(({ token, expiresAtMs }) => ({
+    token,
+    // Normalised here, not only for the minting caller: a joiner gets this too, and NaN would read as fresh.
+    expiresAtMs: Number.isFinite(expiresAtMs) ? expiresAtMs : nowMs
+  }))
 
   const startedAt = generation
   inFlight.set(input.installationId, minted)
   try {
-    const mintedByUs = await minted
-    // An expiry GitHub did not state is treated as spent, so the next caller mints rather than trusting it.
-    const fresh = {
-      token: mintedByUs.token,
-      expiresAtMs: Number.isFinite(mintedByUs.expiresAtMs) ? mintedByUs.expiresAtMs : nowMs
-    }
+    const fresh = await minted
     if (generation === startedAt) {
       cache.set(input.installationId, fresh)
     }

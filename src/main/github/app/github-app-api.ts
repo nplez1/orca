@@ -116,7 +116,6 @@ export async function readGithubApp(input: {
   return { id: body.id, slug: body.slug }
 }
 
-/** `GET /app/installations`: where the App may act, and on which repos (`selected` names them later). */
 export async function listGithubAppInstallations(input: {
   appId: number
   privateKeyPem: string
@@ -145,7 +144,6 @@ export async function listGithubAppInstallations(input: {
   })
 }
 
-/** `POST /app/installations/{id}/access_tokens`: the token `gh` and `git` act with. */
 export async function mintInstallationToken(input: {
   appId: number
   installationId: number
@@ -172,7 +170,6 @@ export async function mintInstallationToken(input: {
   return { token: body.token, expiresAtMs: Number.isFinite(expiresAtMs) ? expiresAtMs : Number.NaN }
 }
 
-/** `GET /installation/repositories` with an installation token: which repos a `selected` install covers. */
 export async function listInstallationRepositories(input: {
   token: string
   fetch: GithubAppFetch

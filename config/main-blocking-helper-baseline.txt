@@ -84,6 +84,8 @@
 1 src/main/antigravity/native-wsl-credentials.ts
 6 src/main/artifacts/artifact-cloud-auth-context.ts
 7 src/main/artifacts/artifact-cloud-service.ts
+2 src/main/github/app/github-app-connection.ts # connect/disconnect once per user action; the only sync step is writeSecureFileAsync's fenced renameSync inside src/shared
+1 src/main/github/app/github-app-credentials.ts # same write path as the connection above: writeSecureFileAsync, whose sync step is shared hardening
 2 src/main/artifacts/artifact-create-intent-store.ts # sign-out clear (bestEffortFsyncDirectorySync) plus writeArtifactFileWhileCurrent, whose only sync step is the fenced renameSync; was 8
 1 src/main/artifacts/artifact-guarded-secure-write.ts # per artifact write: writeSecureFileAsync keeps only its renameSync in the fence-check turn so a sign-out clear cannot land between; replaces sync reads, stage and fsync
 1 src/main/artifacts/artifact-publisher.ts

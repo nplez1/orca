@@ -8,7 +8,7 @@ import {
 import { readGithubAppCredentials } from '../github/app/github-app-credentials'
 import { appIdentityEpoch } from '../github/app/github-app-identity-epoch'
 import { installationToken } from '../github/app/github-app-installation-token'
-import { electronHttpClient } from '../host/electron-http-client'
+import { getMainHttpClient } from '../network/http-client'
 
 export const BOT_GH_APP_TOKEN_ENV = 'GH_TOKEN'
 
@@ -52,7 +52,7 @@ export async function botGithubAppLaunch(
   const { token, expiresAtMs } = await installationToken({
     credentials,
     installationId: installation.id,
-    fetch: electronHttpClient.fetch
+    fetch: getMainHttpClient().fetch
   })
   return {
     env: { [BOT_GH_APP_TOKEN_ENV]: token, GH_PROMPT_DISABLED: '1' },
