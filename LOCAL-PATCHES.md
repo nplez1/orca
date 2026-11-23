@@ -5641,7 +5641,7 @@ row, a bot delete keeping the project, and no row for a bot with no project). Ev
 against a **real loopback HTTP server** (`photon-fake-server.test-fixture.ts`) with knobs to fail a key
 mint, an assignment and a send, and with real idempotency replay — a mock that cannot fail is not a test.
 
-### `local(lint)`: what the iMessage branch's channel does off the main thread, and one foreign red
+### `local(lint)`: the iMessage channel's work off the main thread, and two upstream warnings fixed rather than recorded
 
 The channel's stores were synchronous, and every one of their reads and writes runs on a delivery or a
 turn end rather than once at startup — a blocking read there stalls every window on Electron's main
@@ -5670,8 +5670,8 @@ each module keeps one store, so the charge lands once per file. Collapsing them 
 for four different file shapes, which is worse code than six documented rows. Every read in all six is
 asynchronous; nothing here reads on the message path.
 
-**One upstream warning, fixed in one token rather than allowlisted.**
-Two files, one claim each. `useIpynbDocumentEditing.ts:153` carried an `react-hooks(exhaustive-deps)` warning: `fileId` in
+**Two upstream warnings, one claim each, both fixed rather than allowlisted.**
+`useIpynbDocumentEditing.ts:153` carried an `react-hooks(exhaustive-deps)` warning: `fileId` in
 `flushSourceDrafts`'s dependency array, which the callback never reads — it works off
 `sourceDraftsRef`, `draftBasesRef` and `contentRef`, all stable, plus `latestCells`. `pnpm lint` runs
 oxlint with `--deny-warnings`, so the warning was a failing step. It reproduced on `main` at
