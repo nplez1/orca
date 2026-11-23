@@ -68,10 +68,18 @@ export async function postPhotonReply(
   if (outcome.sent) {
     return { status: 'posted', place: PLACE }
   }
-  // A send a concurrent attempt already settled is not retried, so saying "it retries" would be a lie
-  // in the other direction from claiming it was posted.
-  const notice = outcome.settled
-    ? 'Photon is no longer holding this send: another attempt settled it, so nothing further is retried.'
-    : `Photon did not take it yet (${outcome.error}); it stays queued and retries.`
-  return { status: 'queued', place: PLACE, notices: [notice] }
+  // A settled entry is no longer the outbox's because another attempt sent it: reporting that as queued
+  // would promise a retry that will never happen for a message that is already there.
+  if (outcome.settled) {
+    return {
+      status: 'posted',
+      place: PLACE,
+      notices: ['A concurrent attempt settled this send; this call posted nothing further.']
+    }
+  }
+  return {
+    status: 'queued',
+    place: PLACE,
+    notices: [`Photon did not take it yet (${outcome.error}); it stays queued and retries.`]
+  }
 }

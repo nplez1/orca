@@ -46,9 +46,7 @@ const REPLY_REFUSALS: Readonly<Record<string, string>> = {
 export function formatReply(reply: ConnectorReply): string {
   const place = reply.place ?? 'the thread'
   return [
-    reply.status === 'posted'
-      ? `Posted to ${place}.`
-      : `Queued; it will post to ${place} when the connection is back.`,
+    reply.status === 'posted' ? `Posted to ${place}.` : `Queued for ${place}.`,
     ...(reply.notices ?? [])
   ].join('\n')
 }
