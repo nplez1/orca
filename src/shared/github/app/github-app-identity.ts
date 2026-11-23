@@ -59,6 +59,32 @@ export function githubAppCoversRepo(input: {
 }
 
 /**
+ * The `owner/name` a remote key names on GitHub, or null for any other host or shape. Remote keys read
+ * `host/owner/name`, so the host is stripped here rather than at each caller.
+ */
+export function githubRepoFullNameFromRemoteKey(
+  canonicalKey: string | null | undefined
+): string | null {
+  const key = canonicalKey?.trim()
+  if (!key) {
+    return null
+  }
+  const [host, ...tail] = key.split('/')
+  if (host?.toLowerCase() !== 'github.com' || tail.length !== 2) {
+    return null
+  }
+  const [owner, name] = tail
+  return owner && name ? `${owner}/${name}` : null
+}
+
+/** `owner` of `owner/name`, or null when the string names no repository. */
+export function githubRepoOwner(repoFullName: string | null | undefined): string | null {
+  const trimmed = repoFullName?.trim() ?? ''
+  const slash = trimmed.indexOf('/')
+  return slash > 0 ? trimmed.slice(0, slash) : null
+}
+
+/**
  * The installation a bot acts as: the one covering `repoFullName` when that repo is known, else the first,
  * which is the only answer a Settings read can give.
  */
@@ -83,5 +109,30 @@ export function githubAppInstallationFor<
           repoFullName
         }) !== 'none'
     ) ?? null
+  )
+}
+
+/**
+ * The installation that can act on any repository `owner` owns. A `selected` installation names its
+ * repositories rather than its owner, so its coverage of an owner is whatever it was given there.
+ */
+export function githubAppInstallationForOwner<
+  T extends {
+    repositorySelection: GithubAppRepositorySelection
+    account: string
+    repositories: readonly string[]
+  }
+>(installations: readonly T[], owner: string): T | null {
+  const wanted = owner.trim().toLowerCase()
+  if (!wanted) {
+    return null
+  }
+  return (
+    installations.find((installation) => {
+      if (installation.repositorySelection === 'all') {
+        return sameRepo(installation.account, wanted)
+      }
+      return installation.repositories.some((repo) => sameRepo(repo.split('/')[0] ?? '', wanted))
+    }) ?? null
   )
 }

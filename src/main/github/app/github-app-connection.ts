@@ -46,7 +46,8 @@ function view(installation: GithubAppInstallation): GithubAppInstallationView {
     id: installation.id,
     account: installation.account,
     repositorySelection: installation.repositorySelection,
-    repositories: [...installation.repositories]
+    repositories: [...installation.repositories],
+    canPush: installation.contentsWrite ?? null
   }
 }
 

@@ -7,7 +7,10 @@ import { gitSyncForkDefaultBranch } from '../../../git/remotes/fork-sync'
 import { getUpstreamStatus } from '../../../git/source-control/upstream/upstream'
 import { validateGitPushTarget } from '../../../git/remotes/push-target-validation'
 import { resolveRegisteredWorktreePath } from '../../worktrees/removal/registered-worktree-roots-cache'
-import { getLocalGitOptionsForRegisteredWorktree } from '../../worktrees/local-worktree-runtime-options'
+import {
+  getLocalGitOptionsForRegisteredWorktree,
+  getLocalRemoteSyncGitOptions
+} from '../../worktrees/local-worktree-runtime-options'
 import {
   type GitForkSyncExpectedUpstream,
   type GitForkSyncResult,
@@ -58,11 +61,7 @@ export function registerGitRemoteSyncHandlers(context: FilesystemHandlerContext)
     ): Promise<void> => {
       requireReachableGitRoute(getConnectionExecutionHostId(args.connectionId))
       const worktreePath = await resolveRegisteredWorktreePath(args.worktreePath, store)
-      const gitOptions = getLocalGitOptionsForRegisteredWorktree(
-        store,
-        args.worktreePath,
-        worktreePath
-      )
+      const gitOptions = await getLocalRemoteSyncGitOptions(store, args.worktreePath, worktreePath)
       const materializedPushTarget = args.pushTarget
         ? await materializeWorktreePushTargetRemote(
             worktreePath,
@@ -101,11 +100,7 @@ export function registerGitRemoteSyncHandlers(context: FilesystemHandlerContext)
       })
       requireReachableGitRoute(getConnectionExecutionHostId(args.connectionId))
       const worktreePath = await resolveRegisteredWorktreePath(args.worktreePath, store)
-      const gitOptions = getLocalGitOptionsForRegisteredWorktree(
-        store,
-        args.worktreePath,
-        worktreePath
-      )
+      const gitOptions = await getLocalRemoteSyncGitOptions(store, args.worktreePath, worktreePath)
       return gitSyncForkDefaultBranch(worktreePath, expectedUpstream, {
         ...gitOptions,
         admissionTier: 'interactive'

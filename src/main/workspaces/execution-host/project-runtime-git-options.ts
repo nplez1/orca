@@ -18,6 +18,7 @@ export type LocalProjectWorktreeGitOptions = {
 
 export type LocalProjectGhExecOptions = LocalProjectWorktreeGitOptions & {
   ghAccount?: Repo['ghAccount']
+  ghAccountRepoFullName?: string
 }
 
 export function getLocalProjectGitExecOptions(
@@ -62,9 +63,12 @@ export function getLocalProjectGhExecOptions(
   store: ProjectRuntimeResolutionStore,
   repo: Repo
 ): LocalProjectGhExecOptions {
+  const remoteKey = repo.gitRemoteIdentity?.canonicalKey
+  const repoFullName = remoteKey ? remoteKey.split('/').slice(1).join('/') : ''
   return {
     ...getLocalProjectWorktreeGitOptions(store, repo),
-    ...(repo.ghAccount ? { ghAccount: repo.ghAccount } : {})
+    ...(repo.ghAccount ? { ghAccount: repo.ghAccount } : {}),
+    ...(repoFullName ? { ghAccountRepoFullName: repoFullName } : {})
   }
 }
 

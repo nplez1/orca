@@ -8,5 +8,6 @@ export const BindableAccounts = RepoSelector.extend({
 
 export const ValidateAccountBinding = RepoSelector.extend({
   host: requiredString('Missing host'),
-  user: requiredString('Missing user')
+  user: requiredString('Missing user'),
+  kind: z.enum(['user', 'app']).optional()
 })

@@ -1,8 +1,17 @@
 /** Canonicalize hosts for comparison/gh --hostname; preserve login casing for display and gh auth token --user. */
 
+export type GhAccountKind = 'user' | 'app'
+
+// fork-comment-ok: the two meanings of `user` are the one thing a reader cannot infer from this type.
+/** A gh login, or the App's `<slug>[bot]`; an absent `kind` means a login, as every older record is. */
 export type GhAccountBinding = {
   host: string
   user: string
+  kind?: GhAccountKind
+}
+
+export function isAppGhAccountBinding(binding: GhAccountBinding | null | undefined): boolean {
+  return binding?.kind === 'app'
 }
 
 const HOST_RE = /^[a-z0-9][a-z0-9.-]*(?::\d+)?$/i
@@ -23,7 +32,11 @@ export function normalizeGhAccountBinding(value: unknown): GhAccountBinding | nu
   if (!host || !user || user.includes('\u0000') || !HOST_RE.test(host) || !USER_RE.test(user)) {
     return null
   }
-  return { host, user }
+  const kindRaw = 'kind' in value ? value.kind : undefined
+  if (kindRaw !== undefined && kindRaw !== 'user' && kindRaw !== 'app') {
+    return null
+  }
+  return kindRaw === 'app' ? { host, user, kind: 'app' } : { host, user }
 }
 
 /** Host-insensitive, login-exact comparison — matches how gh resolves `--hostname` and `--user`. */
@@ -34,7 +47,7 @@ export function ghAccountBindingsEqual(
   if (!a || !b) {
     return a === b
   }
-  return a.host === b.host && a.user === b.user
+  return a.host === b.host && a.user === b.user && (a.kind ?? 'user') === (b.kind ?? 'user')
 }
 
 /** github.com/github.localhost/*.ghe.com use GH_TOKEN; other hosts use GH_ENTERPRISE_TOKEN.

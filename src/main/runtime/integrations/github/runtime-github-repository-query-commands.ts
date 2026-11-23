@@ -1,5 +1,19 @@
 import type { GhAccountBinding } from '../../../../shared/github/accounts/account-binding'
+import {
+  isAppGhAccountBinding,
+  normalizeGhAccountBinding
+} from '../../../../shared/github/accounts/account-binding'
 import type { GitHubRepositoryIdentity as GitHubOwnerRepo } from '../../../../shared/github/repositories/repository-identity'
+import type { GithubAppGitCredentialResult } from '../../../../shared/rpc-contract/github/github-app-params'
+import {
+  GITHUB_APP_BOT_SUFFIX,
+  githubAppBotLogin,
+  githubRepoFullNameFromRemoteKey,
+  githubRepoOwner
+} from '../../../../shared/github/app/github-app-identity'
+import { githubAppBoundToken } from '../../../github/app/github-app-bound-token'
+import { readGithubAppCredentials } from '../../../github/app/github-app-credentials'
+import { getMainHttpClient } from '../../../network/http-client'
 import type { ListWorkItemsResult } from '../../../../shared/github/work-items/work-item-types'
 import type { Repo } from '../../../../shared/repository/repo-types'
 import type { LocalProjectGhExecOptions } from '../../../workspaces/execution-host/project-runtime-git-options'
@@ -231,11 +245,33 @@ export class RuntimeGitHubRepositoryQueryCommands {
 
   async validateGitHubAccountBinding(
     repoSelector: string,
-    binding: { host: string; user: string }
+    binding: { host: string; user: string; kind?: 'user' | 'app' }
   ): Promise<Awaited<ReturnType<typeof validateGhAccountBinding>>> {
     const repo = await this.deps.resolveRepo(repoSelector)
     const localGitOptions = this.deps.getLocalGitArgs(repo)[0] ?? {}
     const requiredHost = await resolveGhAccountRequiredHost(repo, localGitOptions)
     return validateGhAccountBinding(binding, localGitOptions, requiredHost ? { requiredHost } : {})
+  }
+
+  async appGitCredential(repoSelector: string): Promise<GithubAppGitCredentialResult> {
+    const repo = await this.deps.resolveRepo(repoSelector)
+    const binding = normalizeGhAccountBinding(repo.ghAccount)
+    if (!isAppGhAccountBinding(binding) || !binding) {
+      throw new Error(
+        'This project is not bound to the GitHub App, so there is no App token for git. Bind it in Settings › Project, or push as your own account.'
+      )
+    }
+    const credentials = await readGithubAppCredentials()
+    const owner = githubRepoOwner(
+      githubRepoFullNameFromRemoteKey(repo.gitRemoteIdentity?.canonicalKey)
+    )
+    const minted = await githubAppBoundToken({
+      host: binding.host,
+      owner,
+      credentials,
+      fetch: getMainHttpClient().fetch
+    })
+    const slug = credentials?.slug ?? binding.user.replace(GITHUB_APP_BOT_SUFFIX, '')
+    return { username: githubAppBotLogin(slug), password: minted.token }
   }
 }

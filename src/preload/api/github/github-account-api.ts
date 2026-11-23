@@ -14,5 +14,6 @@ export type GithubAccountApi = {
     repoId?: string
     host: string
     user: string
+    kind?: 'user' | 'app'
   }) => Promise<GhAccountBindingValidationResult>
 }

@@ -17,8 +17,10 @@ import { BotLaunchTools } from './bot-launch-tools'
 import {
   botGithubAppLaunch,
   githubRepoFullNameOfLaunch,
+  launchRepoOf,
   type LaunchRepo
 } from './bot-gh-app-identity'
+import { appBoundRepoGitLaunchEnv } from '../github/app/github-app-bound-repo-git'
 import {
   advanceBotToolsEpoch,
   botToolsEpoch,
@@ -298,9 +300,13 @@ export async function botSessionToolServers(
   // Read before the file: a write in between makes this launch look stale, never current.
   const epoch = botToolsEpoch(launchDirectory)
   const snapshot = await readBotToolsSnapshot(launchDirectory)
+  const launchRepo = launchRepoOf(repos, launchDirectory)
   const app = await botGithubAppLaunch({
     repoFullName: githubRepoFullNameOfLaunch(repos, launchDirectory)
   })
+  const gitEnv = launchRepo
+    ? await appBoundRepoGitLaunchEnv({ repo: launchRepo, botId: bot.id })
+    : {}
   return {
     tools: (
       await BotLaunchTools.for(
@@ -308,7 +314,9 @@ export async function botSessionToolServers(
         { botId: bot.id, name: bot.name, folder: launchDirectory, agent: record.provider },
         snapshot.servers
       )
-    ).withGithubAppEnv(app.env),
+    )
+      .withGithubAppEnv(app.env)
+      .withGitCredentialEnv(gitEnv),
     launched: {
       folder: launchDirectory,
       revision: botToolsRevision(snapshot.version, epoch),

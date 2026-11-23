@@ -4,6 +4,7 @@ export type GitRuntimeOptions = {
   wslDistro?: string
   signal?: AbortSignal
   admissionTier?: GitAdmissionTier
+  env?: NodeJS.ProcessEnv
   observeChildTermination?: (terminated: Promise<void>, writes: boolean) => void
 }
 
@@ -16,6 +17,7 @@ export function gitOptionsForWorktree(
     ...(options.wslDistro ? { wslDistro: options.wslDistro } : {}),
     ...(options.signal ? { signal: options.signal } : {}),
     ...(options.admissionTier ? { admissionTier: options.admissionTier } : {}),
+    ...(options.env ? { env: options.env } : {}),
     ...(options.observeChildTermination
       ? { observeChildTermination: options.observeChildTermination }
       : {})

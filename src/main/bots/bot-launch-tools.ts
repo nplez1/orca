@@ -86,6 +86,20 @@ export class BotLaunchTools {
           false
         )
   }
+
+  // fork-comment-ok: why a launch env entry ignores the commandsOnly split is not readable from the code.
+  /** A project bound to the GitHub App pushes as it, and a terminal's git is not the CLI's commands. */
+  withGitCredentialEnv(gitEnv: Readonly<Record<string, string>>): BotLaunchTools {
+    return Object.keys(gitEnv).length === 0
+      ? this
+      : new BotLaunchTools(
+          this.servers,
+          { ...this.env, ...gitEnv },
+          this.commandEnv,
+          this.relayed,
+          this.commandsOnly
+        )
+  }
 }
 
 const ENV_REFERENCING_AGENTS: ReadonlySet<string> = new Set(['claude', 'pi'])

@@ -413,7 +413,7 @@ import {
   TerminalArtifactFileWrite
 } from './filesystem/files-terminal-artifact-params'
 import { BindableAccounts, ValidateAccountBinding } from './github/github-account-binding-params'
-import { GithubAppConnect } from './github/github-app-params'
+import { GithubAppConnect, GithubAppGitCredential } from './github/github-app-params'
 import { UploadGitHubAttachment } from './github/github-attachment-params'
 import { CreateIssue, Issue, IssueComment, UpdateIssue } from './github/github-issue-params'
 import {
@@ -1599,6 +1599,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'github.addPRReviewCommentReply': PRReviewCommentReply,
   'github.app.connect': GithubAppConnect,
   'github.app.disconnect': null,
+  'github.app.gitCredential': GithubAppGitCredential,
   'github.app.refresh': null,
   'github.app.status': null,
   'github.countWorkItems': WorkItemsCount,

@@ -1,5 +1,8 @@
 // `github.app.*`: the App a bot can act as on this host, and the only place its key is ever accepted.
-import { GithubAppConnect } from '../../../../../../shared/rpc-contract/github/github-app-params'
+import {
+  GithubAppConnect,
+  GithubAppGitCredential
+} from '../../../../../../shared/rpc-contract/github/github-app-params'
 import {
   connectGithubApp,
   disconnectGithubApp,
@@ -63,5 +66,12 @@ export const GITHUB_APP_METHODS = [
     permission: 'accounts-admin',
     params: null,
     handler: async () => answered(() => disconnectGithubApp({ fetch: getMainHttpClient().fetch }))
+  }),
+  // git's credential helper: workspace, because it mints no new authority — the repo's binding names it.
+  defineMethod({
+    name: 'github.app.gitCredential',
+    permission: 'workspace',
+    params: GithubAppGitCredential,
+    handler: async ({ repo }, { runtime }) => answered(() => runtime.appGitCredential(repo))
   })
 ]

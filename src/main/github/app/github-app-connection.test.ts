@@ -174,7 +174,14 @@ describe('githubAppStatus', () => {
       appId: 5739055,
       login: 'lab-agent-np[bot]',
       installations: [
-        { id: 181472560, account: 'nplez1', repositorySelection: 'selected', repositories: [] }
+        {
+          id: 181472560,
+          account: 'nplez1',
+          repositorySelection: 'selected',
+          repositories: [],
+          // Nothing on disk says whether this install can push, and a view never invents an answer.
+          canPush: null
+        }
       ],
       activeInstallationId: 181472560
     })

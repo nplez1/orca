@@ -4,9 +4,14 @@ import type { GhCaptureLifetimeHooks } from '../../git/command-runner/hosted-cli
 import { addWslEnvKeys } from '../../../shared/shell/wsl/wsl-env'
 import {
   ghTokenEnvVarForHost,
+  isAppGhAccountBinding,
   normalizeGhAccountBinding,
   type GhAccountBinding
 } from '../../../shared/github/accounts/account-binding'
+import {
+  createGhBoundAccountHostMismatchError,
+  createGhBoundAccountUnavailableError
+} from './gh-bound-account-errors'
 import {
   createGhMultiAccountUnsupportedError,
   getGhExecutionHostKey,
@@ -14,6 +19,13 @@ import {
   normalizeGhCapabilityTarget,
   type GhCapabilityTarget
 } from './gh-capability-state'
+import { githubRepoOwner } from '../../../shared/github/app/github-app-identity'
+import { appIdentityEpoch } from '../app/github-app-identity-epoch'
+import { githubAppBoundToken } from '../app/github-app-bound-token'
+import { readGithubAppCredentials } from '../app/github-app-credentials'
+import { getMainHttpClient } from '../../network/http-client'
+
+export { createGhBoundAccountHostMismatchError, createGhBoundAccountUnavailableError }
 
 const TOKEN_RESOLVE_TIMEOUT_MS = 10_000
 const POSITIVE_TTL_MS = 5 * 60_000
@@ -30,13 +42,18 @@ const AMBIENT_GH_ENV_KEYS = [
 ] as const
 
 type TokenCacheEntry =
-  | { kind: 'positive'; token: string; expiresAt: number }
-  | { kind: 'negative'; expiresAt: number }
+  | { kind: 'positive'; token: string; expiresAt: number; epoch?: number }
+  | { kind: 'negative'; expiresAt: number; epoch?: number }
 
 const tokenCache = new Map<string, TokenCacheEntry>()
 
-function tokenCacheKey(binding: GhAccountBinding, target: GhCapabilityTarget): string {
-  return `${getGhExecutionHostKey(target)}\0${binding.host}\0${binding.user}`
+function tokenCacheKey(
+  binding: GhAccountBinding,
+  target: GhCapabilityTarget,
+  repoFullName?: string
+): string {
+  const repo = isAppGhAccountBinding(binding) ? `\0${repoFullName ?? ''}` : ''
+  return `${getGhExecutionHostKey(target)}\0${binding.host}\0${binding.user}${repo}`
 }
 
 function isTransientTokenResolveFailure(error: unknown): boolean {
@@ -83,35 +100,13 @@ function pruneTokenCache(now: number): void {
   }
 }
 
-export function createGhBoundAccountUnavailableError(
-  binding: GhAccountBinding
-): Error & { code: 'gh_bound_account_unavailable'; stderr: string } {
-  const message = `Bound GitHub account ${binding.user}@${binding.host} is unavailable on this runtime.`
-  return Object.assign(new Error(message), {
-    code: 'gh_bound_account_unavailable' as const,
-    stderr: message
-  })
-}
-
-export function createGhBoundAccountHostMismatchError(
-  binding: GhAccountBinding,
-  host: string | undefined
-): Error & { code: 'gh_bound_account_host_mismatch'; stderr: string } {
-  const message = host
-    ? `Bound GitHub account host ${binding.host} does not match request host ${host}.`
-    : `Bound GitHub account ${binding.user}@${binding.host} requires an explicit matching host.`
-  return Object.assign(new Error(message), {
-    code: 'gh_bound_account_host_mismatch' as const,
-    stderr: message
-  })
-}
-
 /** Resolves a short-lived token for `binding`, cached 5 min positive / 30 s negative per execution host. */
 export async function resolveGhAccountToken(
   bindingInput: GhAccountBinding,
   target: GhCapabilityTarget = {},
   nowMs = Date.now(),
-  hooks?: GhCaptureLifetimeHooks
+  hooks?: GhCaptureLifetimeHooks,
+  repoFullName?: string
 ): Promise<string> {
   const binding = normalizeGhAccountBinding(bindingInput)
   if (!binding) {
@@ -119,6 +114,10 @@ export async function resolveGhAccountToken(
   }
 
   const normalizedTarget = normalizeGhCapabilityTarget(target)
+  if (isAppGhAccountBinding(binding)) {
+    return resolveAppGhAccountToken(binding, repoFullName, nowMs)
+  }
+
   const capability = await getGhMultiAccountCapability(normalizedTarget, nowMs, hooks)
   if (capability === 'unsupported') {
     throw createGhMultiAccountUnsupportedError()
@@ -193,6 +192,62 @@ export async function resolveGhAccountToken(
   }
 }
 
+async function resolveAppGhAccountToken(
+  binding: GhAccountBinding,
+  repoFullName: string | undefined,
+  nowMs: number
+): Promise<string> {
+  const owner = githubRepoOwner(repoFullName)
+  pruneTokenCache(nowMs)
+  const key = tokenCacheKey(binding, {}, repoFullName)
+  const cached = tokenCache.get(key)
+  if (cached && cached.epoch === appIdentityEpoch() && cached.expiresAt > nowMs) {
+    if (cached.kind === 'positive') {
+      return cached.token
+    }
+    throw createGhBoundAccountUnavailableError(binding)
+  }
+  try {
+    const minted = await githubAppBoundToken({
+      host: binding.host,
+      owner,
+      credentials: await readGithubAppCredentials(),
+      fetch: getMainHttpClient().fetch,
+      nowMs
+    })
+    const expiresAt = Math.max(minted.expiresAtMs, nowMs + NEGATIVE_TTL_MS)
+    tokenCache.set(key, {
+      kind: 'positive',
+      token: minted.token,
+      expiresAt,
+      epoch: appIdentityEpoch()
+    })
+    pruneTokenCache(nowMs)
+    return minted.token
+  } catch (error) {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      error.code === 'gh_bound_account_unavailable'
+    ) {
+      tokenCache.set(key, {
+        kind: 'negative',
+        expiresAt: nowMs + NEGATIVE_TTL_MS,
+        epoch: appIdentityEpoch()
+      })
+      pruneTokenCache(nowMs)
+      throw error
+    }
+    throw createGhBoundAccountUnavailableError(
+      binding,
+      `The GitHub App could not mint a token for ${owner ?? binding.host}: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    )
+  }
+}
+
 /** Drops ambient GH_TOKEN/GH_HOST/GH_REPO so a bound call cannot inherit the globally active login. */
 export function stripAmbientGhTokenEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const next = { ...env }
@@ -235,8 +290,9 @@ export function invalidateGhAccountTokenCache(binding?: GhAccountBinding | null)
     tokenCache.clear()
     return
   }
+  const suffix = `\0${normalized.host}\0${normalized.user}`
   for (const key of tokenCache.keys()) {
-    if (key.endsWith(`\0${normalized.host}\0${normalized.user}`)) {
+    if (key.endsWith(suffix) || key.includes(`${suffix}\0`)) {
       tokenCache.delete(key)
     }
   }

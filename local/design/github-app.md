@@ -28,13 +28,17 @@ for everything it does as you.
 | --------------------------------- | ------------------------------------------------- |
 | **Pull requests: Read and write** | Open pull requests, comment on them, review them. |
 | **Issues: Read and write**        | Comment on issues.                                |
+| **Contents: Read and write**      | Push commits and branches.                        |
 | **Checks: Read**                  | See whether its own pull request is green.        |
 | **Actions: Read**                 | Read a failed run's logs.                         |
 | **Metadata: Read**                | Added by GitHub to every App; not a choice.       |
 
-**Contents: Read and write** and **Workflows: Read and write** are _not_ needed for what ships: a
-bot's `git push` still runs as the user's git login (see Limits). Request them only if pushes as the
-App are wanted later.
+**Workflows: Read and write** is deliberately _not_ requested. A push that touches
+`.github/workflows/**` needs it, so GitHub rejects such a push with `refusing to allow a GitHub App to
+create or update workflow`. That is stated in Settings rather than discovered: grant it on GitHub if
+the bots push workflows. Settings warns when the installation's `Contents` is not `write`, which the
+installation's own permissions answer; when GitHub answers no permissions at all, Settings says so
+instead of guessing.
 
 Nothing else is asked for: no webhook (nothing has to reach Orca) and no event subscriptions.
 
@@ -93,16 +97,49 @@ Disconnecting revokes the installation tokens Orca minted (`DELETE /installation
 before forgetting them, and it supersedes a connect still in flight, so the last action the user took
 is the one that stands.
 
+## git push, and the App inside `Repo.ghAccount`
+
+A project can be bound to the App, and then **git pushes as it** too. The binding is the same
+`GhAccountBinding` with `kind: 'app'`: absent `kind` still means a `gh` login, so every project saved
+before this existed keeps its meaning, and the picker offers the connected App as one more row beside
+the keyring logins it already shows.
+
+A push cannot carry a token in its environment: an installation token lives an hour and a worktree can
+outlive it, so an injected one would start failing silently. Instead the push is told how to _ask_ for
+one, through git's own credential protocol:
+
+- `orca git-credential get --repo <folder>` reads git's `key=value` request and answers
+  `username=`/`password=` with a token minted at that moment through the runtime RPC. Nothing is
+  written down, and no token reaches argv or the environment.
+- The child git runs with `GIT_TERMINAL_PROMPT=0` and `GIT_CONFIG_COUNT`/`KEY_n`/`VALUE_n` carrying
+  `credential.helper=` (emptied, so a configured helper cannot answer first), then
+  `credential.helper=!orca git-credential --repo <folder>`, and `url.https://github.com/.insteadOf`
+  for `git@github.com:` and `ssh://git@github.com/` — so an SSH remote is fetched and pushed over
+  HTTPS for this binding only, and a user binding's SSH login is untouched.
+- A bot session's launch env needs the credential, not just Orca's own pushes. It gets the same
+  directives as a generated config file plus `GIT_CONFIG_GLOBAL`, because agent CLIs scrub
+  key/token-shaped environment names from what their commands see and `GIT_CONFIG_KEY_n` would then
+  leave git a count with no keys (#26594).
+
+The token is minted for the installation covering the repository's owner, so one App installed on two
+organisations works. No App connected, or no installation covering that owner, **fails** the push and
+the `gh` call with `gh_bound_account_unavailable` and a message naming the host or the owner: falling
+back to the user's login would author the commit as someone else.
+
 ## Limits — not done here
 
-- **Git push as the App.** The push path still runs as the user's git login. Making pushes act as the
-  App needs the installation token in git's credential helper, not just in `gh`'s env; whether
-  `GH_TOKEN` already helps depends on whether `gh` is that helper, which is unverified.
 - **github.com only.** The App's token is a github.com token. On a GitHub Enterprise host a bot's `gh`
-  keeps acting as the signed-in account, and Settings says so.
-- **App accounts inside `Repo.ghAccount`.** The per-repo account picker
-  (`RepositoryGitHubAccountSection`) still chooses among keyring `gh` logins. An App is a host-wide
-  identity, not a per-repo binding, and the two are not yet reconciled.
+  keeps acting as the signed-in account, Settings offers no App binding, and a binding that named a GHES
+  host fails closed rather than pretending.
 - **The token expiry is only shown once known.** A status read never mints a token, so Settings shows
   an expiry only after a bot has acted. Minting on a settings read would cost a network call and could
   fail in a way that looks like a broken connection.
+- **A push that touches workflows.** `Workflows: Read and write` is not requested, so GitHub rejects it;
+  Settings and this note say so instead of it being a surprise at push time.
+- **A bot session's whole `git` is scoped to the bound project, not to the project's remote.** The
+  config file it launches with rewrites every github.com SSH remote and names the helper for the bound
+  project, so a second repository pushed from inside that session is refused rather than pushed as the
+  bound App — loudly, naming the project, and it is the one place a bound session differs from a
+  plain one. Scoping by `includeIf gitdir:` was rejected: a linked worktree's gitdir lives under the
+  main checkout's `.git/worktrees`, so the pattern that matches the checkout does not match the worktree
+  a bot actually works in.

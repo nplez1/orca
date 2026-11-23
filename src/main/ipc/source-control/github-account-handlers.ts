@@ -52,12 +52,21 @@ export function registerGitHubAccountHandlers(store: Store): void {
 
   ipcMain.handle(
     'gh:validateAccountBinding',
-    async (_event, args: { repoPath: string; repoId?: string; host: string; user: string }) => {
+    async (
+      _event,
+      args: {
+        repoPath: string
+        repoId?: string
+        host: string
+        user: string
+        kind?: 'user' | 'app'
+      }
+    ) => {
       const repo = assertRegisteredGitHubRepo(args, store)
       const localGitOptions = getGitHubLocalGitOptionArgs(store, repo)[0] ?? {}
       const requiredHost = await resolveGhAccountRequiredHost(repo, localGitOptions)
       return validateGhAccountBinding(
-        { host: args.host, user: args.user },
+        { host: args.host, user: args.user, ...(args.kind ? { kind: args.kind } : {}) },
         localGitOptions,
         requiredHost ? { requiredHost } : {}
       )

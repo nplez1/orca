@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { GithubAppRepositorySelection } from '../../github/app/github-app-identity'
 import { requiredNumber, requiredString } from '../rpc-param-primitives'
+import { RepoSelector } from './github-repo-target-params'
 
 const GithubAppId = requiredNumber('Missing app id').refine(
   (value) => Number.isInteger(value) && value > 0,
@@ -15,12 +16,22 @@ export const GithubAppConnect = z.object({
 
 export type GithubAppConnectParams = z.infer<typeof GithubAppConnect>
 
+/** `github.app.gitCredential`: git's credential helper asks, so a push mints the token at push time. */
+export const GithubAppGitCredential = RepoSelector.extend({})
+
+export type GithubAppGitCredentialParams = z.infer<typeof GithubAppGitCredential>
+
+/** Git's credential protocol fields: the App's login, and a token minted for this one request. */
+export type GithubAppGitCredentialResult = { username: string; password: string }
+
 export type GithubAppInstallationView = {
   id: number
   account: string
   repositorySelection: GithubAppRepositorySelection
   /** `owner/name`; empty for `all`, which covers every repository the installation was given. */
   repositories: string[]
+  /** False when the installation cannot push; null when GitHub did not report its permissions. */
+  canPush?: boolean | null
 }
 
 /**
