@@ -74,6 +74,7 @@ export type WorktreeRow = {
   branchGroup?: readonly BranchGroupMember[]
   /** Stable key shared with the tab strip's host selection. */
   branchGroupKey?: string
+  lineageCollapseKeys?: readonly string[]
   showProjectName?: boolean
 }
 

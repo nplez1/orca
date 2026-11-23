@@ -114,7 +114,7 @@ function folderLineageToggle(
   ctx: WorktreeVirtualRowContext,
   row: { lineageGroupKey?: string }
 ): LineageToggleHandler | undefined {
-  return row.lineageGroupKey ? ctx.item.getLineageToggleHandler(row.lineageGroupKey) : undefined
+  return row.lineageGroupKey ? ctx.item.getLineageToggleHandler([row.lineageGroupKey]) : undefined
 }
 
 // Header frames retain sticky positioning; each workspace owns its measured slot.

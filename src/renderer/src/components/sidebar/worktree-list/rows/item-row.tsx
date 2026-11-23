@@ -32,10 +32,10 @@ export type WorktreeItemRowContext = {
   selectedWorktreeIds: ReadonlySet<string>
   selectedWorktrees: readonly Worktree[]
   getActiveSurfaceVariant: (row: WorktreeItemRow) => ActiveSurfaceVariant
-  getLineageToggleHandler: (groupKey: string) => LineageToggleHandler
+  getLineageToggleHandler: (groupKeys: readonly string[]) => LineageToggleHandler
   /** Group by branch cards key their host choice by row key. */
   branchGroupSelection: Readonly<Record<string, ExecutionHostId>>
-  onSelectBranchGroupHost: (groupKey: string, hostId: ExecutionHostId) => void
+  onSelectBranchGroupHost: (rowKey: string, groupKey: string, hostId: ExecutionHostId) => void
   onSelectionGesture: (event: React.MouseEvent<HTMLElement>, worktree: Worktree) => boolean
   onWorktreeCardClick?: () => void
   onContextMenuSelect: (
@@ -91,6 +91,8 @@ export function renderWorktreeItemRow(
       worktreeId: ctx.activeWorktreeId,
       hostId: ctx.activeWorkspaceExecutionHostId ?? null
     })
+  const lineageToggleKeys =
+    itemRow.lineageCollapseKeys ?? (itemRow.lineageGroupKey ? [itemRow.lineageGroupKey] : null)
   return (
     <div
       key={itemRow.rowKey}
@@ -162,9 +164,11 @@ export function renderWorktreeItemRow(
         branchGroup={itemRow.branchGroup}
         selectedBranchHostId={selectedBranchHostId}
         branchGroupKey={itemRow.branchGroupKey}
-        onSelectBranchHost={ctx.onSelectBranchGroupHost}
+        onSelectBranchHost={(groupKey, hostId) =>
+          ctx.onSelectBranchGroupHost(itemRow.rowKey, groupKey, hostId)
+        }
         onLineageToggle={
-          itemRow.lineageGroupKey ? ctx.getLineageToggleHandler(itemRow.lineageGroupKey) : undefined
+          lineageToggleKeys ? ctx.getLineageToggleHandler(lineageToggleKeys) : undefined
         }
       />
     </div>

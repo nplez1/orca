@@ -17,8 +17,62 @@ import type {
   WorktreeGroupBy
 } from '../../../../../../shared/sidebar-list/row-types'
 import { planSidebarRows } from '../../../../../../shared/sidebar-list/sidebar-row-plan'
+import { buildProjectGroupingIndex } from '../../../../../../shared/sidebar-list/sections/project-section-grouping'
+import { buildHostOrderedMembers, getBranchGroupKeyForWorktree } from '../grouping/branch-groups'
 import type { SidebarLineageParentIdentities } from '../../../../../../shared/sidebar-list/lineage/worktree-lineage-projection'
 import { createSidebarPRGroupReader } from '../grouping/pr-group-key'
+
+function foldKeysByAncestor(args: {
+  plan: WorktreeOccurrencePlan<Worktree>
+  ancestors: readonly Worktree[]
+  repoMap: Map<string, Repo>
+  projectIndex: ReturnType<typeof buildProjectGroupingIndex>
+  defaultHostId: ExecutionHostId
+}): string[][] {
+  const childrenByParent = new Map<string, Worktree[]>()
+  let candidates: Worktree[] = []
+  for (const candidate of args.plan.preferredByIdentity.values()) {
+    if (candidate.placement === 'pinned') {
+      continue
+    }
+    const parentKey = candidate.parent?.key
+    if (parentKey === undefined) {
+      candidates.push(candidate.row)
+      continue
+    }
+    const siblings = childrenByParent.get(parentKey)
+    if (siblings) {
+      siblings.push(candidate.row)
+    } else {
+      childrenByParent.set(parentKey, [candidate.row])
+    }
+  }
+  const keysByLevel: string[][] = []
+  for (const ancestor of args.ancestors) {
+    const branchKey = getBranchGroupKeyForWorktree(ancestor, args.repoMap, args.projectIndex)
+    const sameBranch = candidates
+      .filter(
+        (candidate) =>
+          branchKey !== null &&
+          getBranchGroupKeyForWorktree(candidate, args.repoMap, args.projectIndex) === branchKey
+      )
+      .map((worktree) => ({ worktree, repo: args.repoMap.get(worktree.repoId) }))
+    const members = buildHostOrderedMembers(sameBranch, args.repoMap, args.defaultHostId, undefined)
+    const memberWorktrees = members?.map((member) => member.worktree) ?? []
+    const ancestorIdentity = getWorktreeHostIdentity(ancestor)
+    const levelWorktrees = memberWorktrees.some(
+      (worktree) => getWorktreeHostIdentity(worktree) === ancestorIdentity
+    )
+      ? memberWorktrees
+      : [ancestor]
+    keysByLevel.push(levelWorktrees.map((worktree) => getWorktreeLineageGroupKey(worktree)))
+    candidates = levelWorktrees.flatMap((worktree) => {
+      const member = args.plan.preferredByIdentity.get(getWorktreeHostIdentity(worktree))
+      return member ? (childrenByParent.get(member.key) ?? []) : []
+    })
+  }
+  return keysByLevel
+}
 
 export function getWorktreeRevealCollapsedGroupKeys(args: {
   occurrencePlan?: WorktreeOccurrencePlan<Worktree>
@@ -39,6 +93,7 @@ export function getWorktreeRevealCollapsedGroupKeys(args: {
   workspaceStatuses: readonly WorkspaceStatusDefinition[]
   projectGroups: readonly ProjectGroup[]
   projectGrouping?: ProjectGroupingModel
+  mergeSameBranchCards?: boolean
 }): string[] {
   const hostId = getWorktreeExecutionHostId(
     args.worktree,
@@ -75,10 +130,29 @@ export function getWorktreeRevealCollapsedGroupKeys(args: {
     return []
   }
   const keys = [`host:${hostId}`]
+  const occurrenceByKey = new Map(
+    [...plan.preferredByIdentity.values()].map((candidate) => [candidate.key, candidate])
+  )
+  const ancestors: Worktree[] = []
   let ancestor = occurrence.parent
   while (ancestor) {
-    keys.push(getWorktreeLineageGroupKey(ancestor.row))
-    ancestor = ancestor.parent
+    const resolved = occurrenceByKey.get(ancestor.key) ?? ancestor
+    if (resolved.row) {
+      ancestors.unshift(resolved.row)
+    }
+    ancestor = resolved.parent
+  }
+  const keysByLevel = args.mergeSameBranchCards
+    ? foldKeysByAncestor({
+        plan,
+        ancestors,
+        repoMap: args.repoMap,
+        projectIndex: buildProjectGroupingIndex(args.projectGrouping),
+        defaultHostId: args.defaultHostId
+      })
+    : ancestors.map((worktree) => [getWorktreeLineageGroupKey(worktree)])
+  for (const levelKeys of keysByLevel) {
+    keys.push(...levelKeys)
   }
   let path: typeof occurrence.sectionPath | undefined = occurrence.sectionPath
   while (path) {

@@ -32,6 +32,23 @@ export function toggleCollapsedGroupSet(previous: ReadonlySet<string>, key: stri
   return recordCollapsedGroupChanges(previous, next, [key])
 }
 
+export function toggleCollapsedGroupKeysSet(
+  previous: ReadonlySet<string>,
+  keys: readonly string[]
+): Set<string> {
+  const unique = [...new Set(keys)]
+  const next = new Set(previous)
+  const folding = unique.every((key) => !next.has(key))
+  for (const key of unique) {
+    if (folding) {
+      next.add(key)
+    } else {
+      next.delete(key)
+    }
+  }
+  return recordCollapsedGroupChanges(previous, next, unique)
+}
+
 export function changedCollapsedGroupKeys(
   previous: ReadonlySet<string>,
   next: ReadonlySet<string>

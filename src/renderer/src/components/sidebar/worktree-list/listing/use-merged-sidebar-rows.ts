@@ -7,7 +7,7 @@ import { ALL_EXECUTION_HOSTS_SCOPE } from '../../../../../../shared/execution-ho
 import { buildProjectGroupingIndex } from '../../../../../../shared/sidebar-list/sections/project-section-grouping'
 import type { ProjectGroupingModel } from '../../../../../../shared/sidebar-list/sections/project-section-grouping'
 import type { planSidebarRows } from '../../../../../../shared/sidebar-list/sidebar-row-plan'
-import { mergeSameBranchRows } from '../grouping/branch-groups'
+import { mergeSameBranchRows } from '../grouping/same-branch-row-merge'
 import type { Row, WorktreeGroupBy } from '../../../../../../shared/sidebar-list/row-types'
 
 type MergedSidebarRowsArgs = {
@@ -51,7 +51,8 @@ export function useMergedSidebarRows(args: MergedSidebarRowsArgs): Row[] {
           repoMap,
           buildProjectGroupingIndex(projectGrouping),
           defaultHostId,
-          hostLabelById
+          hostLabelById,
+          rowCollapsedGroups
         )
       : built
   }, [

@@ -28,9 +28,10 @@ let _publishedVisibleIds: string[] | null = null
 export type VisibleWorktreeShortcutTarget = {
   id: string
   executionHostId?: Worktree['hostId']
-  lineageGroupKey?: string
 }
 let _publishedVisibleShortcutTargets: VisibleWorktreeShortcutTarget[] | null = null
+
+let _publishedLineageFoldKeys: ReadonlyMap<string, readonly string[]> | null = null
 
 export function setVisibleWorktreeIds(ids: string[] | null): void {
   _publishedVisibleIds = ids
@@ -46,6 +47,16 @@ export function getPublishedVisibleWorktreeShortcutTargets():
   | readonly VisibleWorktreeShortcutTarget[]
   | null {
   return _publishedVisibleShortcutTargets
+}
+
+export function setVisibleLineageFoldKeys(
+  keys: ReadonlyMap<string, readonly string[]> | null
+): void {
+  _publishedLineageFoldKeys = keys
+}
+
+export function getPublishedLineageFoldKeys(): ReadonlyMap<string, readonly string[]> | null {
+  return _publishedLineageFoldKeys
 }
 
 /** The unmounted list's visible rows in sidebar sort order, ranked per host copy like the mounted list. */
