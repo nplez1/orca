@@ -7,10 +7,7 @@ import {
 } from '../../shared/github/app/github-app-identity'
 import { readGithubAppCredentials } from '../github/app/github-app-credentials'
 import { appIdentityEpoch } from '../github/app/github-app-identity-epoch'
-import {
-  cachedInstallationTokenExpiry,
-  installationToken
-} from '../github/app/github-app-installation-token'
+import { installationToken } from '../github/app/github-app-installation-token'
 import { electronHttpClient } from '../host/electron-http-client'
 
 export const BOT_GH_APP_TOKEN_ENV = 'GH_TOKEN'
@@ -22,6 +19,8 @@ export const BOT_GH_APP_TOKEN_ENV = 'GH_TOKEN'
 export type BotGithubAppLaunch = {
   env: Record<string, string>
   installationId: number | null
+  /** When the token in `env` dies: the session's own deadline, not whatever the shared cache holds later. */
+  expiresAtMs: number | null
   epoch: number
 }
 
@@ -40,15 +39,17 @@ export async function botGithubAppLaunch(
   const epoch = appIdentityEpoch()
   const credentials = await readGithubAppCredentials()
   if (!credentials) {
-    return { env: {}, installationId: null, epoch }
+    return { env: {}, installationId: null, expiresAtMs: null, epoch }
   }
   const installation = githubAppInstallationFor(credentials.installations, input.repoFullName)
   if (!installation) {
     throw new Error(
-      'The connected GitHub App is installed nowhere, so a bot cannot act as it. Install it, then try again.'
+      input.repoFullName
+        ? `The connected GitHub App is not installed on ${input.repoFullName}, so a bot cannot act as it there. Install the App on that repository, or disconnect it.`
+        : 'The connected GitHub App is installed nowhere, so a bot cannot act as it. Install it, then try again.'
     )
   }
-  const token = await installationToken({
+  const { token, expiresAtMs } = await installationToken({
     credentials,
     installationId: installation.id,
     fetch: electronHttpClient.fetch
@@ -56,6 +57,7 @@ export async function botGithubAppLaunch(
   return {
     env: { [BOT_GH_APP_TOKEN_ENV]: token, GH_PROMPT_DISABLED: '1' },
     installationId: installation.id,
+    expiresAtMs,
     epoch
   }
 }
@@ -64,7 +66,11 @@ export async function botGithubAppLaunch(
 export type LaunchRepo = { path: string; gitRemoteIdentity?: { canonicalKey: string } | null }
 
 /** The identity a launch recorded, as `BotLaunchedTools.appIdentity` holds it. */
-export type LaunchedAppIdentity = { epoch: number; installationId: number | null }
+export type LaunchedAppIdentity = {
+  epoch: number
+  installationId: number | null
+  expiresAtMs: number | null
+}
 
 /**
  * Whether the App a session launched as still holds: a connect or a disconnect since then, or a token
@@ -77,10 +83,9 @@ export function botGithubAppIdentityOutdated(
   if (appIdentityEpoch() !== launched.epoch) {
     return true
   }
-  return (
-    launched.installationId !== null &&
-    githubAppTokenNeedsRefresh(cachedInstallationTokenExpiry(launched.installationId), nowMs)
-  )
+  // The session's own token, not the cache: a sibling launch can replace the cached one and hide this one's
+  // expiry, which is exactly how a chat 401s while every check says it is current.
+  return launched.installationId !== null && githubAppTokenNeedsRefresh(launched.expiresAtMs, nowMs)
 }
 
 const GITHUB_HOST = 'github.com'

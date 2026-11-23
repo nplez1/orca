@@ -46,11 +46,14 @@ function sameRepo(a: string, b: string): boolean {
  */
 export function githubAppCoversRepo(input: {
   repositorySelection: GithubAppRepositorySelection
+  /** The account the installation belongs to: `all` covers that account's repos and no others. */
+  account: string
   repositories: readonly string[]
   repoFullName: string
 }): GithubAppCoverage {
   if (input.repositorySelection === 'all') {
-    return 'all'
+    const owner = input.repoFullName.split('/')[0] ?? ''
+    return sameRepo(input.account, owner) ? 'all' : 'none'
   }
   return input.repositories.some((repo) => sameRepo(repo, input.repoFullName)) ? 'selected' : 'none'
 }
@@ -60,21 +63,25 @@ export function githubAppCoversRepo(input: {
  * which is the only answer a Settings read can give.
  */
 export function githubAppInstallationFor<
-  T extends { repositorySelection: GithubAppRepositorySelection; repositories: readonly string[] }
+  T extends {
+    repositorySelection: GithubAppRepositorySelection
+    account: string
+    repositories: readonly string[]
+  }
 >(installations: readonly T[], repoFullName?: string | null): T | null {
   if (!repoFullName) {
     return installations[0] ?? null
   }
+  // No fallback for a known repo: the first installation is a token that cannot act there.
   return (
     installations.find(
       (installation) =>
         githubAppCoversRepo({
           repositorySelection: installation.repositorySelection,
+          account: installation.account,
           repositories: installation.repositories,
           repoFullName
         }) !== 'none'
-    ) ??
-    installations[0] ??
-    null
+    ) ?? null
   )
 }

@@ -202,22 +202,16 @@ export async function refreshGithubApp(input: { fetch: GithubAppFetch }): Promis
   return githubAppStatus()
 }
 
-/** Best effort: a token GitHub will not revoke (or a network that is down) must not block a disconnect. */
-async function revokeMintedTokens(fetch: GithubAppFetch): Promise<void> {
-  const ids = cachedInstallationIds()
-  await Promise.allSettled(
-    ids.flatMap((id) => {
-      const token = cachedInstallationToken(id)
-      return token ? [revokeInstallationToken({ token, fetch })] : []
-    })
-  )
-}
-
 export async function disconnectGithubApp(input: { fetch: GithubAppFetch }): Promise<void> {
   // A connect still in flight is superseded by this, so it cannot write afterwards.
   operation += 1
-  await revokeMintedTokens(input.fetch)
+  const revocations = [...cachedInstallationIds()].flatMap((id) => {
+    const token = cachedInstallationToken(id)
+    return token ? [revokeInstallationToken({ token, fetch: input.fetch })] : []
+  })
+  // The file goes first: a stalled revoke must never leave the user unable to disconnect.
   await removeGithubAppCredentials()
   forgetInstallationTokens()
   advanceAppIdentityEpoch()
+  await Promise.allSettled(revocations)
 }

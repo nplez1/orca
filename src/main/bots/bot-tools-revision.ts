@@ -33,6 +33,8 @@ export type BotLaunchedAppIdentity = {
   epoch: number
   /** The installation it minted a token for; null when no App was connected. */
   installationId: number | null
+  /** When that token dies; null when no App was connected. */
+  expiresAtMs: number | null
 }
 
 /** What a launch read, from one snapshot, for the chat's later comparisons. */

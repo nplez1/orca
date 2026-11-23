@@ -317,7 +317,11 @@ export async function botSessionToolServers(
       folder: launchDirectory,
       revision: botToolsRevision(snapshot.version, epoch),
       epoch,
-      appIdentity: { epoch: app.epoch, installationId: app.installationId }
+      appIdentity: {
+        epoch: app.epoch,
+        installationId: app.installationId,
+        expiresAtMs: app.expiresAtMs
+      }
     }
   }
 }

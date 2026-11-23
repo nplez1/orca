@@ -8,6 +8,8 @@ type CachedToken = { token: string; expiresAtMs: number }
 
 const cache = new Map<number, CachedToken>()
 const inFlight = new Map<number, Promise<CachedToken>>()
+/** Bumped by `forgetInstallationTokens`, so a mint in flight during a disconnect is not cached afterwards. */
+let generation = 0
 
 /**
  * The token for one installation. The credential and the clock are inputs so this stays testable and so a
@@ -18,16 +20,16 @@ export async function installationToken(input: {
   installationId: number
   fetch: GithubAppFetch
   nowMs?: number
-}): Promise<string> {
+}): Promise<CachedToken> {
   const nowMs = input.nowMs ?? Date.now()
   const cached = cache.get(input.installationId)
   if (cached && !githubAppTokenNeedsRefresh(cached.expiresAtMs, nowMs)) {
-    return cached.token
+    return cached
   }
 
   const pending = inFlight.get(input.installationId)
   if (pending) {
-    return (await pending).token
+    return await pending
   }
 
   const minted = mintInstallationToken({
@@ -38,15 +40,19 @@ export async function installationToken(input: {
     nowMs
   }).then(({ token, expiresAtMs }) => ({ token, expiresAtMs }))
 
+  const startedAt = generation
   inFlight.set(input.installationId, minted)
   try {
-    const fresh = await minted
+    const mintedByUs = await minted
     // An expiry GitHub did not state is treated as spent, so the next caller mints rather than trusting it.
-    cache.set(input.installationId, {
-      token: fresh.token,
-      expiresAtMs: Number.isFinite(fresh.expiresAtMs) ? fresh.expiresAtMs : nowMs
-    })
-    return fresh.token
+    const fresh = {
+      token: mintedByUs.token,
+      expiresAtMs: Number.isFinite(mintedByUs.expiresAtMs) ? mintedByUs.expiresAtMs : nowMs
+    }
+    if (generation === startedAt) {
+      cache.set(input.installationId, fresh)
+    }
+    return fresh
   } finally {
     inFlight.delete(input.installationId)
   }
@@ -54,6 +60,7 @@ export async function installationToken(input: {
 
 /** Disconnecting or re-keying the App must not leave a token for the old key behind. */
 export function forgetInstallationTokens(installationId?: number): void {
+  generation += 1
   if (installationId === undefined) {
     cache.clear()
     return

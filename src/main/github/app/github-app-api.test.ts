@@ -95,8 +95,12 @@ describe('installationToken', () => {
     const expiresAtMs = Date.parse(expiresAt)
     const input = { credentials: credentials(), installationId: 181472560, fetch }
 
-    expect(await installationToken({ ...input, nowMs: expiresAtMs - 3_600_000 })).toBe('ghs_abc')
-    expect(await installationToken({ ...input, nowMs: expiresAtMs - 3_000_000 })).toBe('ghs_abc')
+    expect((await installationToken({ ...input, nowMs: expiresAtMs - 3_600_000 })).token).toBe(
+      'ghs_abc'
+    )
+    expect((await installationToken({ ...input, nowMs: expiresAtMs - 3_000_000 })).token).toBe(
+      'ghs_abc'
+    )
     expect(calls).toHaveLength(1)
 
     // Nine of the sixty minutes left is inside the ten-minute margin: a fresh one is due.
@@ -104,7 +108,7 @@ describe('installationToken', () => {
       installationToken({ ...input, nowMs: expiresAtMs - 540_000 }),
       installationToken({ ...input, nowMs: expiresAtMs - 540_000 })
     ])
-    expect(both).toEqual(['ghs_abc', 'ghs_abc'])
+    expect(both.map((token) => token.token)).toEqual(['ghs_abc', 'ghs_abc'])
     expect(calls).toHaveLength(2)
   })
 
