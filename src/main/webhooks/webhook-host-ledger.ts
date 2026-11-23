@@ -100,7 +100,8 @@ export class WebhookHostLedger {
 
   constructor(
     private readonly userDataPath: string,
-    private readonly account: () => string | null
+    private readonly account: () => string | null,
+    private readonly alsoOwned: () => ReadonlySet<string> = () => new Set()
   ) {}
 
   private get path(): string {
@@ -176,7 +177,10 @@ export class WebhookHostLedger {
 
   /** Every file a call row still owns. */
   files(): ReadonlySet<string> {
-    return new Set(this.ledger()?.calls.flatMap((call) => (call.file ? [call.file] : [])) ?? [])
+    return new Set([
+      ...(this.ledger()?.calls.flatMap((call) => (call.file ? [call.file] : [])) ?? []),
+      ...this.alsoOwned()
+    ])
   }
 
   hooks(): readonly LedgerHook[] {

@@ -3,7 +3,7 @@ import { CLI_GLOBAL_FLAGS as GLOBAL_FLAGS } from '../../shared/cli/cli-argument-
 
 const WEBHOOK_NOTES = [
   'A bot automation\'s webhook is made with `orca automations create --bot <name> --on "webhook.call ..."`; `orca automations trigger-options --bot <name>` lists its filters.',
-  "No command prints a webhook's URL or key. Your owner copies the URL with Copy URL on the automation's card in Orca."
+  "No command prints a webhook's key. Your owner copies the URL of one in Orca Cloud with Copy URL on the automation's card in Orca; a webhook on this computer listens at a loopback URL, which `orca webhooks show --hook <hook id>` prints."
 ]
 
 export const WEBHOOK_COMMAND_SPECS: CommandSpec[] = [

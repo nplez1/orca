@@ -96,6 +96,7 @@ export type WebhookSummary = {
   state: 'pending' | 'live' | 'paused' | 'orphaned'
   /** Without the key, for callers that send it as a Bearer header. */
   url: string
+  urlChangesOnRestart?: boolean
   /** Whose signature calls must carry, or null while the hook is key-only. */
   adapter: WebhookAdapterId | null
   lastCall: { at: number; state: WebhookCallState; signatureValid: boolean } | null

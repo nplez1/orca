@@ -39,12 +39,14 @@ export function connectorTriggers(
     Automation,
     'id' | 'enabled' | 'bot' | 'on' | 'missedRunGraceMinutes'
   >[],
-  pausing: (hookId: string) => boolean = () => false
+  pausing: (hookId: string) => boolean = () => false,
+  servesLocally: (trigger: CloudRule) => boolean = () => false
 ): ConnectorTrigger[] {
   return automations.flatMap(({ id, enabled, bot, on, missedRunGraceMinutes }) =>
     bot
       ? (on ?? [])
           .filter((trigger): trigger is CloudRule => !isGoogleTrigger(trigger))
+          .filter((trigger) => !servesLocally(trigger))
           .filter((trigger) => enabled || pausing(hookIdOfRule(trigger.id) ?? ''))
           .map((trigger) => ({
             ...withoutNames(trigger),

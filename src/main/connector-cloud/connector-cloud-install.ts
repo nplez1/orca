@@ -12,6 +12,10 @@ import { connectorAccount, desktopConnectorTokenMint } from './connector-token-m
 import { connectorTriggers, triggerRunEvent } from './connector-triggers'
 import { hostNeedsConnector } from './connector-connection-need'
 import type { WebhookHostService } from '../webhooks/webhook-host-service'
+import type {
+  AutomationConnectorEventTrigger,
+  AutomationWebhookTrigger
+} from '../../shared/automation-event-triggers'
 import { botPlaceMigrationOnHello } from '../automations/bot-automation-ref-migration'
 import { turnAutomations } from './connector-turn-automations'
 import { eventRun, takingAutomation } from '../automations/automation-trigger-runs'
@@ -39,7 +43,9 @@ export type ConnectorCloudHost = {
   webhooks: Pick<
     WebhookHostService,
     'receive' | 'notice' | 'helloAnswered' | 'pausing' | 'onConfirmed'
-  >
+  > & {
+    servesLocally?: (trigger: AutomationConnectorEventTrigger | AutomationWebhookTrigger) => boolean
+  }
 }
 
 /** The connector acts as this host's own signed-in Orca account; null without Orca Cloud auth config. */
@@ -136,7 +142,11 @@ export function createConnectorCloud({
         ])
       },
       triggers: () =>
-        connectorTriggers(store.listAutomations(), (hookId) => webhooks.pausing(hookId)),
+        connectorTriggers(
+          store.listAutomations(),
+          (hookId) => webhooks.pausing(hookId),
+          (trigger) => webhooks.servesLocally?.(trigger) ?? false
+        ),
       runTrigger: async (delivery) => {
         const event = triggerRunEvent(store.listAutomations(), store.getBots?.() ?? [], delivery)
         if (event?.source === 'webhook') {
@@ -169,7 +179,11 @@ export function createConnectorCloud({
       wantsConnection: () =>
         hostNeedsConnector(
           store.getBots?.() ?? [],
-          connectorTriggers(store.listAutomations(), (hookId) => webhooks.pausing(hookId))
+          connectorTriggers(
+            store.listAutomations(),
+            (hookId) => webhooks.pausing(hookId),
+            (trigger) => webhooks.servesLocally?.(trigger) ?? false
+          )
         ),
       onHelloInputsChanged: (listener) => {
         runtime.onBotsWritten(listener)

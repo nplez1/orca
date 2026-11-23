@@ -232,13 +232,16 @@ describe('bots.create', () => {
 })
 
 describe('bots.list', () => {
-  it("carries each bot's waits still waiting, for its sidebar row", async () => {
+  it("carries each bot's waits still waiting, and which rules this computer answers", async () => {
     const bot = makeTestBot()
     const wait = { id: 'w1', name: "Nora's reply", once: { by: 5000 }, bot: { botId: bot.id } }
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: bots.list reads only runtime.bots, its webhooks, its connector cloud, its automations and its item counts, which the stub provides.
     const runtime = {
       getRuntimeId: () => 'test-runtime',
-      getWebhooks: () => null,
+      getWebhooks: () => ({
+        advertised: () => true,
+        localWebhookFacts: () => ({ answersNew: true, held: ['wh_7Kx2pQ9mZbV4tL1r'] })
+      }),
       getUIState: () => ({}),
       getConnectorCloud: () => null,
       bots: {
@@ -252,7 +255,12 @@ describe('bots.list', () => {
 
     expect(await dispatcher.dispatch(request('bots.list'))).toMatchObject({
       ok: true,
-      result: { waits: { [bot.id]: [{ label: "Nora's reply", by: 5000 }] } }
+      result: {
+        waits: { [bot.id]: [{ label: "Nora's reply", by: 5000 }] },
+        webhooks: true,
+        localWebhooks: true,
+        localWebhookHooks: ['wh_7Kx2pQ9mZbV4tL1r']
+      }
     })
   })
 })

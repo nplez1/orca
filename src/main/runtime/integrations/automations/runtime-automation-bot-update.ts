@@ -72,7 +72,10 @@ export async function patchBotAutomationUpdate(
   assertNoBotOwnedSettings(updates, agent)
   patch.bot &&= await withCheckedBotChat(patch.bot, bot, lookups.botChat, current.bot)
   if (bot) {
-    assertBotHearsEventTriggers(lookups.webhooks.hearing(bot), updates.on)
+    assertBotHearsEventTriggers(
+      lookups.webhooks.hearing(bot),
+      lookups.webhooks.cloudRules(updates.on)
+    )
     patch.agentId = agent
     patch.workspaceId = botAutomationTarget(bot).workspaceId
     if (patch.on) {

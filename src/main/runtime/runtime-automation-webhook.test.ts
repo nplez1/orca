@@ -71,6 +71,7 @@ async function setup(advertised = true) {
   const webhooks = {
     advertised: () => advertised,
     signedOut: () => false,
+    servesLocally: () => false,
     settle,
     saved: vi.fn(),
     abandoned: vi.fn()
