@@ -169,7 +169,7 @@ describe('the send and the cleanup', () => {
       text: 'the build is green',
       idempotencyKey: 'send-1'
     })
-    expect(server.state.sent).toEqual([
+    expect(server.state.sent).toMatchObject([
       { conversationId: 'conv_9', text: 'the build is green', idempotencyKey: 'send-1' }
     ])
   })

@@ -22,6 +22,9 @@ afterAll(async () => {
 beforeEach(() => {
   userDataPath = mkdtempSync(join(tmpdir(), 'orca-photon-send-'))
   server.state.sent.length = 0
+  // The server replays a repeated Idempotency-Key as the same message, so a key from the previous test
+  // would swallow this one's send.
+  server.state.idempotency.clear()
   server.state.failNextSend = undefined
 })
 afterEach(() => {
@@ -117,6 +120,8 @@ describe('one send per finished turn', () => {
     }
 
     expect(server.state.sent.map((entry) => entry.text)).toEqual(['Yes.', 'Yes.'])
+    // And the keys differ: one key for both would be one message replayed rather than two answers.
+    expect(new Set(server.state.sent.map((entry) => entry.idempotencyKey)).size).toBe(2)
   })
 
   it('refuses to send to a conversation Orca never had', async () => {
@@ -154,7 +159,7 @@ describe('a send that fails', () => {
 
     const retried = await test.sendPath.retryPending('b1', credential)
     expect(retried).toEqual([{ sent: true, entryId: expect.any(String), truncated: false }])
-    expect(server.state.sent).toEqual([
+    expect(server.state.sent).toMatchObject([
       { conversationId: 'conv_1', text: 'the build is green', idempotencyKey: expect.any(String) }
     ])
     expect(test.outbox.pendingFor('b1')).toEqual([])

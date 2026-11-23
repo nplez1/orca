@@ -176,7 +176,38 @@ describe('the cursor against the inbox', () => {
     expect(test.inbox.unhandled('p1').map((entry) => entry.messageId)).toEqual(['msg_41'])
   })
 
-  it('refuses a duplicate delivery of a message that is still being dispatched', async () => {
+  it('dispatches in stream order even when an earlier message is slow', async () => {
+    // The agent must see 41's prompt before 47's, which is what a serial chain buys and a shared cursor
+    // does not: without it 47 is dispatched first and the conversation reads backwards.
+    let release = (): void => {}
+    const held = new Promise<void>((resolve) => (release = resolve))
+    const test = harness({ holdStart: () => held })
+    // 47 continues a thread Orca already answers, so it is the fast one; 41 opens a conversation and
+    // waits in `holdStart`.
+    test.threads.bind('b1', 'conv_2', { chatId: 'chat_1', handle: '+15551230000' })
+
+    const slow = test.inbound.handle({
+      botId: 'b1',
+      projectId: 'p1',
+      seq: 41,
+      message: message({ id: 'msg_41', conversationId: 'conv_1', text: 'start X' })
+    })
+    const later = test.inbound.handle({
+      botId: 'b1',
+      projectId: 'p1',
+      seq: 47,
+      message: message({ id: 'msg_47', conversationId: 'conv_2', text: 'and Y' })
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    // Nothing has been dispatched for the later message while the earlier one is in hand.
+    expect(test.calls).toEqual([])
+    release()
+    await Promise.all([slow, later])
+
+    expect(test.calls.map((call) => call.text)).toEqual(['start X', 'and Y'])
+  })
+
+  it('absorbs a duplicate delivery of a message that is still being dispatched', async () => {
     // A drop mid-dispatch resubscribes from the pre-message cursor and Photon redelivers the same id.
     let release = (): void => {}
     const held = new Promise<void>((resolve) => (release = resolve))

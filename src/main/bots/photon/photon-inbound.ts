@@ -8,7 +8,8 @@
 // per project**, because they share one cursor: concurrent handlers let a later seq finish first and
 // move the cursor past an earlier message that then fails, and Photon never redelivers it. And a
 // message already being handled is refused rather than run again, because Photon documents duplicate
-// delivery and two of the same text would open two chats.
+// delivery and two of the same text would open two chats — which the inbox's own dedupe refuses, because
+// the chain means the repeat arrives after the first has been marked handled.
 import type { BotRequestPerson } from '../../../shared/bots/bot-acts-for'
 import type { PhotonCursorStore } from './photon-cursor'
 import type { PhotonInbox, PhotonInboxEntry } from './photon-inbox'
@@ -76,8 +77,6 @@ export class PhotonInbound {
   private readonly log: (message: string, ...rest: unknown[]) => void
   /** One chain per project: the cursor is shared, so the handlers must be ordered. */
   private readonly queues = new Map<string, Promise<void>>()
-  /** Message ids currently being dispatched, so a duplicate delivery is dropped rather than run. */
-  private readonly inFlight = new Set<string>()
 
   constructor(private readonly deps: PhotonInboundDeps) {
     this.log = deps.log ?? ((message, ...rest) => console.warn(message, ...rest))
@@ -144,12 +143,9 @@ export class PhotonInbound {
   }): Promise<PhotonInboundOutcome> {
     const { inbox, threads } = this.deps
     const messageId = input.message.id
-    if (this.inFlight.has(`${input.projectId}:${messageId}`)) {
-      // A duplicate delivery of a message already being dispatched. Running it again is the double-run
-      // this whole store exists to prevent.
-      this.log('[photon] dropping a duplicate delivery of a message already in hand')
-      return { kind: 'replayed', messageId }
-    }
+    // A duplicate delivery needs no guard of its own: this chain serialises messages, so a repeat always
+    // arrives after the first finished, and `claim` finds its `handledAt` and skips it. A second belt
+    // here would be a branch nothing can reach.
     const claim = inbox.claim(input.projectId, input.message, input.seq)
     if (claim.action === 'skip') {
       // Already Orca's, already dispatched. Moving the cursor is all that is left, and it is safe
@@ -181,8 +177,7 @@ export class PhotonInbound {
       return { kind: 'held', messageId }
     }
 
-    this.inFlight.add(`${input.projectId}:${messageId}`)
-    try {
+    {
       const known = threads.chatIdFor(input.botId, input.message.conversationId)
       if (known) {
         await this.deps.sendToChat({
@@ -209,8 +204,6 @@ export class PhotonInbound {
       inbox.markHandled(input.projectId, messageId)
       this.advance(input, messageId)
       return { kind: 'ran', messageId, chatId: started.chatId, continued: false }
-    } finally {
-      this.inFlight.delete(`${input.projectId}:${messageId}`)
     }
   }
 

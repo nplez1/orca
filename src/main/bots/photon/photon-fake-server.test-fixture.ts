@@ -4,33 +4,14 @@
 // needs to make that step fail.
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 
-export type FakeProject = { id: string; slug: string; name: string; organizationId: string }
-export type FakeAssignment = { id: string; handle: string; assignedPhoneNumber: string }
-export type FakeMessage = {
-  conversationId: string
-  text: string
-  idempotencyKey: string | undefined
-}
-
-export type FakePhotonState = {
-  projects: Map<string, FakeProject>
-  /** Idempotency key → the resource id it first produced, per endpoint family. */
-  idempotency: Map<string, string>
-  keys: Map<string, { projectId: string; secret: string; revoked: boolean }>
-  assignments: Map<string, FakeAssignment & { projectId: string }>
-  sent: FakeMessage[]
-  /** Requests seen, as "METHOD /path", for assertions about what the client actually did. */
-  requests: string[]
-  /** How many closure reads stay `closing` before the project is reported closed. */
-  closureReadsRemaining: number
-  /** Set to make the next send fail with this status; cleared when it fires. */
-  failNextSend?: number
-  /** Set to make the next assignment create fail with this status. */
-  failNextAssignment?: number
-  /** Set to make the next key mint fail with this status. */
-  failNextKeyMint?: number
-  deleted: string[]
-}
+import { normaliseHandle } from './photon-fake-server.handles'
+import type {
+  FakeAssignment,
+  FakeMessage,
+  FakePhotonState,
+  FakeProject
+} from './photon-fake-server.state'
+export type { FakeAssignment, FakeMessage, FakePhotonState, FakeProject }
 
 export type FakePhotonServer = {
   baseUrl: string
@@ -268,6 +249,25 @@ export async function startFakePhotonServer(): Promise<FakePhotonServer> {
           send(response, status, { error: 'injected' })
           return
         }
+        // A replayed Idempotency-Key is the same message, not a second one: that is what makes keying a
+        // send on the answer's text rather than on the turn lose the second answer.
+        if (idempotencyKey) {
+          const replay = state.idempotency.get(`send:${idempotencyKey}`)
+          if (replay) {
+            send(response, 202, { accepted: true, id: replay })
+            return
+          }
+          const id = nextId('pho_msg')
+          state.idempotency.set(`send:${idempotencyKey}`, id)
+          state.sent.push({
+            conversationId: String(json.conversationId ?? ''),
+            text: String(json.text ?? ''),
+            idempotencyKey,
+            id
+          })
+          send(response, 202, { accepted: true, id })
+          return
+        }
         state.sent.push({
           conversationId: String(json.conversationId ?? ''),
           text: String(json.text ?? ''),
@@ -301,16 +301,6 @@ export async function startFakePhotonServer(): Promise<FakePhotonServer> {
       }),
     injectRaw: (method, path, status, body) => raw.set(`${method} ${path}`, { status, body })
   }
-}
-
-/** A phone number or Apple-ID email in the form the provider stores it. */
-function normaliseHandle(handle: string): string {
-  const trimmed = handle.trim().toLowerCase()
-  if (trimmed.includes('@')) {
-    return trimmed
-  }
-  const digits = trimmed.replace(/[^0-9]/g, '')
-  return digits.length === 0 ? trimmed : `+1${digits.replace(/^1/, '')}`
 }
 
 /** A request body as a JSON object; anything else reads as no fields rather than failing the server. */
