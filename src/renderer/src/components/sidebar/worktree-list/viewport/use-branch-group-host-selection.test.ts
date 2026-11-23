@@ -62,16 +62,16 @@ afterEach(() => {
 })
 
 describe('findBranchGroupHostTarget', () => {
-  it('finds a non-primary member by group key and host', () => {
-    const target = findBranchGroupHostTarget([makeRow()], GROUP_KEY, 'ssh:gpu-vm')
+  it('finds a non-primary member by row key and host', () => {
+    const target = findBranchGroupHostTarget([makeRow()], 'row-1', 'ssh:gpu-vm')
 
     expect(target?.member.worktree.id).toBe(remoteWorktree.id)
     expect(target?.rowKey).toBe('row-1')
   })
 
-  it('ignores rows for another group or a missing host', () => {
-    expect(findBranchGroupHostTarget([makeRow()], 'other-group', 'ssh:gpu-vm')).toBeNull()
-    expect(findBranchGroupHostTarget([makeRow()], GROUP_KEY, 'ssh:missing')).toBeNull()
+  it('ignores rows for another row key or a missing host', () => {
+    expect(findBranchGroupHostTarget([makeRow()], 'row-2', 'ssh:gpu-vm')).toBeNull()
+    expect(findBranchGroupHostTarget([makeRow()], 'row-1', 'ssh:missing')).toBeNull()
   })
 })
 
@@ -88,7 +88,7 @@ describe('useBranchGroupHostSelection', () => {
     )
 
     act(() => {
-      result.current(GROUP_KEY, 'ssh:gpu-vm')
+      result.current('row-1', GROUP_KEY, 'ssh:gpu-vm')
     })
 
     expect(setBranchGroupHost).toHaveBeenCalledWith(GROUP_KEY, 'ssh:gpu-vm')
@@ -107,7 +107,7 @@ describe('useBranchGroupHostSelection', () => {
     )
 
     act(() => {
-      result.current(GROUP_KEY, 'ssh:gpu-vm')
+      result.current('row-1', GROUP_KEY, 'ssh:gpu-vm')
     })
 
     expect(setBranchGroupHost).toHaveBeenCalledWith(GROUP_KEY, 'ssh:gpu-vm')

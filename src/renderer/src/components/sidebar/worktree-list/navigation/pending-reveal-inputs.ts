@@ -29,6 +29,7 @@ import {
   rowKeyMatchesRenderRow
 } from './render-row-lookup'
 import { getWorktreeRevealCollapsedGroupKeys } from './worktree-reveal-group-keys'
+import { shouldMergeSameBranchCards } from '../grouping/same-branch-row-merge'
 import { useAppStore } from '@/store'
 import { indexHiddenProjects } from '../../../../../../shared/project/catalog/hidden-projects'
 import { readSidebarWorkspaceOwner } from '../../sidebar-reveal-target-state'
@@ -108,7 +109,8 @@ export function expandGroupsForWorktreeReveal(
   for (const groupKey of getWorktreeRevealCollapsedGroupKeys({
     ...args,
     worktree: targetWorktree,
-    hostScopedGroups
+    hostScopedGroups,
+    mergeSameBranchCards: shouldMergeSameBranchCards(useAppStore.getState())
   })) {
     args.toggleGroup(groupKey)
   }

@@ -44,7 +44,7 @@ type BuildArgs = {
   projectHeaderHostContexts: ReadonlyMap<string, ProjectHeaderHostContext>
   headerDrag: WorktreeSidebarHeaderDrag
   getCachedFolderWorkspacePathStatus: ReturnType<typeof useFolderWorkspacePathStatusRows>
-  getLineageToggleHandler: (groupKey: string) => LineageToggleHandler
+  getLineageToggleHandler: (groupKeys: readonly string[]) => LineageToggleHandler
   toggleGroupWithScrollAnchor: (groupKey: string) => void
   onRowClickCapture: (event: React.MouseEvent<HTMLDivElement>) => void
   onRowPointerDown: (
@@ -53,7 +53,7 @@ type BuildArgs = {
     rowKey: string
   ) => void
   branchGroupSelection: Readonly<Record<string, ExecutionHostId>>
-  onSelectBranchGroupHost: (groupKey: string, hostId: ExecutionHostId) => void
+  onSelectBranchGroupHost: (rowKey: string, groupKey: string, hostId: ExecutionHostId) => void
 }
 
 export function buildWorktreeVirtualRowContext(args: BuildArgs): WorktreeVirtualRowContext {

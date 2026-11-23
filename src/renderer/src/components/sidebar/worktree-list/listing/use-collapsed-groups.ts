@@ -1,4 +1,6 @@
 import { useMemo } from 'react'
+import { useAppStore } from '@/store/index'
+import { shouldMergeSameBranchCards } from '../grouping/same-branch-row-merge'
 import type { WorktreeOccurrencePlan } from '../../../../../../shared/sidebar-list/lineage/worktree-occurrence-plan'
 import { getWorktreeRevealCollapsedGroupKeys } from '../navigation/worktree-reveal-group-keys'
 import type { AppState } from '@/store/types'
@@ -56,6 +58,15 @@ export function useEffectiveCollapsedGroups(args: {
     folderWorkspaces,
     defaultHostId
   } = args
+  const mergeSameBranchWorkspaces = useAppStore((s) => s.mergeSameBranchWorkspaces)
+  const workspaceHostScope = useAppStore((s) => s.workspaceHostScope)
+  const visibleWorkspaceHostIds = useAppStore((s) => s.visibleWorkspaceHostIds)
+  const mergeSameBranchCards = shouldMergeSameBranchCards({
+    groupBy,
+    mergeSameBranchWorkspaces,
+    workspaceHostScope,
+    visibleWorkspaceHostIds
+  })
   return useMemo(() => {
     if (!agentSendTargetWorktreeId) {
       return collapsedGroups
@@ -95,7 +106,8 @@ export function useEffectiveCollapsedGroups(args: {
       prCache,
       workspaceStatuses,
       projectGroups,
-      projectGrouping
+      projectGrouping,
+      mergeSameBranchCards
     })) {
       next.delete(groupKey)
     }
@@ -113,6 +125,7 @@ export function useEffectiveCollapsedGroups(args: {
     prCache,
     projectGroups,
     projectGrouping,
+    mergeSameBranchCards,
     repoMap,
     workspaceStatuses,
     worktreeLineageById,

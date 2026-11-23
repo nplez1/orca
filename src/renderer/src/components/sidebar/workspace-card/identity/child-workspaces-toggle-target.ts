@@ -6,7 +6,15 @@ import { getWorktreeHostIdentity } from '../../../../../../shared/worktree/host-
 import type { Worktree } from '../../../../../../shared/worktree/types'
 import { getHoveredWorkspaceIdentity } from './hovered-workspace-identity'
 import { computeRenderedSidebarRows } from '../../worktree-list/listing/rendered-sidebar-worktree-order'
-import { getPublishedVisibleWorktreeShortcutTargets } from '../../worktree-list/listing/visible-worktrees'
+import { getPublishedLineageFoldKeys } from '../../worktree-list/listing/visible-worktrees'
+import {
+  indexLineageFoldKeys,
+  mergeSameBranchRows,
+  shouldMergeSameBranchCards
+} from '../../worktree-list/grouping/same-branch-row-merge'
+import { buildProjectGroupingIndex } from '../../../../../../shared/sidebar-list/sections/project-section-grouping'
+import { getProjectHostSetupProjectionFromState } from '@/store/projects/project-host-setup-selector'
+import { LOCAL_EXECUTION_HOST_ID } from '../../../../../../shared/execution-host/execution-host'
 import { computeVisibleWorktrees } from '../../worktree-list/listing/compute-visible-worktrees'
 import { buildVisibleWorktreeOptionsFromState } from '../../worktree-list/listing/visible-worktree-options-from-state'
 import { getWorktreeLineageGroupKey } from '../../../../../../shared/sidebar-list/sections/group-keys'
@@ -15,6 +23,7 @@ import {
   getWorktreeLineageAncestors
 } from '../../../../../../shared/sidebar-list/lineage/worktree-lineage-projection'
 import { selectWorktreesByRepo } from '@/store/workspaces/catalog/workspace-record-fields'
+import type { Row } from '../../../../../../shared/sidebar-list/row-types'
 
 type ChildWorkspacesToggleState = Pick<
   AppState,
@@ -59,42 +68,52 @@ function getParentWorktree(
   return getWorktreeLineageAncestors(target, lineageById, worktreeMap)[0]
 }
 
-export function resolveChildWorkspacesToggleGroupKey(
+export function resolveChildWorkspacesToggleGroupKeys(
   state: ChildWorkspacesToggleState,
-  renderedChipKeys: ReadonlySet<string>,
+  renderedChipKeys: ReadonlyMap<string, readonly string[]>,
   doc: HoverDocument = document
-): string | null {
+): readonly string[] | null {
   const target = resolveTargetWorktree(state, doc)
   if (!target || target.isArchived) {
     return null
   }
-  const ownKey = getWorktreeLineageGroupKey(target)
-  if (renderedChipKeys.has(ownKey)) {
-    return ownKey
+  const ownKeys = renderedChipKeys.get(getWorktreeLineageGroupKey(target))
+  if (ownKeys) {
+    return ownKeys
   }
   const parent = getParentWorktree(state, target)
-  const parentKey = parent ? getWorktreeLineageGroupKey(parent) : null
-  return parentKey && renderedChipKeys.has(parentKey) ? parentKey : null
+  const parentKeys = parent ? renderedChipKeys.get(getWorktreeLineageGroupKey(parent)) : undefined
+  return parentKeys ?? null
 }
 
-/** Uses mounted rows so temporary reveal and drag policies match the existing chip. */
-export function getRenderedLineageChipKeys(state: AppState): Set<string> {
-  const publishedTargets = getPublishedVisibleWorktreeShortcutTargets()
-  if (publishedTargets !== null) {
-    return new Set(
-      publishedTargets.flatMap((target) => (target.lineageGroupKey ? [target.lineageGroupKey] : []))
-    )
+export function getRenderedLineageChipKeys(
+  state: AppState
+): ReadonlyMap<string, readonly string[]> {
+  const published = getPublishedLineageFoldKeys()
+  if (published !== null) {
+    return published
   }
   const visibleWorktrees = computeVisibleWorktrees(
     selectWorktreesByRepo(state),
     [],
     buildVisibleWorktreeOptionsFromState(state, getIndexedRepoMap(state.repos))
   )
-  const keys = new Set<string>()
-  for (const row of computeRenderedSidebarRows(state, visibleWorktrees)) {
-    if (row.type === 'item' && row.lineageGroupKey && row.lineageChildCount > 0) {
-      keys.add(row.lineageGroupKey)
-    }
+  const rows = computeRenderedSidebarRows(state, visibleWorktrees)
+  if (!shouldMergeSameBranchCards(state)) {
+    return indexLineageFoldKeys(rows)
   }
-  return keys
+  const projection = getProjectHostSetupProjectionFromState(state)
+  return indexLineageFoldKeys(
+    mergeSameBranchRows(
+      rows.filter((row): row is Row => row.type !== 'host-header'),
+      getIndexedRepoMap(state.repos),
+      buildProjectGroupingIndex({
+        projects: projection.projects,
+        projectHostSetups: projection.setups
+      }),
+      LOCAL_EXECUTION_HOST_ID,
+      undefined,
+      state.collapsedGroups
+    )
+  )
 }

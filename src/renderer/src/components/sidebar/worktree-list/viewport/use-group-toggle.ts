@@ -7,8 +7,9 @@ import { createLineageToggleHandlerCache } from '../../workspace-card/identity/w
 export function useGroupToggleWithScrollAnchor(args: {
   scrollRef: React.RefObject<HTMLDivElement | null>
   toggleGroup: (key: string) => void
+  toggleGroups: (keys: readonly string[]) => void
 }) {
-  const { scrollRef, toggleGroup } = args
+  const { scrollRef, toggleGroup, toggleGroups } = args
   const recordCurrentScrollAnchor = useCallback(() => {
     scrollRef.current?.dispatchEvent(new Event(VIRTUALIZED_SCROLL_ANCHOR_RECORD_EVENT))
   }, [scrollRef])
@@ -19,10 +20,17 @@ export function useGroupToggleWithScrollAnchor(args: {
     },
     [recordCurrentScrollAnchor, toggleGroup]
   )
+  const toggleGroupsWithScrollAnchor = useCallback(
+    (groupKeys: readonly string[]) => {
+      recordCurrentScrollAnchor()
+      toggleGroups(groupKeys)
+    },
+    [recordCurrentScrollAnchor, toggleGroups]
+  )
   // Cache callbacks per group so WorktreeCard can retain its memoized identity.
   const getLineageToggleHandler = useMemo(
-    () => createLineageToggleHandlerCache(toggleGroupWithScrollAnchor),
-    [toggleGroupWithScrollAnchor]
+    () => createLineageToggleHandlerCache(toggleGroupsWithScrollAnchor),
+    [toggleGroupsWithScrollAnchor]
   )
 
   return { toggleGroupWithScrollAnchor, getLineageToggleHandler }

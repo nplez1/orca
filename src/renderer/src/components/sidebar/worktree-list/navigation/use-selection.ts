@@ -7,9 +7,11 @@ import type { PinnedWorktreeDisplayPolicy } from '../../../../../../shared/sideb
 import { getRenderedWorkspaceRowsInSidebarOrder } from './worktree-sidebar-row-preference'
 import { getWorktreeExecutionHostId } from '../../../../../../shared/execution-host/execution-host'
 import {
+  setVisibleLineageFoldKeys,
   setVisibleWorktreeIds,
   setVisibleWorktreeShortcutTargets
 } from '../listing/visible-worktrees'
+import { indexLineageFoldKeys } from '../grouping/same-branch-row-merge'
 import { useListMultiSelection } from '@/lib/list-interaction/use-list-multi-selection'
 import { useReusedArrayIdentity } from '../listing/use-reused-array-identity'
 import { useAppStore } from '@/store'
@@ -99,27 +101,19 @@ export function useSidebarWorktreeSelection(args: {
 
   // Why layout effect: the Cmd/Ctrl+1–9 handler can fire right after commit; publishing after paint would leave the shortcut cache stale.
   useLayoutEffect(() => {
-    const chipKeysByIdentity = new Map<string, string>()
-    for (const row of sectionRows) {
-      if (row.type === 'item' && row.lineageGroupKey && row.lineageChildCount > 0) {
-        chipKeysByIdentity.set(getWorktreeHostIdentity(row.worktree), row.lineageGroupKey)
-      }
-    }
     setVisibleWorktreeIds(renderedWorktreeIds)
     setVisibleWorktreeShortcutTargets(
-      renderedWorktrees.map((worktree) => {
-        const lineageGroupKey = chipKeysByIdentity.get(getWorktreeHostIdentity(worktree))
-        return {
-          id: worktree.id,
-          ...(worktree.hostId ? { executionHostId: worktree.hostId } : {}),
-          ...(lineageGroupKey ? { lineageGroupKey } : {})
-        }
-      })
+      renderedWorktrees.map((worktree) => ({
+        id: worktree.id,
+        ...(worktree.hostId ? { executionHostId: worktree.hostId } : {})
+      }))
     )
+    setVisibleLineageFoldKeys(indexLineageFoldKeys(sectionRows))
     // Why null, not []: [] is a real rendered order (all collapsed/filtered); null tells shortcuts the list is unmounted.
     return () => {
       setVisibleWorktreeIds(null)
       setVisibleWorktreeShortcutTargets(null)
+      setVisibleLineageFoldKeys(null)
     }
   }, [renderedWorktreeIds, renderedWorktrees, sectionRows])
 

@@ -59,6 +59,7 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
     activeWorktreeId,
     collapsedGroups,
     toggleGroup,
+    toggleGroups,
     repoMap,
     worktreeMap,
     worktreeLineageById,
@@ -249,7 +250,8 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
 
   const { toggleGroupWithScrollAnchor, getLineageToggleHandler } = useGroupToggleWithScrollAnchor({
     scrollRef,
-    toggleGroup
+    toggleGroup,
+    toggleGroups
   })
 
   const dropCtx = useWorktreeDropCommitContext({
