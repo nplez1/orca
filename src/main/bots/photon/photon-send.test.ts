@@ -140,6 +140,50 @@ describe('one send per finished turn', () => {
   })
 })
 
+describe('an answer the horizon passed on', () => {
+  it('is recorded as owed rather than dropped quietly', async () => {
+    // The design promises the answer "retries, rather than vanishing"; this is where the retrying stops,
+    // and the promise is kept honest by naming what was owed instead of leaving a console line.
+    let clock = 1_000
+    const store = new PhotonStore(userDataPath)
+    const outbox = new PhotonOutbox(store, () => clock)
+    const threads = new PhotonThreadMap(store)
+    await threads.bind('b1', 'conv_1', { chatId: 'chat_1', handle: '+15551230000' })
+    const owed: string[] = []
+    const sendPath = new PhotonSendPath({
+      api: new PhotonApi({ baseUrl: server.baseUrl }),
+      outbox,
+      threads,
+      log: () => {},
+      noteUndelivered: (_botId, reason) => {
+        owed.push(reason)
+      }
+    })
+    server.state.failNextSend = 503
+
+    const first = await sendPath.sendTurnResult({
+      botId: 'b1',
+      projectId: 'pho_prj_1',
+      conversationId: 'conv_1',
+      credential,
+      text: 'the build is green',
+      turnId: 'turn_1'
+    })
+    expect(first.sent).toBe(false)
+    // Inside the horizon it is still a retry, and nothing is reported as owed yet.
+    expect(owed).toEqual([])
+
+    clock += 6 * 60 * 60 * 1000
+    server.state.failNextSend = 503
+    await sendPath.retryPending('b1', credential)
+
+    expect(owed).toEqual([
+      'Photon POST /projects/pho_prj_1/platforms/imessage/messages failed: 503 {"error":"injected"}'
+    ])
+    expect(await outbox.pendingFor('b1')).toEqual([])
+  })
+})
+
 describe('a send that fails', () => {
   it('leaves the turn’s result recorded and retries it rather than letting it vanish', async () => {
     const test = await harness()

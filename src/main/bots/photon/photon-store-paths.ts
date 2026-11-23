@@ -7,12 +7,20 @@ export const PHOTON_DIR = 'local-photon'
 export const RECORD_FILE = 'photon.json'
 export const SECRET_FILE = 'photon-secrets.json'
 
-/** One path segment built from a provider id, refused rather than joined when it could escape. */
+/**
+ * One path segment built from a provider id.
+ *
+ * A `:` is **encoded**, not refused: on NTFS `a:b.json` opens an alternate data stream that `readdir`
+ * never lists, so the file would be written somewhere the store cannot find again and the cursor would
+ * stop at `not-in-inbox`. Photon's id alphabet is unpublished, so this encodes the one character that is
+ * unsafe on a supported filesystem rather than assuming it never appears. Percent-encoding is reversible
+ * and `%` is encoded first, so two ids can never collide on one name.
+ */
 export function photonPathSegment(id: string): string {
-  if (!/^[A-Za-z0-9._:-]{1,200}$/.test(id) || id === '.' || id === '..') {
+  if (!/^[A-Za-z0-9._:%-]{1,400}$/.test(id) || id === '.' || id === '..') {
     throw new Error(`Photon id is not usable as a path segment: ${id.slice(0, 80)}`)
   }
-  return id
+  return id.replaceAll('%', '%25').replaceAll(':', '%3A')
 }
 
 const inDir = (userDataPath: string, ...parts: string[]): string =>

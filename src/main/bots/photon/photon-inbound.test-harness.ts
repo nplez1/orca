@@ -42,6 +42,8 @@ export type HarnessOptions = {
   holdStart?: () => Promise<void>
   paused?: boolean
   refusedSend?: string
+  /** A follow-up that fails the way a deleted or retired chat's does, every time. */
+  failSend?: boolean
 }
 
 export function inboundHarness(userDataPath: string, options: HarnessOptions = {}) {
@@ -51,6 +53,7 @@ export function inboundHarness(userDataPath: string, options: HarnessOptions = {
   const threads = new PhotonThreadMap(store)
   const calls: Call[] = []
   const unknownSenders: string[] = []
+  const parked: string[] = []
   let chats = 0
   const inbound = new PhotonInbound({
     inbox,
@@ -61,6 +64,9 @@ export function inboundHarness(userDataPath: string, options: HarnessOptions = {
     paused: () => options.paused === true,
     noteUnknownSender: (botId) => {
       unknownSenders.push(botId)
+    },
+    noteParkedMessage: (_botId, reason) => {
+      parked.push(reason)
     },
     startConversation: async ({ text, person }) => {
       if (options.holdStart) {
@@ -77,9 +83,12 @@ export function inboundHarness(userDataPath: string, options: HarnessOptions = {
       if (options.refusedSend) {
         throw new Error(options.refusedSend)
       }
+      if (options.failSend) {
+        throw new Error('This chat is closed.')
+      }
       calls.push({ kind: 'send', chatId, text, person })
     },
     log: () => {}
   })
-  return { inbound, calls, inbox, cursors, threads, store, unknownSenders }
+  return { inbound, calls, inbox, cursors, threads, store, unknownSenders, parked }
 }

@@ -74,6 +74,55 @@ describe('a paused bot', () => {
   })
 })
 
+describe('a message nothing can deliver', () => {
+  it('is parked after a few attempts, named, and stops blocking the messages behind it', async () => {
+    // A thread pointing at a deleted or retired chat throws the same way every time. Replaying it
+    // forever is worse than either answering or losing it: the entry would stay unhandled, so
+    // `blocked-by-unhandled` stops the cursor and every later message queues behind one that can never
+    // be dealt with — the bot goes deaf for good, with the owner seeing only log lines.
+    const test = harness({ failSend: true })
+    // The bad message's conversation is already bound, so it takes the follow-up path that fails.
+    await test.threads.bind('b1', 'conv_1', { chatId: 'chat_1', handle: '+15551230000' })
+    const attempts: number[] = []
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      attempts.push(
+        await test.inbound
+          .handle({ botId: 'b1', projectId: 'p1', seq: 41, message: message() })
+          .then(
+            (outcome) => (outcome.kind === 'parked' ? attempt : -attempt),
+            () => -attempt
+          )
+      )
+    }
+
+    // Two attempts threw (the stream resumes from the checkpoint between them), the third parked it.
+    expect(attempts).toEqual([-1, -2, 3])
+    const parked = await test.inbox.read('p1', 'msg_1')
+    expect(parked?.parkedReason).toMatch(/This chat is closed/)
+    // Parked means handled, so the cursor may pass it and later messages are not stuck behind it.
+    expect(parked?.handledAt).toBeDefined()
+    expect(await test.cursors.read('p1')).toBe(41)
+    expect(await test.inbox.unhandled('p1')).toEqual([])
+    expect(test.parked).toEqual(['This chat is closed.'])
+    // The message itself is kept, not deleted: the answer the person is waiting for is still readable.
+    expect(await test.inbox.parked('p1')).toHaveLength(1)
+  })
+
+  it('retries a delivery that only fails once, rather than parking it', async () => {
+    const test = harness({ refusedSend: 'This chat is closed.' })
+    await test.threads.bind('b1', 'conv_1', { chatId: 'chat_1', handle: '+15551230000' })
+
+    await expect(
+      test.inbound.handle({ botId: 'b1', projectId: 'p1', seq: 41, message: message() })
+    ).rejects.toThrow('This chat is closed.')
+    // One failure is a retry, not a verdict: nothing is parked and the entry is still unhandled.
+    expect(await test.inbox.parked('p1')).toEqual([])
+    expect((await test.inbox.read('p1', 'msg_1'))?.attempts).toBe(1)
+    expect(test.inbox.unhandled('p1')).toBeTruthy()
+    expect(await test.cursors.read('p1')).toBe(0)
+  })
+})
+
 describe('a refused follow-up', () => {
   it('is not marked handled and does not advance the cursor, so it is not lost', async () => {
     const test = harness({ refusedSend: 'This chat is closed.' })

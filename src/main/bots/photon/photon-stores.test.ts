@@ -5,8 +5,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { PhotonInboundMessage } from './photon-contract'
 import { PhotonCursorStore } from './photon-cursor'
 import { PhotonInbox } from './photon-inbox'
-import { PhotonOutbox, PHOTON_OUTBOX_MAX_ATTEMPTS } from './photon-outbox'
+import { PhotonOutbox, PHOTON_OUTBOX_HORIZON_MS } from './photon-outbox'
 import { PhotonStore } from './photon-store'
+import { photonPathSegment } from './photon-store-paths'
 import { PhotonThreadMap } from './photon-thread-map'
 
 let userDataPath: string
@@ -198,6 +199,15 @@ describe('the inbox, which is both the crash guard and the dedupe index', () => 
     })
   })
 
+  it('encodes a colon, which NTFS would turn into an alternate data stream', async () => {
+    // `a:b.json` is not a file name on NTFS: it opens a stream `readdir` never lists, so the write lands
+    // somewhere the store cannot find again and the cursor stops at not-in-inbox. Photon's alphabet is
+    // unpublished, so the character is encoded rather than assumed away.
+    expect(photonPathSegment('msg:1')).toBe('msg%3A1')
+    expect(photonPathSegment('msg%3A1')).not.toBe(photonPathSegment('msg:1'))
+    expect(photonPathSegment('msg_1')).toBe('msg_1')
+  })
+
   it('refuses a message id that could escape its directory', async () => {
     const inbox = new PhotonInbox(new PhotonStore(userDataPath))
     await expect(inbox.claim('p1', message({ id: '../../etc/passwd' }))).rejects.toThrow(
@@ -360,8 +370,11 @@ describe('the outbox', () => {
     expect(await outbox.entries()).toHaveLength(1)
   })
 
-  it('gives up after the attempt cap instead of retrying a stale answer forever', async () => {
-    const outbox = new PhotonOutbox(new PhotonStore(userDataPath))
+  it('keeps retrying inside the horizon, however many attempts that is', async () => {
+    // The horizon is time, not a count: a count is only honest if something tries often enough to reach
+    // it, and twelve attempts over a 60 s tick was a quarter of an hour.
+    let clock = 1_000
+    const outbox = new PhotonOutbox(new PhotonStore(userDataPath), () => clock)
     await outbox.enqueue({
       id: 's1',
       botId: 'b1',
@@ -369,9 +382,32 @@ describe('the outbox', () => {
       conversationId: 'c1',
       body: 'done'
     })
-    for (let attempt = 0; attempt < PHOTON_OUTBOX_MAX_ATTEMPTS; attempt += 1) {
-      await outbox.fail('s1', 'still failing')
+    for (let attempt = 0; attempt < 50; attempt += 1) {
+      clock += 60_000
+      expect(await outbox.fail('s1', 'still failing')).not.toBeNull()
     }
+    expect(await outbox.entries()).toHaveLength(1)
+    expect(await outbox.droppedAnswers()).toEqual([])
+  })
+
+  it('gives up when the horizon passes, keeps the answer, and can be asked what it dropped', async () => {
+    let clock = 1_000
+    const outbox = new PhotonOutbox(new PhotonStore(userDataPath), () => clock)
+    await outbox.enqueue({
+      id: 's1',
+      botId: 'b1',
+      projectId: 'p1',
+      conversationId: 'c1',
+      body: 'the build is green'
+    })
+    await outbox.fail('s1', 'still failing')
+    clock += PHOTON_OUTBOX_HORIZON_MS
+
+    expect(await outbox.fail('s1', 'still failing')).toBeNull()
+    // Out of the retry queue, but not gone: the answer is nameable rather than a silent gap.
     expect(await outbox.entries()).toEqual([])
+    const dropped = await outbox.droppedAnswers()
+    expect(dropped).toHaveLength(1)
+    expect(dropped[0]).toMatchObject({ body: 'the build is green', lastError: 'still failing' })
   })
 })

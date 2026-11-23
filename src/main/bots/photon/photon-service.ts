@@ -125,17 +125,24 @@ export class PhotonService {
       handle: input.handle,
       credential
     })
-    const assignments = [
-      ...record.assignments.filter(
-        (entry) => normalisePhotonHandle(entry.handle) !== normalisePhotonHandle(assignment.handle)
-      ),
-      {
-        assignmentId: assignment.assignmentId,
-        handle: assignment.handle,
-        phoneNumber: assignment.phoneNumber
-      }
-    ]
-    await this.deps.store.putBot({ ...record, assignments })
+    // Merged inside the store's queue, not onto the record read before the network call: two `member.add`
+    // calls in flight each write back a list they read, and one assignment is then lost from the local
+    // mirror — after which that member's texts are dropped as unknown senders and nothing can recover
+    // them.
+    await this.deps.store.updateBot(input.botId, (current) => ({
+      ...current,
+      assignments: [
+        ...current.assignments.filter(
+          (entry) =>
+            normalisePhotonHandle(entry.handle) !== normalisePhotonHandle(assignment.handle)
+        ),
+        {
+          assignmentId: assignment.assignmentId,
+          handle: assignment.handle,
+          phoneNumber: assignment.phoneNumber
+        }
+      ]
+    }))
     return {
       handle: assignment.handle,
       phoneNumber: assignment.phoneNumber,
@@ -163,12 +170,12 @@ export class PhotonService {
         throw error
       }
     }
-    await this.deps.store.putBot({
-      ...record,
-      assignments: record.assignments.filter(
+    await this.deps.store.updateBot(input.botId, (current) => ({
+      ...current,
+      assignments: current.assignments.filter(
         (entry) => entry.assignmentId !== assignment.assignmentId
       )
-    })
+    }))
     return { released: true }
   }
 
@@ -176,10 +183,11 @@ export class PhotonService {
   async deleteBot(botId: string): Promise<PhotonReleaseOutcome> {
     // Recorded as released before anything can fail, so a half-finished teardown is retried by the
     // health tick instead of leaving a live stream on a bot that no longer exists.
-    const record = await this.deps.store.bot(botId)
-    if (record && !record.released) {
-      await this.deps.store.putBot({ ...record, released: true, releasedAt: Date.now() })
-    }
+    // Inside the queue: a `member.add` in flight would otherwise write its stale record back with
+    // `released: false` and leave a live channel on a bot that no longer exists.
+    await this.deps.store.updateBot(botId, (current) =>
+      current.released ? null : { ...current, released: true, releasedAt: Date.now() }
+    )
     this.stopStream(botId)
     return this.deps.teardown.releaseBot({
       botId,
@@ -224,6 +232,11 @@ export class PhotonService {
     return { repaired: outcome.repaired, notes: outcome.notes }
   }
 
+  /** This service's own store, which is the one that holds a session key never written to disk. */
+  store(): PhotonStore {
+    return this.deps.store
+  }
+
   /** The bot's people, derived from its assignment list so there is no second ACL to keep in step. */
   async people(botId: string): Promise<Map<string, PhotonPerson>> {
     const record = await this.deps.store.bot(botId)
@@ -260,12 +273,6 @@ export class PhotonService {
     return record !== null && (!record.released || record.assignments.length > 0)
   }
 
-  /** Notes that a sender with no assignment here reached the stream: the mirror of the provider's
-   *  allowlist is stale, which `bots.photon.reconcile` repairs. */
-  noteUnknownSender(botId: string): Promise<void> {
-    return this.deps.store.noteUnknownSender(botId)
-  }
-
   /** Whether this chat is one the channel answers: the check a turn end makes before reading a journal. */
   async answersChat(botId: string, chatId: string): Promise<boolean> {
     return (await this.deps.threads.conversationFor(botId, chatId)) !== null
@@ -300,10 +307,6 @@ export class PhotonService {
   /** Fire-and-forget on purpose: a caller that provisioned a bot should not wait on its socket. */
   startStream(botId: string): void {
     void this.deps.streams.start(botId)
-  }
-
-  async startStreamNow(botId: string): Promise<PhotonStreamStatus | null> {
-    return this.deps.streams.start(botId)
   }
 
   stopStream(botId: string): void {

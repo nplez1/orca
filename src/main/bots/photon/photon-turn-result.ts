@@ -8,37 +8,37 @@ import { structuredAgentSessionTurnAssistantMessage } from '../../../shared/agen
 import type { TurnEndedRows } from '../../native-chat/agent-session-wire/structured-agent-session-turn-context'
 import type { PhotonThreadMap } from './photon-thread-map'
 
-/** The turn's own item id, which is what scopes an assistant message to it. */
-function turnItemIdOf(rows: TurnEndedRows): string | null {
-  for (let index = rows.items.length - 1; index >= 0; index -= 1) {
-    const item = rows.items[index]
-    if (item && readAgentJournalTurn(item.body) !== null) {
-      return item.itemId
+/** Turn records in the rows, oldest first, as `[itemId, turnId]`. */
+function turnRecordsOf(rows: TurnEndedRows): { itemId: string; turnId: string }[] {
+  const records: { itemId: string; turnId: string }[] = []
+  for (const item of rows.items) {
+    const held = item ? readAgentJournalTurn(item.body) : null
+    if (item && held) {
+      records.push({ itemId: item.itemId, turnId: held.turnId })
     }
   }
-  return null
+  return records
 }
 
 /**
- * The one message a finished turn sends, or null when there is nothing to send. Scoped to `turnId` when
- * one is given, so a second turn that has already started cannot make the first answer read from it.
+ * The one message a finished turn sends, or null when there is nothing to send.
+ *
+ * The turn's record is **selected by `turnId`**, not taken as the newest one. Deliveries queue, so a
+ * second text can start turn 2 and write its record before turn 1's rows are read — and this read
+ * happens behind an `await` — which makes "newest" the wrong turn often enough to matter. Reading the
+ * newest and then refusing when it is not ours would drop the first turn's answer entirely.
+ *
+ * Without a `turnId` the newest record is the only thing to go on; that is the shape a caller with no
+ * turn id has, not a guess this code makes for a caller that has one.
  */
 export function photonTurnResultText(rows: TurnEndedRows, turnId?: string): string | null {
-  const turnItemId = turnItemIdOf(rows)
-  if (!turnItemId) {
+  const records = turnRecordsOf(rows)
+  const mine =
+    turnId === undefined ? records.at(-1) : records.find((entry) => entry.turnId === turnId)
+  if (!mine) {
     return null
   }
-  if (turnId !== undefined) {
-    const own = rows.items.find((item) => item.itemId === turnItemId)
-    const held = own ? readAgentJournalTurn(own.body) : null
-    if (held !== null && held.turnId !== turnId) {
-      // The journal's newest turn is not the one that ended, which happens when a queued message has
-      // already started. Its prose is not this turn's answer, so nothing is sent rather than the
-      // wrong turn's words.
-      return null
-    }
-  }
-  const prose = structuredAgentSessionTurnAssistantMessage(rows.items, turnItemId).trim()
+  const prose = structuredAgentSessionTurnAssistantMessage(rows.items, mine.itemId).trim()
   return prose.length > 0 ? prose : null
 }
 

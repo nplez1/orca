@@ -21,9 +21,9 @@ function item(
   }
 }
 
-const turn = (userItemId: string): AgentJournalItemBody => ({
+const turn = (userItemId: string, turnId = 'turn_1'): AgentJournalItemBody => ({
   kind: 'turn',
-  turnId: 'turn_1',
+  turnId,
   state: 'completed',
   userItemId,
   outcome: 'success'
@@ -76,5 +76,37 @@ describe("a finished turn's answer", () => {
 
   it('sends nothing when the rows hold no turn at all', () => {
     expect(photonTurnResultText(rows([]))).toBeNull()
+  })
+
+  it('reads the record whose turn id matches, not the newest one, when a second text is queued', () => {
+    // Deliveries queue, so turn 2 can write its record before turn 1's end is read — and the read sits
+    // behind an `await`. Selecting the newest record and refusing when it is not ours dropped turn 1's
+    // answer entirely, which is the send the person was waiting for.
+    const text = photonTurnResultText(
+      rows([
+        item('u1', asked('is it green?')),
+        item('t1', turn('u1', 'turn_1')),
+        item('a1', said('The build is green.'), 't1'),
+        // Turn 2 already started for a second text.
+        item('u2', asked('and the tests?')),
+        item('t2', turn('u2', 'turn_2'))
+      ]),
+      'turn_1'
+    )
+    expect(text).toBe('The build is green.')
+  })
+
+  it('sends nothing when the matching turn recorded no answer of its own', () => {
+    const text = photonTurnResultText(
+      rows([
+        item('u1', asked('is it green?')),
+        item('t1', turn('u1', 'turn_1')),
+        item('u2', asked('and the tests?')),
+        item('t2', turn('u2', 'turn_2')),
+        item('a2', said('Running them now.'), 't2')
+      ]),
+      'turn_1'
+    )
+    expect(text).toBeNull()
   })
 })

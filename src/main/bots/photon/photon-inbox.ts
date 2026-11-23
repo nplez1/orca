@@ -24,7 +24,13 @@ const InboxEntrySchema = z.object({
   receivedAt: z.number(),
   /** Set once the message has been dispatched to a turn or deliberately ignored. Absent means a crash
    *  landed between the write and the dispatch, so a replay must run it. */
-  handledAt: z.number().optional()
+  handledAt: z.number().optional(),
+  /** How many times a dispatch has been attempted and failed. Durable, so a crash mid-retry cannot
+   *  restart the count and replay the same undeliverable message forever. */
+  attempts: z.number().int().nonnegative().default(0),
+  /** Set when Orca gave up: the message is kept, named, and out of the stream's way. */
+  parkedAt: z.number().optional(),
+  parkedReason: z.string().optional()
 })
 export type PhotonInboxEntry = z.infer<typeof InboxEntrySchema>
 
@@ -34,6 +40,15 @@ export type PhotonInboxClaim =
   | { action: 'run'; entry: PhotonInboxEntry }
   /** Orca already handled it: a replay, and running it again would be the double-run this store stops. */
   | { action: 'skip'; entry: PhotonInboxEntry }
+
+/**
+ * How many times one message may fail to dispatch before Orca parks it. A thread whose chat was deleted
+ * or retired fails the same way every time, and replaying it forever makes the bot deaf for good: the
+ * cursor refuses to pass an unhandled entry, so every later message queues behind a message that can
+ * never be delivered. Three attempts is enough for a transient failure (the stream resumes with backoff
+ * between them) and small enough that a repeatable one stops quickly.
+ */
+export const PHOTON_INBOX_MAX_ATTEMPTS = 3
 
 /** Message ids become file names, so anything that could escape the directory is refused. */
 const SAFE_ID = /^[A-Za-z0-9._:-]{1,200}$/
@@ -78,7 +93,8 @@ export class PhotonInbox {
         sender: message.sender,
         text: message.text,
         createdAt: message.createdAt,
-        receivedAt: this.now()
+        receivedAt: this.now(),
+        attempts: 0
       }
       await this.write(entry)
       return { action: 'run', entry }
@@ -93,6 +109,53 @@ export class PhotonInbox {
       return
     }
     await this.write({ ...held, handledAt: this.now() })
+  }
+
+  /** Counts a failed dispatch, durably and before the retry: a crash mid-retry must not reset the count
+   *  and leave the message replaying for good. Returns the entry's attempt count after the increment. */
+  async recordAttempt(projectId: string, messageId: string): Promise<number> {
+    const held = await this.read(projectId, messageId)
+    if (!held) {
+      return 0
+    }
+    const attempts = held.attempts + 1
+    await this.write({ ...held, attempts })
+    return attempts
+  }
+
+  /** Gives up on one message: kept on disk, named, and marked handled so the cursor may pass it. This is
+   *  the declared terminal outcome a message needs when nothing can deliver it — without it the entry
+   *  stays unhandled, `blocked-by-unhandled` stops the cursor, and every later message queues behind one
+   *  that will never be dealt with. */
+  async park(
+    projectId: string,
+    messageId: string,
+    reason: string
+  ): Promise<PhotonInboxEntry | null> {
+    const held = await this.read(projectId, messageId)
+    if (!held) {
+      return null
+    }
+    const parked: PhotonInboxEntry = {
+      ...held,
+      handledAt: held.handledAt ?? this.now(),
+      parkedAt: this.now(),
+      parkedReason: reason
+    }
+    await this.write(parked)
+    return parked
+  }
+
+  /** The messages Orca gave up on, newest first: what a listing shows instead of a silent gap. */
+  async parked(projectId: string): Promise<PhotonInboxEntry[]> {
+    const parked: PhotonInboxEntry[] = []
+    for (const messageId of await this.idsOf(projectId)) {
+      const entry = await this.read(projectId, messageId)
+      if (entry?.parkedAt !== undefined) {
+        parked.push(entry)
+      }
+    }
+    return parked.sort((left, right) => (right.parkedAt ?? 0) - (left.parkedAt ?? 0))
   }
 
   async has(projectId: string, messageId: string): Promise<boolean> {

@@ -48,7 +48,7 @@ describe('provisioning', () => {
     expect(outcome.createdProject).toBe(true)
     expect(outcome.record).toMatchObject({
       botId: 'b1',
-      slug: 'orca-bot-scout',
+      slug: 'orca-bot-scout-7dc96f77',
       organizationId: 'org_1',
       completedThrough: 'assignment'
     })
@@ -181,7 +181,7 @@ describe('the reconciler', () => {
     })
 
     expect(outcome.repaired).toBe(true)
-    expect(outcome.record?.slug).toBe('orca-bot-scout')
+    expect(outcome.record?.slug).toBe('orca-bot-scout-7dc96f77')
     expect(outcome.notes.join(' ')).toMatch(/slug repaired/)
   })
 
@@ -289,7 +289,7 @@ describe('teardown', () => {
     const outcome = await teardown(store).deleteProject({
       botId: 'b1',
       account,
-      confirmSlug: 'orca-bot-scout'
+      confirmSlug: 'orca-bot-scout-7dc96f77'
     })
 
     expect(server.state.deleted).toEqual([projectId])
@@ -307,7 +307,7 @@ describe('teardown', () => {
     const outcome = await teardown(store).deleteProject({
       botId: 'b1',
       account,
-      confirmSlug: 'orca-bot-scout'
+      confirmSlug: 'orca-bot-scout-7dc96f77'
     })
 
     expect(outcome.state).toBe('closed')

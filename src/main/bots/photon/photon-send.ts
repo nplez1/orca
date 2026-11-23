@@ -55,6 +55,8 @@ export type PhotonSendDeps = {
   outbox: PhotonOutbox
   threads: PhotonThreadMap
   log?: (message: string, ...rest: unknown[]) => void
+  /** Reports an answer the retry horizon passed on, so it is visible rather than a console line. */
+  noteUndelivered?: (botId: string, reason: string) => void | Promise<void>
 }
 
 export type PhotonSendOutcome =
@@ -134,7 +136,13 @@ export class PhotonSendPath {
       return { sent: true, entryId: entry.id, truncated: entry.truncated }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      await this.deps.outbox.fail(entry.id, message)
+      const kept = await this.deps.outbox.fail(entry.id, message)
+      if (kept === null) {
+        // The horizon passed: the answer stops being retried, but it is recorded as owed rather than
+        // dropped quietly, and the design's promise is bounded by a time the owner can see.
+        await this.deps.noteUndelivered?.(entry.botId, message)
+        return { sent: false, entryId: entry.id, error: message }
+      }
       this.log('[photon] could not send a turn result; it is kept for a retry', message)
       return { sent: false, entryId: entry.id, error: message }
     }

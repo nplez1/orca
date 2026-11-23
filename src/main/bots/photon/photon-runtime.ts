@@ -61,21 +61,16 @@ export function photonChannel(runtime: OrcaRuntimeService): PhotonService {
   const threads = new PhotonThreadMap(store)
   const outbox = new PhotonOutbox(store)
   const api = new PhotonApi()
-  // Resolved lazily: the inbound adapter is built with the service, so it cannot close over it yet.
-  let service: PhotonService | null = null
-
   const inbound = new PhotonInbound({
     inbox,
     cursors,
     threads,
-    people: (botId) => {
-      if (!service) {
-        throw new Error('photon service used before it was built')
-      }
-      return service.people(botId)
-    },
+    people: (botId) => built.people(botId),
     paused: (botId) => runtime.bots.list().find((entry) => entry.id === botId)?.paused === true,
-    noteUnknownSender: (botId) => service?.noteUnknownSender(botId),
+    // Straight to the store: these are records about a bot, not channel state, and they are needed
+    // before the service exists.
+    noteUnknownSender: (botId) => store.noteUnknownSender(botId),
+    noteParkedMessage: (botId, reason) => store.noteParkedMessage(botId, reason),
     startConversation: async ({ botId, text, person, title }) => {
       const bot = requireBot(runtime, botId)
       const sessionId = await startBotSession(runtime, bot, {
@@ -111,7 +106,12 @@ export function photonChannel(runtime: OrcaRuntimeService): PhotonService {
     }
   })
 
-  const sendPath = new PhotonSendPath({ api, outbox, threads })
+  const sendPath = new PhotonSendPath({
+    api,
+    outbox,
+    threads,
+    noteUndelivered: (botId, reason) => store.noteUndeliveredAnswer(botId, reason)
+  })
   const streams = new PhotonStreams({
     store,
     cursors,
@@ -123,6 +123,7 @@ export function photonChannel(runtime: OrcaRuntimeService): PhotonService {
       return { cancel: () => clearTimeout(handle) }
     }
   })
+  // Assigned once the service exists; the adapters below only read it when a frame arrives.
   const built = new PhotonService({
     store,
     api,
@@ -136,7 +137,6 @@ export function photonChannel(runtime: OrcaRuntimeService): PhotonService {
     sendPath,
     streams
   })
-  service = built
   channels.set(runtime, built)
   return built
 }
@@ -144,9 +144,9 @@ export function photonChannel(runtime: OrcaRuntimeService): PhotonService {
 /** What a settings card or `orca bot connectors` shows, without opening a stream to find out. */
 export async function photonChannelStatus(
   service: PhotonService,
-  store: PhotonStore,
   botIds: readonly string[]
 ): Promise<PhotonChannelStatus> {
+  const store = service.store()
   const account = await store.account()
   const credential = await store.accountCredential()
   return {
@@ -164,7 +164,11 @@ export async function photonChannelStatus(
         handles: record.assignments.map((entry) => entry.handle),
         stream: streamWord(status, record.released),
         released: record.released,
-        unknownSenderCount: record.unknownSenderCount
+        unknownSenderCount: record.unknownSenderCount,
+        parkedMessageCount: record.parkedMessageCount,
+        lastParkedReason: record.lastParkedReason ?? null,
+        undeliveredAnswerCount: record.undeliveredAnswerCount,
+        lastUndeliveredReason: record.lastUndeliveredReason ?? null
       }
     })
   }

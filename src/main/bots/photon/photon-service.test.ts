@@ -11,6 +11,7 @@ import { PhotonInbox } from './photon-inbox'
 import { PhotonOutbox } from './photon-outbox'
 import { PhotonProvisioner } from './photon-provisioning'
 import { PhotonSendPath } from './photon-send'
+import { photonChannelStatus } from './photon-runtime'
 import { PhotonService } from './photon-service'
 import { PhotonStreams } from './photon-streams'
 import { PhotonStore } from './photon-store'
@@ -110,6 +111,17 @@ describe('the channel', () => {
     expect(await store.accountKey()).toBe('pho_ask_1')
   })
 
+  it('reports connected on the default path, where the key is held only for the session', async () => {
+    // The status read a second PhotonStore over the same files, but the session key lives on the
+    // service's own instance — so with `storesKey: false`, the default, a successful connect reported
+    // `connected: false`.
+    const { runtime } = service()
+    await runtime.connect({ organizationId: 'org_1', accountKey: 'pho_ask_1', storesKey: false })
+
+    const status = await photonChannelStatus(runtime, [])
+    expect(status).toMatchObject({ connected: true, accountKeyStored: false })
+  })
+
   it('creates a bot after a restart on the unstored path, with the key passed to the call', async () => {
     // The blocker: with `storesKey: false` every account-key operation failed, so the default was
     // broken and the toggle was mandatory. The organization is kept; only the key is not.
@@ -153,7 +165,7 @@ describe('the channel', () => {
     })
 
     expect(created.createdProject).toBe(true)
-    expect((await store.bot('b1'))?.slug).toBe('orca-bot-scout')
+    expect((await store.bot('b1'))?.slug).toBe('orca-bot-scout-7dc96f77')
     expect(server.state.projects.size).toBe(1)
     expect((await store.bot('b1'))?.phoneNumber).toBeTruthy()
   })
@@ -171,6 +183,40 @@ describe('the channel', () => {
     await runtime.releaseMember({ botId: 'b1', handle: '+15559990000' })
     expect((await runtime.people('b1')).has('+15559990000')).toBe(false)
     expect(server.state.assignments.size).toBe(1)
+  })
+
+  it('keeps both assignments when two people are added at once', async () => {
+    // Each add reads the record, awaits the provider, then writes it back. Written onto the record read
+    // before that await, the second write erases the first assignment from this computer's mirror — and
+    // from then on that member's texts are dropped as an unknown sender, which no reconcile recovers
+    // because the mirror is the thing that was wrong.
+    const { runtime } = service()
+    await runtime.connect({ organizationId: 'org_1', accountKey: 'pho_ask_1', storesKey: true })
+    await runtime.createBot({ botId: 'b1', botName: 'Scout', handle: '+15551230000' })
+
+    await Promise.all([
+      runtime.addMember({ botId: 'b1', handle: '+15559990000' }),
+      runtime.addMember({ botId: 'b1', handle: '+15558880000' })
+    ])
+
+    const people = await runtime.people('b1')
+    expect([...people.keys()].sort()).toEqual(['+15551230000', '+15558880000', '+15559990000'])
+    expect(server.state.assignments.size).toBe(3)
+  })
+
+  it('does not resurrect a released channel when an add was already in flight', async () => {
+    // The release writes `released: true`; an add that read the record before it writes it back with
+    // `released: false`, and a live channel is left on a bot that no longer exists.
+    const { runtime, store } = service()
+    await runtime.connect({ organizationId: 'org_1', accountKey: 'pho_ask_1', storesKey: true })
+    await runtime.createBot({ botId: 'b1', botName: 'Scout', handle: '+15551230000' })
+
+    await Promise.all([
+      runtime.addMember({ botId: 'b1', handle: '+15559990000' }),
+      runtime.deleteBot('b1')
+    ])
+
+    expect((await store.bot('b1'))?.released).toBe(true)
   })
 
   it('tells `orca bot connectors` what the bot answers on and who may text it', async () => {
@@ -206,7 +252,10 @@ describe('the channel', () => {
     // A tombstone, not nothing: the record still names the project its deletion has to burn, so the
     // separate cleanup stays reachable.
     expect(await store.bot('b1')).toMatchObject({ released: true, projectId, assignments: [] })
-    const deleted = await runtime.deleteProject({ botId: 'b1', confirmSlug: 'orca-bot-scout' })
+    const deleted = await runtime.deleteProject({
+      botId: 'b1',
+      confirmSlug: 'orca-bot-scout-7dc96f77'
+    })
     expect(deleted.terminal).toBe(true)
     expect(await store.bot('b1')).toBeNull()
   })
@@ -237,17 +286,24 @@ describe('the channel', () => {
   })
 
   it('validates a project deletion before it takes the stream down', async () => {
-    const { runtime, store } = service()
-    await runtime.connect({ organizationId: 'org_1', accountKey: 'pho_ask_1', storesKey: true })
-    await runtime.createBot({ botId: 'b1', botName: 'Scout', handle: '+15551230000' })
-    const streamed = await runtime.startStreamNow('b1')
+    const quietIo: PhotonIoFactory = () => ({ on: () => {}, emit: () => {}, disconnect: () => {} })
+    const streaming = serviceWith(quietIo)
+    await streaming.runtime.connect({
+      organizationId: 'org_1',
+      accountKey: 'pho_ask_1',
+      storesKey: true
+    })
+    await streaming.runtime.createBot({ botId: 'b1', botName: 'Scout', handle: '+15551230000' })
+    // `createBot` opens the stream without waiting on it, so wait for it rather than assuming it.
+    await vi.waitFor(async () => expect(await streaming.runtime.streamStatus('b1')).not.toBeNull())
+    const before = await streaming.runtime.streamStatus('b1')
 
-    // A typo must not leave the bot deaf until the next restart.
-    await expect(runtime.deleteProject({ botId: 'b1', confirmSlug: 'wrong' })).rejects.toThrow(
-      /confirmation names/
-    )
-    expect((await runtime.streamStatus('b1'))?.state).toBe(streamed?.state)
-    expect(await store.bot('b1')).not.toBeNull()
+    // A typo must not leave the bot deaf until the next restart: the check runs before the stop.
+    await expect(
+      streaming.runtime.deleteProject({ botId: 'b1', confirmSlug: 'wrong' })
+    ).rejects.toThrow(/confirmation names/)
+    expect((await streaming.runtime.streamStatus('b1'))?.state).toBe(before?.state)
+    expect(await streaming.store.bot('b1')).not.toBeNull()
   })
 })
 

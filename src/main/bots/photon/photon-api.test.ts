@@ -198,17 +198,24 @@ describe('the send and the cleanup', () => {
 
 describe('the slug', () => {
   it('is deterministic, lowercase and legal, so a retried provisioning finds one project', () => {
-    expect(photonSlugForBot('Scout')).toBe('orca-bot-scout')
-    expect(photonSlugForBot('Scout')).toBe(photonSlugForBot('Scout'))
-    expect(photonSlugForBot('My  Bot!!')).toBe('orca-bot-my-bot')
+    expect(photonSlugForBot('Scout', 'b1')).toBe('orca-bot-scout-7dc96f77')
+    expect(photonSlugForBot('Scout', 'b1')).toBe(photonSlugForBot('Scout', 'b1'))
+    expect(photonSlugForBot('My  Bot!!', 'b1')).toBe('orca-bot-my-bot-7dc96f77')
+  })
+
+  it('carries the bot id, so two bots sharing a display name never derive one slug', () => {
+    // A slug is the project's natural key and can never be reused: one slug for two bots means the
+    // second 409s and adopts the first bot's project, sharing its stream, cursor and inbox.
+    expect(photonSlugForBot('Scout', 'b1')).not.toBe(photonSlugForBot('Scout', 'b2'))
   })
 
   it('stays inside the 3–63 character window for a name with no usable characters', () => {
-    const slug = photonSlugForBot('!!!')
+    const slug = photonSlugForBot('!!!', 'b1')
     expect(slug).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
     expect(slug.length).toBeGreaterThanOrEqual(3)
     expect(slug.length).toBeLessThanOrEqual(PHOTON_SLUG_MAX)
-    // Two odd names must not land on one slug: the slug is immutable and can never be reused.
-    expect(photonSlugForBot('???')).not.toBe(slug)
+    // Two odd names must not land on one slug, and neither may a long one overrun the limit.
+    expect(photonSlugForBot('???', 'b1')).not.toBe(slug)
+    expect(photonSlugForBot('x'.repeat(200), 'b1').length).toBeLessThanOrEqual(PHOTON_SLUG_MAX)
   })
 })

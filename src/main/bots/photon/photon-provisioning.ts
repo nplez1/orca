@@ -50,9 +50,14 @@ export type PhotonAssignmentResult = {
   phoneNumber: string
 }
 
-/** The slug a bot's project is created under, from its stored record when it has one. */
-export function photonSlugFor(input: { botName: string; stored?: PhotonBotRecord | null }): string {
-  return input.stored?.slug ?? photonSlugForBot(input.botName)
+/** The slug a bot's project is created under: its stored one when it has one, else derived from its name
+ *  and its id. Stored, never re-derived for a bot that has a project — the slug is immutable upstream. */
+export function photonSlugFor(input: {
+  botName: string
+  botId: string
+  stored?: PhotonBotRecord | null
+}): string {
+  return input.stored?.slug ?? photonSlugForBot(input.botName, input.botId)
 }
 
 export class PhotonProvisioner {
@@ -74,7 +79,7 @@ export class PhotonProvisioner {
         `This bot's Photon channel was released; its project is kept but its numbers are gone. Delete the project first, then create a new channel.`
       )
     }
-    const slug = photonSlugFor({ botName: input.botName, stored: existing })
+    const slug = photonSlugFor({ botName: input.botName, botId: input.botId, stored: existing })
 
     // Step 1 — the project. Its own key is the slug, and the derived idempotency key makes a replay
     // return the project this bot already has.
@@ -307,6 +312,19 @@ export class PhotonProvisioner {
       if (!adopted) {
         throw new Error(
           `Photon refused the slug "${input.slug}" as taken but lists no project under it. Rename the bot, which changes the slug, and try again.`
+        )
+      }
+      // Adoption exists for one case: this bot's own project, still upstream after this computer lost
+      // its record. The slug carries the bot id, so that is the only way a bot reaches its own 409. A
+      // project another bot's record already names is *not* ours to adopt — sharing one project shares
+      // its stream, cursor and inbox, so the two bots would fight over every message and each would
+      // judge the other's members as unknown senders.
+      const holder = (await this.deps.store.bots()).find(
+        (entry) => entry.projectId === adopted.id && entry.botId !== input.botId
+      )
+      if (holder) {
+        throw new Error(
+          `Photon already has a project under "${input.slug}", and this computer records it as bot ${holder.botId}'s. Two bots cannot share one project, so this bot was not given a channel: rename it to change its slug, or release the other bot's channel first.`
         )
       }
       this.log('[photon] adopted a project already holding this slug', input.slug)

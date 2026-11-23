@@ -213,6 +213,8 @@ export class PhotonStore {
       keyGeneration: input.keyGeneration ?? 0,
       released: input.released ?? false,
       unknownSenderCount: input.unknownSenderCount ?? 0,
+      parkedMessageCount: input.parkedMessageCount ?? 0,
+      undeliveredAnswerCount: input.undeliveredAnswerCount ?? 0,
       createdAt: input.createdAt ?? Date.now()
     }
     await this.change(() => {
@@ -222,13 +224,66 @@ export class PhotonStore {
     return saved
   }
 
-  /** Notes that a sender Orca does not have assigned reached the stream, so the mirror is stale. */
-  async noteUnknownSender(botId: string): Promise<void> {
-    const record = await this.bot(botId)
-    if (!record) {
-      return
+  /**
+   * Changes one bot's record **inside the queue**, so the read and the write cannot be split by another
+   * change to the same bot. A caller that reads with `bot()`, awaits a network call and then calls
+   * `putBot()` writes back the record it read — and a concurrent change to the same bot is then gone:
+   * two `member.add` calls lose one assignment from the local mirror, and a `member.add` in flight over
+   * a `release` writes `released: false` back. `change()` serialises per store, which covers different
+   * bots; this covers the same one.
+   *
+   * `mutate` returns the record to write, or null to leave it alone.
+   */
+  updateBot(
+    botId: string,
+    mutate: (record: PhotonBotRecord) => PhotonBotRecord | null
+  ): Promise<PhotonBotRecord | null> {
+    let saved: PhotonBotRecord | null = null
+    const publish = (next: PhotonBotRecord): void => {
+      saved = next
+      this.record = {
+        ...(this.record ?? emptyRecord()),
+        bots: (this.record?.bots ?? []).map((entry) => (entry.botId === next.botId ? next : entry))
+      }
     }
-    await this.putBot({ ...record, unknownSenderCount: record.unknownSenderCount + 1 })
+    return this.change(() => {
+      const record = (this.record?.bots ?? []).find((entry) => entry.botId === botId)
+      if (!record) {
+        return
+      }
+      const next = mutate(structuredClone(record))
+      if (next) {
+        publish(next)
+      }
+    }).then(() => saved)
+  }
+
+  /** Notes that a sender Orca does not have assigned reached the stream, so the mirror is stale. */
+  noteUnknownSender(botId: string): Promise<void> {
+    return this.updateBot(botId, (record) => ({
+      ...record,
+      unknownSenderCount: record.unknownSenderCount + 1
+    })).then(() => undefined)
+  }
+
+  /** Notes that a message could not be delivered and was parked, so the status can say the bot went
+   *  quiet for a reason rather than merely going quiet. */
+  noteParkedMessage(botId: string, reason: string): Promise<void> {
+    return this.updateBot(botId, (record) => ({
+      ...record,
+      parkedMessageCount: record.parkedMessageCount + 1,
+      lastParkedReason: reason.slice(0, 300)
+    })).then(() => undefined)
+  }
+
+  /** Notes an answer that never arrived, so a listing can say someone is owed a reply rather than
+   *  leaving the owner to infer it from silence. */
+  noteUndeliveredAnswer(botId: string, reason: string): Promise<void> {
+    return this.updateBot(botId, (record) => ({
+      ...record,
+      undeliveredAnswerCount: record.undeliveredAnswerCount + 1,
+      lastUndeliveredReason: reason.slice(0, 300)
+    })).then(() => undefined)
   }
 
   /** Drops one bot's own project key, keeping its record: what a released channel is left with. */
@@ -295,7 +350,9 @@ export class PhotonStore {
   }
 
   /** One change at a time, then one write. A queued change reads the state its predecessor left, so two
-   *  overlapping writes cannot each clone the same record and lose the other's bot. */
+   *  overlapping writes cannot each clone the same record and lose the other's bot. The change is applied
+   *  to a **clone** and only published once the write has landed: otherwise a failed write leaves memory
+   *  ahead of the disk, and the next reader trusts a record that is not there. */
   private change(mutate: () => void): Promise<void> {
     const run = this.queue.then(async () => {
       await this.load()
@@ -307,15 +364,24 @@ export class PhotonStore {
       if (unreadable.secrets) {
         throw new PhotonStoreUnreadableError(this.secretsPath)
       }
-      const before = { record: JSON.stringify(this.record), secrets: JSON.stringify(this.secrets) }
-      mutate()
-      // Durable, because a record that vanished would orphan a live project the user paid capacity for.
-      // Only what actually changed is rewritten, so a send does not rewrite the whole secrets file.
-      if (JSON.stringify(this.record) !== before.record) {
-        await writePhotonJson(this.recordPath, this.record ?? emptyRecord())
-      }
-      if (JSON.stringify(this.secrets) !== before.secrets) {
-        await writePhotonJson(this.secretsPath, this.secrets ?? emptySecrets())
+      const held = { record: this.record, secrets: this.secrets }
+      this.record = structuredClone(this.record)
+      this.secrets = structuredClone(this.secrets)
+      try {
+        mutate()
+        // Durable, because a record that vanished would orphan a live project the user paid capacity for.
+        // Only what actually changed is rewritten, so a send does not rewrite the whole secrets file.
+        if (JSON.stringify(this.record) !== JSON.stringify(held.record)) {
+          await writePhotonJson(this.recordPath, this.record ?? emptyRecord())
+        }
+        if (JSON.stringify(this.secrets) !== JSON.stringify(held.secrets)) {
+          await writePhotonJson(this.secretsPath, this.secrets ?? emptySecrets())
+        }
+      } catch (error) {
+        // Nothing was published, so memory still matches the disk.
+        this.record = held.record
+        this.secrets = held.secrets
+        throw error
       }
     })
     // The queue outlives a failed write, so one refusal does not wedge every later change.

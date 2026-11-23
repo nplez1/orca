@@ -48,9 +48,11 @@ export const BOT_PHOTON_STATUS_METHOD = defineMethod({
   params: PhotonStatusParams,
   handler: async ({ botId }, context): Promise<PhotonChannelStatus> => {
     context.runtime.bots.assertEnabled()
-    const store = new PhotonStore(getAppEnvironment().getPath('userData'))
     const botIds = botId ? [botId] : context.runtime.bots.list().map((bot) => bot.id)
-    return photonChannelStatus(photonChannel(context.runtime), store, botIds)
+    // The service's own store, not a second one over the same files: a key held for the session lives on
+    // that instance, so a fresh store reads it as absent and reports `connected: false` on the default
+    // path — the one where `storesKey` is off and the key was never written.
+    return photonChannelStatus(photonChannel(context.runtime), botIds)
   }
 })
 

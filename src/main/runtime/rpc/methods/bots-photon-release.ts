@@ -3,7 +3,6 @@
 // to block the delete, because the record stays and the release can be finished afterwards.
 import type { OrcaRuntimeService } from '../../../runtime/orca-runtime'
 import { photonChannel } from '../../../bots/photon/photon-runtime'
-import { PhotonStoreUnreadableError } from '../../../bots/photon/photon-store'
 
 /** Releases the channel's numbers and key for a bot that is being deleted. Silent for a bot that never
  *  had one, which is most of them. */
@@ -13,7 +12,7 @@ export async function releaseDeletedPhotonChannel(
 ): Promise<void> {
   try {
     const channel = photonChannel(runtime)
-    if (!channel.hasChannel(botId)) {
+    if (!(await channel.hasChannel(botId))) {
       return
     }
     const outcome = await channel.deleteBot(botId)
@@ -21,9 +20,9 @@ export async function releaseDeletedPhotonChannel(
       console.warn('[photon] a deleted bot’s channel is only partly released', outcome.problems)
     }
   } catch (error) {
-    if (error instanceof PhotonStoreUnreadableError) {
-      throw error
-    }
+    // A store this build cannot read is reported and the delete continues, as this file's header says:
+    // the record stays untouched, so releasing the channel is still possible once the file is readable.
+    // Throwing here blocked deleting any bot whose Photon store was corrupt, which is the opposite.
     console.warn('[photon] could not release a deleted bot’s channel', error)
   }
 }

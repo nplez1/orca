@@ -104,7 +104,7 @@ describe('what a re-run must not erase', () => {
     expect(rerun.record.assignments[0]?.assignmentId).not.toBe(assignmentId)
   })
 
-  it('adopts the project already holding the slug instead of failing on 409 forever', async () => {
+  it('gives two bots with the same name two projects, never one they both read', async () => {
     const store = new PhotonStore(userDataPath)
     await provisioner(store).provision({
       botId: 'b1',
@@ -112,17 +112,53 @@ describe('what a re-run must not erase', () => {
       handle: '+15551230000',
       account: { organizationId: 'org_1', credential: account }
     })
-    // A second bot with the same name derives the same slug; before the lookup it was a permanent 409.
-    const second = new PhotonStore(userDataPath)
-    const outcome = await provisioner(second).provision({
+    // The slug carries the bot id, so a second "Scout" derives its own and never reaches the 409 that
+    // used to hand it the first bot's project. Sharing one project means sharing its stream, cursor and
+    // inbox: whichever stream took a frame first claimed it, and the other judged its members against
+    // the wrong bot's allowlist and dropped them for good.
+    const outcome = await provisioner(store).provision({
       botId: 'b2',
       botName: 'Scout',
       handle: '+15559990000',
       account: { organizationId: 'org_1', credential: account }
     })
 
-    expect(outcome.record.slug).toBe('orca-bot-scout')
-    expect(server.state.projects.size).toBe(1)
+    expect(outcome.record.slug).not.toBe(store.bot('b1'))
+    const first = await store.bot('b1')
+    expect(outcome.record.projectId).not.toBe(first?.projectId)
+    expect(server.state.projects.size).toBe(2)
+  })
+
+  it('refuses to adopt a project another bot’s record already holds', async () => {
+    // Adoption exists for one case: this bot's own project after this computer lost its record. A
+    // project another local record names is not ours, and the slug alone cannot tell the two apart —
+    // the record can. This is the shape a record written before slugs carried the bot id has.
+    const store = new PhotonStore(userDataPath)
+    const first = await provisioner(store).provision({
+      botId: 'b1',
+      botName: 'Scout',
+      handle: '+15551230000',
+      account: { organizationId: 'org_1', credential: account }
+    })
+    await store.putBot({
+      botId: 'b2',
+      projectId: 'pho_prj_gone',
+      slug: first.record.slug,
+      organizationId: 'org_1',
+      completedThrough: 'project'
+    })
+    // b2's project is gone upstream and its slug is b1's, so the create 409s and adoption looks up a
+    // project b1's record already names. The guard is what stands between that and two bots reading one
+    // stream, one cursor and one inbox.
+    await expect(
+      provisioner(store).provision({
+        botId: 'b2',
+        botName: 'Scout',
+        handle: '+15559990000',
+        account: { organizationId: 'org_1', credential: account }
+      })
+    ).rejects.toThrow(/cannot share one project/)
+    expect(server.state.assignments.size).toBe(1)
   })
 
   it('follows the handle the provider returned, so a typed phone number is still the owner', async () => {

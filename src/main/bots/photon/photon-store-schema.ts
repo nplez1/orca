@@ -40,6 +40,15 @@ const PhotonBotRecord = z.object({
   /** Messages from a handle that is not assigned here. Non-zero means Orca's mirror of the provider's
    *  allowlist is stale, which is a thing to repair rather than a sender to ignore silently. */
   unknownSenderCount: z.number().int().nonnegative().default(0),
+  /** Messages Orca could not deliver and parked, so a listing can say so instead of the bot simply going
+   *  quiet. The messages themselves stay in the inbox, with the reason. */
+  parkedMessageCount: z.number().int().nonnegative().default(0),
+  /** Why the most recent message was parked, for that listing. */
+  lastParkedReason: z.string().optional(),
+  /** Answers Orca could not send before the retry horizon passed. Non-zero means someone is owed a
+   *  reply that never arrived, which the owner can see rather than infer from silence. */
+  undeliveredAnswerCount: z.number().int().nonnegative().default(0),
+  lastUndeliveredReason: z.string().optional(),
   createdAt: z.number()
 })
 export type PhotonBotRecord = z.infer<typeof PhotonBotRecord>

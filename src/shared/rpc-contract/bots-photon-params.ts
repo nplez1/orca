@@ -79,5 +79,13 @@ export type PhotonChannelStatus = {
     /** Messages from handles this bot has no assignment for. Non-zero means the assignment list here
      *  has drifted from the provider's, and `bots.photon.reconcile` is the repair. */
     unknownSenderCount: number
+    /** Messages Orca could not deliver and parked. Non-zero means the bot went quiet for a reason the
+     *  owner can act on: the thread's chat was deleted or retired, and `lastParkedReason` says which. */
+    parkedMessageCount: number
+    lastParkedReason: string | null
+    /** Answers Orca could not send before the retry horizon passed. Non-zero means someone is owed a
+     *  reply that never arrived, which the owner can see rather than infer from silence. */
+    undeliveredAnswerCount: number
+    lastUndeliveredReason: string | null
   }[]
 }

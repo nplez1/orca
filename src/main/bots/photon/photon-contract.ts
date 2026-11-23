@@ -142,22 +142,35 @@ export function photonParse<T>(schema: z.ZodType<T>, what: string, value: unknow
   return parsed.data
 }
 
-/** The slug a bot's project is created under, from its name: deterministic, so a retried provisioning
- *  finds the existing project instead of creating a second one that costs plan capacity. */
-export function photonSlugForBot(botName: string): string {
+/**
+ * The slug a bot's project is created under. Deterministic, so a retried provisioning finds the project
+ * this bot already has instead of creating a second one that costs plan capacity — and keyed on the **bot
+ * id**, not only the name, because a slug is the project's natural key and can never be reused: two bots
+ * that happen to share a display name would otherwise derive one slug, and the second would 409 and adopt
+ * the first bot's project, sharing its stream, cursor and inbox.
+ *
+ * Including the id also keeps adoption honest. A 409 on *our own* derived slug means the project is ours
+ * and this computer lost the record; a second bot never reaches that path, because its slug differs.
+ */
+export function photonSlugForBot(botName: string, botId: string): string {
   const normalised = botName
     .normalize('NFKD')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
-  // A name with no usable characters still needs a legal slug, and a constant one would collide with
-  // every other such bot under a name that is immutable and can never be reused. A short digest of the
-  // name keeps it deterministic per bot without being the same for two of them.
+  // A name with no usable characters still needs a legal stem, and a constant one would collide.
   const stem = normalised || createHash('sha256').update(botName).digest('hex').slice(0, 8)
-  const prefixed = `orca-bot-${stem}`.replace(/-+/g, '-').replace(/-+$/g, '')
-  const trimmed = prefixed.slice(0, PHOTON_SLUG_MAX).replace(/-+$/g, '')
-  if (trimmed.length >= PHOTON_SLUG_MIN && PHOTON_SLUG_PATTERN.test(trimmed)) {
-    return trimmed
+  const perBot = createHash('sha256').update(botId).digest('hex').slice(0, 8)
+  // Room for the prefix, the separator and the digest, so the stem is what gives when a name is long.
+  const room = PHOTON_SLUG_MAX - 'orca-bot-'.length - perBot.length - 1
+  const head = `orca-bot-${stem}`
+    .replace(/-+/g, '-')
+    .replace(/-+$/g, '')
+    .slice(0, room)
+    .replace(/-+$/g, '')
+  const slug = `${head}-${perBot}`
+  if (slug.length >= PHOTON_SLUG_MIN && PHOTON_SLUG_PATTERN.test(slug)) {
+    return slug
   }
-  return `orca-bot-${createHash('sha256').update(botName).digest('hex').slice(0, 8)}`
+  return `orca-bot-${perBot}`
 }

@@ -2,26 +2,40 @@
 // only long-lived state in the channel: a stream that stopped itself is replaced rather than returned
 // dead, a stream that is connected but never subscribed is restarted rather than merely called deaf, and
 // a send that failed is retried instead of sitting in the outbox until the process dies.
+import type { PhotonCredential } from './photon-api'
 import type { PhotonCursorStore } from './photon-cursor'
 import type { PhotonInbound } from './photon-inbound'
-import type { PhotonSendPath } from './photon-send'
 import { PhotonStream, type PhotonIoFactory, type PhotonStreamStatus } from './photon-stream'
 import type { PhotonStore } from './photon-store'
 import { PHOTON_STREAM_URL } from './photon-contract'
 
 export type PhotonTimer = { cancel: () => void }
 
+/** The one thing a stream asks of the inbound adapter: take a frame, and say how it went. A test gives
+ *  it only that, which is what a handler that always fails is. */
+export type PhotonFrameHandler = {
+  handle(input: Parameters<PhotonInbound['handle']>[0]): Promise<unknown>
+}
+
+/** The one thing the tick asks of the send path: retry what is waiting. The outcome is the send path's
+ *  own report and the tick does not read it, so it is not named here. */
+export type PhotonSendRetry = {
+  retryPending(botId: string, credential: PhotonCredential): Promise<unknown>
+}
+
 export type PhotonStreamsDeps = {
   store: PhotonStore
   cursors: PhotonCursorStore
-  inbound: PhotonInbound
-  sendPath: PhotonSendPath
+  inbound: PhotonFrameHandler
+  sendPath: PhotonSendRetry
   io: PhotonIoFactory
   streamUrl?: string
   log?: (message: string, ...rest: unknown[]) => void
   /** How often the health tick runs. Absent means no tick, which is what a test wants. */
   healthIntervalMs?: number
+  /** Handed to every stream as well as used by the tick, so one clock drives the whole channel. */
   setTimer?: (callback: () => void, ms: number) => PhotonTimer
+  clearTimer?: (timer: PhotonTimer) => void
 }
 
 const DEFAULT_HEALTH_MS = 60_000
@@ -71,7 +85,11 @@ export class PhotonStreams {
         this.deps.inbound
           .handle({ botId, projectId: record.projectId, seq: frame.seq, message: frame.message })
           .then(() => undefined),
-      log: this.deps.log
+      // The same clock the tick uses. A stream's own liveness and resume deadlines are what a test has
+      // to reach to prove that a stopped stream's resume was cancelled and not merely forgotten.
+      ...(this.deps.setTimer ? { setTimer: this.deps.setTimer } : {}),
+      ...(this.deps.clearTimer ? { clearTimer: this.deps.clearTimer } : {}),
+      log: this.log
     })
     try {
       stream.start()
@@ -114,9 +132,13 @@ export class PhotonStreams {
     for (const [botId, stream] of Array.from(this.streams)) {
       const status = stream.status()
       if (status.state === 'stopped' && status.stoppedBy !== 'closed') {
+        // `stop()` rather than dropping the map entry: a stream that stopped on a handler failure has a
+        // resume timer armed, and deleting it from the map alone lets that timer reconnect a socket
+        // nothing references any more — unreachable by stop(), by stopAll() and by a release, and
+        // growing one per tick once the backoff passes the interval.
         this.log('[photon] restarting a stream that stopped itself', botId, status.stoppedBy)
-        this.streams.delete(botId)
-        this.start(botId)
+        this.stop(botId)
+        await this.start(botId)
         continue
       }
       // The liveness assertion, with a caller that acts on it: reporting `deaf` in a status nobody polls
@@ -147,12 +169,11 @@ export class PhotonStreams {
     const schedule = (): void => {
       this.health =
         this.deps.setTimer?.(() => {
-          try {
-            this.tick()
-          } catch (error) {
-            this.log('[photon] the health tick failed', error)
-          }
-          schedule()
+          // Awaiting inside the callback is what gives the catch a rejection to see: `tick` is async, so
+          // a `try` around the call itself caught nothing and every failure went unhandled.
+          void this.tick()
+            .catch((error: unknown) => this.log('[photon] the health tick failed', error))
+            .finally(schedule)
         }, this.deps.healthIntervalMs ?? DEFAULT_HEALTH_MS) ?? null
     }
     schedule()

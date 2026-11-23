@@ -16,16 +16,29 @@ const OutboxEntry = z.object({
   truncated: z.boolean().default(false),
   createdAt: z.number(),
   attempts: z.number().int().nonnegative().default(0),
-  lastError: z.string().optional()
+  /** When the first attempt failed: the retry horizon is measured from here, not from a count. */
+  firstFailedAt: z.number().optional(),
+  lastError: z.string().optional(),
+  /** Set when Orca stopped trying: the answer is kept, named, and no longer retried. */
+  droppedAt: z.number().optional()
 })
 export type PhotonOutboxEntry = z.infer<typeof OutboxEntry>
 
-const OutboxFile = z.object({ entries: z.array(OutboxEntry).default([]) })
+const OutboxFile = z.object({
+  entries: z.array(OutboxEntry).default([]),
+  /** Answers Orca stopped trying to send. Kept, with the reason, so the gap is nameable. */
+  dropped: z.array(OutboxEntry).default([])
+})
 type OutboxFile = z.infer<typeof OutboxFile>
 
-/** Beyond this a pending send is dropped rather than retried forever: an answer to a conversation
- *  nobody is waiting on any more is worse than a logged gap. */
-export const PHOTON_OUTBOX_MAX_ATTEMPTS = 12
+/**
+ * How long an answer is retried. **Time, not attempts**: a count is only honest if something tries
+ * often enough to reach it, and the send is retried once per health tick, so twelve attempts was
+ * roughly fifteen minutes of a dropped connection losing an answer to a console line. Six hours is a
+ * horizon a person can be asleep through and still find their answer, and it ends rather than retries
+ * forever.
+ */
+export const PHOTON_OUTBOX_HORIZON_MS = 6 * 60 * 60 * 1000
 
 export class PhotonOutbox {
   private file: OutboxFile | null = null
@@ -87,30 +100,48 @@ export class PhotonOutbox {
     })
   }
 
-  /** A send that did not land: kept with what went wrong, until it runs out of attempts. */
+  /** A send that did not land: kept with what went wrong until the retry horizon passes, then dropped
+   *  from the queue but **kept in `dropped`**, so the answer is not simply gone. Returns null when the
+   *  horizon has passed, which is what the caller reports as an undelivered answer. */
   async fail(id: string, error: string): Promise<PhotonOutboxEntry | null> {
     let kept: PhotonOutboxEntry | null = null
     await this.change((file) => {
       const entries: PhotonOutboxEntry[] = []
-      let dropped = 0
       for (const entry of file.entries) {
         if (entry.id !== id) {
           entries.push(entry)
           continue
         }
         const attempts = entry.attempts + 1
-        if (attempts >= PHOTON_OUTBOX_MAX_ATTEMPTS) {
-          console.warn('[photon] dropping an outbound message after', attempts, 'attempts:', error)
-          dropped += 1
+        const firstFailedAt = entry.firstFailedAt ?? this.now()
+        if (this.now() - firstFailedAt >= PHOTON_OUTBOX_HORIZON_MS) {
+          console.warn(
+            '[photon] giving up on an outbound message after',
+            Math.round((this.now() - firstFailedAt) / 60_000),
+            'minutes:',
+            error
+          )
+          file.dropped = [
+            ...file.dropped,
+            { ...entry, attempts, firstFailedAt, droppedAt: this.now(), lastError: error }
+          ]
           continue
         }
-        kept = { ...entry, attempts, lastError: error }
+        kept = { ...entry, attempts, firstFailedAt, lastError: error }
         entries.push(kept)
       }
       file.entries = entries
-      return dropped > 0 || entries.some((entry) => entry.id === id)
+      return true
     })
     return kept
+  }
+
+  /** The answers Orca gave up on, newest first: what a listing shows instead of a silent gap. */
+  async droppedAnswers(): Promise<PhotonOutboxEntry[]> {
+    await this.load()
+    return [...(this.file?.dropped ?? [])].sort(
+      (left, right) => (right.droppedAt ?? 0) - (left.droppedAt ?? 0)
+    )
   }
 
   /** Drops everything for a bot whose record is going away. */
@@ -140,13 +171,13 @@ export class PhotonOutbox {
       }
       console.warn('[photon] the outbox is unreadable; starting empty', parsed.error.issues)
     }
-    this.file = { entries: [] }
+    this.file = { entries: [], dropped: [] }
   }
 
   private change(mutate: (file: OutboxFile) => boolean): Promise<void> {
     const run = this.queue.then(async () => {
       await this.load()
-      const file = structuredClone(this.file ?? { entries: [] })
+      const file = structuredClone(this.file ?? { entries: [], dropped: [] })
       if (!mutate(file)) {
         return
       }

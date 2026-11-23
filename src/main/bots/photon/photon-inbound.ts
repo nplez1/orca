@@ -12,7 +12,7 @@
 // the chain means the repeat arrives after the first has been marked handled.
 import type { BotRequestPerson } from '../../../shared/bots/bot-acts-for'
 import type { PhotonCursorStore } from './photon-cursor'
-import type { PhotonInbox, PhotonInboxEntry } from './photon-inbox'
+import { PHOTON_INBOX_MAX_ATTEMPTS, type PhotonInbox, type PhotonInboxEntry } from './photon-inbox'
 import type { PhotonInboundMessage } from './photon-contract'
 import type { PhotonThreadMap } from './photon-thread-map'
 
@@ -31,6 +31,9 @@ export type PhotonInboundDeps = {
   /** Records that a sender Orca has no assignment for reached the stream, which means this computer's
    *  mirror of the provider's allowlist is stale rather than that the sender is a stranger. */
   noteUnknownSender?: (botId: string) => void | Promise<void>
+  /** Records that a message could not be delivered and was parked: what a listing shows rather than a
+   *  silent gap where an answer should have been. */
+  noteParkedMessage?: (botId: string, reason: string) => void | Promise<void>
   /** Starts a conversation the message opens; resolves the chat that will answer it. */
   startConversation: (input: {
     botId: string
@@ -59,6 +62,8 @@ export type PhotonInboundOutcome =
   | { kind: 'ignored'; messageId: string; reason: 'unknown-handle' }
   /** Recorded and deliberately held: the bot is paused, so this is replayed when it resumes. */
   | { kind: 'held'; messageId: string }
+  /** Given up on after repeated failures: kept on disk, named, and out of the way of later messages. */
+  | { kind: 'parked'; messageId: string; reason: string }
 
 /** Handles compare case-insensitively and without the separators people type in a phone number. */
 export function normalisePhotonHandle(handle: string): string {
@@ -177,7 +182,7 @@ export class PhotonInbound {
       return { kind: 'held', messageId }
     }
 
-    {
+    try {
       const known = await threads.chatIdFor(input.botId, input.message.conversationId)
       if (known) {
         await this.deps.sendToChat({
@@ -204,6 +209,28 @@ export class PhotonInbound {
       await inbox.markHandled(input.projectId, messageId)
       await this.advance(input, messageId)
       return { kind: 'ran', messageId, chatId: started.chatId, continued: false }
+    } catch (error) {
+      // A dispatch that failed is retried from the checkpoint, which is what the cursor is for. A
+      // dispatch that fails *the same way* every time — a thread whose chat was deleted or retired —
+      // is a message nothing can deliver, and replaying it forever is worse than either answering or
+      // losing it: the entry stays unhandled, so `blocked-by-unhandled` stops the cursor and every
+      // later message queues behind one that will never be dealt with. So it is parked, named, and
+      // counted, and the owner can see it instead of a bot that has quietly gone deaf.
+      const attempts = await inbox.recordAttempt(input.projectId, messageId)
+      const reason = error instanceof Error ? error.message : String(error)
+      if (attempts < PHOTON_INBOX_MAX_ATTEMPTS) {
+        throw error
+      }
+      await inbox.park(input.projectId, messageId, reason)
+      this.log(
+        '[photon] parking a message nothing can deliver after',
+        attempts,
+        'attempts:',
+        reason
+      )
+      await this.deps.noteParkedMessage?.(input.botId, reason)
+      await this.advance(input, messageId)
+      return { kind: 'parked', messageId, reason }
     }
   }
 
