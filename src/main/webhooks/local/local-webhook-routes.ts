@@ -48,6 +48,11 @@ function viewOf(deps: LocalWebhookRoutesDeps, hookId: string): WebhookView {
   if (!hook) {
     throw new Error('webhook_not_found')
   }
+  // Nothing is served while the listener is down, and a made-up port would be a URL that 404s.
+  const url = deps.listener().url(hookId)
+  if (url === null) {
+    throw new Error('webhooks_unavailable')
+  }
   const automation = deps.automations().find((entry) => entry.id === hook.automationId)
   const calls = deps.ledger.calls().filter((entry) => entry.hookId === hookId)
   const last = calls.reduce<LedgerCall | null>(
@@ -61,7 +66,8 @@ function viewOf(deps: LocalWebhookRoutesDeps, hookId: string): WebhookView {
     state: automation?.enabled === false ? 'paused' : 'live',
     epoch: hook.epoch,
     keyGeneration: 1,
-    url: deps.listener().url(hookId) ?? `http://127.0.0.1:0/hook/${hookId}`,
+    // A loopback URL's token is the whole of its auth and cannot be revealed on click like a cloud key.
+    url: `${url}/${hook.token}`,
     adapter: null,
     previousKeyExpiresAt: null,
     lastCall: last ? { at: last.occurredAt, state: callState(last), signatureValid: false } : null,
@@ -97,16 +103,27 @@ export function localWebhookUrls(
   })
 }
 
+/** A kept call's body; a body that went with its row is told as gone, so the run forgets the call. */
+async function envelopeOf(
+  deps: LocalWebhookRoutesDeps,
+  callId: string
+): Promise<ConnectorResult<WebhookEnvelope>> {
+  const envelope = await deps.store.envelope(callId)
+  return envelope ? ok(envelope) : { ok: false, status: 404, error: null, retryAfterMs: null }
+}
+
 export function localWebhookRoutes(deps: LocalWebhookRoutesDeps): WebhookCloudCalls {
   const { cloud } = deps
-  const local = (hookId: string): boolean => deps.store.hook(hookId) !== undefined
+  const local = (id: string): boolean =>
+    deps.store.hook(id) !== undefined || deps.store.call(id) !== undefined
   return {
     ...cloud,
     list: async (botId) => {
+      const listening = deps.listener().listening()
       const here = deps.store
         .hooks()
         .filter((hook) => hook.botId === botId && localHookListed(deps.automations, hook))
-        .map((hook) => viewOf(deps, hook.hookId))
+        .flatMap((hook) => (listening ? [viewOf(deps, hook.hookId)] : []))
       const remote = await cloud.list(botId)
       if (here.length === 0) {
         return remote ?? { ok: true, value: { hooks: [] } }
@@ -116,17 +133,15 @@ export function localWebhookRoutes(deps: LocalWebhookRoutesDeps): WebhookCloudCa
     get: (hookId) => (local(hookId) ? ok(viewOf(deps, hookId)) : cloud.get(hookId)),
     setState: (hookId, body) =>
       local(hookId) ? ok(viewOf(deps, hookId)) : cloud.setState(hookId, body),
-    remove: (hookId) => (local(hookId) ? ok(undefined) : (cloud.remove(hookId) ?? ok(undefined))),
+    // A cloud hook's remove is the cloud's answer, so a null one is retried rather than read as done.
+    remove: (hookId) => (local(hookId) ? ok(undefined) : cloud.remove(hookId)),
     calls: (hookId) =>
       local(hookId) ? ok({ calls: callRowsOf(deps, hookId) }) : cloud.calls(hookId),
     reveal: (hookId, body) =>
       local(hookId)
         ? ok({ key: deps.store.hook(hookId)?.token ?? '' })
         : cloud.reveal(hookId, body),
-    envelope: (callId): Promise<ConnectorResult<WebhookEnvelope>> | null => {
-      const call = deps.store.call(callId)
-      return call ? ok(call.envelope) : cloud.envelope(callId)
-    },
+    envelope: (callId) => (local(callId) ? envelopeOf(deps, callId) : cloud.envelope(callId)),
     start: (callId, runId) =>
       deps.ledger.call(callId) ? ok({ started: true as const }) : cloud.start(callId, runId),
     sample: (hookId, operationId) =>

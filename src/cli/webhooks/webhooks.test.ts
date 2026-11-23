@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { EVENT_ONLY_SCHEDULE } from '../../shared/automation-event-triggers'
 import { RuntimeClient } from '../runtime/client'
 import { AUTOMATION_HANDLERS } from '../automations/automations'
+import type { RuntimeRpcSuccess } from '../../shared/remote-runtime/rpc/runtime-rpc-envelope'
 import { WEBHOOK_HANDLERS } from './webhooks'
 
 const HOOK = 'wh_7Kx2pQ9mZbV4tL1r'
@@ -215,18 +216,15 @@ describe('orca webhooks', () => {
 
   it('prints where a hook on this computer listens, and a cloud hook’s URL nowhere', async () => {
     const { client } = host()
-    const loopback = {
-      ...summary('live'),
-      url: `http://127.0.0.1:51234/hook/${HOOK}`
-    }
-    vi.spyOn(client, 'call').mockImplementation(async () => ({
+    const loopback = { ...summary('live'), url: `http://127.0.0.1:51234/hook/${HOOK}/tok` }
+    const answerTo = <T>(result: T): RuntimeRpcSuccess<T> => ({
       id: 'request-1',
       ok: true as const,
-      result: loopback,
+      result,
       _meta: { runtimeId: 'r' }
-    }))
-    for (const json of [false, true]) {
-      const printed = await output(() =>
+    })
+    const show = (json: boolean) =>
+      output(() =>
         WEBHOOK_HANDLERS['webhooks show']!({
           client,
           cwd: '/tmp',
@@ -234,16 +232,15 @@ describe('orca webhooks', () => {
           flags: new Map([['hook', HOOK]])
         })
       )
-      expect(printed).toContain(loopback.url)
+
+    vi.spyOn(client, 'call').mockResolvedValue(answerTo(loopback))
+    for (const json of [false, true]) {
+      expect(await show(json)).toContain(loopback.url)
     }
-    const cloud = await output(() =>
-      WEBHOOK_HANDLERS['webhooks show']!({
-        client,
-        cwd: '/tmp',
-        json: true,
-        flags: new Map([['hook', HOOK]])
-      })
-    )
-    expect(cloud).not.toContain('hooks.orca.test')
+
+    vi.spyOn(client, 'call').mockResolvedValue(answerTo(summary('live')))
+    for (const json of [false, true]) {
+      expect(await show(json)).not.toContain('hooks.orca.test')
+    }
   })
 })

@@ -1443,6 +1443,8 @@
 1 src/main/warp-themes/auto-discovered-theme-files.ts
 6 src/main/warp-themes/discovery.ts
 1 src/main/warp-themes/index.ts
+1 src/main/webhooks/local/local-webhook-listener.ts # per local delivery: writeSecureFileAsync keeps only its renameSync in the fence-check turn, and the body must be on disk before the listener answers 200
+1 src/main/webhooks/local/local-webhook-store.ts # per local delivery: writeSecureFileAsync keeps only its renameSync in the fence-check turn, and the body must be on disk before the listener answers 200
 2 src/main/webhooks/webhook-call-file.ts
 1 src/main/webhooks/webhook-call-runs.ts
 3 src/main/webhooks/webhook-host-ledger.ts

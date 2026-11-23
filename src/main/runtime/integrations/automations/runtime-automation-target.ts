@@ -195,7 +195,12 @@ export function assertThreadReplies(
 export function requireCreatableAutomationBot(
   store: RuntimeStore | null,
   input: BotOwnedSettings & { bot?: AutomationBotTarget; on?: readonly AutomationEventTrigger[] },
-  webhooks: { hearing(bot: Bot): Bot }
+  webhooks: {
+    hearing(bot: Bot): Bot
+    cloudRules(
+      on: readonly AutomationEventTrigger[] | undefined
+    ): AutomationEventTrigger[] | undefined
+  }
 ): Bot | null {
   if (!input.bot) {
     return null
@@ -203,7 +208,7 @@ export function requireCreatableAutomationBot(
   const bot = requireAutomationBot(store, input.bot)
   const agent = botAutomationAgent(input.bot, bot)
   assertNoBotOwnedSettings(input, agent)
-  assertBotHearsEventTriggers(webhooks.hearing(bot), input.on)
+  assertBotHearsEventTriggers(webhooks.hearing(bot), webhooks.cloudRules(input.on))
   return bot
 }
 

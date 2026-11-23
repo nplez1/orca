@@ -10,11 +10,15 @@ import type { Bot } from '../../shared/bot-types'
 import { WEBHOOKS_NOT_CONNECTED } from './webhook-hooks'
 import type { AutomationWebhooks } from './webhook-host-service'
 
+export type AutomationWebhooksHost = AutomationWebhooks & {
+  servesLocally?: (rule: AutomationEventTrigger) => boolean
+}
+
 export class AutomationWebhookSaves {
   // Only a desktop signed in to Orca Cloud hosts the connector, so only it makes webhooks.
-  private webhooks: AutomationWebhooks | null = null
+  private webhooks: AutomationWebhooksHost | null = null
 
-  set(webhooks: AutomationWebhooks | null): void {
+  set(webhooks: AutomationWebhooksHost | null): void {
     this.webhooks = webhooks
   }
 
@@ -26,6 +30,13 @@ export class AutomationWebhookSaves {
       webhooks: this.webhooks?.advertised() ?? false,
       cloudSignedOut: this.webhooks?.signedOut() ?? false
     }
+  }
+
+  cloudRules(
+    on: readonly AutomationEventTrigger[] | undefined
+  ): AutomationEventTrigger[] | undefined {
+    const webhooks = this.webhooks
+    return on?.filter((rule) => !(webhooks?.servesLocally?.(rule) ?? false))
   }
 
   /**

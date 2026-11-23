@@ -1,8 +1,12 @@
 # Local webhooks: GitHub events on a bot with no Orca account
 
-**Status:** design, agreed 2026-11-21. Nothing built yet.
+**Status:** built 2026-11-23 (PR #453). The route works; the card, signature verification, the `orcad`
+window and the app-inbound half are deferred, each for the reason given below. What shipped and the
+anchors it costs are `LOCAL-PATCHES.md` § `local(webhooks)`.
 **Scope:** fork-only (`local(webhooks)`), never proposed upstream. The cloud path stays exactly as it is;
-this is a _second_, opt-in delivery route for the same event source.
+this is a _second_ delivery route for the same event source, chosen per save rather than by a host-wide
+switch: a webhook goes to this computer when the host has no Orca Cloud or is signed out of it, and an
+edit keeps whichever host already holds it.
 **Product framing:** a bot's GitHub card gains a second way to hear GitHub — "this computer" beside
 "Orca Cloud". It is not a new connector chip and not a new event source.
 
@@ -61,20 +65,28 @@ Three findings make this a small patch.
    setState are only used by `webhook-hooks.ts` lifecycle reconciliation. A local hook answered locally
    therefore needs no change to `webhook-call-runs.ts`.
 
-The one upstream line that has to move is the install condition: webhooks are installed only when a
-connector cloud exists (`src/main/connector-cloud/connector-host-install.ts:103`, `if (runtime
-.getConnectorCloud())`). That becomes "connector cloud **or** local webhooks configured".
+The install condition has to move: webhooks were installed only when a connector cloud exists
+(`src/main/connector-cloud/connector-host-install.ts`, `if (runtime.getConnectorCloud())`). That guard now
+owns only Composio — `setWebhooks`, both stops and the cloud host's own `start()` hoist out of it, so the
+listener exists on every host, signed in or not, and its sweep walks the bot folders either way. It is
+therefore **not** an opt-in switch: the listener runs and publishes wherever Orca NP runs, and what is
+opt-in is which host makes a given hook.
 
 ## Design
 
-Three fork-owned modules under `src/main/webhooks/local/`, plus two touches in upstream files.
+Five fork-owned modules under `src/main/webhooks/local/` — the store, the listener (with
+`local-webhook-envelope.ts` beside it), the provider, the routes it answers and the host subclass —
+plus the install hunk and a handful of one-expression touches in upstream files.
 
 ### A. `local-webhook-store.ts` — hooks and calls, on disk
 
-`<userDataPath>/local-webhooks.json`, owner-only via `writeDurableSecureJsonFile`, the same discipline as
-the ledger (`src/main/webhooks/webhook-host-ledger.ts:11-14`). Not in the ledger: that file's shape is
-the cloud's (`state: pending|live|paused`, an unconfirmed `change` retried until the cloud agrees) and
-merging local hooks into it would put fork semantics inside an upstream schema.
+`<userDataPath>/local-webhooks/local-webhooks.json`, owner-only via `writeDurableSecureJsonFile`, the same
+discipline as the ledger (`src/main/webhooks/webhook-host-ledger.ts:11-14`). Not in the ledger: that
+file's shape is the cloud's (`state: pending|live|paused`, an unconfirmed `change` retried until the cloud
+agrees) and merging local hooks into it would put fork semantics inside an upstream schema. The index
+holds hooks, one row per call and the mint intents; a call's **body is its own file** under
+`local-webhooks/calls/<callId>.json`, so a delivery writes one small file instead of rewriting everything
+this computer has kept, and a body goes when its row does.
 
 ```ts
 type LocalHook = {
@@ -117,16 +129,26 @@ Implements the five-method `AutomationWebhooks` and the two cloud calls, routing
 
 | Call                           | Local hook                                                                                          | Cloud hook |
 | ------------------------------ | --------------------------------------------------------------------------------------------------- | ---------- |
-| `advertised()`                 | `true` when the listener is on                                                                      | unchanged  |
-| `signedOut()`                  | `false` — a local hook outlives sign-out                                                            | unchanged  |
+| `advertised()`                 | `true` — the cloud's answer or this computer's listener                                             | unchanged  |
+| `signedOut()`                  | the host's real answer: sign-out is per rule now, not per host (see below)                          | unchanged  |
+| `servesLocally(rule)`          | `true` for a webhook rule whose hook is held here, and for a new one while no cloud can make it     | n/a        |
 | `settle({automationId, next})` | mint `wh_…` + token, write the store, return the rule's id `webhookRuleId(hookId)`; no operation id | delegate   |
 | `saved` / `abandoned`          | no-op (nothing remote to confirm)                                                                   | delegate   |
-| `envelope(callId)`             | the stored body, our token scrubbed from headers, truncated like the cloud's                        | delegate   |
+| `envelope(callId)`             | the stored body, our token scrubbed from headers, never cut short (the 2 MiB cap bounds it)         | delegate   |
 | `start(callId, runId)`         | `{ok:true, value:{started:true}}` — one start per callId is already guaranteed locally              | delegate   |
 | `get` / `setState` / `remove`  | local store                                                                                         | delegate   |
 
 Forking on `hookIdOfRule` keeps a host free to hold both kinds at once, which is the point: this is a
 secondary option, not a replacement.
+
+**Sign-out is per rule, not per host.** `signedOut()` used to be overridden to `false` whenever the
+listener was up, which told `AutomationWebhookSaves.hearing()` that the whole host was signed in — and a
+signed-out desktop then accepted `slack.message`, `github.*` and `linear.*` rules it could never fire. The
+override is gone: `hearing()` keeps the host's real answer, and `cloudRules()` drops the rules this
+computer serves itself before the refusal sees them. A Slack rule is refused while signed out, a local
+webhook rule is saved, and a _cloud_ webhook rule is still refused. The listing's "won't fire while signed
+out" note stays host-wide, because the CLI cannot see which hooks are local; it therefore over-warns for a
+local rule, which is the safe direction.
 
 ## Where it runs: the shared runtime, not the Electron main process
 
@@ -170,7 +192,11 @@ is theatre** — it is a requirement of this patch, not a nicety.
 
 **While nothing serves the profile, a delivery is lost**, and no amount of care in this patch fixes it:
 the run needs the runtime, and the runtime is the app. `gh webhook forward` does not replay either, so
-both ends of the pipe are down together.
+both ends of the pipe are down together. (An earlier draft said "lost only while nothing serves the
+profile", which reads as though a running app also has a window — it does not: the listener is up
+whenever the runtime is, and the replay pass closes the gap between its ack and its run. The unstable
+port was the real second gap: with the port derived from the profile it is stable, and when the fallback
+takes over the endpoint file says so.)
 
 The consequence to design for rather than hide: **the local route is a latency optimisation, not a
 correctness mechanism.** The bot already re-derives GitHub state by reading it (`gh pr checks`, the
@@ -192,7 +218,7 @@ runtime for any enabled automation or non-final run
 (`src/main/orcad/host-runtime/orcad-automations.ts:34`, probe at `orcad-managed-idle-exit.ts:86`), so an
 `orcad` user keeps the listener alive for free; only the receive→run window would need one more probe,
 and a host that never runs `orcad` has no window to protect. Recorded as an `orcad`-only follow-up
-below rather than bought now, which keeps the upstream touch count at exactly one hunk.
+below rather than bought now.
 
 ## An app on the account changes two of these gaps
 
@@ -229,7 +255,8 @@ dropping bot-authored deliveries is a precise filter rather than the body-marker
 ## Auth, honestly
 
 **For the forwarder route, chosen: the token in the URL path.** App deliveries verify `X-Hub-Signature-256`
-instead, so the two routes authenticate differently and the store records which one a rule came from.
+instead, so the two routes authenticate differently — and the store does not record which one a rule came
+from, because only the forwarder route exists; an app route would add that field.
 `gh webhook forward` takes only `--repo/--org`, `--events` and
 `--url`; its docs document no header flag, and it owns the secret it registers on the repository, so it
 neither adds our header nor lets us verify `X-Hub-Signature-256`. A path token is the only shape that
@@ -244,7 +271,11 @@ What this buys and what it does not:
   be stronger than the filesystem holding it. Do not describe this as authenticated delivery from
   GitHub; it is authenticated _to_ the listener.
 - `gh webhook forward` never replays, so a delivery is lost whenever nothing serves the profile. See
-  _Durability, corrected_ above for what that does and does not mean; the card should not imply a queue.
+  _Durability_ above for what that does and does not mean; the card should not imply a queue.
+- The URL is stable across restarts because the port is derived from the profile (`localWebhookPort`), so a
+  forwarder keeps working. If that port is held by something else the listener falls back to an ephemeral
+  one and says so (`ORCA_LOCAL_WEBHOOK_STABLE=0` in the endpoint file), and then the forwarder's URL is
+  dead until the owner re-runs it.
 - If signature verification is ever wanted: register the repository webhook yourself with a secret you
   know, and front the listener with a relay (a smee-style tunnel or a small reverse proxy) — the
   listener would then verify `X-Hub-Signature-256`. Deferred; it needs a public hop, which is the thing
@@ -289,19 +320,20 @@ scheme works. Comments have no such record, so the marker is the only signal the
 
 ## What it costs
 
-| Change                                                                                                                                            | File                                                                                                              | Sync tax  |
-| ------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | --------- |
-| Install local webhooks without a connector cloud                                                                                                  | `src/main/connector-cloud/connector-host-install.ts` (one condition, one call)                                    | 1 hunk    |
-| Replay unsettled calls on start (fork-owned module, no upstream edit)                                                                             | `src/main/webhooks/local/**`                                                                                      | 0         |
-| `webhooks` capability reaches bots from the listener                                                                                              | none — `advertised()` feeds `hearing()` (`automation-webhook-saves.ts:23`), which feeds `bot-event-sources.ts:38` | 0         |
-| The three modules + tests                                                                                                                         | `src/main/webhooks/local/**`                                                                                      | new files |
-| Card shows the local URL, "this computer" beside "Orca Cloud", and the age of the last delivery — a dead `gh webhook forward` is otherwise silent | `src/renderer/src/components/bots/**` (webhook card)                                                              | 2-3 hunks |
-| `orca webhooks show` may print a **loopback** URL (the CLI rule against printing URLs is about the cloud key)                                     | `src/cli/specs/webhooks.ts`, its handler                                                                          | 1-2 hunks |
+Built, the tree is ~2,000 lines with tests, of which ~1,000 is the five fork-owned modules. The permanent
+cost is the anchors in files upstream edits whenever it touches webhooks; the exact set is the table in
+`LOCAL-PATCHES.md` § `local(webhooks)`, and a sync that moves one is the signal to re-read this document.
+In outline:
 
-Roughly 600-900 lines with tests. The permanent cost is not the size, it is that `connector-host-install.ts`
-and the webhook card are files upstream edits when it touches webhooks; `LOCAL-PATCHES.md` §
-`local(webhooks)` must list those anchors, and a sync that moves them is the signal to re-read this
-document.
+| Change                                                                                            | File                                                   | Sync tax     |
+| ------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | ------------ |
+| Webhooks install without a connector cloud; the sweep walks both hosts' files                     | `connector-cloud/connector-host-install.ts`            | 1 hunk       |
+| A rule is refused per source, not per host                                                        | `webhooks/automation-webhook-saves.ts`, two call sites | 3 one-liners |
+| Ownership of call files spans both ledgers                                                        | `webhooks/webhook-host-ledger.ts` (`files()`)          | 2 lines      |
+| A host may answer a rule itself, and a local hook's card is its own                               | `webhooks/webhook-host-service.ts` (one optional dep)  | 1 line       |
+| A hello never lists a rule this computer serves                                                   | `connector-cloud/connector-triggers.ts` + its install  | 3 lines      |
+| `orca webhooks show` prints a **loopback** URL (the CLI rule against URLs is about the cloud key) | `cli/webhooks/webhooks.ts`, `cli/specs/webhooks.ts`    | 2 hunks      |
+| Card showing "this computer" beside "Orca Cloud" — deferred                                       | `renderer/src/components/bots/**`                      | not built    |
 
 ## Verification
 
@@ -309,10 +341,13 @@ document.
   a non-POST, an oversize body, and a 201st call in an hour; a delivery writes before it acks; body read
   after restart recovers exactly once.
 - Contract: a local call produces a run whose prompt carries the same fence and the same
-  "information, not instructions" line as a cloud call (`automation-event-prompt.test.ts` is the
-  existing proof to extend, fork-side).
-- One end-to-end: real `gh webhook forward` against a scratch repo, unsigned-in, one PR opened, one run,
-  one `.untrusted.json`, one Items row.
+  "information, not instructions" line as a cloud call. The prompt is the cloud's own code and needs no
+  test of its own for a local call: what a local call proves is that it reaches that code with a `file`
+  and a body, which `local-webhook-provider.test.ts` asserts.
+- End-to-end over real HTTP: a `curl` delivery at a scratch automation produces one call, one
+  `.untrusted.json` and one run (run once, not committed — it needs a second process to send the
+  request). `gh webhook forward` against a real repository is **not** verified: it needs the owner's
+  GitHub account.
 - Gate: `pnpm test <the new files>`, `pnpm tc:node`, then the fork PR path (`local/open-pr.mjs`).
 
 ## Deferred, deliberately

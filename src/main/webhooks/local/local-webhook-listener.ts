@@ -1,7 +1,8 @@
-// This computer's webhook endpoint: loopback only, an ephemeral port, and one route per hook whose
-// token is the whole of the auth. A call is on disk before it is answered 200.
+// This computer's webhook endpoint: loopback only, one route per hook whose token is the whole of the
+// auth, and a port derived from the profile so a forwarder's URL survives a restart. A call is on disk
+// before it is answered 200.
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
-import { rmSync } from 'node:fs'
+import { rm } from 'node:fs/promises'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { join } from 'node:path'
 import {
@@ -10,26 +11,39 @@ import {
 } from '../../../shared/agent-hook-listener/transport/endpoint-publication'
 import { WEBHOOK_RUN_CAPS } from '../../../shared/connector-webhook-contract'
 import type { WebhookEnvelope } from '../../../shared/connector-webhook-routes'
-import { writeSecureFile } from '../../../shared/secure-storage/secure-file'
+import { writeSecureFileAsync } from '../../../shared/secure-storage/secure-file-async-write'
+import { localWebhookEnvelope } from './local-webhook-envelope'
 import { LOCAL_WEBHOOK_DIR, type LocalHook } from './local-webhook-store'
 
 export const MAX_LOCAL_WEBHOOK_BODY_BYTES = 2 * 1024 * 1024
 /** A rolling hour, which is the window the contract's per-hook run cap counts in. */
 export const LOCAL_WEBHOOK_HOUR_MS = 60 * 60 * 1000
-const MAX_HEADER_VALUE_LENGTH = 1024
+const PORT_BASE = 43000
+const PORT_SPAN = 5000
 const HOOK_PATH = /^\/hook\/(wh_[A-Za-z0-9]{16})\/([^/]+)$/
-// A token is never part of the call as data, and neither is a credential the sender added for us.
-const WITHHELD_HEADERS = new Set(['authorization', 'cookie', 'proxy-authorization'])
+
+/**
+ * The port this profile listens on, so `gh webhook forward --url=…` keeps working across restarts. The
+ * instance lock means one runtime serves a profile, so the same profile cannot collide with itself; a
+ * different one would have to hash into the same slot, and the fallback covers that.
+ */
+export function localWebhookPort(userDataPath: string): number {
+  const digest = createHash('sha256').update(userDataPath).digest()
+  return PORT_BASE + (digest.readUInt16BE(0) % PORT_SPAN)
+}
 
 export type LocalWebhookCall = { hookId: string; callId: string; envelope: WebhookEnvelope }
+
+/** What the listener did with a delivery it authenticated. */
+export type LocalWebhookVerdict = 'kept' | 'over_cap' | 'failed'
 
 export type LocalWebhookListenerDeps = {
   userDataPath: string
   hook: (hookId: string) => LocalHook | undefined
   /** The calls this hook has already taken since `since`, for its hourly cap. */
   taken: (hookId: string, since: number) => number
-  /** Keeps the call durably; false when it could not be kept, and then nothing is acknowledged. */
-  deliver: (call: LocalWebhookCall) => boolean
+  /** Keeps the call durably, and re-checks the cap as it does, so concurrent senders cannot pass it. */
+  deliver: (call: LocalWebhookCall) => Promise<LocalWebhookVerdict>
   /** Every hook's complete URL, for the discovery route the endpoint file's token opens. */
   urls: () => readonly { hookId: string; url: string }[]
   now?: () => number
@@ -37,7 +51,9 @@ export type LocalWebhookListenerDeps = {
 
 export class LocalWebhookListener {
   private server: Server | null = null
+  private starting: Promise<void> | null = null
   private bound: number | null = null
+  private derived = false
   private readonly adminToken = randomBytes(32).toString('base64url')
   private readonly now: () => number
 
@@ -54,54 +70,65 @@ export class LocalWebhookListener {
     return this.bound
   }
 
-  /** The hook's URL without its token, as every webhook view names one. */
+  /** Whether it holds the port this profile names, rather than the ephemeral one it fell back to. */
+  stable(): boolean {
+    return this.bound !== null && this.derived
+  }
+
+  /** The hook's URL without its token, as every webhook view names one; null while nothing serves it. */
   url(hookId: string): string | null {
     return this.bound === null ? null : `http://127.0.0.1:${this.bound}/hook/${hookId}`
   }
 
-  async start(): Promise<void> {
+  start(): Promise<void> {
     if (this.server) {
-      return
+      return Promise.resolve()
     }
+    this.starting ??= this.listen().finally(() => {
+      this.starting = null
+    })
+    return this.starting
+  }
+
+  private async listen(): Promise<void> {
     const server = createServer((request, response) => void this.handle(request, response))
     server.headersTimeout = 10_000
     server.requestTimeout = 30_000
-    await new Promise<void>((resolve, reject) => {
-      const failed = (error: Error): void => {
-        server.off('listening', bound)
-        reject(error)
-      }
-      const bound = (): void => {
-        server.off('error', failed)
-        resolve()
-      }
-      server.once('error', failed)
-      server.once('listening', bound)
-      server.listen(0, '127.0.0.1')
-    })
-    const address = server.address()
-    if (address === null || typeof address === 'string') {
-      server.close()
-      throw new Error('local webhooks could not bind a port')
+    const wanted = localWebhookPort(this.deps.userDataPath)
+    try {
+      this.bound = await bind(server, wanted)
+      this.derived = true
+    } catch (error) {
+      // Another process holds this profile's port: take an ephemeral one rather than not listening.
+      console.warn(
+        `[webhooks] port ${wanted} is taken, so this computer's webhook URL changes on restart`,
+        error
+      )
+      this.bound = await bind(server, 0)
+      this.derived = false
     }
     this.server = server
-    this.bound = address.port
-    this.publishEndpoint()
     server.on('error', (error) => {
       console.warn('[webhooks] this computer’s local webhook listener failed', error)
     })
+    try {
+      await this.publishEndpoint()
+    } catch (error) {
+      // A delivery still has to be served: the endpoint file is discovery, not the route itself.
+      console.warn('[webhooks] could not publish where this computer listens', error)
+    }
   }
 
   stop(): void {
+    this.starting = null
     this.server?.closeAllConnections()
     this.server?.close()
     this.server = null
     this.bound = null
-    try {
-      rmSync(this.endpointPath, { force: true })
-    } catch (error) {
+    this.derived = false
+    void rm(this.endpointPath, { force: true }).catch((error: unknown) => {
       console.warn('[webhooks] could not remove the local webhook endpoint file', error)
-    }
+    })
   }
 
   private get endpointPath(): string {
@@ -109,7 +136,7 @@ export class LocalWebhookListener {
   }
 
   /** The port and the per-computer token, in the shape the agent-hook listener publishes its own. */
-  private publishEndpoint(): void {
+  private async publishEndpoint(): Promise<void> {
     if (this.bound === null) {
       return
     }
@@ -118,7 +145,9 @@ export class LocalWebhookListener {
     const values: [string, string][] = [
       ['ORCA_LOCAL_WEBHOOK_PORT', String(this.bound)],
       ['ORCA_LOCAL_WEBHOOK_TOKEN', this.adminToken],
-      ['ORCA_LOCAL_WEBHOOK_URL', `http://127.0.0.1:${this.bound}`]
+      ['ORCA_LOCAL_WEBHOOK_URL', `http://127.0.0.1:${this.bound}`],
+      // 0 means the URL changes on the next restart; see the note on localWebhookPort.
+      ['ORCA_LOCAL_WEBHOOK_STABLE', this.derived ? '1' : '0']
     ]
     for (const [key, value] of values) {
       if (!isShellSafeEndpointValue(value)) {
@@ -126,10 +155,7 @@ export class LocalWebhookListener {
       }
     }
     const lines = [...values.map(([key, value]) => `${prefix}${key}=${value}`), '']
-    const written = writeSecureFile(this.endpointPath, lines.join(separator), { ownerOnly: true })
-    if (!written) {
-      throw new Error('the local webhook endpoint file could not be made owner-only')
-    }
+    await writeSecureFileAsync(this.endpointPath, lines.join(separator))
   }
 
   private async handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
@@ -159,9 +185,7 @@ export class LocalWebhookListener {
         return
       }
       // Asked before the body is read, so a sender past its cap costs us no memory to refuse.
-      if (
-        this.deps.taken(hookId, this.now() - LOCAL_WEBHOOK_HOUR_MS) >= WEBHOOK_RUN_CAPS.hookDefault
-      ) {
+      if (this.overCap(hookId)) {
         answer(response, 429)
         return
       }
@@ -176,7 +200,14 @@ export class LocalWebhookListener {
         callId,
         envelope: localWebhookEnvelope(request, bytes, this.now(), hook.token)
       }
-      if (!this.deps.deliver(call)) {
+      // Asked again as the call is kept: reading the body is awaited, so senders that arrived together
+      // all passed the check above, and only the count at admission can hold the cap.
+      const verdict = await this.deps.deliver(call)
+      if (verdict === 'over_cap') {
+        answer(response, 429)
+        return
+      }
+      if (verdict !== 'kept') {
         answer(response, 500)
         return
       }
@@ -185,6 +216,12 @@ export class LocalWebhookListener {
       console.warn('[webhooks] a local delivery failed', error)
       answer(response, 400)
     }
+  }
+
+  private overCap(hookId: string): boolean {
+    return (
+      this.deps.taken(hookId, this.now() - LOCAL_WEBHOOK_HOUR_MS) >= WEBHOOK_RUN_CAPS.hookDefault
+    )
   }
 
   private answerState(request: IncomingMessage, response: ServerResponse): void {
@@ -197,8 +234,35 @@ export class LocalWebhookListener {
       answer(response, 401)
       return
     }
-    answer(response, 200, { ok: true, port: this.bound, hooks: this.deps.urls() })
+    answer(response, 200, {
+      ok: true,
+      port: this.bound,
+      stable: this.derived,
+      hooks: this.deps.urls()
+    })
   }
+}
+
+/** Binds the port, or rejects with the reason it could not; the port 0 case takes any free one. */
+function bind(server: Server, port: number): Promise<number> {
+  return new Promise<number>((resolve, reject) => {
+    const failed = (error: Error): void => {
+      server.off('listening', bound)
+      reject(error)
+    }
+    const bound = (): void => {
+      server.off('error', failed)
+      const address = server.address()
+      if (address === null || typeof address === 'string') {
+        reject(new Error('local webhooks could not bind a port'))
+        return
+      }
+      resolve(address.port)
+    }
+    server.once('error', failed)
+    server.once('listening', bound)
+    server.listen(port, '127.0.0.1')
+  })
 }
 
 function answer(response: ServerResponse, status: number, body?: unknown): void {
@@ -245,60 +309,4 @@ function readCappedBody(request: IncomingMessage): Promise<Buffer | null> {
 
 function newCallId(): string {
   return `call_${randomBytes(10).toString('hex')}`
-}
-
-/** What the sender posted, as the cloud would have kept it: the body by its type, headers minus ours. */
-export function localWebhookEnvelope(
-  request: IncomingMessage,
-  bytes: Buffer,
-  receivedAt: number,
-  token: string
-): WebhookEnvelope {
-  const contentType = headerOf(request, 'content-type')?.slice(0, MAX_HEADER_VALUE_LENGTH) ?? null
-  const headers: Record<string, string> = {}
-  for (const [name, value] of Object.entries(request.headers)) {
-    if (WITHHELD_HEADERS.has(name)) {
-      continue
-    }
-    const text = Array.isArray(value) ? value.join(', ') : value
-    if (text === undefined || text.includes(token)) {
-      continue
-    }
-    headers[name] = text.slice(0, MAX_HEADER_VALUE_LENGTH)
-  }
-  return {
-    receivedAt,
-    contentType,
-    headers,
-    body: localWebhookBody(contentType, bytes),
-    truncated: false
-  }
-}
-
-function headerOf(request: IncomingMessage, name: string): string | undefined {
-  const value = request.headers[name]
-  return Array.isArray(value) ? value.join(', ') : value
-}
-
-function localWebhookBody(contentType: string | null, bytes: Buffer): WebhookEnvelope['body'] {
-  const text = bytes.toString('utf8')
-  const type = contentType?.toLowerCase() ?? ''
-  if (type.includes('json')) {
-    try {
-      const value: unknown = JSON.parse(text)
-      return { kind: 'json', value }
-    } catch {
-      return { kind: 'text', value: text }
-    }
-  }
-  if (type.includes('x-www-form-urlencoded')) {
-    const value: Record<string, string | string[]> = {}
-    for (const [key, entry] of new URLSearchParams(text)) {
-      const known = value[key]
-      value[key] =
-        known === undefined ? entry : Array.isArray(known) ? [...known, entry] : [known, entry]
-    }
-    return { kind: 'form', value }
-  }
-  return { kind: 'text', value: text }
 }

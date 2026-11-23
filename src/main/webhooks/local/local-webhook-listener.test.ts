@@ -1,14 +1,17 @@
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as z from 'zod'
 import { getEndpointFileName } from '../../../shared/agent-hook-listener/transport/endpoint-publication'
 import {
   LOCAL_WEBHOOK_HOUR_MS,
   LocalWebhookListener,
   MAX_LOCAL_WEBHOOK_BODY_BYTES,
-  type LocalWebhookCall
+  localWebhookPort,
+  type LocalWebhookCall,
+  type LocalWebhookVerdict
 } from './local-webhook-listener'
 import {
   LOCAL_WEBHOOK_DIR,
@@ -19,6 +22,14 @@ import {
 
 const HOOK = 'wh_7Kx2pQ9mZbV4tL1r'
 const TOKEN = 'b'.repeat(43)
+
+const CallAnswer = z.object({ ok: z.literal(true), callId: z.string() })
+const StateAnswer = z.object({
+  ok: z.literal(true),
+  port: z.number(),
+  stable: z.boolean(),
+  hooks: z.array(z.object({ hookId: z.string(), url: z.string() }))
+})
 
 const hook = (): LocalHook => ({
   hookId: HOOK,
@@ -35,13 +46,7 @@ let listener: LocalWebhookListener
 let taken: number
 let takenSince: number[]
 let delivered: LocalWebhookCall[]
-
-const CallAnswer = z.object({ ok: z.literal(true), callId: z.string() })
-const StateAnswer = z.object({
-  ok: z.literal(true),
-  port: z.number(),
-  hooks: z.array(z.object({ hookId: z.string(), url: z.string() }))
-})
+let verdict: LocalWebhookVerdict
 
 const post = (path: string, body: string, headers: Record<string, string> = {}) =>
   fetch(`http://127.0.0.1:${listener.port() ?? 0}${path}`, { method: 'POST', body, headers })
@@ -49,10 +54,12 @@ const post = (path: string, body: string, headers: Record<string, string> = {}) 
 beforeEach(async () => {
   userDataPath = mkdtempSync(join(tmpdir(), 'orca-local-webhooks-listener-'))
   store = new LocalWebhookStore(userDataPath)
-  store.putHook(hook())
+  await store.load()
+  await store.putHook(hook())
   taken = 0
   takenSince = []
   delivered = []
+  verdict = 'kept'
   listener = new LocalWebhookListener({
     userDataPath,
     hook: (hookId) => store.hook(hookId),
@@ -60,10 +67,15 @@ beforeEach(async () => {
       takenSince.push(since)
       return taken
     },
-    deliver: (call) => {
+    deliver: async (call) => {
       delivered.push(call)
-      store.putCall({ callId: call.callId, hookId: call.hookId, envelope: call.envelope })
-      return true
+      if (verdict === 'kept') {
+        await store.putCall(
+          { callId: call.callId, hookId: call.hookId, createdAt: 10 },
+          call.envelope
+        )
+      }
+      return verdict
     },
     urls: () => [
       { hookId: HOOK, url: `http://127.0.0.1:${listener.port()}/hook/${HOOK}/${TOKEN}` }
@@ -79,8 +91,10 @@ afterEach(() => {
 })
 
 describe('this computer’s webhook listener', () => {
-  it('binds loopback on an ephemeral port and publishes where it listens', () => {
+  it('binds loopback on the port its profile names, and publishes where it listens', () => {
     expect(listener.listening()).toBe(true)
+    expect(listener.port()).toBe(localWebhookPort(userDataPath))
+    expect(listener.stable()).toBe(true)
     expect(listener.url(HOOK)).toBe(`http://127.0.0.1:${listener.port()}/hook/${HOOK}`)
     const endpoint = readFileSync(
       join(userDataPath, LOCAL_WEBHOOK_DIR, getEndpointFileName()),
@@ -88,6 +102,39 @@ describe('this computer’s webhook listener', () => {
     )
     expect(endpoint).toContain(`ORCA_LOCAL_WEBHOOK_PORT=${listener.port()}`)
     expect(endpoint).toContain('ORCA_LOCAL_WEBHOOK_TOKEN=')
+    expect(endpoint).toContain('ORCA_LOCAL_WEBHOOK_STABLE=1')
+  })
+
+  it('falls back to an ephemeral port, and says so, when its own port is taken', async () => {
+    const wanted = localWebhookPort(userDataPath)
+    // This profile's port, held by something else before this host gets to it.
+    listener.stop()
+    const squatter = createServer()
+    await new Promise<void>((resolve, reject) => {
+      squatter.once('error', reject)
+      squatter.listen(wanted, '127.0.0.1', resolve)
+    })
+    const other = new LocalWebhookListener({
+      userDataPath,
+      hook: () => hook(),
+      taken: () => 0,
+      deliver: async () => 'kept',
+      urls: () => []
+    })
+    try {
+      await other.start()
+      expect(other.listening()).toBe(true)
+      expect(other.port()).not.toBe(wanted)
+      expect(other.stable()).toBe(false)
+      const endpoint = readFileSync(
+        join(userDataPath, LOCAL_WEBHOOK_DIR, getEndpointFileName()),
+        'utf8'
+      )
+      expect(endpoint).toContain('ORCA_LOCAL_WEBHOOK_STABLE=0')
+    } finally {
+      other.stop()
+      squatter.close()
+    }
   })
 
   it('takes a delivery and answers with the call it kept', async () => {
@@ -96,10 +143,9 @@ describe('this computer’s webhook listener', () => {
     })
     expect(response.status).toBe(200)
     const answer = CallAnswer.parse(await response.json())
-    expect(answer.ok).toBe(true)
     expect(answer.callId).toMatch(/^call_[A-Za-z0-9]{20}$/)
     // Kept before the answer: the body is on disk by the time a 200 could reach the sender.
-    expect(store.call(answer.callId)?.envelope.body).toEqual({
+    expect((await store.envelope(answer.callId))?.body).toEqual({
       kind: 'json',
       value: { action: 'opened' }
     })
@@ -113,7 +159,7 @@ describe('this computer’s webhook listener', () => {
     })
     expect(response.status).toBe(200)
     const { callId } = CallAnswer.parse(await response.json())
-    const { headers } = store.call(callId)!.envelope
+    const { headers } = (await store.envelope(callId))!
     expect(JSON.stringify(headers)).not.toContain(TOKEN)
     expect(headers['authorization']).toBeUndefined()
   })
@@ -145,6 +191,13 @@ describe('this computer’s webhook listener', () => {
     expect((await post(`/hook/${HOOK}/${TOKEN}`, '{}')).status).toBe(200)
   })
 
+  it('answers 429 when the cap was passed while the body was still arriving', async () => {
+    verdict = 'over_cap'
+    expect((await post(`/hook/${HOOK}/${TOKEN}`, '{}')).status).toBe(429)
+    verdict = 'failed'
+    expect((await post(`/hook/${HOOK}/${TOKEN}`, '{}')).status).toBe(500)
+  })
+
   it('answers the discovery route only to the endpoint file’s token', async () => {
     const endpoint = readFileSync(
       join(userDataPath, LOCAL_WEBHOOK_DIR, getEndpointFileName()),
@@ -159,14 +212,16 @@ describe('this computer’s webhook listener', () => {
     expect(StateAnswer.parse(await answer.json())).toEqual({
       ok: true,
       port: listener.port(),
+      stable: true,
       hooks: [{ hookId: HOOK, url: `http://127.0.0.1:${listener.port()}/hook/${HOOK}/${TOKEN}` }]
     })
   })
 
-  it('removes its endpoint file when it stops, so nothing points at a dead port', () => {
+  it('removes its endpoint file when it stops, so nothing points at a dead port', async () => {
     const path = join(userDataPath, LOCAL_WEBHOOK_DIR, getEndpointFileName())
     listener.stop()
     expect(listener.listening()).toBe(false)
-    expect(() => readFileSync(path)).toThrow()
+    expect(listener.url(HOOK)).toBe(null)
+    await vi.waitFor(() => expect(() => readFileSync(path)).toThrow())
   })
 })

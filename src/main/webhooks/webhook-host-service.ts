@@ -61,6 +61,7 @@ export type WebhookHostServiceDeps = {
   botFolder: (botId: string) => string | null
   /** Every bot's folder on this host, for the call-file sweep. */
   botFolders: () => readonly string[]
+  ownsExtraCallFiles?: () => ReadonlySet<string>
   botExists: (botId: string) => boolean
   bot: (botId: string) => Bot | undefined
   /** The bot's "couldn't finish" notification, on this computer and paired phones; never an agent turn. */
@@ -101,7 +102,7 @@ export class WebhookHostService {
   private router: WebhookCallRunsDeps['route'] | null = null
 
   constructor(private readonly deps: WebhookHostServiceDeps) {
-    this.ledger = new WebhookHostLedger(deps.userDataPath, deps.account)
+    this.ledger = new WebhookHostLedger(deps.userDataPath, deps.account, deps.ownsExtraCallFiles)
     this.routes = deps.routes ?? webhookCloudCalls(deps.cloud)
     this.hooks = new WebhookHooks({
       ledger: this.ledger,

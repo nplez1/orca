@@ -8,7 +8,8 @@ import { connectorAccount } from './connector-token-mint'
 import { botAccessHost } from '../bots/bot-access-host'
 import { botAccessSeenFile, createBotAccessRequestWatch } from '../bots/bot-access-request-watch'
 import { notifyBotCouldNotFinish, runtimeBotOwnerNotice } from '../bots/bot-could-not-finish'
-import { LocalWebhookHostService, LocalWebhooks } from '../webhooks/local/local-webhook-provider'
+import { LocalWebhooks } from '../webhooks/local/local-webhook-provider'
+import { LocalWebhookHostService } from '../webhooks/local/local-webhook-host'
 import { installComposioUpkeep } from '../runtime/rpc/methods/bots-composio-upkeep'
 import { refreshDueLinearLogins } from '../linear/accounts/linear-login-refresh'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
@@ -60,6 +61,11 @@ export function installConnectorHost({
     // Bot homes live under this host's ~/.orca/bots; a remote path is never written as a local one.
     return folder && !folder.connectionId ? folder.folderPath : null
   }
+  const botFolders = () =>
+    store.getBots().flatMap((bot) => {
+      const folder = botFolder(bot.id)
+      return folder ? [folder] : []
+    })
   const localWebhooks = new LocalWebhooks({
     userDataPath,
     cloud: () => runtime.getConnectorCloud(),
@@ -86,19 +92,15 @@ export function installConnectorHost({
       }
     },
     botFolder,
-    botFolders: () =>
-      store.getBots().flatMap((bot) => {
-        const folder = botFolder(bot.id)
-        return folder ? [folder] : []
-      }),
+    botFolders,
+    ownsExtraCallFiles: () => localWebhooks.callFiles(),
     botExists: (botId) => store.getBots().some((entry) => entry.id === botId),
     bot: (botId) => store.getBots().find((entry) => entry.id === botId),
     notifyOwner: (bot, automation, notice) =>
       notifyBotCouldNotFinish(runtimeBotOwnerNotice(runtime), bot, automation, notice),
     runForEvent: (automationId, event, gate) =>
       runtime.runAutomationForEvent(automationId, event, gate),
-    local: localWebhooks,
-    routes: localWebhooks.routes
+    local: localWebhooks
   })
   runtime.setConnectorCloud(
     createConnectorCloud({
@@ -118,6 +120,7 @@ export function installConnectorHost({
       runtime.onClientEvent(listener, { consumesTerminalSideEffects: false }),
     onBotsWritten: (listener) => runtime.onBotsWritten(listener)
   })
+  void webhooks.start()
   if (runtime.getConnectorCloud()) {
     const composio = installComposioUpkeep(runtime, webhooks)
     stops.push(() => composio.stop())
@@ -134,7 +137,6 @@ export function installConnectorHost({
       { consumesTerminalSideEffects: false }
     )
     runtime.onBotsWritten(() => webhooks.changed())
-    void webhooks.start()
   }
   // Once the account's orgs are known, people saved before orgs had rows go in each of them.
   gitHubInstallations.onChange(() => {

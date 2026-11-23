@@ -73,6 +73,24 @@ describe('connector triggers', () => {
     expect(rule).not.toHaveProperty('names')
   })
 
+  it('never sends the cloud a rule whose hook this computer serves itself', () => {
+    const local = 'wh_7Kx2pQ9mZbV4tL1r'
+    const remote = 'wh_7Kx2pQ9mZbV4tL1s'
+    const rules = connectorTriggers(
+      [
+        automation({
+          on: [
+            { id: webhookRuleId(local), source: 'webhook', event: 'call', rev: 1 },
+            { id: webhookRuleId(remote), source: 'webhook', event: 'call', rev: 1 }
+          ]
+        })
+      ],
+      () => false,
+      (trigger) => trigger.id === webhookRuleId(local)
+    )
+    expect(rules.map((rule) => rule.id)).toEqual([webhookRuleId(remote)])
+  })
+
   it('marks the rules of an automation that answers in the thread', () => {
     const [rule] = connectorTriggers([
       automation({ bot: { botId: 'bot-1', runsIn: 'new', resultsTo: 'thread' } })

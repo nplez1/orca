@@ -12,22 +12,27 @@ import {
 } from '../../../shared/automation-event-triggers'
 import type { Automation } from '../../../shared/automations/automation-definition'
 import type { AutomationRun } from '../../../shared/automations/history/automation-run'
-import type { ConnectorDelivery } from '../../../shared/connectors/connector-cloud-contract'
 import {
   hookIdOfRule,
-  webhookActorId,
-  webhookRuleId,
-  type WebhookFilters
+  WEBHOOK_RUN_CAPS,
+  webhookRuleId
 } from '../../../shared/connector-webhook-contract'
 import type { EventStartGate } from '../../automations/automation-trigger-runs'
 import { WebhookCallRuns } from '../webhook-call-runs'
 import { webhookCloudCalls, type WebhookCloudCalls } from '../webhook-cloud-routes'
-import { WEBHOOK_LEDGER_RETENTION_MS, WebhookHostLedger } from '../webhook-host-ledger'
-import { WebhookHostService, type WebhookHostServiceDeps } from '../webhook-host-service'
+import { WebhookHostLedger } from '../webhook-host-ledger'
+import type { WebhookHostServiceDeps } from '../webhook-host-service'
 import { WebhookRecoverySweep } from '../webhook-recovery-sweep'
-import { LocalWebhookListener, type LocalWebhookCall } from './local-webhook-listener'
+import {
+  LOCAL_WEBHOOK_HOUR_MS,
+  LocalWebhookListener,
+  type LocalWebhookCall,
+  type LocalWebhookVerdict
+} from './local-webhook-listener'
+import { deliveryOf, filtersOf, eventOf } from './local-webhook-delivery'
 import { localHookListed, localWebhookRoutes, localWebhookUrls } from './local-webhook-routes'
 import {
+  LOCAL_MINT_GRACE_MS,
   LOCAL_WEBHOOK_DIR,
   LOCAL_WEBHOOK_EPOCH,
   LocalWebhookStore,
@@ -35,9 +40,7 @@ import {
 } from './local-webhook-store'
 
 /** Local hooks are not the cloud's, so their calls are not either: their own ledger, in their own file. */
-const LOCAL_LEDGER_ACCOUNT = 'local'
-
-type TriggerDelivery = Extract<ConnectorDelivery, { kind: 'trigger' }>
+export const LOCAL_LEDGER_ACCOUNT = 'local'
 
 export type LocalWebhookSettleInput = {
   automationId: string
@@ -66,9 +69,6 @@ export type LocalWebhooksDeps = {
   now?: () => number
 }
 
-const filtersOf = ({ where, textContains, pick, subjectFrom, subject }: WebhookFilters): string =>
-  JSON.stringify([where ?? [], textContains ?? '', pick ?? [], subjectFrom ?? '', subject ?? ''])
-
 function hookOfRule(rule: AutomationWebhookTrigger | undefined): string | null {
   return rule ? hookIdOfRule(rule.id) : null
 }
@@ -81,6 +81,8 @@ export class LocalWebhooks {
   private readonly sweep: WebhookRecoverySweep
   private readonly listener: LocalWebhookListener
   private readonly now: () => number
+  /** Calls past the cap check but not yet in the ledger, per hook; the check and this move together. */
+  private readonly admitting = new Map<string, number>()
 
   constructor(private readonly deps: LocalWebhooksDeps) {
     this.now = deps.now ?? Date.now
@@ -89,6 +91,16 @@ export class LocalWebhooks {
       return LOCAL_LEDGER_ACCOUNT
     })
     this.cloudRoutes = webhookCloudCalls(deps.cloud)
+    this.store.load().catch((error: unknown) => {
+      console.warn('[webhooks] could not read this computer’s local webhooks', error)
+    })
+    this.routes = localWebhookRoutes({
+      cloud: this.cloudRoutes,
+      store: this.store,
+      ledger: this.ledger,
+      automations: deps.automations.list,
+      listener: () => this.listener
+    })
     this.runs = new WebhookCallRuns({
       ledger: this.ledger,
       cloud: this.routes,
@@ -106,20 +118,25 @@ export class LocalWebhooks {
     this.listener = new LocalWebhookListener({
       userDataPath: deps.userDataPath,
       hook: (hookId) => this.store.hook(hookId),
-      taken: (hookId, since) =>
-        this.ledger.calls().filter((call) => call.hookId === hookId && call.occurredAt >= since)
-          .length,
+      taken: (hookId, since) => this.taken(hookId, since),
       deliver: (call) => this.deliver(call),
       urls: () => localWebhookUrls({ store: this.store, listener: () => this.listener }),
       now: deps.now
     })
   }
 
+  /**
+   * Replay comes first and does not wait on the socket: offering every unsettled call again is what
+   * makes a call kept before its ack survive a restart, and a port that will not bind must not hide it.
+   */
   async start(): Promise<void> {
-    await this.listener.start()
+    await this.store.load()
     this.runs.resume()
-    this.changed()
-    await this.sweep.start()
+    await this.changed()
+    void this.sweep.start()
+    await this.listener.start().catch((error: unknown) => {
+      console.warn('[webhooks] this computer’s local webhook listener did not start', error)
+    })
   }
 
   stop(): void {
@@ -129,13 +146,18 @@ export class LocalWebhooks {
   }
 
   /** An automation, a bot or a hook changed: drop what nothing lists any more, then let the sweep follow. */
-  changed(): void {
+  async changed(): Promise<void> {
+    await this.store.load()
+    const now = this.now()
     for (const hook of this.store.hooks()) {
-      if (!localHookListed(this.deps.automations.list, hook)) {
-        this.dropHook(hook.hookId)
+      if (localHookListed(this.deps.automations.list, hook)) {
+        await this.store.dropIntent(hook.hookId)
+      } else if (!this.pending(hook, now)) {
+        // Not listed and not waiting on a save: nothing will ever name it.
+        await this.dropHook(hook.hookId)
       }
     }
-    this.store.prune(() => true, new Set(this.ledger.calls().map((call) => call.callId)))
+    await this.store.prune(() => true, new Set(this.ledger.calls().map((call) => call.callId)))
     this.sweep.arm()
   }
 
@@ -144,27 +166,22 @@ export class LocalWebhooks {
     onClientEvent: (listener: (event: { type: string }) => void) => void
     onBotsWritten: (listener: () => void) => void
   }): void {
+    const changed = (): void => {
+      this.changed().catch((error: unknown) =>
+        console.warn('[webhooks] could not bring this computer’s webhooks up to date', error)
+      )
+    }
     events.onClientEvent((event) => {
       if (event.type === 'automationsChanged' || event.type === 'reposChanged') {
-        this.changed()
+        changed()
       }
     })
-    events.onBotsWritten(() => this.changed())
-    this.start().catch((error: unknown) => {
-      console.warn('[webhooks] this computer’s local webhook listener did not start', error)
-    })
+    events.onBotsWritten(changed)
+    void this.start()
   }
 
   /** The routes a `WebhookHostService` asks, answered here for a local hook and by the cloud otherwise. */
-  get routes(): WebhookCloudCalls {
-    return localWebhookRoutes({
-      cloud: this.cloudRoutes,
-      store: this.store,
-      ledger: this.ledger,
-      automations: this.deps.automations.list,
-      listener: () => this.listener
-    })
-  }
+  readonly routes: WebhookCloudCalls
 
   /** Whether a new webhook goes here rather than to Orca Cloud: no account, or signed out of it. */
   private cloudMakesHooks(): boolean {
@@ -172,26 +189,45 @@ export class LocalWebhooks {
     return cloud !== null && cloud.status?.() !== 'signed-out'
   }
 
+  /** Whether this computer answers the rule itself, whether or not its hook has been made yet. */
+  servesLocally(rule: { source: string; id?: string }): boolean {
+    if (rule.source !== 'webhook') {
+      return false
+    }
+    const hookId = rule.id ? hookIdOfRule(rule.id) : null
+    return hookId ? this.store.hook(hookId) !== undefined : !this.cloudMakesHooks()
+  }
+
+  holdsLocally(hookId: string): boolean {
+    return this.store.hook(hookId) !== undefined
+  }
+
+  /** This host's hook tokens, for the one route that shows a URL to its owner. */
+  keyOf(hookId: string): string | undefined {
+    return this.store.hook(hookId)?.token
+  }
+
+  /** The call files this computer's ledger owns, so Orca Cloud's sweep leaves them. */
+  callFiles(): ReadonlySet<string> {
+    return this.ledger.files()
+  }
+
   advertised(fromHost: () => boolean): boolean {
-    return this.deps.cloud() ? fromHost() : this.listener.listening()
+    return this.listener.listening() || fromHost()
   }
 
-  /** A local hook outlives sign-out, so this host is not signed out of the route its hooks use. */
-  signedOut(fromHost: () => boolean): boolean {
-    return this.listener.listening() ? false : fromHost()
-  }
-
-  settle(
+  async settle(
     input: LocalWebhookSettleInput,
     fromHost: (input: LocalWebhookSettleInput) => Promise<LocalWebhookSettleResult>
   ): Promise<LocalWebhookSettleResult> {
+    await this.store.load()
     const kept = hookOfRule(input.current ? automationWebhookTrigger(input.current) : undefined)
-    const here = kept ? this.store.hook(kept) !== undefined : !this.cloudMakesHooks()
-    return here ? Promise.resolve(this.settleLocally(input)) : fromHost(input)
+    const here = kept ? this.holdsLocally(kept) : !this.cloudMakesHooks()
+    return here ? this.settleLocally(input) : fromHost(input)
   }
 
   /** Mints the hook and the rule that names it; no operation id, because there is nothing remote to confirm. */
-  private settleLocally(input: LocalWebhookSettleInput): LocalWebhookSettleResult {
+  private async settleLocally(input: LocalWebhookSettleInput): Promise<LocalWebhookSettleResult> {
     const wanted = input.next.find(isWebhookTrigger)
     if (!wanted) {
       return { on: [...input.next] }
@@ -207,108 +243,102 @@ export class LocalWebhooks {
       const rev = filtersOf(wanted) === filtersOf(kept) ? kept.rev : kept.rev + 1
       return { on: [...others, { ...wanted, id: kept.id, rev }] }
     }
-    const hook =
-      this.store.hooks().find((entry) => entry.automationId === input.automationId) ??
-      this.mint(input.automationId, input.botId)
+    // Only a mint that has not been saved yet is reused: a token nothing lists is not this save's.
+    const minted = this.store
+      .intents()
+      .find((intent) => intent.automationId === input.automationId)?.hookId
+    const hook = (minted ? this.store.hook(minted) : undefined) ?? (await this.mint(input))
     return { on: [...others, { ...wanted, id: webhookRuleId(hook.hookId), rev: 1 }] }
   }
 
-  private mint(automationId: string, botId: string): LocalHook {
+  private async mint(input: LocalWebhookSettleInput): Promise<LocalHook> {
     const hook: LocalHook = {
       hookId: `wh_${randomBytes(8).toString('hex')}`,
       token: randomBytes(32).toString('base64url'),
-      automationId,
-      botId,
+      automationId: input.automationId,
+      botId: input.botId,
       epoch: LOCAL_WEBHOOK_EPOCH,
       created: this.now()
     }
-    this.store.putHook(hook)
+    await this.store.putHook(hook)
+    await this.store.saveIntent({
+      automationId: input.automationId,
+      hookId: hook.hookId,
+      createdAt: hook.created
+    })
     // The ledger's hook row is what lets its first real call say so, and what a pause would name.
     this.ledger.saveHook({
       hookId: hook.hookId,
-      automationId,
-      botId,
+      automationId: hook.automationId,
+      botId: hook.botId,
       epoch: hook.epoch,
       state: 'live'
     })
     return hook
   }
 
-  private deliver(call: LocalWebhookCall): boolean {
+  /** A hook minted for an automation whose save has not landed; the cloud's intents have the same grace. */
+  private pending(hook: LocalHook, now: number): boolean {
+    const intent = this.store.intents().find((entry) => entry.hookId === hook.hookId)
+    if (!intent) {
+      return false
+    }
+    if (now - intent.createdAt > LOCAL_MINT_GRACE_MS) {
+      this.store.dropIntent(hook.hookId)
+      return false
+    }
+    return true
+  }
+
+  private taken(hookId: string, since: number): number {
+    const kept = this.ledger
+      .calls()
+      .filter((call) => call.hookId === hookId && call.occurredAt >= since).length
+    return kept + (this.admitting.get(hookId) ?? 0)
+  }
+
+  private admit(hookId: string, change: 1 | -1): void {
+    const next = (this.admitting.get(hookId) ?? 0) + change
+    if (next > 0) {
+      this.admitting.set(hookId, next)
+    } else {
+      this.admitting.delete(hookId)
+    }
+  }
+
+  private async deliver(call: LocalWebhookCall): Promise<LocalWebhookVerdict> {
     const hook = this.store.hook(call.hookId)
     if (!hook) {
-      return false
+      return 'failed'
     }
+    // Asked again here, and reserved in the same breath: reading the body was awaited, so senders that
+    // arrived together all passed the listener's check, and only a synchronous check-then-count holds.
+    const since = call.envelope.receivedAt - LOCAL_WEBHOOK_HOUR_MS
+    if (this.taken(call.hookId, since) >= WEBHOOK_RUN_CAPS.hookDefault) {
+      return 'over_cap'
+    }
+    this.admit(call.hookId, 1)
     try {
-      this.store.putCall({ callId: call.callId, hookId: call.hookId, envelope: call.envelope })
+      await this.store.putCall(
+        { callId: call.callId, hookId: call.hookId, createdAt: call.envelope.receivedAt },
+        call.envelope
+      )
       if (!this.runs.receive(deliveryOf(hook, call), eventOf(hook, call))) {
-        this.store.dropCall(call.callId)
-        return false
+        await this.store.dropCall(call.callId)
+        return 'failed'
       }
       this.sweep.arm()
-      return true
+      return 'kept'
     } catch (error) {
       console.warn('[webhooks] could not keep a local call', error)
-      return false
+      return 'failed'
+    } finally {
+      this.admit(call.hookId, -1)
     }
   }
 
-  private dropHook(hookId: string): void {
-    this.store.dropHook(hookId)
-    for (const call of this.ledger.calls().filter((entry) => entry.hookId === hookId)) {
-      this.ledger.forget(call.callId)
-    }
-  }
-}
-
-/** The host a local route needs: the cloud's answers stay its own, and only a webhook save is routed. */
-export type LocalWebhookHostDeps = WebhookHostServiceDeps & { local: LocalWebhooks }
-
-export class LocalWebhookHostService extends WebhookHostService {
-  private readonly local: LocalWebhooks
-
-  constructor({ local, ...deps }: LocalWebhookHostDeps) {
-    super(deps)
-    this.local = local
-  }
-
-  override advertised(): boolean {
-    return this.local.advertised(() => super.advertised())
-  }
-
-  override signedOut(): boolean {
-    return this.local.signedOut(() => super.signedOut())
-  }
-
-  override settle(input: LocalWebhookSettleInput): Promise<LocalWebhookSettleResult> {
-    return this.local.settle(input, (value) => super.settle(value))
-  }
-}
-
-function deliveryOf(hook: LocalHook, call: LocalWebhookCall): TriggerDelivery {
-  return {
-    kind: 'trigger',
-    deliveryId: call.callId,
-    expiresAt: call.envelope.receivedAt + WEBHOOK_LEDGER_RETENTION_MS,
-    conversation: { source: 'webhook', externalId: hook.hookId },
-    automationId: hook.automationId,
-    triggerId: webhookRuleId(hook.hookId),
-    botId: hook.botId,
-    event: {
-      key: call.callId,
-      actorId: webhookActorId(hook.hookId),
-      occurredAt: call.envelope.receivedAt,
-      webhook: { callId: call.callId, epoch: hook.epoch }
-    }
-  }
-}
-
-function eventOf(hook: LocalHook, call: LocalWebhookCall): AutomationRunEvent {
-  return {
-    triggerId: webhookRuleId(hook.hookId),
-    source: 'webhook',
-    event: 'call',
-    key: call.callId,
-    occurredAt: call.envelope.receivedAt
+  private async dropHook(hookId: string): Promise<void> {
+    await this.store.dropHook(hookId)
+    this.ledger.dropHook(hookId)
   }
 }
