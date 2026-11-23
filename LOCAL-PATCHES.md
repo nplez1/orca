@@ -5331,9 +5331,10 @@ a delivery enters through `WebhookHostService.receive`, and at run time the clou
 things (`envelope`, `start`, `webhook-call-runs.ts:175,264`). A hook answered locally therefore needs no
 change to the run path at all.
 
-**The anchors.** Sixteen sites across eleven files upstream owns, plus one ratchet baseline; each is a
+**The anchors.** Sixteen sites across twelve files upstream owns, plus one ratchet baseline; each is a
 line or two, and the reason each exists is this file. `connector-host-install.ts` is three hunks, not one
-— the review of R1 was right about that.
+— the review of R1 was right about that. `src/shared/rpc-contract/webhooks-params.ts` is the one under
+`src/shared/`, so any sync that moves it is a global input and needs the full unit gate.
 
 | File                                                                         | Anchor                                             | Change                                                                                                       |
 | ---------------------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
