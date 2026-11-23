@@ -41,10 +41,15 @@ describe('assertAppBoundPushUrl', () => {
     await expect(
       assertAppBoundPushUrl('/repo', 'origin', { env: appEnv() })
     ).resolves.toBeUndefined()
-    expect(gitExecFileAsyncMock).toHaveBeenCalledWith(
-      ['remote', 'get-url', '--push', 'origin'],
-      expect.objectContaining({ cwd: '/repo', env: appEnv() })
-    )
+  })
+
+  it('refuses when a second push URL is not the App’s, which a first-only read would miss', async () => {
+    gitExecFileAsyncMock.mockResolvedValueOnce({
+      stdout: 'https://github.com/nplez1/orca.git\ngh-work:nplez1/orca.git\n',
+      stderr: ''
+    })
+    const message = await refusal(assertAppBoundPushUrl('/repo', 'origin', { env: appEnv() }))
+    expect(message).toContain('gh-work:nplez1/orca.git')
   })
 
   it('refuses a push URL the App’s rewrite never reached, so it cannot act as the user', async () => {

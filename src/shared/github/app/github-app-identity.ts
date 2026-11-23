@@ -91,7 +91,11 @@ export function githubRepoOwner(repoFullName: string | null | undefined): string
 export function githubRepoFullNameFromCredentialPath(
   path: string | null | undefined
 ): string | null {
-  const trimmed = path?.trim().replace(/^\/+|\/+$/g, '') ?? ''
+  // git-lfs appends `/info/lfs` to the same repository's path, and that is still that repository.
+  const trimmed = (path?.trim().replace(/^\/+|\/+$/g, '') ?? '').replace(
+    /\/info\/lfs(?:\/.*)?$/i,
+    ''
+  )
   const name = trimmed.toLowerCase().endsWith('.git') ? trimmed.slice(0, -'.git'.length) : trimmed
   const [owner, repo, ...rest] = name.split('/')
   return owner && repo && rest.length === 0 ? `${owner}/${repo}`.toLowerCase() : null

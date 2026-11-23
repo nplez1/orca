@@ -23,15 +23,20 @@ export async function assertAppBoundPushUrl(
   if (!options.env?.[APP_BOUND_GIT_ENV_MARKER]) {
     return
   }
+  // Every push URL git will send to: a second `pushurl` is a second identity, and it is not the App's.
   const { stdout } = await gitExecFileAsync(
-    ['remote', 'get-url', '--push', remote],
+    ['remote', 'get-url', '--push', '--all', remote],
     gitOptionsForWorktree(worktreePath, options)
   )
-  const url = stdout.trim()
-  if (url.startsWith(`https://${GITHUB_APP_HOST}/`)) {
+  const urls = stdout
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+  const offending = urls.find((url) => !url.startsWith(`https://${GITHUB_APP_HOST}/`))
+  if (!offending) {
     return
   }
   throw new Error(
-    `This project pushes as its GitHub App, but “${remote}” resolves to ${withoutCredentials(url) || 'no URL'}, so this push would act as your own GitHub login instead. Point “${remote}” at an https://${GITHUB_APP_HOST}/ URL, remove a user-level pushInsteadOf for it, or clear this project’s GitHub account.`
+    `This project pushes as its GitHub App, but “${remote}” resolves to ${withoutCredentials(offending) || 'no URL'}, so this push would act as your own GitHub login instead. Point “${remote}” at an https://${GITHUB_APP_HOST}/ URL, remove a user-level pushInsteadOf for it, or clear this project’s GitHub account.`
   )
 }
