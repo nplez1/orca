@@ -12,6 +12,7 @@ import { ComposioKeyControl } from '@/components/bots/composio/ComposioKeyContro
 import { useComposioEventsHolder } from '@/components/bots/composio/composio-key-client'
 import { selectExecutionHostDisplayLabel } from '@/runtime/hosts/display/execution-host-display-label'
 import { GitHubAccountSettings } from '@/components/bots/github/GitHubAccountSettings'
+import { GitHubAppSettings } from '@/components/bots/github/GitHubAppSettings'
 import { GoogleAccountSettings } from '@/components/bots/google/GoogleAccountSettings'
 import { useGoogleHost } from '@/components/bots/google/google-connect-client'
 import { LinearAccountSettings } from '@/components/bots/linear/LinearAccountSettings'
@@ -285,6 +286,7 @@ function LiveServerGroup({ computer }: { computer: BotSettingsComputer }): React
       <ServerEnableRow hostId={computer.hostId} host={host} />
       <ComputerBots computer={computer} />
       <ComputerConnectors computer={computer} />
+      <GitHubAppSettings hostId={computer.hostId} hostName={host} />
       <GoogleAccountSettings target={botHostTarget(computer.hostId)} />
       <ComposioKeySection
         computer={computer}
@@ -342,6 +344,7 @@ function LocalGroup({ computer }: { computer: BotSettingsComputer }): React.JSX.
     <SettingsGroup icon={Laptop} title={computer.name} detail={email}>
       <ComputerBots computer={computer} />
       <ComputerConnectors computer={computer} />
+      <GitHubAppSettings hostId={computer.hostId} hostName={null} />
       <GoogleAccountSettings target={botHostTarget(computer.hostId)} />
       <ComposioKeySection
         computer={computer}

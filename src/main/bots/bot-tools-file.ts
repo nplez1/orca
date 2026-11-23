@@ -15,6 +15,11 @@ import type { Bot } from '../../shared/bot-types'
 import { folderWorkspaceKey } from '../../shared/workspace/identity/workspace-scope'
 import { BotLaunchTools } from './bot-launch-tools'
 import {
+  botGithubAppLaunch,
+  githubRepoFullNameOfLaunch,
+  type LaunchRepo
+} from './bot-gh-app-identity'
+import {
   advanceBotToolsEpoch,
   botToolsEpoch,
   botToolsRevision,
@@ -84,7 +89,6 @@ async function readRawSnapshot(folder: string): Promise<BotToolsSnapshot> {
     text,
     file: parsed.data,
     servers,
-    // A header-only edit keeps the file and its credential id, so the saved values count too.
     version: createHash('sha256')
       .update(text ?? '')
       .update(botToolCredentialsFingerprint(folder, credentialsOf(servers)))
@@ -131,7 +135,6 @@ function writeServers(
     const { headers, credential, ...rest } = server
     const signIn = credential ? readBotToolOAuth(folder, credential) : null
     if (signIn && signIn.url !== server.url) {
-      // A new address is another app to sign in to: the old sign-in goes, and a new one starts out.
       const id = newBotToolCredentialId()
       signIns.set(id, server.url)
       return { ...unknown, ...rest, credential: id }
@@ -241,7 +244,6 @@ export function changeBotToolServers(
   })
 }
 
-/** The revision a launch would read now; concurrent asks for one folder share a read. */
 const revisionReads = new Map<string, Promise<string>>()
 export function currentBotToolsRevision(folder: string): Promise<string> {
   const running = revisionReads.get(folder)
@@ -284,7 +286,8 @@ export async function botSessionToolServers(
   bots: readonly Pick<Bot, 'id' | 'name' | 'folderWorkspaceId'>[],
   record: { provider: string; location: { workspaceId: string } },
   launchDirectory: string,
-  relay: Pick<BotToolRelay, 'grant'> = botToolRelay
+  relay: Pick<BotToolRelay, 'grant'> = botToolRelay,
+  repos: readonly LaunchRepo[] = []
 ): Promise<{ tools: BotLaunchTools; launched: BotLaunchedTools | null }> {
   const bot = bots.find(
     (entry) => folderWorkspaceKey(entry.folderWorkspaceId) === record.location.workspaceId
@@ -295,16 +298,26 @@ export async function botSessionToolServers(
   // Read before the file: a write in between makes this launch look stale, never current.
   const epoch = botToolsEpoch(launchDirectory)
   const snapshot = await readBotToolsSnapshot(launchDirectory)
+  const app = await botGithubAppLaunch({
+    repoFullName: githubRepoFullNameOfLaunch(repos, launchDirectory)
+  })
   return {
-    tools: await BotLaunchTools.for(
-      relay,
-      { botId: bot.id, name: bot.name, folder: launchDirectory, agent: record.provider },
-      snapshot.servers
-    ),
+    tools: (
+      await BotLaunchTools.for(
+        relay,
+        { botId: bot.id, name: bot.name, folder: launchDirectory, agent: record.provider },
+        snapshot.servers
+      )
+    ).withGithubAppEnv(app.env),
     launched: {
       folder: launchDirectory,
       revision: botToolsRevision(snapshot.version, epoch),
-      epoch
+      epoch,
+      appIdentity: {
+        epoch: app.epoch,
+        installationId: app.installationId,
+        expiresAtMs: app.expiresAtMs
+      }
     }
   }
 }

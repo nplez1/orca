@@ -10,7 +10,7 @@ const LOOPBACK_HOSTS = ['127.0.0.1', 'localhost', '::1']
 
 /** A bot's servers ready for its CLI; only `BotLaunchTools.for` makes one, so no saved value slips through. */
 export class BotLaunchTools {
-  static readonly none = new BotLaunchTools([], {}, {}, false)
+  static readonly none = new BotLaunchTools([], {}, {}, false, false)
   // A private member makes the type nominal: a plain object with the same fields isn't one.
   declare private readonly nominal: true
 
@@ -21,7 +21,8 @@ export class BotLaunchTools {
     /** Added to the environment of the commands the CLI runs, not the CLI's own. */
     readonly commandEnv: Readonly<Record<string, string>>,
     /** Some tool goes through the relay, so the CLI must reach loopback directly. */
-    readonly relayed: boolean
+    readonly relayed: boolean,
+    private readonly commandsOnly: boolean
   ) {}
 
   /**
@@ -60,8 +61,30 @@ export class BotLaunchTools {
       }),
       commandsOnly ? shimEnv : { ...tokenEnv, ...shimEnv },
       commandsOnly ? tokenEnv : {},
-      servers.some((server) => 'url' in server && server.credential)
+      servers.some((server) => 'url' in server && server.credential),
+      commandsOnly
     )
+  }
+
+  withGithubAppEnv(appEnv: Readonly<Record<string, string>>): BotLaunchTools {
+    if (Object.keys(appEnv).length === 0) {
+      return this
+    }
+    return this.commandsOnly
+      ? new BotLaunchTools(
+          this.servers,
+          this.env,
+          { ...this.commandEnv, ...appEnv },
+          this.relayed,
+          true
+        )
+      : new BotLaunchTools(
+          this.servers,
+          { ...this.env, ...appEnv },
+          this.commandEnv,
+          this.relayed,
+          false
+        )
   }
 }
 
