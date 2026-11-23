@@ -1,8 +1,9 @@
 // This computer's webhooks, in a file of the fork's own: Orca Cloud's ledger holds the cloud's hooks
 // and the changes it has yet to confirm, and a local hook has neither, so it lives beside it rather
 // than inside a schema the cloud owns. A call's body is its own file, so a delivery touches one small
-// file instead of rewriting everything this computer has kept. Every write is off the thread: this runs
-// in the main process, on a loopback request's own path.
+// file instead of rewriting everything this computer has kept. Every change goes through one queue, so
+// two overlapping writes cannot each clone the same state and lose the other's. The writes are awaited
+// off the main thread on POSIX; on win32 writeSecureFileAsync is synchronous throughout (see `write`).
 import { readFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { z } from 'zod'
@@ -60,9 +61,13 @@ type StoredStore = z.infer<typeof StoredStore>
 
 const emptyStore = (): StoredStore => ({ hooks: [], calls: [], intents: [] })
 
+/** A queued change: what it worked out, and whether the index has to be written for it. */
+type Change<T> = { changed: boolean; value: T }
+
 export class LocalWebhookStore {
   private stored: StoredStore | null = null
   private loading: Promise<void> | null = null
+  private queue: Promise<void> = Promise.resolve()
 
   constructor(private readonly userDataPath: string) {}
 
@@ -105,17 +110,33 @@ export class LocalWebhookStore {
   }
 
   /**
-   * On disk before it is in memory, and before the caller answers: a hook or a call exists only once it
-   * survives a crash, which is what lets the listener answer 200 for a call it has already kept.
+   * One change at a time, each over the state the one before it left: two overlapping writes would
+   * otherwise clone the same index and the last to finish would silently drop the other's row — a call
+   * whose 200 was already sent, or a hook a change event had just dropped coming back to life.
    */
-  private async commit(change: (store: StoredStore) => void): Promise<void> {
-    const next = structuredClone(await this.index())
-    change(next)
-    await this.write(this.path, next)
-    this.stored = next
+  private enqueue<T>(task: (draft: StoredStore) => Promise<Change<T>> | Change<T>): Promise<T> {
+    const run = this.queue.then(async () => {
+      const draft = structuredClone(await this.index())
+      const { changed, value } = await task(draft)
+      if (changed) {
+        await this.write(this.path, draft)
+        this.stored = draft
+      }
+      return value
+    })
+    // The queue outlives a failed write, so one refusal does not wedge every later change.
+    this.queue = run.then(
+      () => undefined,
+      () => undefined
+    )
+    return run
   }
 
-  /** Staged, owner-only and durable: the one write this store does, so no caller can skip a step. */
+  /**
+   * Staged, owner-only and durable: the one write this store does, so no caller can skip a step. Off the
+   * thread on POSIX, where only the publishing rename is synchronous; on win32 the helper writes, chmods
+   * and fsyncs synchronously, so a delivery there does two blocking durable writes.
+   */
   private write(target: string, value: unknown): Promise<void> {
     return writeSecureFileAsync(target, JSON.stringify(value, null, 2), { durable: true }).then(
       () => undefined
@@ -153,47 +174,55 @@ export class LocalWebhookStore {
       if (!isMissingFileError(error)) {
         console.warn('[webhooks] could not read a local call’s body', error)
       }
-      return undefined
     }
+    return undefined
   }
 
-  async putHook(hook: LocalHook): Promise<void> {
-    await this.commit((store) => {
-      store.hooks = [...store.hooks.filter((entry) => entry.hookId !== hook.hookId), hook]
+  putHook(hook: LocalHook): Promise<void> {
+    return this.enqueue((draft) => {
+      draft.hooks = [...draft.hooks.filter((entry) => entry.hookId !== hook.hookId), hook]
+      return { changed: true, value: undefined }
     })
   }
 
   /** A hook, its pending mint and the calls still waiting for it: nothing can answer for them once it is gone. */
   async dropHook(hookId: string): Promise<void> {
-    const dropped = this.calls().filter((entry) => entry.hookId === hookId)
-    await this.commit((store) => {
-      store.hooks = store.hooks.filter((entry) => entry.hookId !== hookId)
-      store.intents = store.intents.filter((entry) => entry.hookId !== hookId)
-      store.calls = store.calls.filter((entry) => entry.hookId !== hookId)
+    const dropped = await this.enqueue((draft) => {
+      const going = draft.calls.filter((entry) => entry.hookId === hookId)
+      draft.hooks = draft.hooks.filter((entry) => entry.hookId !== hookId)
+      draft.intents = draft.intents.filter((entry) => entry.hookId !== hookId)
+      draft.calls = draft.calls.filter((entry) => entry.hookId !== hookId)
+      return { changed: true, value: going.map((entry) => entry.callId) }
     })
-    await removeBodies(
-      this,
-      dropped.map((entry) => entry.callId)
-    )
+    await removeBodies(this, dropped)
   }
 
-  /** The body first, so a row never names a body that is not there. */
-  async putCall(call: LocalCall, envelope: WebhookEnvelope): Promise<void> {
-    await this.write(this.bodyPath(call.callId), envelope)
-    await this.commit((store) => {
-      store.calls = [...store.calls.filter((entry) => entry.callId !== call.callId), call]
+  /**
+   * The body first, so a row never names a body that is not there. False when the hook went while the
+   * body was being written: its call has nothing left to answer for.
+   */
+  putCall(call: LocalCall, envelope: WebhookEnvelope): Promise<boolean> {
+    return this.enqueue(async (draft) => {
+      if (!draft.hooks.some((entry) => entry.hookId === call.hookId)) {
+        return { changed: false, value: false }
+      }
+      await this.write(this.bodyPath(call.callId), envelope)
+      draft.calls = [...draft.calls.filter((entry) => entry.callId !== call.callId), call]
+      return { changed: true, value: true }
     })
   }
 
   async dropCall(callId: string): Promise<void> {
-    await this.load()
-    if (!this.call(callId)) {
-      return
-    }
-    await this.commit((store) => {
-      store.calls = store.calls.filter((entry) => entry.callId !== callId)
+    const dropped = await this.enqueue((draft) => {
+      if (!draft.calls.some((entry) => entry.callId === callId)) {
+        return { changed: false, value: false }
+      }
+      draft.calls = draft.calls.filter((entry) => entry.callId !== callId)
+      return { changed: true, value: true }
     })
-    await removeBodies(this, [callId])
+    if (dropped) {
+      await removeBodies(this, [callId])
+    }
   }
 
   intents(): readonly LocalIntent[] {
@@ -201,19 +230,20 @@ export class LocalWebhookStore {
   }
 
   /** A hook minted for an automation whose save has not landed yet. */
-  async saveIntent(intent: LocalIntent): Promise<void> {
-    await this.commit((store) => {
-      store.intents = [...store.intents.filter((entry) => entry.hookId !== intent.hookId), intent]
+  saveIntent(intent: LocalIntent): Promise<void> {
+    return this.enqueue((draft) => {
+      draft.intents = [...draft.intents.filter((entry) => entry.hookId !== intent.hookId), intent]
+      return { changed: true, value: undefined }
     })
   }
 
-  async dropIntent(hookId: string): Promise<void> {
-    await this.load()
-    if (!this.intents().some((entry) => entry.hookId === hookId)) {
-      return
-    }
-    await this.commit((store) => {
-      store.intents = store.intents.filter((entry) => entry.hookId !== hookId)
+  dropIntent(hookId: string): Promise<void> {
+    return this.enqueue((draft) => {
+      if (!draft.intents.some((entry) => entry.hookId === hookId)) {
+        return { changed: false, value: undefined }
+      }
+      draft.intents = draft.intents.filter((entry) => entry.hookId !== hookId)
+      return { changed: true, value: undefined }
     })
   }
 
@@ -222,18 +252,19 @@ export class LocalWebhookStore {
     keepHook: (hook: LocalHook) => boolean,
     keepCalls: ReadonlySet<string>
   ): Promise<void> {
-    await this.load()
-    const gone = this.calls()
-      .filter((entry) => !keepCalls.has(entry.callId))
-      .map((entry) => entry.callId)
-    if (gone.length === 0 && this.hooks().every(keepHook)) {
-      return
-    }
-    await this.commit((store) => {
-      store.hooks = store.hooks.filter(keepHook)
-      const kept = new Set(store.hooks.map((hook) => hook.hookId))
-      store.intents = store.intents.filter((intent) => kept.has(intent.hookId))
-      store.calls = store.calls.filter((entry) => keepCalls.has(entry.callId))
+    const gone = await this.enqueue((draft) => {
+      const stale = draft.calls.filter((entry) => !keepCalls.has(entry.callId))
+      const listed = draft.hooks.filter(keepHook)
+      const unchanged = stale.length === 0 && listed.length === draft.hooks.length
+      if (unchanged) {
+        const none: string[] = []
+        return { changed: false, value: none }
+      }
+      const kept = new Set(listed.map((hook) => hook.hookId))
+      draft.hooks = listed
+      draft.intents = draft.intents.filter((intent) => kept.has(intent.hookId))
+      draft.calls = draft.calls.filter((entry) => keepCalls.has(entry.callId))
+      return { changed: true, value: stale.map((entry) => entry.callId) }
     })
     await removeBodies(this, gone)
   }

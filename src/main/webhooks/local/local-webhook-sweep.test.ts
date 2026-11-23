@@ -3,7 +3,7 @@
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { webhookCallFileName } from '../webhook-call-file'
 import { WebhookHostLedger } from '../webhook-host-ledger'
 import { WebhookRecoverySweep } from '../webhook-recovery-sweep'
@@ -12,7 +12,10 @@ import { LOCAL_WEBHOOK_DIR, LocalWebhookStore } from './local-webhook-store'
 const HOOK = 'wh_7Kx2pQ9mZbV4tL1r'
 const LOCAL_CALL = 'call_0123456789abcdefABC1'
 const CLOUD_CALL = 'call_0123456789abcdefABC2'
-const TWO_HOURS_AGO = () => new Date(Date.now() - 2 * 60 * 60 * 1000)
+/** A fixed instant, so nothing here reads the wall clock: the sweep's `Date.now()` is faked to it. */
+const NOW = Date.UTC(2026, 0, 15, 12, 0, 0)
+/** Older than the hour an unowned file is given, which is what a long run looks like. */
+const TWO_HOURS_AGO = new Date(NOW - 2 * 60 * 60 * 1000)
 
 let userDataPath: string
 let botFolder: string
@@ -20,17 +23,18 @@ let botFolder: string
 const localPath = (callId: string) => join(botFolder, webhookCallFileName(callId))
 
 beforeEach(() => {
+  vi.useFakeTimers({ now: NOW })
   userDataPath = mkdtempSync(join(tmpdir(), 'orca-local-webhooks-sweep-'))
   botFolder = join(userDataPath, 'bots', 'scout')
   mkdirSync(join(botFolder, 'webhook-calls'), { recursive: true })
   for (const callId of [LOCAL_CALL, CLOUD_CALL]) {
     writeFileSync(localPath(callId), '{}', { mode: 0o600 })
-    // Older than the hour an unowned file is given, which is what a long run looks like.
-    utimesSync(localPath(callId), TWO_HOURS_AGO(), TWO_HOURS_AGO())
+    utimesSync(localPath(callId), TWO_HOURS_AGO, TWO_HOURS_AGO)
   }
 })
 
 afterEach(() => {
+  vi.useRealTimers()
   rmSync(userDataPath, { recursive: true, force: true })
 })
 
@@ -43,10 +47,10 @@ function cloudSweep(alsoOwned?: () => ReadonlySet<string>): WebhookRecoverySweep
       hookId: HOOK,
       automationId: 'a1',
       triggerId: `wh-${HOOK}`,
-      occurredAt: Date.now(),
+      occurredAt: 1,
       epoch: 1
     },
-    Date.now()
+    1
   )
   ledger.bind(CLOUD_CALL, { file: localPath(CLOUD_CALL) })
   return new WebhookRecoverySweep({

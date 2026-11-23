@@ -6,6 +6,7 @@ import {
   formatUnreachableBotServer
 } from '../../shared/bot-roster'
 import type { BotConnectors } from '../../shared/bot-event-sources'
+import { hookIdOfRule } from '../../shared/connector-webhook-contract'
 import type { CommandHandler, HandlerContext } from '../dispatch/dispatch'
 import { getOptionalStringFlag } from '../arguments/flags'
 import { printResult } from '../output/command-result-output'
@@ -31,6 +32,8 @@ export function callBots<TResult>(
 export type BotsListResult = {
   bots: Bot[]
   webhooks?: boolean
+  localWebhooks?: boolean
+  localWebhookHooks?: string[]
   threadReplies: boolean
   githubEvents2?: boolean
   githubWorkflows?: boolean
@@ -41,7 +44,40 @@ export type BotsListResult = {
 export type HostBot = Bot &
   Pick<BotConnectors, 'webhooks' | 'cloudSignedOut' | 'githubEvents2' | 'githubWorkflows'> & {
     threadReplies: boolean
+    localWebhooks: boolean
+    localWebhookHooks: ReadonlySet<string>
   }
+
+export function withHostFacts(bot: Bot, result: BotsListResult): HostBot {
+  return {
+    ...bot,
+    webhooks: result.webhooks,
+    threadReplies: result.threadReplies,
+    githubEvents2: result.githubEvents2 === true,
+    githubWorkflows: result.githubWorkflows === true,
+    cloudSignedOut: result.connectorStatus === 'signed-out',
+    localWebhooks: result.localWebhooks === true,
+    localWebhookHooks: new Set(result.localWebhookHooks ?? [])
+  }
+}
+
+export function servesWebhookHere(
+  bot: Pick<HostBot, 'localWebhooks' | 'localWebhookHooks'>,
+  rule: { source: string; id?: string }
+): boolean {
+  if (rule.source !== 'webhook') {
+    return false
+  }
+  const hookId = rule.id ? hookIdOfRule(rule.id) : null
+  return hookId ? bot.localWebhookHooks.has(hookId) : bot.localWebhooks
+}
+
+export function cloudRules<Rule extends { source: string; id?: string }>(
+  bot: Pick<HostBot, 'localWebhooks' | 'localWebhookHooks'>,
+  on: readonly Rule[] | undefined
+): Rule[] | undefined {
+  return on?.filter((rule) => !servesWebhookHere(bot, rule))
+}
 
 /** The bot named by id or name (any case), with what its host's Orca Cloud takes. */
 export async function findBot(
@@ -56,14 +92,7 @@ export async function findBot(
   if (!bot) {
     throw new RuntimeClientError('invalid_argument', `No bot named ${selector}`)
   }
-  return {
-    ...bot,
-    webhooks: result.webhooks,
-    threadReplies: result.threadReplies,
-    githubEvents2: result.githubEvents2 === true,
-    githubWorkflows: result.githubWorkflows === true,
-    cloudSignedOut: result.connectorStatus === 'signed-out'
-  }
+  return withHostFacts(bot, result)
 }
 
 export const BOT_HANDLERS: Record<string, CommandHandler> = {

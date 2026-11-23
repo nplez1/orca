@@ -217,6 +217,29 @@ describe('this computer’s webhook listener', () => {
     })
   })
 
+  it('closes a server whose bind finished after a stop, and can be started again', async () => {
+    const fresh = new LocalWebhookListener({
+      userDataPath,
+      hook: () => hook(),
+      taken: () => 0,
+      deliver: async () => 'kept',
+      urls: () => []
+    })
+    // Stopped while the port is still being taken: the bind must not leave a server nothing can reach.
+    const starting = fresh.start()
+    fresh.stop()
+    await starting
+    expect(fresh.port()).toBe(null)
+    // A listener that kept the stale server would return early here and never serve again.
+    await fresh.start()
+    try {
+      expect(fresh.listening()).toBe(true)
+      expect(fresh.port()).toBeGreaterThan(0)
+    } finally {
+      fresh.stop()
+    }
+  })
+
   it('removes its endpoint file when it stops, so nothing points at a dead port', async () => {
     const path = join(userDataPath, LOCAL_WEBHOOK_DIR, getEndpointFileName())
     listener.stop()

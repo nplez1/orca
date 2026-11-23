@@ -1443,8 +1443,8 @@
 1 src/main/warp-themes/auto-discovered-theme-files.ts
 6 src/main/warp-themes/discovery.ts
 1 src/main/warp-themes/index.ts
-1 src/main/webhooks/local/local-webhook-listener.ts # per local delivery: writeSecureFileAsync keeps only its renameSync in the fence-check turn, and the body must be on disk before the listener answers 200
-1 src/main/webhooks/local/local-webhook-store.ts # per local delivery: writeSecureFileAsync keeps only its renameSync in the fence-check turn, and the body must be on disk before the listener answers 200
+1 src/main/webhooks/local/local-webhook-listener.ts # once per start, publishing the endpoint file: writeSecureFileAsync's only synchronous step on POSIX is its publishing renameSync, and on win32 the helper is wholly synchronous — nothing here runs per delivery
+1 src/main/webhooks/local/local-webhook-store.ts # per delivery, twice (the body, then the index): writeSecureFileAsync has no fence check here, so on POSIX only its publishing renameSync blocks; on win32 the helper writes, chmods and fsyncs synchronously, so both are blocking durable writes
 2 src/main/webhooks/webhook-call-file.ts
 1 src/main/webhooks/webhook-call-runs.ts
 3 src/main/webhooks/webhook-host-ledger.ts

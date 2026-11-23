@@ -54,6 +54,8 @@ export class LocalWebhookListener {
   private starting: Promise<void> | null = null
   private bound: number | null = null
   private derived = false
+  /** Raised by every stop, so a bind that finishes after one closes its server instead of keeping it. */
+  private generation = 0
   private readonly adminToken = randomBytes(32).toString('base64url')
   private readonly now: () => number
 
@@ -91,6 +93,7 @@ export class LocalWebhookListener {
   }
 
   private async listen(): Promise<void> {
+    const generation = this.generation
     const server = createServer((request, response) => void this.handle(request, response))
     server.headersTimeout = 10_000
     server.requestTimeout = 30_000
@@ -107,6 +110,14 @@ export class LocalWebhookListener {
       this.bound = await bind(server, 0)
       this.derived = false
     }
+    if (generation !== this.generation) {
+      // Stopped while the port was being taken: a server nothing can reach would outlive its host.
+      server.closeAllConnections()
+      server.close()
+      this.bound = null
+      this.derived = false
+      return
+    }
     this.server = server
     server.on('error', (error) => {
       console.warn('[webhooks] this computer’s local webhook listener failed', error)
@@ -120,6 +131,7 @@ export class LocalWebhookListener {
   }
 
   stop(): void {
+    this.generation += 1
     this.starting = null
     this.server?.closeAllConnections()
     this.server?.close()

@@ -4,13 +4,23 @@ import type { AutomationEventTrigger } from '../../../shared/automation-event-tr
 import type { WebhookKey, WebhookSummary } from '../../../shared/rpc-contract/webhooks-params'
 import { webhookSummary } from '../webhook-cloud-routes'
 import { WebhookHostService, type WebhookHostServiceDeps } from '../webhook-host-service'
-import type {
-  LocalWebhooks,
-  LocalWebhookSettleInput,
-  LocalWebhookSettleResult
-} from './local-webhook-provider'
+import type { LocalWebhooks } from './local-webhook-provider'
+import type { LocalWebhookSettleInput, LocalWebhookSettleResult } from './local-webhook-settle'
 
 export type LocalWebhookHostDeps = WebhookHostServiceDeps & { local: LocalWebhooks }
+
+/** What this host answers itself, for a hello and for `bots.list`. */
+export type LocalWebhookFacts = { answersNew: boolean; held: readonly string[] }
+
+/**
+ * The facts, from whatever `runtime.getWebhooks()` returned. Only this build's host has them, so the
+ * question is asked structurally: anything else answers nothing, which is the same as no cloud.
+ */
+export function localWebhookFactsOf(host: unknown): LocalWebhookFacts {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the method is checked for before it is called, and nothing else is read.
+  const facts = (host as { localWebhookFacts?: () => LocalWebhookFacts } | null)?.localWebhookFacts
+  return typeof facts === 'function' ? facts.call(host) : { answersNew: false, held: [] }
+}
 
 export class LocalWebhookHostService extends WebhookHostService {
   private readonly local: LocalWebhooks
@@ -23,6 +33,11 @@ export class LocalWebhookHostService extends WebhookHostService {
 
   override advertised(): boolean {
     return this.local.advertised(() => super.advertised())
+  }
+
+  /** Whether a webhook rule made now would be answered here, and the hook ids this computer holds. */
+  localWebhookFacts(): LocalWebhookFacts {
+    return { answersNew: this.local.answersNewWebhooks(), held: this.local.heldLocally() }
   }
 
   /** Whether this computer answers the rule itself, so Orca Cloud is never asked to. */
@@ -44,7 +59,9 @@ export class LocalWebhookHostService extends WebhookHostService {
     if (!hook?.ok) {
       throw new Error('webhooks_unavailable')
     }
-    return webhookSummary(hook.value, this.automationOf(hookId))
+    const summary = webhookSummary(hook.value, this.automationOf(hookId))
+    // Its port was taken, so the URL a forwarder was given stops working at the next restart.
+    return this.local.portIsStable() ? summary : { ...summary, urlChangesOnRestart: true }
   }
 
   override settle(input: LocalWebhookSettleInput): Promise<LocalWebhookSettleResult> {
@@ -53,7 +70,7 @@ export class LocalWebhookHostService extends WebhookHostService {
 
   /** A local hook's URL carries its token, which is the whole of its auth; a cloud hook's is revealed. */
   override async reveal(hookId: string): Promise<WebhookKey> {
-    const key = this.local.keyOf(hookId)
+    const key = await this.local.keyOf(hookId)
     if (key === undefined) {
       return super.reveal(hookId)
     }

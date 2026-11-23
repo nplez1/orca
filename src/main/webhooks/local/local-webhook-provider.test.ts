@@ -1,4 +1,5 @@
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -23,7 +24,9 @@ import {
   LocalWebhooks,
   type LocalWebhooksDeps
 } from './local-webhook-provider'
-import { LOCAL_MINT_GRACE_MS, LOCAL_WEBHOOK_DIR } from './local-webhook-store'
+import type { ConnectorCloudStatus } from '../../connector-cloud/connector-cloud'
+import { localWebhookPort } from './local-webhook-listener'
+import { LOCAL_MINT_GRACE_MS, LOCAL_WEBHOOK_DIR, LocalWebhookStore } from './local-webhook-store'
 
 const BOT = 'bot-1'
 const AUTOMATION = 'a1'
@@ -295,6 +298,66 @@ describe('a webhook on this computer', () => {
     now += LOCAL_MINT_GRACE_MS + 1
     await webhooks.changed()
     expect(webhooks.holdsLocally(hookId)).toBe(false)
+    // Dropped means dropped: the store holds neither the hook nor its intent, so nothing can name it
+    // again and the listener answers 404 for it.
+    const store = new LocalWebhookStore(userDataPath)
+    await store.load()
+    expect(store.hooks()).toEqual([])
+    expect(store.intents()).toEqual([])
+  })
+
+  it('binds even when the store cannot be brought up to date', async () => {
+    // A hook nothing lists, so the change has work to do; a listing that throws makes that work fail.
+    mkdirSync(join(userDataPath, LOCAL_WEBHOOK_DIR), { recursive: true })
+    writeFileSync(
+      join(userDataPath, LOCAL_WEBHOOK_DIR, 'local-webhooks.json'),
+      JSON.stringify({
+        hooks: [
+          {
+            hookId: 'wh_0000000000000003',
+            token: 't'.repeat(43),
+            automationId: 'gone',
+            botId: BOT,
+            epoch: 1,
+            created: 1
+          }
+        ],
+        calls: [],
+        intents: []
+      })
+    )
+    const webhooks = local({
+      automations: {
+        list: () => {
+          throw new Error('the store is not ready')
+        },
+        runs: () => []
+      }
+    })
+    await expect(webhooks.start()).resolves.toBeUndefined()
+    try {
+      // The listener is up regardless: replay is not the socket's business, nor the socket replay's.
+      expect(readFileSync(join(userDataPath, LOCAL_WEBHOOK_DIR, ENDPOINT), 'utf8')).toContain(
+        'ORCA_LOCAL_WEBHOOK_PORT='
+      )
+    } finally {
+      webhooks.stop()
+    }
+  })
+
+  it('answers for a hook it holds before the index has loaded', async () => {
+    const first = local()
+    const settled = await first.settle(
+      { automationId: AUTOMATION, botId: BOT, next: draft() },
+      () => Promise.reject(new Error('the cloud was asked'))
+    )
+    const hookId = hookIdOfRule(settled.on[0]!.id)!
+    // A fresh host reads its ledger synchronously, so a hello built now cannot mistake this hook for
+    // Orca Cloud's and list its id and filters to the cloud.
+    const second = local()
+    expect(second.holdsLocally(hookId)).toBe(true)
+    expect(second.servesLocally({ source: 'webhook', id: settled.on[0]!.id })).toBe(true)
+    second.stop()
   })
 
   it('refuses the 201st call in a rolling hour, however the calls arrive', async () => {
@@ -332,12 +395,33 @@ describe('a host with both kinds of hook', () => {
     status: () => 'signed-out' as const
   })
 
-  function host(options: { cloud?: () => ReturnType<typeof signedOutCloud> | null } = {}) {
-    const localWebhooks = local()
+  /** A host signed in to a cloud that does not take webhooks: the case N2 is about. */
+  const cloudWithoutWebhooks = () => ({
+    call: async () => {
+      throw new Error('this test never reaches the cloud')
+    },
+    cloudFeatures: () => new Set<string>(),
+    withConnection: async <T>(run: () => Promise<T>) => run(),
+    status: () => 'ok' as const
+  })
+
+  /** What the host asks a cloud: its features, and whether it is signed out. */
+  type TestCloud = {
+    call: () => Promise<never>
+    cloudFeatures: () => ReadonlySet<string> | null
+    withConnection: <T>(run: () => Promise<T>) => Promise<T>
+    status: () => ConnectorCloudStatus
+  }
+
+  function host(options: { cloud?: () => TestCloud | null } = {}) {
+    // One cloud for both halves: the route a save takes and the answer `advertised` gives are the same
+    // question, so a harness that gave them different clouds would test nothing real.
+    const cloud = options.cloud ?? (() => null)
+    const localWebhooks = local({ cloud })
     const service = new LocalWebhookHostService({
       userDataPath,
       account: () => 'acct-1',
-      cloud: options.cloud ?? (() => null),
+      cloud,
       automations: {
         list: () => automations,
         runs: () => [],
@@ -400,6 +484,72 @@ describe('a host with both kinds of hook', () => {
         localWebhooks.stop()
       }
     })
+  })
+
+  it('says a cloud that does not take webhooks does not, even with its own listener up', async () => {
+    const { service, localWebhooks } = host({ cloud: cloudWithoutWebhooks })
+    localWebhooks.attach({ onClientEvent: () => {}, onBotsWritten: () => {} })
+    await localWebhooks.start()
+    try {
+      // A signed-in cloud makes the hook, so its answer is the host's: this computer is not a fallback
+      // for a cloud that cannot take them, and the save must be refused with the cloud's own message.
+      expect(service.advertised()).toBe(false)
+      expect(service.localWebhookFacts()).toMatchObject({ answersNew: false })
+    } finally {
+      localWebhooks.stop()
+    }
+  })
+
+  it('offers webhooks while signed out, because this computer answers them', async () => {
+    const { service, localWebhooks } = host({ cloud: signedOutCloud })
+    localWebhooks.attach({ onClientEvent: () => {}, onBotsWritten: () => {} })
+    await localWebhooks.start()
+    try {
+      expect(service.advertised()).toBe(true)
+      expect(service.localWebhookFacts()).toMatchObject({ answersNew: true })
+    } finally {
+      localWebhooks.stop()
+    }
+  })
+
+  it('tells the CLI the URL changes on restart when the port it wanted was taken', async () => {
+    const squatter = createServer()
+    const wanted = localWebhookPort(userDataPath)
+    await new Promise<void>((resolve, reject) => {
+      squatter.once('error', reject)
+      squatter.listen(wanted, '127.0.0.1', resolve)
+    })
+    const { service, localWebhooks } = host()
+    try {
+      const rule = await service.settle({ automationId: AUTOMATION, botId: BOT, next: draft() })
+      automations = [automationFor(rule.on[0]!.id)]
+      localWebhooks.attach({ onClientEvent: () => {}, onBotsWritten: () => {} })
+      await localWebhooks.start()
+      expect(localWebhooks.portIsStable()).toBe(false)
+      // The card is what `orca webhooks show` prints, and it has to say the URL will not survive.
+      expect(await service.card(hookIdOfRule(rule.on[0]!.id)!)).toMatchObject({
+        urlChangesOnRestart: true
+      })
+    } finally {
+      localWebhooks.stop()
+      squatter.close()
+    }
+  })
+
+  it('says nothing about restarts when it holds the port its profile names', async () => {
+    const { service, localWebhooks } = host()
+    const rule = await service.settle({ automationId: AUTOMATION, botId: BOT, next: draft() })
+    automations = [automationFor(rule.on[0]!.id)]
+    localWebhooks.attach({ onClientEvent: () => {}, onBotsWritten: () => {} })
+    await localWebhooks.start()
+    try {
+      expect(localWebhooks.portIsStable()).toBe(true)
+      expect(await service.card(hookIdOfRule(rule.on[0]!.id)!)).not.toHaveProperty(
+        'urlChangesOnRestart'
+      )
+    } finally {
+      localWebhooks.stop()
+    }
   })
 
   it('keeps a local hook out of the cloud ledger', async () => {

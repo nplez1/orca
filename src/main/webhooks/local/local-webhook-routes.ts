@@ -46,7 +46,8 @@ function callState(call: Pick<LedgerCall, 'state'>): WebhookCallState {
 function viewOf(deps: LocalWebhookRoutesDeps, hookId: string): WebhookView {
   const hook = deps.store.hook(hookId)
   if (!hook) {
-    throw new Error('webhook_not_found')
+    // Held, but the index has not been read yet: not ready, rather than a hook that does not exist.
+    throw new Error(deps.ledger.hook(hookId) ? 'webhooks_unavailable' : 'webhook_not_found')
   }
   // Nothing is served while the listener is down, and a made-up port would be a URL that 404s.
   const url = deps.listener().url(hookId)
@@ -115,7 +116,9 @@ async function envelopeOf(
 export function localWebhookRoutes(deps: LocalWebhookRoutesDeps): WebhookCloudCalls {
   const { cloud } = deps
   const local = (id: string): boolean =>
-    deps.store.hook(id) !== undefined || deps.store.call(id) !== undefined
+    deps.ledger.hook(id) !== undefined ||
+    deps.store.hook(id) !== undefined ||
+    deps.store.call(id) !== undefined
   return {
     ...cloud,
     list: async (botId) => {

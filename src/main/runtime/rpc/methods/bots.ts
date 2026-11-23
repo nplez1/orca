@@ -12,6 +12,8 @@ import {
   type BotUpdateParams
 } from '../../../../shared/rpc-contract/bots-params'
 import { googleSetupRuns } from '../../../google/google-setup-runs'
+import { localWebhookFactsOf } from '../../../webhooks/local/local-webhook-host'
+import type { WebhookHostService } from '../../../webhooks/webhook-host-service'
 import { readSharedBotActivity } from '../../../bots/bot-activity-host'
 import {
   requireStructuredHost,
@@ -107,6 +109,17 @@ async function ownerTypedLatest(runtime: RpcContext['runtime'], sessionId: strin
   return body?.kind === 'message' && !body.from && !body.origin && !body.memorySource
 }
 
+function localWebhookListFacts(host: WebhookHostService): {
+  localWebhooks: boolean
+  localWebhookHooks?: string[]
+} {
+  const { answersNew, held } = localWebhookFactsOf(host)
+  return {
+    localWebhooks: answersNew,
+    ...(held.length > 0 ? { localWebhookHooks: [...held] } : {})
+  }
+}
+
 // Off, nothing creates a bot or opens its Chat; listing, editing and deleting stay.
 export const BOT_METHODS = [
   defineMethod({
@@ -129,7 +142,9 @@ export const BOT_METHODS = [
         // The host's Bot options, so a phone lists its bots as this sidebar does.
         botSidebarView: normalizeBotSidebarView(runtime.getUIState().botSidebarView),
         ...(listing.bots.length > 0 ? await listedBotsFacts(runtime) : {}),
-        ...(webhooks ? { webhooks: webhooks.advertised() } : {}),
+        ...(webhooks
+          ? { webhooks: webhooks.advertised(), ...localWebhookListFacts(webhooks) }
+          : {}),
         ...(runtime.getConnectorCloud()?.botListFacts() ?? {
           threadReplies: false,
           githubEvents2: false,

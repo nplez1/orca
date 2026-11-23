@@ -11,6 +11,40 @@ const RANGER = {
   slack: { appId: 'A1', teamId: 'T1' }
 }
 
+function signedOutHost(automations: { id: string }[] = [], hookId = LOCAL_HOOK) {
+  const writes: { method: string; params: unknown }[] = []
+  const call = vi.fn(async (method: string, params?: unknown) => {
+    const ok = (result: unknown) => ({
+      id: 'request-1',
+      ok: true as const,
+      result,
+      _meta: { runtimeId: 'runtime-1' }
+    })
+    switch (method) {
+      case 'status.get':
+        return ok({ capabilities: [] })
+      case 'bots.list':
+        return ok({
+          bots: [RANGER],
+          webhooks: true,
+          localWebhooks: true,
+          localWebhookHooks: [hookId],
+          connectorStatus: 'signed-out'
+        })
+      case 'automation.list':
+        return ok({ automations })
+      case 'automation.create':
+      case 'automation.update':
+        writes.push({ method, params })
+        return ok({ automation: { id: 'a1', name: 'x', on: [] } })
+    }
+    throw new Error(`unexpected ${method}`)
+  })
+  const client = new RuntimeClient('/tmp/orca-local-webhook-cli-test', 60_000, null, null)
+  vi.spyOn(client, 'call').mockImplementation(call)
+  return { client, writes }
+}
+
 function host(automations: { id: string }[] = []) {
   const writes: { method: string; params: unknown }[] = []
   const call = vi.fn(async (method: string, params?: unknown) => {
@@ -53,6 +87,8 @@ function run(command: string, client: RuntimeClient, flags: [string, string | bo
   })
 }
 
+const LOCAL_HOOK = 'wh_7Kx2pQ9mZbV4tL1r'
+
 const BOT_CREATE: [string, string][] = [
   ['name', 'Deploy pings'],
   ['prompt', 'Answer it'],
@@ -84,6 +120,54 @@ describe('orca automations --timezone', () => {
     expect(writes[1]?.params).not.toHaveProperty('timezoneExplicit')
     expect(writes[2]?.params).toMatchObject({
       updates: { timezone: 'Asia/Tokyo', timezoneExplicit: true }
+    })
+  })
+})
+
+describe('orca automations --on, signed out of Orca', () => {
+  it('creates a webhook rule this computer answers, which is the rule it exists for', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined)
+    const { client, writes } = signedOutHost()
+
+    await run('automations create', client, [...BOT_CREATE, ['on', 'webhook.call']])
+
+    expect(writes[0]?.params).toMatchObject({
+      on: [{ id: '', source: 'webhook', event: 'call', rev: 0 }]
+    })
+  })
+
+  it('still refuses a Slack rule, which only Orca Cloud delivers', async () => {
+    const { client, writes } = signedOutHost()
+
+    await expect(
+      run('automations create', client, [...BOT_CREATE, ['on', 'slack.mentioned in=C1']])
+    ).rejects.toThrow('signed out of Orca')
+    expect(writes).toEqual([])
+  })
+
+  it('does not call a local rule stale in the listing, and still calls a Slack one stale', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined)
+    const listed = (id: string, on: unknown[]) => ({
+      id,
+      name: id,
+      agentId: 'claude',
+      enabled: true,
+      bot: { botId: 'bot-1', runsIn: 'new', resultsTo: 'chat' },
+      on,
+      rrule: EVENT_ONLY_SCHEDULE.rrule,
+      dtstart: EVENT_ONLY_SCHEDULE.dtstart,
+      nextRunAt: EVENT_ONLY_SCHEDULE.dtstart
+    })
+    const { client } = signedOutHost([
+      listed('here', [{ id: `wh-${LOCAL_HOOK}`, source: 'webhook', event: 'call', rev: 1 }]),
+      listed('cloud', [{ id: 'on-1', source: 'slack', event: 'mentioned' }])
+    ])
+
+    await run('automations list', client, [])
+
+    const [{ result }] = log.mock.calls.map(([text]) => JSON.parse(String(text)))
+    expect(result.wontFire).toEqual({
+      cloud: "won't fire while signed out of Orca (slack.mentioned)"
     })
   })
 })

@@ -5331,8 +5331,9 @@ a delivery enters through `WebhookHostService.receive`, and at run time the clou
 things (`envelope`, `start`, `webhook-call-runs.ts:175,264`). A hook answered locally therefore needs no
 change to the run path at all.
 
-**The anchors.** Six sites in files upstream owns; each is a line or two, and the reason each exists is
-this file. `connector-host-install.ts` is three hunks, not one — the review of R1 was right about that.
+**The anchors.** Sixteen sites across eleven files upstream owns, plus one ratchet baseline; each is a
+line or two, and the reason each exists is this file. `connector-host-install.ts` is three hunks, not one
+— the review of R1 was right about that.
 
 | File                                                                         | Anchor                                             | Change                                                                                                       |
 | ---------------------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
@@ -5341,14 +5342,24 @@ this file. `connector-host-install.ts` is three hunks, not one — the review of
 | `src/main/connector-cloud/connector-host-install.ts`                         | `const stops` / `if (runtime.getConnectorCloud())` | `setWebhooks`, both stops and the cloud host's `start()` hoist out of the guard; Composio stays in it        |
 | `src/main/connector-cloud/connector-host-install.ts`                         | the cloud host's deps                              | `ownsExtraCallFiles: () => localWebhooks.callFiles()`, so its sweep leaves this computer's call files alone  |
 | `src/main/webhooks/webhook-host-service.ts`                                  | `WebhookHostServiceDeps`                           | one optional field, `ownsExtraCallFiles`, passed to the ledger on the constructor line it already had        |
+| `src/main/webhooks/webhook-host-service.ts`                                  | `advertised()`'s neighbours                        | `answersNewWebhooks()` and `heldLocally()`, both `false`/`[]` here and overridden by the fork's host         |
 | `src/main/webhooks/webhook-host-ledger.ts`                                   | the constructor / `files()`                        | an optional `alsoOwned` third parameter that `files()` unions into what the sweep treats as owned            |
 | `src/main/webhooks/automation-webhook-saves.ts`                              | `hearing()`'s neighbours                           | `AutomationWebhooksHost` (a host may answer rules itself) and `cloudRules()`, the rules Orca Cloud must hear |
 | `src/main/runtime/integrations/automations/runtime-automation-bot-update.ts` | the `assertBotHearsEventTriggers` call             | one expression: `cloudRules(updates.on)` instead of `updates.on`                                             |
-| `src/main/runtime/integrations/automations/runtime-automation-target.ts`     | the same call, and `BotAutomationLookups`          | the same expression, and its `webhooks` type widened by the optional predicate                               |
+| `src/main/runtime/integrations/automations/runtime-automation-target.ts`     | the same call, and `BotAutomationLookups`          | the same expression, and its `webhooks` type gains `cloudRules` as a required member                         |
+| `src/main/runtime/rpc/methods/bots.ts`                                       | `bots.list`'s result                               | `localWebhooks` and `localWebhookHooks`, so a client can ask which host answers a rule                       |
 | `src/main/connector-cloud/connector-triggers.ts`                             | `connectorTriggers`                                | a third parameter, `servesLocally`, so a hello never lists a rule this computer answers                      |
 | `src/main/connector-cloud/connector-cloud-install.ts`                        | both `connectorTriggers` calls                     | pass `webhooks.servesLocally`, and widen the local `webhooks` type by the optional method                    |
+| `src/shared/rpc-contract/webhooks-params.ts`                                 | `WebhookSummary`                                   | one optional field, `urlChangesOnRestart`, so `orca webhooks show` can say a fallback port will move         |
 | `src/cli/webhooks/webhooks.ts`                                               | `hookJson` and `formatSummary`                     | a loopback URL is printed (it carries the token that is its whole auth), a cloud URL still is not            |
 | `src/cli/specs/webhooks.ts`                                                  | `WEBHOOK_NOTES`                                    | the note names where a hook on this computer is discovered                                                   |
+
+Two of those files are **tests** upstream owns, edited rather than added to: `src/cli/automations/automation-event-triggers-cli.test.ts`
+(the signed-out CLI cases) and `src/main/runtime/rpc/methods/bots.test.ts` (`bots.list`'s new fields). And
+one is a ratchet baseline, `config/main-blocking-helper-baseline.txt`, which is a **global input**: two rows
+for `writeSecureFileAsync`, one per fork-owned module that writes. The store's row is per delivery (the body,
+then the index) and on win32 that helper writes, chmods and fsyncs synchronously, so a delivery there is two
+blocking durable writes; the listener's row is once per start, publishing the endpoint file.
 
 `installConnectorHost` is the whole wiring path, which is the point: the desktop main process
 (`main-process-connector-startup.ts:32`) and `orcad` / `orca serve` (`orcad-connector.ts:14`) both call it,
@@ -5357,15 +5368,18 @@ so the listener exists in both hosts with no second path. **A sync that moves th
 keep `ownsExtraCallFiles` wired, or Orca Cloud's sweep deletes this computer's call files an hour after
 they are written, taking the file a running prompt points at with it.
 
-**Fork-owned, all the logic** (`src/main/webhooks/local/`, five modules, ~1,000 lines with tests):
+**Fork-owned, all the logic** (`src/main/webhooks/local/`, seven modules, ~1,300 lines with tests):
 
 - `local-webhook-store.ts` — hooks, one row per call and the mint intents in
-  `<userDataPath>/local-webhooks/local-webhooks.json`, owner-only through `writeDurableSecureJsonFile`,
-  deliberately **not** the cloud ledger's file: that file's `state`/`change` schema is the cloud's. Each
-  call's **body is its own file** (`local-webhooks/calls/<callId>.json`), written before the index row and
-  removed with it, so a delivery touches one small file rather than rewriting a week of bodies. A mint
-  intent (`LOCAL_MINT_GRACE_MS`, ten minutes, as the cloud's `STALE_INTENT_MS`) keeps a hook alive between
-  its mint and its automation's save.
+  `<userDataPath>/local-webhooks/local-webhooks.json`, owner-only through `writeSecureFileAsync` with
+  `durable`, deliberately **not** the cloud ledger's file: that file's `state`/`change` schema is the
+  cloud's. Each call's **body is its own file** (`local-webhooks/calls/<callId>.json`), written before the
+  index row and removed with it, so a delivery touches one small file rather than rewriting a week of
+  bodies. Every change runs through **one promise queue**, each over the state the previous one left: two
+  overlapping writes would otherwise clone the same index and the last to finish would silently drop the
+  other's row — a call whose `200` was already sent, or a hook a change event had just dropped coming back
+  to life. A mint intent (`LOCAL_MINT_GRACE_MS`, ten minutes, as the cloud's `STALE_INTENT_MS`) keeps a
+  hook alive between its mint and its automation's save.
 - `local-webhook-listener.ts` — binds `127.0.0.1` on the port this profile names (`localWebhookPort`, a
   hash of the userDataPath into 43000–47999, so a forwarder's URL survives a restart; a port already taken
   falls back to an ephemeral one and publishes `ORCA_LOCAL_WEBHOOK_STABLE=0`), publishes
@@ -5388,6 +5402,21 @@ they are written, taking the file a running prompt points at with it.
 - `local-webhook-host.ts` — `LocalWebhookHostService`: `advertised`, `servesLocally`, `holdsLocally`,
   `settle`, and a local hook's `card`/`reveal` answered here so the hook's id never reaches the cloud ledger
   (a row there would have reconcile send the real Orca Cloud a `DELETE` for an id it never made).
+
+**A cloud that makes hooks answers for them.** `advertised()` is the cloud's answer whenever a cloud can
+make a hook, even one that does not take them: the save is then refused with "Orca Cloud doesn't support
+webhooks yet" instead of failing inside the mint, `bots.list` does not offer `webhook.call` to a bot that
+cannot have it, and `helloAnswered` does not retry a pause against a cloud that takes no webhooks. Only a
+host with no cloud to make one falls back to this computer — and it says yes before its listener has
+bound, because `settle` routes here on the same question, so the offer and the save cannot disagree.
+
+**The CLI asks the same question the host does.** In every packaged build Orca Cloud is configured and
+reports `signed-out` with no account, so the never-signed-in user is the target of this route — and
+`botEventTriggerRefusal` counts every `webhook` rule as the cloud's. `bots.list` therefore reports
+`localWebhooks` (a rule made now would be answered here) and `localWebhookHooks` (the ids already held),
+and `src/cli/bots/bot.ts` answers `servesWebhookHere`/`cloudRules` from them: a webhook rule is created on
+a signed-out host, a Slack rule is still refused, and the listing's "won't fire while signed out" note
+covers only the rules Orca Cloud delivers.
 
 **Sign-out is per rule, not per host** — the one real defect the R1 review found. `signedOut()` was
 overridden to `false` while the listener was up, which made `AutomationWebhookSaves.hearing()` tell
@@ -5442,4 +5471,12 @@ true while signed out, no local row in the cloud ledger, and a host holding both
 call started here), `local-webhook-sweep.test.ts` (a live local call file surviving Orca Cloud's sweep, and
 the same sweep deleting it when it is not told), `connector-host-install-local-webhooks.test.ts` (a host
 with no connector cloud still installing webhooks, publishing its endpoint and taking a delivery), and
-`connector-triggers.test.ts` (a hello never listing a rule this computer serves).
+`connector-triggers.test.ts` (a hello never listing a rule this computer serves),
+`src/main/runtime/rpc/methods/bots.test.ts` (`bots.list` naming the rules this computer answers), and
+`src/cli/automations/automation-event-triggers-cli.test.ts` (creating a webhook rule on a signed-out host,
+refusing a Slack one there, and the listing note covering only the cloud's rules).
+
+Round 3 added the concurrency proof: two overlapping `putCall`s keep both rows and both survive a reopen,
+a drop cannot be undone by a write already in flight, and a call whose hook went before its body landed is
+refused rather than kept. `local-webhook-listener.test.ts` gained the stale-bind case (a bind that finishes
+after `stop()` closes its server and can start again).

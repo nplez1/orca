@@ -40,7 +40,10 @@ function formatSummary(hook: WebhookSummary): string {
     `${hook.hookId}  ${hook.state}  ${lastCall}`,
     `automation: ${hook.automationId}`,
     `checks: ${hook.adapter ? `${hook.adapter} signature` : 'key only'}`,
-    ...(loopbackWebhookUrl.test(hook.url) ? [`listening on ${hook.url} (this computer only)`] : [])
+    ...(loopbackWebhookUrl.test(hook.url) ? [`listening on ${hook.url} (this computer only)`] : []),
+    ...(hook.urlChangesOnRestart
+      ? ["this computer's port was taken, so that URL changes at the next restart"]
+      : [])
   ].join('\n')
 }
 

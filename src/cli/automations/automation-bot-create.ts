@@ -31,7 +31,7 @@ import {
   getRequiredStringFlag
 } from '../arguments/flags'
 import { RuntimeClientError } from '../runtime/connection/types'
-import { findBot } from '../bots/bot'
+import { cloudRules, findBot, type HostBot } from '../bots/bot'
 import { getEnabledFlag, getPrecheckFlag } from './automation-handler-flags'
 import { getTimezoneFlags } from './automation-timezone-flag'
 import { legacyPlaceOf } from '../../shared/connector-place-names'
@@ -198,7 +198,7 @@ export async function getBotTargetFlags(
   on: readonly AutomationEventTrigger[] | undefined,
   schedule: { dtstart: number },
   once?: AutomationOnce
-): Promise<{ bot: Bot; target: AutomationBotTarget } | null> {
+): Promise<{ bot: HostBot; target: AutomationBotTarget } | null> {
   const selector = getOptionalStringFlag(flags, 'bot')
   const agentEdit = getBotAgentSetupEdit(flags)
   if (!selector) {
@@ -294,13 +294,13 @@ export function editedBotTarget(
 export async function createBotAutomation(
   client: HandlerContext['client'],
   flags: Map<string, string | boolean>,
-  { bot, target }: { bot: Bot; target: AutomationBotTarget },
+  { bot, target }: { bot: HostBot; target: AutomationBotTarget },
   schedule: { rrule: string; dtstart: number },
   on: AutomationEventTrigger[] | undefined,
   once?: AutomationOnce
 ) {
   // Checked here too, since an older host saves the rule and it never fires.
-  const refusal = botEventTriggerRefusal(bot, on ?? [])
+  const refusal = botEventTriggerRefusal(bot, cloudRules(bot, on) ?? [])
   if (refusal) {
     throw new RuntimeClientError('invalid_argument', refusal)
   }

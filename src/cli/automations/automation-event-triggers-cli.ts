@@ -16,7 +16,7 @@ import { getOptionalStringFlag, getRepeatedStringFlag } from '../arguments/flags
 import { RuntimeClientError } from '../runtime/connection/types'
 import type { RuntimeClient } from '../runtime/client'
 import { getScheduleFlag } from './automation-handler-flags'
-import { callBots, findBot, type BotsListResult } from '../bots/bot'
+import { callBots, cloudRules, findBot, withHostFacts, type BotsListResult } from '../bots/bot'
 import { botEventSources, wontFireNote } from '../../shared/bot-event-sources'
 import type { AutomationListPayload } from './automation-format'
 import type { AutomationOnce } from '../../shared/automation-once'
@@ -103,19 +103,19 @@ export async function withWontFire<Listed extends { result: AutomationListPayloa
   if (withRules.length === 0) {
     return listed
   }
-  const { bots, webhooks, connectorStatus } = await callBots<BotsListResult>(
-    client,
-    'bots.list'
-  ).then(
+  const facts = await callBots<BotsListResult>(client, 'bots.list').then(
     ({ result }) => result,
     (): BotsListResult => ({ bots: [], threadReplies: false })
   )
+  const { bots } = facts
   const notes = withRules.flatMap(({ id, bot: target, on }) => {
     // A deleted bot's automation runs nowhere; the listing says nothing more about its rules.
-    const bot = bots.find((entry) => entry.id === target?.botId)
-    const note =
-      bot &&
-      wontFireNote({ ...bot, webhooks, cloudSignedOut: connectorStatus === 'signed-out' }, on ?? [])
+    const listed = bots.find((entry) => entry.id === target?.botId)
+    if (!listed) {
+      return []
+    }
+    const bot = withHostFacts(listed, facts)
+    const note = wontFireNote(bot, cloudRules(bot, on) ?? [])
     return note ? [[id, note] as const] : []
   })
   return notes.length > 0
