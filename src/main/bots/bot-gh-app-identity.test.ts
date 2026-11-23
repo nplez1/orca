@@ -7,7 +7,9 @@ import {
 import { forgetInstallationTokens } from '../github/app/github-app-installation-token'
 
 const fetchMock = vi.hoisted(() => vi.fn())
-vi.mock('../host/electron-http-client', () => ({ electronHttpClient: { fetch: fetchMock } }))
+vi.mock('../network/http-client', () => ({
+  getMainHttpClient: () => ({ fetch: fetchMock, proxySession: () => null })
+}))
 
 const { botGithubAppLaunch } = await import('./bot-gh-app-identity')
 
