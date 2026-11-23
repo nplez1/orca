@@ -9,6 +9,7 @@ import { BotChangeNotices } from '../bots/bot-change-notices'
 import { deleteAutomationsOfBot } from '../bots/bot-automations-removal'
 import { syncBotAutomationAgents } from '../bots/bot-automation-agent-sync'
 import { BotController } from '../bots/bot-controller'
+import { photonChatTurnEnded } from '../bots/photon/photon-chat-replies'
 import {
   BotLookAroundStore,
   lookAroundFileIo,
@@ -275,6 +276,7 @@ export abstract class OrcaRuntimeWithBots extends OrcaRuntimeWithLinearCommands 
         work: this.botWork,
         lookAround: this.lookAround,
         requestTurnEnded: (sessionId, ended) => this.botSessions.turnEnded(sessionId, ended),
+        outsideTurnEnded: (sessionId, readItems) => photonChatTurnEnded(this, sessionId, readItems),
         recentChats: (botId, sessionId, message) =>
           this.botSessions.recentChats(botId, sessionId, message),
         unansweredQuestionNote: (sessionId) => this.botSessions.unansweredQuestionNote(sessionId),

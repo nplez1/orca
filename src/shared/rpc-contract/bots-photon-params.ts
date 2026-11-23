@@ -1,0 +1,69 @@
+// `bots.photon.*`: connecting a Photon account, creating a bot's project, and the two halves of who may
+// text it. The renderer card is deliberately absent from v1 — these methods are the surface, so a client
+// can drive the channel without waiting on a UI that needs its own Electron validation and STYLEGUIDE
+// pass. Every method refuses politely when the channel is not connected rather than half-doing the work.
+import * as z from 'zod'
+
+const Id = z.string().min(1).max(256)
+
+/** A phone number, or an Apple-ID email: both are handles the provider assigns a line to. */
+const Handle = z
+  .string()
+  .trim()
+  .min(3)
+  .max(320)
+  .refine((value) => value.includes('@') || /^\+?[0-9][0-9 ().-]{4,}$/.test(value), {
+    message: 'Give a phone number or an email address.'
+  })
+
+/** Connect once. The account key is stored only when the owner says so; off is the default. */
+export const PhotonConnectParams = z.object({
+  organizationId: Id,
+  accountKey: z.string().trim().min(8).max(512),
+  storesKey: z.boolean().default(false)
+})
+
+/** Create the bot's project, mint its key and give it a number, in one retryable step. */
+export const PhotonCreateBotParams = z.object({
+  botId: Id,
+  handle: Handle
+})
+
+/** Add someone by creating their assignment, which is the same call that returns their number. */
+export const PhotonAddMemberParams = z.object({ botId: Id, handle: Handle })
+
+/** Remove someone by releasing their number. Reversible: adding them again gives it back. */
+export const PhotonReleaseMemberParams = z.object({ botId: Id, handle: Handle })
+
+/** Delete a bot. Releases its numbers and revokes its key; the project stays. */
+export const PhotonReleaseBotParams = z.object({ botId: Id })
+
+/** The one irreversible step. `confirmSlug` must name the slug that will be burned. */
+export const PhotonDeleteProjectParams = z.object({ botId: Id, confirmSlug: Id })
+
+export const PhotonStatusParams = z.object({ botId: Id.optional() })
+
+export type PhotonConnectInput = z.infer<typeof PhotonConnectParams>
+export type PhotonCreateBotInput = z.infer<typeof PhotonCreateBotParams>
+export type PhotonAddMemberInput = z.infer<typeof PhotonAddMemberParams>
+export type PhotonReleaseMemberInput = z.infer<typeof PhotonReleaseMemberParams>
+export type PhotonReleaseBotInput = z.infer<typeof PhotonReleaseBotParams>
+export type PhotonDeleteProjectInput = z.infer<typeof PhotonDeleteProjectParams>
+
+/** What the channel looks like right now, for a settings card or `orca bot connectors`. */
+export type PhotonChannelStatus = {
+  connected: boolean
+  organizationId: string | null
+  /** Whether the account key is stored, which is the owner's choice rather than a default. */
+  accountKeyStored: boolean
+  bots: {
+    botId: string
+    slug: string
+    projectId: string
+    /** The number this bot last answered on, as the provider reported it. */
+    phoneNumber: string | null
+    /** The handles that may text it. This list is the allowlist, not a copy of one. */
+    handles: string[]
+    stream: 'live' | 'deaf' | 'stopped' | 'not started'
+  }[]
+}

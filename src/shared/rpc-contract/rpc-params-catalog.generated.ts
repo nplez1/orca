@@ -214,6 +214,15 @@ import {
   WorktreeReleaseBotHome
 } from './bots-params'
 import {
+  PhotonAddMemberParams,
+  PhotonConnectParams,
+  PhotonCreateBotParams,
+  PhotonDeleteProjectParams,
+  PhotonReleaseBotParams,
+  PhotonReleaseMemberParams,
+  PhotonStatusParams
+} from './bots-photon-params'
+import {
   BotSharePartView,
   BotSharePrepare,
   BotSharePublish,
@@ -1279,6 +1288,13 @@ export const RPC_PARAMS_BY_METHOD = {
   'bots.memory.forget': BotMemoryForget,
   'bots.memory.history': BotChat,
   'bots.memory.undo': BotMemoryUndo,
+  'bots.photon.bot.release': PhotonReleaseBotParams,
+  'bots.photon.connect': PhotonConnectParams,
+  'bots.photon.create': PhotonCreateBotParams,
+  'bots.photon.member.add': PhotonAddMemberParams,
+  'bots.photon.member.release': PhotonReleaseMemberParams,
+  'bots.photon.project.delete': PhotonDeleteProjectParams,
+  'bots.photon.status': PhotonStatusParams,
   'bots.request.outcome': BotRequestOutcomeParams,
   'bots.roster': BotRoster,
   'bots.sendRunAgain': BotRunSendAgainParams,

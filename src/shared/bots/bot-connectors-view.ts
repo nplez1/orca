@@ -7,7 +7,7 @@ import { GOOGLE_SERVICE_INFO } from '../google/google-scopes'
 import { googleBotConnectState, type GoogleHostConnect } from '../google/google-bot-connect-state'
 
 export type BotConnectorService = {
-  source: ConnectorOfferSource
+  source: ConnectorOfferSource | 'photon'
   tool: string
   /** Who what the tool does shows as: the bot's owner, or the bot itself. */
   actsAs: 'owner' | 'bot'
@@ -102,11 +102,17 @@ function googleService(
   }
 }
 
+export type BotPhotonConnector = {
+  phoneNumber: string | null
+  handles: string[]
+}
+
 /** Each service's row, from the bot's links and what this computer is signed in to. */
 export function botConnectorServices(
   bot: Pick<Bot, 'slack' | 'slackApps' | 'linear' | 'linearWorkspaces' | 'github' | 'google'>,
   local: LocalSignIns,
-  slackApproveUrl?: string
+  slackApproveUrl?: string,
+  photon?: BotPhotonConnector
 ): BotConnectorService[] {
   const slack = botSlackApps(bot).length > 0
   return [
@@ -139,12 +145,30 @@ export function botConnectorServices(
       wakes: slack,
       ...(slackApproveUrl ? { approveUrl: slackApproveUrl } : {})
     },
-    ...(local.google ? [googleService(bot, local.google, local.googleApp === true)] : [])
+    ...(local.google ? [googleService(bot, local.google, local.googleApp === true)] : []),
+    ...(photon ? [photonService(photon)] : [])
   ]
 }
 
+function photonService(photon: BotPhotonConnector): BotConnectorService {
+  const number = photon.phoneNumber
+    ? `Answers on ${photon.phoneNumber}.`
+    : 'No number assigned yet; add someone to give it one.'
+  return {
+    source: 'photon',
+    tool: 'iMessage',
+    actsAs: 'bot',
+    signedIn: true,
+    detail:
+      photon.handles.length > 0
+        ? `${number} People who can text it: ${photon.handles.join(', ')}.`
+        : `${number} Add them, then they can text: an unknown handle cannot reach this bot at all.`,
+    wakes: false
+  }
+}
+
 function serviceLines(service: BotConnectorService, botName: string): string[] {
-  const name = CONNECTOR_OFFER_NAMES[service.source]
+  const name = service.source === 'photon' ? 'iMessage' : CONNECTOR_OFFER_NAMES[service.source]
   const as = service.actsAs === 'owner' ? 'as your owner' : `as ${botName}`
   const state = service.signedIn
     ? service.actsAs === 'bot'

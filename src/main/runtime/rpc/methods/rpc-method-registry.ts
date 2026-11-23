@@ -111,6 +111,7 @@ import { BOT_IMPORT_METHODS } from './bots-import'
 import { BOT_SHARE_METHODS } from './bots-share'
 import { BOT_SHARE_RECEIVE_METHODS } from './bots-share-receive'
 import { BOT_CONNECTORS_METHOD } from './bots-connectors'
+import { BOT_PHOTON_METHODS } from './bots-photon'
 import { BOT_TOOLS_METHODS } from './bots-tools'
 import { BOT_TOOLS_OWNED_SIGN_IN_METHODS } from './bots-tools-owned-sign-in'
 import { BOT_COMPOSIO_METHODS } from './bots-composio'
@@ -164,6 +165,7 @@ const BOT_RPC_METHODS = [
   ...BOT_LINEAR_METHODS,
   ...BOT_GITHUB_METHODS,
   ...BOT_CONNECT_METHODS,
+  ...BOT_PHOTON_METHODS,
   ...BOT_LOOK_AROUND_METHODS,
   ...BOT_TIDY_UP_METHODS,
   ...BOT_WORK_METHODS,

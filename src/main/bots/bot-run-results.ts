@@ -8,6 +8,7 @@ import type { AutomationRun } from '../../shared/automations/history/automation-
 import type { Bot } from '../../shared/bot-types'
 import {
   CONNECTOR_CLIENT_LIMITS,
+  ConnectorConversation,
   type ConnectorBotPostAnswer,
   type ConnectorTurnFor
 } from '../../shared/connectors/connector-cloud-contract'
@@ -280,10 +281,18 @@ export function runtimeBotRunResults(runtime: OrcaRuntimeService): BotRunResults
               noteId,
               { kind: 'status', text }
             ),
-          replyInThread: (conversation, replyId, text, turnFor) =>
-            runtime
-              .getConnectorCloud()
-              ?.reply({ replyId, conversation, turnId: Date.now(), text, turnFor }) ?? null,
+          replyInThread: (conversation, replyId, text, turnFor) => {
+            const cloud = ConnectorConversation.safeParse(conversation)
+            return cloud.success
+              ? (runtime.getConnectorCloud()?.reply({
+                  replyId,
+                  conversation: cloud.data,
+                  turnId: Date.now(),
+                  text,
+                  turnFor
+                }) ?? null)
+              : null
+          },
           turnForOf: (sessionId) => botTurnFor(runtime, sessionId, undefined),
           ...runtimeBotOwnerNotice(runtime)
         },
