@@ -30,13 +30,46 @@ describe("a bot's token", () => {
     const relay = { grant: async () => ({ origin: 'http://127.0.0.1:4100', token: 't' }) }
     const claude = await BotLaunchTools.for(
       relay,
-      { botId: 'b', folder: '/b', agent: 'claude' },
+      { botId: 'b', name: 'Scout', folder: '/b', agent: 'claude' },
       []
     )
-    const codex = await BotLaunchTools.for(relay, { botId: 'b', folder: '/b', agent: 'codex' }, [])
-    expect(withBotLaunchToolsEnv({}, claude)).toEqual({ ORCA_BOT_TOOLS_TOKEN: 't' })
+    const codex = await BotLaunchTools.for(
+      relay,
+      { botId: 'b', name: 'Scout', folder: '/b', agent: 'codex' },
+      []
+    )
+    expect(withBotLaunchToolsEnv({}, claude).ORCA_BOT_TOOLS_TOKEN).toBe('t')
     expect(claude.commandEnv).toEqual({})
-    expect(withBotLaunchToolsEnv({}, codex)).toEqual({})
+    expect(withBotLaunchToolsEnv({}, codex).ORCA_BOT_TOOLS_TOKEN).toBeUndefined()
     expect(codex.commandEnv).toEqual({ ORCA_BOT_TOOLS_TOKEN: 't' })
+  })
+
+  it.skipIf(process.platform === 'win32')(
+    "puts the bot's own gh first on PATH, in both agents' own environment",
+    async () => {
+      const relay = { grant: async () => ({ origin: 'http://127.0.0.1:4100', token: 't' }) }
+      const claude = await BotLaunchTools.for(
+        relay,
+        { botId: 'b', name: 'Scout', folder: '/b', agent: 'claude' },
+        []
+      )
+      const codex = await BotLaunchTools.for(
+        relay,
+        { botId: 'b', name: 'Scout', folder: '/b', agent: 'codex' },
+        []
+      )
+
+      const claudeEnv = withBotLaunchToolsEnv({}, claude)
+      expect(claudeEnv.PATH?.split(':')[0]).toContain('.gh-shims')
+      expect(claudeEnv).not.toHaveProperty('ORCA_BOT_GH_SHIM_DIR')
+      expect(withBotLaunchToolsEnv({}, codex).PATH?.split(':')[0]).toContain('.gh-shims')
+    }
+  )
+
+  it('installs no shim for a launch that cannot name its bot, rather than marking with another', async () => {
+    const relay = { grant: async () => ({ origin: 'http://127.0.0.1:4100', token: 't' }) }
+    const probe = await BotLaunchTools.for(relay, { botId: 'b', folder: '/b', agent: 'claude' }, [])
+
+    expect(withBotLaunchToolsEnv({}, probe)).not.toHaveProperty('PATH')
   })
 })

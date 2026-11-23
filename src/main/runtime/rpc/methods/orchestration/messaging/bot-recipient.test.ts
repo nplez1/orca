@@ -775,6 +775,42 @@ describe('mail to a bot', () => {
     })
   })
 
+  it("names this computer's owner only for a send from this computer's own shell", async () => {
+    const shell = { address: 'unknown', terminalHandle: null, paneKey: null, orcaSessionId: null }
+    const mail = (messageId: string) => ({
+      params: { subject: 'hello', body: 'how is it going?', type: 'question' as const },
+      from: 'unknown',
+      to: 'bot:Docs',
+      sender: shell,
+      routing: { run: undefined },
+      messageId
+    })
+
+    await sendToBot(
+      {
+        runtime,
+        orchestrationCaller: undefined,
+        recordMutationReceipt: undefined,
+        callerScope: { kind: 'owner' }
+      },
+      mail('msg_shell_ask')
+    )
+    expect(JSON.parse(db.getBotRequest('msg_shell_ask')!.record).askers).toMatchObject([
+      { kind: 'person', source: 'local', role: 'owner' }
+    ])
+
+    await sendToBot(
+      {
+        runtime,
+        orchestrationCaller: undefined,
+        recordMutationReceipt: undefined,
+        callerScope: { kind: 'runtime-paired', grants: [] }
+      },
+      mail('msg_peer_ask')
+    )
+    expect(JSON.parse(db.getBotRequest('msg_peer_ask')!.record).askers).toEqual([{ kind: 'owner' }])
+  })
+
   it('leaves mail that reaches no bot alone', async () => {
     journals[RANGER_THREAD] = [message('ask')]
     await expect(

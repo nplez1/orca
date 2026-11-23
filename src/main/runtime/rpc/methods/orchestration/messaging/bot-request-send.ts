@@ -23,7 +23,6 @@ import { generateId } from '../../../../orchestration/db/generated-id'
 import type { OrchestrationPartyIdentity as OrchestrationCallerIdentity } from '../../../../../../shared/orchestration/mailbox/orchestration-party-identity'
 import { OrchestrationError } from '../../../../orchestration/orchestration-error'
 import type { RunRow } from '../../../../orchestration/db/orchestration-records'
-import type { RpcContext } from '../../../core'
 import type { OrcaRuntimeService } from '../../../../orca-runtime'
 import type { SendParams } from './send-params'
 import {
@@ -41,6 +40,7 @@ import { botRequestChain, botRequestSendKey } from './bot-request-chain'
 import { askedInConversation } from './bot-request-record'
 import { resolveBareOrchestrationRecipient } from './recipient-routing'
 import { sessionCallerOf } from '../../../../orchestration/addressing/orchestration-caller-identity'
+import type { BotMailContext } from '../../../../../bots/fork-local-owner'
 
 type SendParamsInput = Pick<
   z.infer<typeof SendParams>,
@@ -58,7 +58,7 @@ export function mayReachBot(
 
 /** Mail that reaches a bot, by any address, is held to who the sending turn is for; null for other mail. */
 export async function sendToBot(
-  context: Pick<RpcContext, 'runtime' | 'orchestrationCaller' | 'recordMutationReceipt'>,
+  context: BotMailContext,
   mail: {
     params: SendParamsInput
     from: string
@@ -91,7 +91,7 @@ export async function sendToBot(
       'Group bot sessions accept peer requests only from current members of their own group.'
     )
   }
-  const acting = await readActingSender(runtime, db, callerSessionId, mail.sender, receiving)
+  const acting = await readActingSender(runtime, db, context, mail.sender, receiving)
   if (!acting) {
     return null
   }

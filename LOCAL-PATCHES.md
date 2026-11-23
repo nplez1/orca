@@ -5141,3 +5141,167 @@ text), `src/main/pi/rpc/launch/rpc-launch.test.ts` (`bash` in the read set, `rea
 `--extension`, and the throw for a `'read'` run with no gate), `src/main/bots/bot-look-around-start-failure.test.ts`
 (a wrapped too-old refusal keeps its cause, a plain failure does not), and the existing bot look-around
 suites.
+
+### `local(bots)`: talking to a bot without Orca Cloud, and the identity its writes carry
+
+Step 0 and Step 3 of `local/design/talking-to-bots.md`: a person can ask a bot on this computer something
+from their own shell, the bot is told who asked, and every GitHub body a bot writes carries an invisible
+marker that its own event rules read as "not mine". Step 1 (the loopback `POST /ask` listener) and Step 2
+(the Photon iMessage channel) are not built; the design note's status line says so. Authority does not
+move: a local ask runs as the owner, on the owner's credentials, exactly as a cloud turn does. What this
+patch adds is attribution — who is addressed, and which writes were the bot's.
+
+**The asker, and why it is not a flag.** `orca bot ask` is a thin CLI over `orchestration.send` — the same
+mail path `orca orchestration send --to bot:<name>` already uses — so it inherits every refusal, hold and
+dedupe instead of growing a parallel one. The asker is _not_ taken from the payload: a surface that can
+name a person is not the same thing as a person who may claim any identity. The host decides, from two
+things it alone knows: the send has no caller session behind it, and the transport did not prove the caller
+to be a paired device or a phone. Both hold only for a send from this computer's own shell, and only that
+send mints the owner as a `BotRequestPerson` (`source: 'local'`, `role: 'owner'`). Every other send keeps
+`OWNER_ACTS_FOR`'s bare owner, which is all a cloud turn or another computer's mail can claim — a paired
+Orca's mail arrives with no session of its own either, so the session test alone stamped another machine's
+agent as this computer's owner, which is what the scope test fixes. The CLI's own half of the same rule:
+`orca bot ask` sends a `from` only when the shell carries Orca's own `ORCA_TERMINAL_HANDLE`, and validates
+it so a stale one is re-minted. It never infers a terminal from the working folder — that would let an ask
+typed in any shell speak as a sibling pane, take its mail, and have the answer typed into its agent.
+
+**A withdrawn deliverable, recorded so the next reader does not re-add it.** An earlier commit in this
+patch carried a `fork-local-results.ts` that routed a run's result into the asking chat. It was
+misconceived and is deleted: a local ask is _mail_, which `bot-request-send.ts` delivers, while
+`deliverBotRunResult` only ever sees _automation_ runs — so the code never ran for a local ask, and for
+an automation run whose conversation held a local person it overrode the configured Slack/Linear/thread
+destination and posted to the Home Chat rather than the chat the ask came from. **The cloud-off reply hole
+(`bot-run-results.ts`: "Orca Cloud isn't connected, so the result wasn't posted") therefore stays open.**
+A fallback belongs there only where upstream returns `COPY.cloudOff`/`COPY.signedOut`, and would deliver
+to `result.sessionId` through `sendToSession`, not `sendToChat`.
+
+**Anchors, each the smallest diff that works in a file upstream owns — the reason is here, never in the
+file:**
+
+| File                                                                              | Line   | Change                                                                                                                |
+| --------------------------------------------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------- |
+| `src/shared/bots/bot-acts-for.ts`                                                 | `:9`   | `BotRequestPersonSource` and `BOT_REQUEST_SOURCE_NAMES`: `'local'` widens the asker's source, nothing else            |
+| `src/shared/bots/bot-acts-for.ts`                                                 | `:19`  | `source: BotRequestPersonSource` on `BotRequestPerson`                                                                |
+| `src/shared/bots/bot-acts-for.ts`                                                 | `:33`  | one function, `ownerAsPerson`, additive beside `OWNER_ACTS_FOR`                                                       |
+| `src/main/bots/bot-request-view.ts`                                               | `:1`   | one import, `BOT_REQUEST_SOURCE_NAMES` beside `BOT_QUIET_MARKER`                                                      |
+| `src/main/bots/bot-request-view.ts`                                               | `:45`  | `askedFromShell`, additive: a local person's ask is the owner at a shell, not the owner's agent                       |
+| `src/main/bots/bot-request-view.ts`                                               | `:80`  | the asker label reads `BOT_REQUEST_SOURCE_NAMES`, so a local asker reads as this computer                             |
+| `src/main/bots/bot-request-view.ts`                                               | `:92`  | the sender name says the shell, and `:182` says the answer comes back to the terminal it was asked from               |
+| `src/main/runtime/rpc/methods/orchestration/messaging/bot-recipient.ts`           | `:10`  | one import                                                                                                            |
+| `src/main/runtime/rpc/methods/orchestration/messaging/bot-recipient.ts`           | `:211` | `context` replaces `callerSessionId`, so the caller's own scope travels with the session                              |
+| `src/main/runtime/rpc/methods/orchestration/messaging/bot-recipient.ts`           | `:252` | one line, below the dispatch branch: `botMailCallerOf` names the session and the turn a send with no session acts for |
+| `src/main/runtime/rpc/methods/orchestration/messaging/bot-request-send.ts`        | `:43`  | one import                                                                                                            |
+| `src/main/runtime/rpc/methods/orchestration/messaging/bot-request-send.ts`        | `:61`  | the context is `BotMailContext`: the same fields, in one line, with the caller scope the decision reads               |
+| `src/main/runtime/rpc/methods/orchestration/messaging/bot-request-send.ts`        | `:94`  | one call: the context where the caller's session id used to be                                                        |
+| `src/main/runtime/rpc/methods/orchestration/federation/peer-mail-bot-delivery.ts` | `:63`  | `callerScope: { kind: 'runtime-paired', grants: [] }`: a paired Orca delivered it, not this shell                     |
+| `src/main/bots/bot-launch-tools.ts`                                               | `:8`   | one import                                                                                                            |
+| `src/main/bots/bot-launch-tools.ts`                                               | `:33`  | `name` on the bot a launch describes                                                                                  |
+| `src/main/bots/bot-launch-tools.ts`                                               | `:42`  | one expression: the shim folder, in the CLI's own env, only for a launch that can name its bot                        |
+| `src/main/bots/bot-launch-tools.ts`                                               | `:61`  | one spread: Codex's commands get the token, both agents' env get the shim folder                                      |
+| `src/main/bots/bot-launch-tools.ts`                                               | `:75`  | `withBotLaunchToolsEnv` merges through `withBotGhShimOnPath` instead of the raw env                                   |
+| `src/main/bots/bot-tools-file.ts`                                                 | `:284` | `'name'` joins the `Pick`, and the bot's name reaches `BotLaunchTools.for`                                            |
+| `src/main/bots/bot-tools-file.ts`                                                 | `:301` | one property: the name, so the shim carries the bot's name rather than its id                                         |
+| `src/main/connector-cloud/own-pr-trigger-guard.ts`                                | `:11`  | one import                                                                                                            |
+| `src/main/connector-cloud/own-pr-trigger-guard.ts`                                | `:14`  | `'text'` joins `OwnPrRun`'s `Pick`, so the body is readable                                                           |
+| `src/main/connector-cloud/own-pr-trigger-guard.ts`                                | `:81`  | one condition: a marked body is the bot's work, beside the head-branch check                                          |
+| `src/cli/specs/bot.ts`                                                            | `:45`  | the `bot ask` spec                                                                                                    |
+| `src/cli/bots/bot-handler-groups.ts`                                              | `:10`  | the handler group, so the command has a handler behind it                                                             |
+| `skill-guides/orca-cli/references/bots.md`                                        | table  | one row, so the guide names the command                                                                               |
+
+**No `bot-preamble.ts` line.** An earlier commit taught `orca bot ask` in the bot's own Tools and Rules;
+that is dropped. `bot-command-drift.test.ts` checks that commands the preamble and guides _teach_ parse
+against the CLI — it never forces the reverse, so nothing asked for that line, and it told a bot to run a
+command a person runs. The guide row stays because it documents the command where the guide already
+documents every other one.
+
+**The marker, appended by code the bot cannot skip.** `fork-gh-shim.ts` writes a bash `gh` into
+`~/.orca/bots/.gh-shims/<botId>/gh`, and a bot launch puts that folder first on `PATH` through
+`BotLaunchTools`, so no preamble line the model has to remember is involved. The shim marks the body of
+every verb that posts one — `pr comment`, `issue comment`, `pr review`, `pr create`, `pr edit`,
+`issue create`, `issue edit`, and `new`, which gh aliases to `create` — in a single rewrite: it finds the
+verb past a persistent `-R`/`--repo`, takes the **last** body flag including the attached short forms gh
+accepts (`-bText`, `-b=Text`, `-FFile`, `--body-file=`), reads a file or `-` for stdin, drops every body
+argument and hands gh one `--body "<text>\n\n<!-- orca-bot:<name> -->"`. Everything else `exec`s
+byte-identical, exit code included — and the shapes whose body it cannot mark are refused with exit 2
+rather than posted unmarked (see the limits below).
+A body travels as an argument (GitHub caps one at 65,536 characters, far under `ARG_MAX`), so there is no
+temp file to leak on a signal. An empty body stays empty: a marker on its own would turn a refused comment
+into a blank one. It finds the real `gh` by PATH order and compares inodes (`-ef`), because `pwd -P` on
+macOS turns `/tmp` into `/private/tmp` and the first version resolved itself and recursed forever. The
+marker takes `>` and a doubled hyphen out of the bot's name — one would break the read-back, the other ends
+the HTML comment and renders the rest visibly.
+
+**Coverage, measured rather than assumed.** Every structured agent in a bot home gets the shim, because
+`botSessionToolServers` → `BotLaunchTools.for` → `withBotLaunchToolsEnv` is the one env path they all take:
+Claude (`claude-structured-launch-resolution.ts:257`), Codex (`codex-structured-launch-resolution.ts:228`),
+Pi (`rpc-launch-resolution.ts:264`) and ACP agents (`acp-structured-launch-resolution.ts:295`). **Bot workers
+do not**: `botSessionToolServers` returns `BotLaunchTools.none` for a session outside the bot's home
+(`bot-tools-file.ts:289`), so a worker's `gh` is unmarked even though workers open most bot pull requests —
+for those, the head-branch check is what identifies the work, and only while the worker is live. Windows
+bots get no shim at all: `installBotGhShim` returns null there.
+
+**Probe launches install nothing.** `cliWithLaunchTools` (`bot-tools-host.ts`, `bot-tools-sign-in.ts`) hands
+`BotLaunchTools.for` no name, and the shim is installed only when there is one. An earlier version fell back
+to the bot's id, which rewrote the file the live session runs with a marker naming the id instead of the bot.
+
+**Deliberately not done here.**
+
+- **The `Co-authored-by:` trailer.** It needs the same shim family for `git`, an email per bot, and a
+  decision about repos that require signed commits; more than a shim and its test, so deferred.
+- **`BotChatOrigin`.** A local ask wants a seventh origin, but that union is upstream's and reaches icons,
+  labels and the phone; a local conversation's chat shows as `side` until it is worth the divergence.
+- **A separate `'local'` member of `CONNECTOR_SOURCES`.** The first version added one; it widened every
+  `z.enum` built on that list (`connector-message-asker.ts`, `bot-link-open-target.ts`, `bot-deep-link.ts`),
+  so a cloud payload or a deep link could claim `local`. The widened _asker_ source does the job and keeps
+  the connector union what it was.
+
+**The honest limits.**
+
+- **Comment verbs the shim does not cover.** `issue close`, `pr close` and `reopen --comment` post a body
+  too, and are not marked; the shim marks the verbs a bot writes with, not every verb gh has.
+- **Calls that bypass the shim entirely.** `gh api -f body=…` writes a body through the API, `env -i` and an
+  absolute path to another `gh` skip PATH, and a bot's own `gh alias set` can point anywhere. None is
+  detected; the fallback the design note names — recording the ids of the comments the fork created — is
+  not built.
+- **It fails closed where it cannot mark.** `--fill`/`--fill-first`/`--fill-verbose`, a `-T`/`--template`
+  with no body, and a combined short flag that could hide `-b`/`-F` (`-db`, `-dF`) exit 2 with a message
+  telling the bot to pass `--body`. A bot sees that as a refused command; it is deliberate, because the
+  alternative is a body posted unmarked. `--body` with `--body-file` is passed through to gh, which
+  refuses the pair itself.
+- **Inlining `--body-file` moves relative image resolution.** gh 2.103 resolves a relative `--attach` path
+  against the body file's directory; the shim hands gh the body as an argument, so it resolves against the
+  working directory instead. Absolute paths are unaffected.
+- **PATH is not ours to keep.** The shim only stays first if the shell does not put another `gh` ahead of
+  it: with `~/.local/bin` absent from the inherited PATH, `~/.zshenv` prepends it, and any profile that
+  prepends gh's own directory does the same. Nothing detects it, and the marker would then be missing with
+  no signal. The fallback the design note names — recording the ids of the comments the fork created — is
+  not built.
+- **`.gh-shims/<botId>` is never removed** when a bot is deleted.
+- **`askedInOwnersChat` still reads `asker.kind === 'owner'`**, so a local owner's request is labelled as a
+  person's on the _sender's_ view lines. The receiving bot reads the owner's name, which is the point.
+- **The cloud-off reply hole stays open** (see the withdrawn deliverable above).
+
+**Two files sit exactly at the 300-line budget.** `bot-recipient.ts` (300) and `bot-request-send.ts`
+(299) are upstream files that were at 298/299 before this patch: the fork's diff on each was paid for by
+shaping it as a parameter swap and one call rather than new statements. A sync that grows either file has
+to shrink the fork's share first, or the `max-lines` rule fails on a file the fork did not touch.
+
+**The next sync's obligation.** `bot_conversation_acts_for` rows this patch wrote hold
+`{"kind":"person","source":"local"}`, and bot request records hold the same. Those rows are persisted: a
+sync must not narrow `BotRequestPersonSource` back to `ConnectorSource`, and must keep
+`BOT_REQUEST_SOURCE_NAMES` covering `'local'`, or an existing conversation's asker stops reading and its
+turns fall to `unknown`. The ratchet files to watch are `bot-acts-for.ts` (the widened source),
+`bot-recipient.ts` (`readActingSender`'s `context` parameter and `botMailCallerOf`), and
+`bot-launch-tools.ts` (the env merge).
+
+Tests: `src/shared/bots/bot-acts-for.test.ts` (the owner as a person is still the owner),
+`src/main/bots/fork-local-owner.test.ts` (the turn names the owner, and only a send with no session, the
+owner's scope and no peer delivery counts as this shell), `src/main/bots/fork-gh-shim.test.ts` (the
+**generated** shim driven against a fake `gh`: every marked verb, the attached and `--body-file=` forms,
+`-F -`, a repeated `-b`, `pr -R … comment`, an empty body left alone, four byte-identical passthroughs
+including a failing one's exit code, the name sanitiser, and the install gate),
+`src/cli/bots/fork-bot-ask.test.ts` (unknown and ambiguous bots, a chat that takes no mail, the id address,
+the `from` it sends and prints, the subject), `src/main/connector-cloud/own-pr-trigger-guard.test.ts` (the
+marker as own work, without asking the branch), and
+`src/main/runtime/rpc/methods/orchestration/messaging/bot-recipient.test.ts` (both directions of the local
+asker: this shell's send is the owner as a person, a paired Orca's is the bare owner).

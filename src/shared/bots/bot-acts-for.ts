@@ -1,12 +1,22 @@
 // Who a bot's conversation acts for, as Orca recorded it when the conversation started: the owner, or
 // the people a teammate's request or automation came from. Every check on whom a bot may ask reads it.
-import type { ConnectorSource } from '../connectors/external-conversation-link'
+import {
+  CONNECTOR_SOURCE_NAMES,
+  type ConnectorSource
+} from '../connectors/external-conversation-link'
 import type { ConnectorAskerPlaceKind } from '../connectors/connector-cloud-contract'
+
+export type BotRequestPersonSource = ConnectorSource | 'local'
+
+export const BOT_REQUEST_SOURCE_NAMES: Record<BotRequestPersonSource, string> = {
+  ...CONNECTOR_SOURCE_NAMES,
+  local: 'this computer'
+}
 
 /** A person a request is for; `workspaceId` is null when Orca doesn't know which workspace they asked in. */
 export type BotRequestPerson = {
   kind: 'person'
-  source: ConnectorSource
+  source: BotRequestPersonSource
   userId: string
   name?: string
   workspaceId: string | null
@@ -19,6 +29,17 @@ export type BotRequestPerson = {
 export type BotRequestAsker = { kind: 'owner' } | BotRequestPerson | { kind: 'unknown' }
 
 export const OWNER_ACTS_FOR: readonly BotRequestAsker[] = [{ kind: 'owner' }]
+
+export function ownerAsPerson(owner: { userId: string; name?: string }): BotRequestPerson {
+  return {
+    kind: 'person',
+    source: 'local',
+    userId: owner.userId,
+    ...(owner.name ? { name: owner.name } : {}),
+    workspaceId: null,
+    role: 'owner'
+  }
+}
 
 /** Whether every person named is the bots' owner, by Orca's record or the cloud's verdict. */
 export function actsForOwner(askers: readonly BotRequestAsker[]): boolean {

@@ -7,6 +7,7 @@ import { botOfAddress, parseBotAddress } from '../../../../../../shared/bot-rost
 import { isFinalAutomationRunStatus } from '../../../../../../shared/automations/history/automation-run'
 import { isConnectorSource } from '../../../../../../shared/automation-event-triggers'
 import { botOfSession } from '../../../../../bots/bot-session-tabs'
+import { botMailCallerOf, type BotMailContext } from '../../../../../bots/fork-local-owner'
 import { requireStructuredHost } from '../../../../../bots/bot-chat-session'
 import { readBotConversationActsFor } from '../../../../../bots/bot-conversation-acts-for'
 import {
@@ -207,7 +208,7 @@ function workspaceOf(externalId: string): string | null {
 export async function readActingSender(
   runtime: OrcaRuntimeService,
   db: OrchestrationDb,
-  callerSessionId: string | undefined,
+  context: BotMailContext,
   sender: OrchestrationCallerIdentity,
   receiving: ReceivingBot
 ): Promise<ActingSender | null> {
@@ -248,8 +249,9 @@ export async function readActingSender(
       conversation: null
     }
   }
+  const { callerSessionId, turn: ownerTurn } = botMailCallerOf(context, OWNER_TURN)
   if (!callerSessionId) {
-    return { sessionId: null, bot: null, turn: OWNER_TURN, conversation: null }
+    return { sessionId: null, bot: null, turn: ownerTurn, conversation: null }
   }
   const bot = botOfSession(runtime.bots, callerSessionId)
   const read = await readBotTurn(runtime, db, callerSessionId)

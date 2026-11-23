@@ -5,6 +5,7 @@ import type { BotToolProblem, BotToolServer } from '../../shared/bot-tools'
 import type { BotToolsCli } from './bot-tools-host'
 import { botToolRelay, type BotToolRelay } from './tool-relay/bot-tool-relay'
 import { BOT_TOOLS_TOKEN_ENV } from '../../shared/agent-session/lifecycle/launch/agent-session-caller-env'
+import { botGhShimEnv, withBotGhShimOnPath } from './fork-gh-shim'
 const LOOPBACK_HOSTS = ['127.0.0.1', 'localhost', '::1']
 
 /** A bot's servers ready for its CLI; only `BotLaunchTools.for` makes one, so no saved value slips through. */
@@ -29,7 +30,7 @@ export class BotLaunchTools {
    */
   static async for(
     relay: Pick<BotToolRelay, 'grant'>,
-    bot: { botId: string; folder: string; agent: string },
+    bot: { botId: string; folder: string; agent: string; name?: string },
     servers: readonly BotToolServer[]
   ): Promise<BotLaunchTools> {
     if (servers.some((server) => 'url' in server && Object.keys(server.headers ?? {}).length > 0)) {
@@ -38,6 +39,7 @@ export class BotLaunchTools {
     }
     const { origin, token } = await relay.grant(bot.botId, bot.folder)
     const tokenEnv = { [BOT_TOOLS_TOKEN_ENV]: token }
+    const shimEnv = await botGhShimEnv({ id: bot.botId, ...(bot.name ? { name: bot.name } : {}) })
     // Claude and Pi expand `${VAR}` in a server's headers, so their config names only the variable.
     const authorization = ENV_REFERENCING_AGENTS.has(bot.agent)
       ? `Bearer \${${BOT_TOOLS_TOKEN_ENV}}`
@@ -56,7 +58,7 @@ export class BotLaunchTools {
           headers: { authorization }
         }
       }),
-      commandsOnly ? {} : tokenEnv,
+      commandsOnly ? shimEnv : { ...tokenEnv, ...shimEnv },
       commandsOnly ? tokenEnv : {},
       servers.some((server) => 'url' in server && server.credential)
     )
@@ -70,16 +72,17 @@ export function withBotLaunchToolsEnv(
   env: Record<string, string>,
   tools: BotLaunchTools
 ): Record<string, string> {
+  const launchEnv = withBotGhShimOnPath({ ...env, ...tools.env })
   if (!tools.relayed) {
-    return Object.keys(tools.env).length > 0 ? { ...env, ...tools.env } : env
+    return launchEnv
   }
   // Both CLIs send loopback calls into HTTP(S)_PROXY unless NO_PROXY names loopback.
-  const existing = [env.NO_PROXY, env.no_proxy]
+  const existing = [launchEnv.NO_PROXY, launchEnv.no_proxy]
     .flatMap((value) => (value ?? '').split(','))
     .map((entry) => entry.trim())
     .filter(Boolean)
   const noProxy = [...new Set([...existing, ...LOOPBACK_HOSTS])].join(',')
-  return { ...env, ...tools.env, NO_PROXY: noProxy, no_proxy: noProxy }
+  return { ...launchEnv, NO_PROXY: noProxy, no_proxy: noProxy }
 }
 
 /** The bot's servers as its CLI gets them for a turn, and the CLI with the env that goes with them. */

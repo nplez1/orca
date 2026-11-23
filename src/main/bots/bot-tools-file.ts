@@ -281,7 +281,7 @@ export function botOwnTool(server: BotToolServer, folder: string): BotOwnTool {
 /** Any agent's session in a bot's home folder gets that bot's own tools and token; any other session none.
  *  `launched` comes from the same read as the tools, so a write during launch can't look applied. */
 export async function botSessionToolServers(
-  bots: readonly Pick<Bot, 'id' | 'folderWorkspaceId'>[],
+  bots: readonly Pick<Bot, 'id' | 'name' | 'folderWorkspaceId'>[],
   record: { provider: string; location: { workspaceId: string } },
   launchDirectory: string,
   relay: Pick<BotToolRelay, 'grant'> = botToolRelay
@@ -298,7 +298,7 @@ export async function botSessionToolServers(
   return {
     tools: await BotLaunchTools.for(
       relay,
-      { botId: bot.id, folder: launchDirectory, agent: record.provider },
+      { botId: bot.id, name: bot.name, folder: launchDirectory, agent: record.provider },
       snapshot.servers
     ),
     launched: {

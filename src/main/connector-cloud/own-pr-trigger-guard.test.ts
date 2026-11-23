@@ -57,6 +57,17 @@ describe('own pull request guard', () => {
     )
   })
 
+  it("starts nothing for a body a bot's own gh wrote, even on someone else's branch", async () => {
+    const isBotWork = vi.fn(async () => false)
+    const marked = { ...run, text: 'Opened by the bot.\n\n<!-- orca-bot:Scout -->' }
+
+    expect(await ownPrRefusal(deps({ isBotWork }), marked, ownPr)).toBe('bot_work')
+    expect(isBotWork).not.toHaveBeenCalled()
+    expect(
+      await ownPrRefusal(deps({ isBotWork }), { ...run, text: 'Opened by hand.' }, ownPr)
+    ).toBeNull()
+  })
+
   it("leaves everyone else's events, and the owner's other events, alone", async () => {
     const isBotWork = vi.fn(async () => true)
     const guard = deps({ isBotWork })

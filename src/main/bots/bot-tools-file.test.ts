@@ -54,20 +54,36 @@ describe("a bot's tools file", () => {
   it("gives its servers and token to sessions in the bot's home folder, and only there", async () => {
     const folder = tempDir('bot-tools-file-')
     await writeBotToolServers(folder, [notion])
-    const bots = [{ id: 'scout', folderWorkspaceId: 'scout-home' }]
+    const bots = [{ id: 'scout', name: 'Scout', folderWorkspaceId: 'scout-home' }]
     const home = folderWorkspaceKey('scout-home')
     const launch = (workspaceId: string) =>
       botSessionToolServers(bots, { provider: 'grok', location: { workspaceId } }, folder, relay)
 
     const { tools } = await launch(home)
     expect(tools.servers).toEqual([notion])
-    expect(tools.env).toEqual({ ORCA_BOT_TOOLS_TOKEN: 'bot-token' })
+    expect(tools.env.ORCA_BOT_TOOLS_TOKEN).toBe('bot-token')
 
     const elsewhere = await launch('repo-1')
     expect(elsewhere.tools.servers).toEqual([])
     expect({ ...elsewhere.tools.env, ...elsewhere.tools.commandEnv }).toEqual({})
     expect(elsewhere.launched).toBeNull()
   })
+
+  it.skipIf(process.platform === 'win32')(
+    "gives a launch in the bot's home the bot's own gh, first on its PATH",
+    async () => {
+      const folder = tempDir('bot-tools-file-')
+      const bots = [{ id: 'scout', name: 'Scout', folderWorkspaceId: 'scout-home' }]
+      const { tools } = await botSessionToolServers(
+        bots,
+        { provider: 'grok', location: { workspaceId: folderWorkspaceKey('scout-home') } },
+        folder,
+        relay
+      )
+
+      expect(tools.env.ORCA_BOT_GH_SHIM_DIR).toContain('.gh-shims')
+    }
+  )
 
   it('keeps header values out of the file, sealed in the host store bound to the address', async () => {
     const folder = tempDir('bot-tools-file-')
@@ -175,7 +191,7 @@ describe('saving a tool', () => {
 })
 
 describe('the tools a chat launched with', () => {
-  const bots = [{ id: 'scout', folderWorkspaceId: 'scout-home' }]
+  const bots = [{ id: 'scout', name: 'Scout', folderWorkspaceId: 'scout-home' }]
   const launch = (
     folder: string,
     provider = 'codex',

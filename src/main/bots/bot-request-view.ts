@@ -1,9 +1,12 @@
 // What each side of a bot request reads, worked out from Orca's record of it: who sent it and for whom,
 // how to answer and where the answer appears, and what the sender does when an answer comes back.
-import { CONNECTOR_SOURCE_NAMES } from '../../shared/connectors/external-conversation-link'
 import { BOT_QUIET_MARKER } from '../../shared/bot-quiet-result'
 import type { BotRequestConversation } from './bot-request-asker'
-import type { AutomationTriggeredBy, BotRequestAsker } from '../../shared/bots/bot-acts-for'
+import {
+  BOT_REQUEST_SOURCE_NAMES,
+  type AutomationTriggeredBy,
+  type BotRequestAsker
+} from '../../shared/bots/bot-acts-for'
 import type { BotRequestPurpose } from './bot-request-policy'
 import type { BotGroupPeerScope } from '../../shared/bots/bot-group-schema'
 import { AUTOMATION_EVENT_SOURCE_NAMES } from '../automations/automation-event-prompt'
@@ -39,6 +42,18 @@ const CHANNELS = new Set(['public_channel', 'private_channel', 'channel'])
 const askedByOf = (record: Pick<BotRequestRecord, 'askers' | 'askedBy'>): BotRequestAsker[] =>
   record.askedBy ?? record.askers
 
+export function askedFromShell(record: {
+  fromBotId?: string | null
+  askers?: readonly BotRequestAsker[]
+  askedBy?: readonly BotRequestAsker[]
+}): boolean {
+  const asked = record.askedBy ?? record.askers ?? []
+  return (
+    (record.fromBotId ?? null) === null &&
+    asked.some((asker) => asker.kind === 'person' && asker.source === 'local')
+  )
+}
+
 /** The Slack thread a handed-over job is answered in, as the receiving bot itself; null anywhere
  *  else (a DM is the asker's with the sender's own app; Linear and GitHub share one app), where the
  *  answer goes back to the sender to pass on. */
@@ -62,19 +77,19 @@ export function botRequestAskerLabel(asker: BotRequestAsker): string {
     return 'your owner'
   }
   return asker.kind === 'person'
-    ? `${asker.name ?? 'someone'} on ${CONNECTOR_SOURCE_NAMES[asker.source]}`
+    ? `${asker.name ?? 'someone'} on ${BOT_REQUEST_SOURCE_NAMES[asker.source]}`
     : 'someone Orca cannot name'
 }
 
 const askersOf = (record: BotRequestRecord): string =>
   askedByOf(record).map(botRequestAskerLabel).join(', ')
 
-/** Who sent it, as the receiving bot reads it. */
 export function botRequestSenderName(
-  record: Pick<BotRequestRecord, 'fromBotName' | 'fromWorker'>
+  record: Pick<BotRequestRecord, 'fromBotName' | 'fromWorker'> &
+    Partial<Pick<BotRequestRecord, 'askers' | 'askedBy' | 'fromBotId'>>
 ): string {
   if (!record.fromBotName) {
-    return "your owner's agent"
+    return askedFromShell(record) ? "your owner at this computer's shell" : "your owner's agent"
   }
   return record.fromWorker ? `${record.fromBotName}'s worker` : record.fromBotName
 }
@@ -162,7 +177,9 @@ export function botRequestView(
     answer: reply('<your answer>'),
     answerAppears:
       record.purpose === 'question'
-        ? `${sender}'s conversation, waking it to finish the job`
+        ? askedFromShell(record)
+          ? `back to ${sender}, where they read it with orca orchestration check`
+          : `${sender}'s conversation, waking it to finish the job`
         : askedInOwnersChat(record)
           ? `${sender}'s conversation, where your owner reads it`
           : `${sender}'s conversation, which passes it on to ${askers}`
