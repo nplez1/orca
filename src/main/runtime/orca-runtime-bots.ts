@@ -260,11 +260,6 @@ export abstract class OrcaRuntimeWithBots extends OrcaRuntimeWithLinearCommands 
   /** A bot session's gate on a queued message; the runtime overrides it. */
   protected assertStructuredQueuedMessageAllowed(_sessionId: string, _messageId: string): void {}
 
-  /** The bots on this host's store, read per call. */
-  protected wiredBots(): readonly WiredBot[] {
-    return this.store?.getBots?.() ?? []
-  }
-
   /** The structured host's bot side: their sessions' tools and memory, Look around, and the queued-message gate. */
   protected botStructuredSessionHostDeps(store: () => RuntimeStore) {
     return {
@@ -299,7 +294,7 @@ export abstract class OrcaRuntimeWithBots extends OrcaRuntimeWithLinearCommands 
   protected botAttentionDeliveryDeps() {
     const muteDeps = {
       isWorkspaceMuted: (id: string) => this.isWorkspaceNotificationMuted(id),
-      bots: () => this.wiredBots()
+      bots: () => this.store?.getBots?.() ?? []
     }
     type Muted = Parameters<typeof isStructuredAttentionMuted>
     return {
@@ -311,7 +306,7 @@ export abstract class OrcaRuntimeWithBots extends OrcaRuntimeWithLinearCommands 
 
   /** Gives installed bots' older background chats their rows once the chat host is up. */
   protected backfillBotBackgroundChats(): Promise<void> {
-    return backfillInstalledBotBackgroundChats(() => this.wiredBots())
+    return backfillInstalledBotBackgroundChats(() => this.store?.getBots?.() ?? [])
   }
 
   protected abstract leaveBotGroups(botId: string): Promise<void>

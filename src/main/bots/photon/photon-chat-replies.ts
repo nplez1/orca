@@ -29,12 +29,13 @@ export function photonChatTurnEnded(
   }
   // Checked before the read, not after: every bot turn on the host comes through here, and a journal
   // read it cannot use is a cost paid by chats this channel never opened.
-  if (!channel.answersChat(bot.id, sessionId)) {
-    return
-  }
-  void readItems(null)
-    .then((rows) => channel.sendChatTurnResult({ botId: bot.id, chatId: sessionId, turnId, rows }))
-    .catch((error: unknown) =>
-      console.warn('[photon] could not send a finished turn’s answer', error)
-    )
+  void (async (): Promise<void> => {
+    if (!(await channel.answersChat(bot.id, sessionId))) {
+      return
+    }
+    const rows = await readItems(null)
+    await channel.sendChatTurnResult({ botId: bot.id, chatId: sessionId, turnId, rows })
+  })().catch((error: unknown) =>
+    console.warn('[photon] could not send a finished turn’s answer', error)
+  )
 }

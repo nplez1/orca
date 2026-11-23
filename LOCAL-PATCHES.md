@@ -5670,14 +5670,24 @@ each module keeps one store, so the charge lands once per file. Collapsing them 
 for four different file shapes, which is worse code than six documented rows. Every read in all six is
 asynchronous; nothing here reads on the message path.
 
-**One foreign red, recorded rather than fixed.** `useIpynbDocumentEditing.ts:153:6` carries an
-`react-hooks(exhaustive-deps)` warning about an unnecessary `fileId` dependency, and `pnpm lint` runs
-oxlint with `--deny-warnings`. The file is upstream's, this branch does not touch it (`git diff main
---name-only` lists nothing under `src/renderer`), and it reproduces on `main` at `9d8c6c8cb64` when oxlint
-runs on that file alone. It is `local/lint-known-red.json`'s first `oxlint` entry, matched on the message:
-its class is `upstream-exhaustive-deps-warning`, not this patch's. The entry the gate reported as stale —
-`check:code-quality:changed`, `wholeStep`, left from the 2026-11-20 sync — is gone, because the changed
-checks run clean here.
+**One upstream warning, fixed in one token rather than allowlisted.**
+Two files, one claim each. `useIpynbDocumentEditing.ts:153` carried an `react-hooks(exhaustive-deps)` warning: `fileId` in
+`flushSourceDrafts`'s dependency array, which the callback never reads — it works off
+`sourceDraftsRef`, `draftBasesRef` and `contentRef`, all stable, plus `latestCells`. `pnpm lint` runs
+oxlint with `--deny-warnings`, so the warning was a failing step. It reproduced on `main` at
+`9d8c6c8cb64` when oxlint ran on that file alone, so it is not this branch's bug; the repair is the
+dependency list `[latestCells]`, which is what the hook actually closes over, and no behaviour changes.
+
+Recorded as an anchor because it is an upstream file:
+
+| File                                                                                               | Anchor                                         | Change                                                                                                               |
+| -------------------------------------------------------------------------------------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `src/renderer/src/components/editor/notebook/document/useIpynbDocumentEditing.ts`                  | `flushSourceDrafts`'s dependency array         | `[fileId, latestCells]` → `[latestCells]`; `fileId` was never read by the callback                                   |
+| `src/renderer/src/components/editor/rich-markdown/document/useRichMarkdownPendingSerialization.ts` | `flushPendingSerialization`'s dependency array | the same claim in the markdown editor: `fileId` removed, and it is read only by the neighbouring hook two lines down |
+
+`local/lint-known-red.json` therefore keeps **no** entry for this branch, and the one the gate reported as
+stale — `check:code-quality:changed`, `wholeStep`, left from the 2026-11-20 sync — is gone, because the
+changed checks run clean here.
 
 ### `local(test)`: one `host-load` flake seen on the iMessage branch, and why the red set was left alone
 

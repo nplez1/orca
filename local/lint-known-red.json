@@ -39,13 +39,5 @@
     "2026-11-20 sync (upstream 0c6207e3d7): one whole-step entry for `check:code-quality:changed`, which cannot pass before `main` is pushed \u2014 E2BIG on the 2000-commit diff, see LOCAL-PATCHES.md \u00a7 `local(lint)`: the 2026-11-20 sync's lint gate. It goes stale on the first run after `git push origin main`; prune it then. The three ratchets that arrived with this sync were closed in the tree and in two new `.fork.txt` overlays, not here."
   ],
   "recordedAt": "2026-11-20",
-  "entries": [
-    {
-      "step": "oxlint",
-      "class": "upstream-exhaustive-deps-warning",
-      "owner": "upstream",
-      "match": "useIpynbDocumentEditing\\.ts:153:6: warning react-hooks\\(exhaustive-deps\\)",
-      "evidence": "LOCAL-PATCHES.md \u00a7 local(lint): a warning in an upstream file this branch does not touch \u2014 `react-hooks(exhaustive-deps)` reports `fileId` as an unnecessary dependency of a `useCallback`, and `pnpm lint` runs oxlint with `--deny-warnings`, so it is red rather than noisy. Reproduced on main (9d8c6c8cb64) by running oxlint on that file alone, and `git diff main --name-only` lists no file under src/renderer for this branch."
-    }
-  ]
+  "entries": []
 }

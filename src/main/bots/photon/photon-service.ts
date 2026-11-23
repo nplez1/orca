@@ -266,10 +266,9 @@ export class PhotonService {
     return this.deps.store.noteUnknownSender(botId)
   }
 
-  /** Whether this chat is one the channel answers, which is the check a turn end makes before reading
-   *  any journal. */
-  answersChat(botId: string, chatId: string): boolean {
-    return this.deps.threads.conversationFor(botId, chatId) !== null
+  /** Whether this chat is one the channel answers: the check a turn end makes before reading a journal. */
+  async answersChat(botId: string, chatId: string): Promise<boolean> {
+    return (await this.deps.threads.conversationFor(botId, chatId)) !== null
   }
 
   /** Follows every bot that has a key and has not been released, and replays what Orca never dealt with. */
@@ -277,22 +276,25 @@ export class PhotonService {
     void this.deps.streams.startAll().then(() => this.replayPending())
   }
 
-  /** Replays what Orca wrote down and never dealt with, for every live bot. This is the crash recovery
-   *  the inbox exists for, and it runs at startup because that is when a crash is discovered. */
-  async replayPending(): Promise<void> {
+  /** Replays what Orca wrote down and never dealt with, for every live bot: the crash recovery the inbox
+   *  exists for, run at startup because that is when a crash is discovered. */
+  private async replayPending(): Promise<void> {
     for (const record of await this.deps.store.bots()) {
-      if (!record.released) {
-        this.replay(record.botId, record.projectId)
-      }
+      await this.replayBot(record.botId)
+    }
+  }
+
+  /** Replays a live bot's unhandled messages; a released one has none to replay. */
+  private async replayBot(botId: string): Promise<void> {
+    const record = await this.deps.store.bot(botId)
+    if (record && !record.released) {
+      this.replay(botId, record.projectId)
     }
   }
 
   /** Replays one bot's held messages, for a bot that has just been resumed from a pause. */
   async releaseHeld(botId: string): Promise<void> {
-    const record = await this.deps.store.bot(botId)
-    if (record && !record.released) {
-      this.replay(botId, record.projectId)
-    }
+    await this.replayBot(botId)
   }
 
   /** Fire-and-forget on purpose: a caller that provisioned a bot should not wait on its socket. */
@@ -306,10 +308,6 @@ export class PhotonService {
 
   stopStream(botId: string): void {
     this.deps.streams.stop(botId)
-  }
-
-  stopStreams(): void {
-    this.deps.streams.stopAll()
   }
 
   streamStatus(botId: string): PhotonStreamStatus | null {
