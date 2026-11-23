@@ -5658,3 +5658,11 @@ that is why the gate could not treat the flake as inert on its own.
 - The test was **not** edited. How it behaves under load is upstream's to fix, and changing an upstream
   suite in the fork costs more at the next sync than the red costs now (the same rule that keeps the
   other classes out of the fork's files).
+- **The reconciliation, stated because the file's own arithmetic test pins it.** A new entry cannot be
+  added to `local/unit-known-red.json` on top of an old run: `tests/tools/unit-gate.test.mjs` requires
+  `observedRun.allowlisted === entries.length + prunedSince.length`, so an entry that was never in the
+  recorded run has no place in it. `observedRun` is therefore this branch's gate run at `0a8fa3bde4`
+  (one failing record, one allowlisted, nothing fixed), and the previous run's fifty `prunedSince` rows
+  — the 2026-10-29 sweep, each with its commit and reason — are kept verbatim under
+  `prunedBeforeThisRun`, which is history rather than an assertion about this run. Nothing was
+  re-derived by editing a number, and none of the fifty repairs was undone.
