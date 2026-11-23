@@ -246,8 +246,7 @@ export function changeBotToolServers(
   })
 }
 
-/** The revision a launch would read now; concurrent asks for one folder share a read. */ const revisionReads =
-  new Map<string, Promise<string>>()
+const revisionReads = new Map<string, Promise<string>>()
 export function currentBotToolsRevision(folder: string): Promise<string> {
   const running = revisionReads.get(folder)
   if (running) {

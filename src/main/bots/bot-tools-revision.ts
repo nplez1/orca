@@ -27,7 +27,6 @@ export function botToolsRevision(version: string, epoch: number): string {
   return createHash('sha256').update(`${version}\0${epoch}`).digest('hex')
 }
 
-/** The GitHub App a launch's `gh` acted as: the identity epoch it launched under, and that installation. */
 export type BotLaunchedAppIdentity = {
   epoch: number
   installationId: number | null

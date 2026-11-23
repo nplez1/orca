@@ -22,7 +22,6 @@ export class BotLaunchTools {
     readonly commandEnv: Readonly<Record<string, string>>,
     /** Some tool goes through the relay, so the CLI must reach loopback directly. */
     readonly relayed: boolean,
-    /** The CLI snapshots its own env to disk, so a secret belongs only to the commands it runs. */
     private readonly commandsOnly: boolean
   ) {}
 
@@ -67,10 +66,6 @@ export class BotLaunchTools {
     )
   }
 
-  /**
-   * The App's token, which belongs to one session launch: a tool check or a sign-in never carries it, and
-   * Codex gets it in the env of the commands it runs rather than its own, which it snapshots to disk.
-   */
   withGithubAppEnv(appEnv: Readonly<Record<string, string>>): BotLaunchTools {
     if (Object.keys(appEnv).length === 0) {
       return this

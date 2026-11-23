@@ -127,7 +127,6 @@ describe("a bot chat's tools", () => {
         folder
       )
     await launch('chat-1')
-    // No App connected: its absence is not a reason to start the chat again on every turn.
     expect(await wiring.launchTools.changed('chat-1')).toBe(false)
     expect(wiring.launchTools.outdated('chat-1')).toBe(false)
 
@@ -136,7 +135,6 @@ describe("a bot chat's tools", () => {
     expect(await wiring.launchTools.changed('chat-1')).toBe(true)
     expect(wiring.launchTools.outdated('chat-1')).toBe(true)
 
-    // The next launch records the new identity, so it settles again rather than restarting forever.
     await launch('chat-1')
     expect(wiring.launchTools.outdated('chat-1')).toBe(false)
   })
