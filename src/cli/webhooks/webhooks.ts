@@ -20,9 +20,14 @@ import { RuntimeClientError } from '../runtime/connection/types'
 import { getEventTriggersFlag } from '../automations/automation-event-triggers-cli'
 import { findBot } from '../bots/bot'
 
+const loopbackWebhookUrl = /^http:\/\/127\.0\.0\.1:\d+\/hook\//
+
 /** What --json shows of a hook: no URL, which alone is half a credential; the owner copies the
  *  whole URL from the automation's card in Orca. */
-function hookJson(hook: WebhookSummary): Omit<WebhookSummary, 'url'> {
+function hookJson(hook: WebhookSummary): Omit<WebhookSummary, 'url'> & { url?: string } {
+  if (loopbackWebhookUrl.test(hook.url)) {
+    return hook
+  }
   const { url: _url, ...shown } = hook
   return shown
 }
@@ -34,7 +39,8 @@ function formatSummary(hook: WebhookSummary): string {
   return [
     `${hook.hookId}  ${hook.state}  ${lastCall}`,
     `automation: ${hook.automationId}`,
-    `checks: ${hook.adapter ? `${hook.adapter} signature` : 'key only'}`
+    `checks: ${hook.adapter ? `${hook.adapter} signature` : 'key only'}`,
+    ...(loopbackWebhookUrl.test(hook.url) ? [`listening on ${hook.url} (this computer only)`] : [])
   ].join('\n')
 }
 
@@ -53,7 +59,7 @@ function formatCallRow(row: WebhookCallRow): string {
 // Where the owner gets the URL: never from the bot. The card fills it in once the hook is live, and
 // a save made from a Slack, Linear or GitHub thread also puts the card in the bot's Chat.
 const COPY_FROM_CARD =
-  "Your owner copies its URL with Copy URL on the automation's card in Orca: in this chat, or in your Chat when this conversation is a Slack, Linear or GitHub thread."
+  "Your owner copies its URL with Copy URL on the automation's card in Orca: in this chat, or in your Chat when this conversation is a Slack, Linear or GitHub thread. One that this computer serves itself has no card yet: `orca webhooks show --hook <hook id>` prints where it listens."
 
 /** After a save that made a hook: where the owner copies its URL. */
 function webhookNote(automation: Automation): string | null {

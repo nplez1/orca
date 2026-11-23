@@ -178,13 +178,14 @@ look-around run's read-only sweep), so a dropped delivery costs hours of latency
 card should say "while Orca NP is running here", and the documentation should point at look-around as
 the safety net instead of implying a queue.
 
-**One qualification, for this fork's own bot.** Look-around runs only on `claude` and `codex`
+**One qualification, for this fork's own bot.** Look-around runs on `claude`, `codex` and `pi`
 (`LOOK_AROUND_AGENTS`, `src/shared/bots/bot-look-around.ts:10`; `lookAroundSupported()` is what gates
 the setting, `bot-look-around-state.ts:311`). A Hermes-backed bot — which is the obvious choice here,
-Hermes is in `BOT_AGENTS` — has **no** read-only sweep, so the safety net above does not exist for it
-and a dropped delivery would not be recovered by anything. Wire the fallback explicitly: a scheduled
-automation on the same bot (`--trigger hourly`, `--precheck '<gh …>'`) runs on the bot's own agent,
-Hermes included, and turns the webhook route back into the latency optimisation it is.
+Hermes is in `BOT_AGENTS` — has **no** read-only sweep, and neither does any other agent the list does
+not name, so the safety net above does not exist for it and a dropped delivery would not be recovered
+by anything. Wire the fallback explicitly: a scheduled automation on the same bot (`--trigger hourly`,
+`--precheck '<gh …>'`) runs on the bot's own agent, Hermes included, and turns the webhook route back
+into the latency optimisation it is.
 
 **The `orcad` probe therefore drops out of the patch.** `automationsBusy` already holds a managed
 runtime for any enabled automation or non-final run
@@ -204,13 +205,13 @@ gives a stable id per delivery — which is exactly the ledger key the store alr
 failed deliveries, so dedupe by delivery id stops a retry becoming a second run.
 
 **But an app cannot deliver to loopback.** GitHub posts app webhooks to a **public HTTPS URL**; it will never
-reach `127.0.0.1`. So the app solves *verification* and does not solve *reachability*:
+reach `127.0.0.1`. So the app solves _verification_ and does not solve _reachability_:
 
-| Your situation | Wire it this way |
-|---|---|
+| Your situation                                                                    | Wire it this way                                                                                |
+| --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | The app already has a public endpoint (anything running a label pipeline has one) | that endpoint hands the raw body to the loopback listener, or a `smee`/`cloudflared` relay does |
-| No public endpoint, laptop only | keep `gh webhook forward` for events; the app is used only for write-back |
-| A server that is always up | the listener's own public route, with the app's secret verified |
+| No public endpoint, laptop only                                                   | keep `gh webhook forward` for events; the app is used only for write-back                       |
+| A server that is always up                                                        | the listener's own public route, with the app's secret verified                                 |
 
 **Outbound, the app is the missing identity.** A one-hour installation token minted per run (`GH_TOKEN` in the
 launch env) lets `resultsTo: 'thread'` comment on the issue or PR as the bot, and — see `talking-to-bots.md` —
@@ -328,7 +329,7 @@ document.
 - Slack and Linear local delivery: both need an OAuth app and an inbound endpoint that Orca Cloud hosts;
   GitHub is the one source where the credential and the payload are both already local.
 - Extending look-around to the other bot agents. It waits on "a place where Orca can hold a run to
-  reads" for each; until then every non-`claude`/`codex` bot needs the scheduled-automation fallback
-  above.
+  reads" for each; until then every bot whose agent is not `claude`, `codex` or `pi` needs the
+  scheduled-automation fallback above.
 - Whether this is upstream-worthy. It probably is — offline-only operation is not a fork concern — but
   proposing it is a separate decision, and nothing here may ride an upstream-bound branch.

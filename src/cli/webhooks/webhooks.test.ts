@@ -212,4 +212,38 @@ describe('orca webhooks', () => {
       filters: { where: [{ path: 'body.action', op: 'exists' }] }
     })
   })
+
+  it('prints where a hook on this computer listens, and a cloud hook’s URL nowhere', async () => {
+    const { client } = host()
+    const loopback = {
+      ...summary('live'),
+      url: `http://127.0.0.1:51234/hook/${HOOK}`
+    }
+    vi.spyOn(client, 'call').mockImplementation(async () => ({
+      id: 'request-1',
+      ok: true as const,
+      result: loopback,
+      _meta: { runtimeId: 'r' }
+    }))
+    for (const json of [false, true]) {
+      const printed = await output(() =>
+        WEBHOOK_HANDLERS['webhooks show']!({
+          client,
+          cwd: '/tmp',
+          json,
+          flags: new Map([['hook', HOOK]])
+        })
+      )
+      expect(printed).toContain(loopback.url)
+    }
+    const cloud = await output(() =>
+      WEBHOOK_HANDLERS['webhooks show']!({
+        client,
+        cwd: '/tmp',
+        json: true,
+        flags: new Map([['hook', HOOK]])
+      })
+    )
+    expect(cloud).not.toContain('hooks.orca.test')
+  })
 })
