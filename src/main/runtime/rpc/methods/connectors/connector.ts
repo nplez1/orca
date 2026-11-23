@@ -46,7 +46,9 @@ export const CONNECTOR_METHODS = [
       const chatSessionId = 'sessionId' in params ? params.sessionId : null
       const photon = !target && chatSessionId ? photonServiceOf(context.runtime) : null
       const photonBot =
-        photon && chatSessionId ? botOfSession(context.runtime.bots, chatSessionId) : null
+        photon && chatSessionId && context.runtime.bots.enabled()
+          ? botOfSession(context.runtime.bots, chatSessionId)
+          : null
       if (photon && photonBot && chatSessionId) {
         try {
           const local = await postPhotonReply(photon, {

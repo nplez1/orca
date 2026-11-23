@@ -57,6 +57,19 @@ describe('postPhotonReply', () => {
     expect(await postPhotonReply(null, base)).toBeNull()
   })
 
+  it('falls through on a review in a chat the channel never opened, instead of refusing it', async () => {
+    const channel = fakeChannel({ conversationId: null })
+    expect(await postPhotonReply(channel, { ...base, review: { verdict: 'approve' } })).toBeNull()
+  })
+
+  it('does not claim a settled send will retry', async () => {
+    const channel = fakeChannel({
+      outcome: { sent: false, entryId: 'e1', error: 'socket down', settled: true }
+    })
+    const result = await postPhotonReply(channel, base)
+    expect(result?.notices?.[0]).toContain('nothing further is retried')
+  })
+
   it('refuses a review rather than posting its prose as if the verdict landed', async () => {
     const channel = fakeChannel({})
     let refusal: unknown = null

@@ -52,12 +52,12 @@ export async function postPhotonReply(
   if (!channel) {
     return null
   }
-  if (input.review) {
-    throw new PhotonReplyRefusal('no_review_on_imessage')
-  }
   const conversationId = await channel.conversationForChat(input.botId, input.chatId)
   if (!conversationId) {
     return null
+  }
+  if (input.review) {
+    throw new PhotonReplyRefusal('no_review_on_imessage')
   }
   const outcome = await channel.sendTurnResult({
     botId: input.botId,
@@ -65,11 +65,13 @@ export async function postPhotonReply(
     text: input.text,
     turnId: input.replyId
   })
-  return outcome.sent
-    ? { status: 'posted', place: PLACE }
-    : {
-        status: 'queued',
-        place: PLACE,
-        notices: [`Photon did not take it yet (${outcome.error}); it stays queued and retries.`]
-      }
+  if (outcome.sent) {
+    return { status: 'posted', place: PLACE }
+  }
+  // A send a concurrent attempt already settled is not retried, so saying "it retries" would be a lie
+  // in the other direction from claiming it was posted.
+  const notice = outcome.settled
+    ? 'Photon is no longer holding this send: another attempt settled it, so nothing further is retried.'
+    : `Photon did not take it yet (${outcome.error}); it stays queued and retries.`
+  return { status: 'queued', place: PLACE, notices: [notice] }
 }

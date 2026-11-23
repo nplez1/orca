@@ -48,7 +48,7 @@ export function formatReply(reply: ConnectorReply): string {
   return [
     reply.status === 'posted'
       ? `Posted to ${place}.`
-      : `Sent; Orca Cloud will post it to ${place}.`,
+      : `Queued; it will post to ${place} when the connection is back.`,
     ...(reply.notices ?? [])
   ].join('\n')
 }
