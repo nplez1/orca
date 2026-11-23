@@ -150,7 +150,7 @@ export function useIpynbDocumentEditing({
       onContentChangeRef.current(nextContent)
     }
     return nextContent
-  }, [fileId, latestCells])
+  }, [latestCells])
 
   const queueSourceDraftCommit = useCallback((): void => {
     if (sourceCommitTimerRef.current !== null) {

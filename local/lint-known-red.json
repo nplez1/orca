@@ -39,13 +39,5 @@
     "2026-11-20 sync (upstream 0c6207e3d7): one whole-step entry for `check:code-quality:changed`, which cannot pass before `main` is pushed \u2014 E2BIG on the 2000-commit diff, see LOCAL-PATCHES.md \u00a7 `local(lint)`: the 2026-11-20 sync's lint gate. It goes stale on the first run after `git push origin main`; prune it then. The three ratchets that arrived with this sync were closed in the tree and in two new `.fork.txt` overlays, not here."
   ],
   "recordedAt": "2026-11-20",
-  "entries": [
-    {
-      "step": "check:code-quality:changed",
-      "wholeStep": true,
-      "class": "sync-sized-diff-not-yet-pushed",
-      "owner": "local(ci)",
-      "evidence": "LOCAL-PATCHES.md \u00a7 local(lint): the 2026-11-20 sync's lint gate. origin/main is still the pre-sync tip, so the changed set is upstream's 1425 commits plus the replayed 579 (25k+ code files) and check-changed-code-quality.mjs spawnSync fails E2BIG before reporting anything (measured 2026-11-20 in /Volumes/Storage/Code/orca/main). The post-merge fix-ups ran clean under ORCA_CODE_QUALITY_BASE=HEAD. Prune on the first run after `git push origin main`."
-    }
-  ]
+  "entries": []
 }

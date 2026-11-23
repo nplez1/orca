@@ -157,6 +157,8 @@ export function NativeChatVisualFrame({
           unansweredRef.current = null
         }
       },
+      // fork-comment-ok: the dependency is the signal: this lifetime effect tears its cleanup down and re-runs it when the key changes, and the callback body reads refs only
+      // oxlint-disable-next-line react-hooks/exhaustive-deps -- the dependency is the signal: this lifetime effect tears its cleanup down and re-runs it when the key changes, and the callback body reads refs only
       [built.channel]
     )
   )

@@ -8,6 +8,7 @@ import { BotConnectors } from '../../../../shared/rpc-contract/bots-look-around-
 import { readGhSignIn } from '../../../bots/bot-local-sign-ins'
 import { getGoogleConnect } from '../../../google/google-connect'
 import { botOfSession } from '../../../bots/bot-session-tabs'
+import { photonServiceOf } from '../../../bots/photon/photon-runtime'
 import { defineMethod, InvalidArgumentError } from '../core'
 import { CONNECTOR_ACT_METHOD } from './connector-act'
 
@@ -64,6 +65,7 @@ export const BOT_CONNECTORS_METHOD = defineMethod({
                 ? places.message
                 : 'Orca Cloud could not list them.'
         }
+    const photon = await photonServiceOf(runtime)?.statusFor(bot.id)
     return {
       bot: bot.name,
       services: botConnectorServices(
@@ -74,7 +76,8 @@ export const BOT_CONNECTORS_METHOD = defineMethod({
           google: (await getGoogleConnect()?.accounts()) ?? [],
           googleApp: Boolean(await getGoogleConnect()?.client())
         },
-        approveUrl
+        approveUrl,
+        photon ?? undefined
       ),
       ...workspaces
     }

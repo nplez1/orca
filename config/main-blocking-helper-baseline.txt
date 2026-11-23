@@ -1597,3 +1597,10 @@
 13 src/shared/shell/command-resolution/node-cli-command-resolution.ts
 1 src/shared/shell/command-resolution/nvm-version-directories.ts
 1 src/shared/shell/launch/startup-command-staging.ts
+
+1 src/main/bots/photon/photon-cursor.ts # per delivery and per turn end, through writePhotonJson: on POSIX only writeSecureFileAsync's publishing renameSync blocks, and on win32 the helper writes, chmods and fsyncs synchronously; every read here is node:fs/promises, and LOCAL-PATCHES § `local(bots)` carries the measurement
+1 src/main/bots/photon/photon-files.ts # per delivery and per turn end, through writePhotonJson: on POSIX only writeSecureFileAsync's publishing renameSync blocks, and on win32 the helper writes, chmods and fsyncs synchronously; every read here is node:fs/promises, and LOCAL-PATCHES § `local(bots)` carries the measurement
+1 src/main/bots/photon/photon-inbox.ts # per delivery and per turn end, through writePhotonJson: on POSIX only writeSecureFileAsync's publishing renameSync blocks, and on win32 the helper writes, chmods and fsyncs synchronously; every read here is node:fs/promises, and LOCAL-PATCHES § `local(bots)` carries the measurement
+1 src/main/bots/photon/photon-outbox.ts # per delivery and per turn end, through writePhotonJson: on POSIX only writeSecureFileAsync's publishing renameSync blocks, and on win32 the helper writes, chmods and fsyncs synchronously; every read here is node:fs/promises, and LOCAL-PATCHES § `local(bots)` carries the measurement
+2 src/main/bots/photon/photon-store.ts # per delivery and per turn end, through writePhotonJson: on POSIX only writeSecureFileAsync's publishing renameSync blocks, and on win32 the helper writes, chmods and fsyncs synchronously; every read here is node:fs/promises, and LOCAL-PATCHES § `local(bots)` carries the measurement
+1 src/main/bots/photon/photon-thread-map.ts # per delivery and per turn end, through writePhotonJson: on POSIX only writeSecureFileAsync's publishing renameSync blocks, and on win32 the helper writes, chmods and fsyncs synchronously; every read here is node:fs/promises, and LOCAL-PATCHES § `local(bots)` carries the measurement

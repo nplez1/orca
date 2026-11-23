@@ -60,7 +60,6 @@ export function useRichMarkdownPendingSerialization({
     }
     return false
   }, [
-    fileId,
     editorRef,
     lastCommittedMarkdownRef,
     originalSourceRef,

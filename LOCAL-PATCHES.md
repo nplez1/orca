@@ -5481,3 +5481,238 @@ Round 3 added the concurrency proof: two overlapping `putCall`s keep both rows a
 a drop cannot be undone by a write already in flight, and a call whose hook went before its body landed is
 refused rather than kept. `local-webhook-listener.test.ts` gained the stale-bind case (a bind that finishes
 after `stop()` closes its server and can start again).
+
+### `local(bots)`: iMessage, so a bot can be texted where Hermes already is
+
+The design is `local/design/imessage-channel.md`; this records what shipped, the anchors, and what the
+note could not promise. The gap it closes is the one the channel set named: GitHub gives a bot presence but
+not a conversation of its own, and the owner already talks to Hermes over iMessage. Photon is the
+integration because it is **outbound** — a Socket.IO stream over HTTP, no webhook URL, no public endpoint,
+no signing secret — which is the same shape as the loopback designs and the only kind of inbound this fork
+can have. The bot gets a number of its own, so texting it is a conversation with Scout rather than with
+yourself, and that is the half of the identity requirement GitHub mode gave up.
+
+**The decision that shapes the code is Beta (2.0), for both provisioning and streaming.** Provisioning does
+not exist on Stable at all (only CLI commands), and mixing a Beta provisioning client with a Stable
+streaming one would mean two auth schemes (Bearer vs Basic) and two contracts for one conversation. Beta's
+transport is Socket.IO and its provisioning is plain HTTPS, both pure JS — the doc's one reopening
+condition, a native gRPC binding, does not fire, so there is no sidecar. That was **checked, not assumed**:
+`@photon-ai/api@0.7.1` pulls only `zod` and `standardwebhooks`, `socket.io-client@4.8.4` pulls `debug`,
+`engine.io-client`, `socket.io-parser` and `@socket.io/component-emitter`, and a full install has no
+`binding.gyp`, no prebuilt `.node`, no `prebuilds/` directory and no install script. One dependency is
+added (`socket.io-client`); `zod` was already a dependency, so `@photon-ai/api`'s own client is not.
+
+**Two stores, and the split is the point.** The message payload goes to `<userData>/local-photon/inbox/`
+**before any turn starts**, which is both the crash guard and the dedupe index; the Photon **cursor** goes
+to `local-photon/cursors/<projectId>/<purpose>.json` and advances **only** once that message is durably in
+the inbox. The handler Photon means by "success" is "accepted into Orca's queue", never "the agent finished
+answering", which is what lets a four-minute turn hold no cursor. The inbox entry carries a `handledAt`
+mark, so a crash between the write and the dispatch replays the turn while a replay of something already
+dispatched is a no-op — the two cases the note separates. Cursors are opaque and may contain gaps: nothing
+here computes `last + 1`, `startSeq: 0` is new-events-only, and an advance whose message the inbox does not
+hold is refused rather than taken.
+
+**Reconnect is the failure mode worth naming.** Socket.IO reconnects the socket itself, but the server
+disables session recovery, so the application must subscribe again — a reconnect that forgets to
+resubscribe hears nothing while looking healthy. `PhotonStream` therefore reports `subscribed` separately
+from `connected`, reads its cursor **fresh on every subscribe** (not once at start), arms a liveness
+deadline that turns a connected-but-unsubscribed stream into `stalled`, and `assertLive()` throws on
+`connected && !subscribed`. `orca bot connectors` prints `deaf` for that state rather than `live`.
+
+**Provisioning is a saga, and its repair is a reconciler, not a rollback.** Rolling back would delete a
+project that cost the user capacity and burn a slug that can never be reused — by an active project _or a
+deleted one_. So every step asks upstream first (the slug is the project's natural key, the assignment list
+is the allowlist, a handle that already has a number keeps it), the project id is persisted before the next
+step can fail, and `reconcile()` reads state back and finishes the record. Idempotency keys are **derived**
+from the bot id (`photon-create-<botId>`, `photon-key-<botId>-<generation>`, `photon-assign-<botId>-<sha>`)
+rather than stored, so a restart resumes the same saga without an intent file that could itself be lost.
+The slug is stored beside the bot and never re-derived, because it is immutable upstream.
+
+**Deleting a bot is not deleting a project.** A bot delete releases its numbers and revokes its key, and
+says `projectKept: true`; the project stays. `DELETE /v1/projects/{id}` is a separate call that must name
+the slug it is deleting (a mismatch refuses), because the slug is a one-way door. Its closure is polled to
+a terminal state and a `closing` answer is reported as "still closing", never as success.
+
+**One send per finished turn.** The turn end is read for that turn's own last assistant message, so
+progress items, tool calls and status lines are never messages — a turn that emitted twenty of them still
+sends once. Long output folds into one attachment rather than N messages. There is no host-wide message
+counter: the 5,000/day budget that justified one belongs to Stable, which this path deliberately does not
+use. A send is only ever addressed to a conversation already in the thread map, so Orca never cold-starts a
+conversation. A failed send is written to `photon-outbox.json` before the attempt and retried with a key
+derived from the entry, so a send that may already have landed replays rather than arriving twice.
+
+**Two credentials, two blast radii.** The account service key can create projects and mint keys; it is
+**opt-in to store** (`storesKey`, off by default), because the alternative to storing it is re-pasting it
+for every new bot. Each bot stores only its own project key, in `local-photon/photon-secrets.json` written
+through `writeDurableSecureJsonFile` alongside the Slack token discipline, and **no key is readable back
+out**: a lost project key is replaced by minting one and revoking the old, and there is no "show key" path
+in the RPC surface at all.
+
+**Access control is the assignment list.** Giving someone a number and admitting them are the same call, so
+Orca's Who-can-ask is an editor of the provider's records rather than a second ACL to keep in sync.
+`allow_all` is never offered. An unknown handle cannot reach the stream at all, so the access-request flow
+(`bot-access-request.ts`) deliberately does not apply here — `orca bot connectors` says "add them, then they
+can text" instead of promising a queue that never fills.
+
+**The anchors.** Thirty-seven hunks across fourteen files upstream owns, one of them generated. Each is a
+line or two, and the reason each exists is this file. **How that number was produced:**
+`git diff <base> -- <path> | grep -c '^@@'`, summed over the upstream-owned files only. `git diff --stat`
+counts files, not hunks, so it cannot produce this figure; the fork-owned files under `src/main/bots/photon/`
+and `src/main/runtime/rpc/methods/bots-photon*` are whole new modules, not hunks, and are not in this table.
+`src/shared/connectors/external-conversation-link.ts` is the union member the note calls for, and
+`src/shared/bots/bot-connectors-view.ts` is under `src/shared/` too, so **this patch is a global input**:
+`package.json`, `pnpm-lock.yaml` and `pnpm-workspace.yaml` also move, which means gate 1 is required, not
+optional.
+
+| File                                                               | Anchor                                   | Change                                                                                                               |
+| ------------------------------------------------------------------ | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `src/shared/connectors/external-conversation-link.ts`              | `CONNECTOR_SOURCES` and the names record | `'photon'` added as one union member, named `Photon`                                                                 |
+| `src/shared/bots/bot-connectors-view.ts`                           | `BotConnectorService.source`             | widened by `'photon'`, which is not an offer source: its card is deferred                                            |
+| `src/shared/bots/bot-connectors-view.ts`                           | `botConnectorServices`                   | one optional `photon` argument and a `photonService` row: the number and who may text it                             |
+| `src/shared/bots/bot-connectors-view.ts`                           | `serviceLines`                           | names the row `iMessage`, since `CONNECTOR_OFFER_NAMES` has no entry for it                                          |
+| `src/main/bots/bot-chat-tree-base.ts`                              | the link-origin loop                     | a photon link shows as a side chat, as Discord's does (upstream's own comment line kept)                             |
+| `src/main/bots/bot-run-results.ts`                                 | `replyInThread`                          | the conversation is narrowed by `ConnectorConversation.safeParse`, so a photon thread has no cloud thread to post to |
+| `src/main/bots/bot-structured-session-wiring.ts`                   | `turnEnded`                              | one optional `outsideTurnEnded` dep, handed the turn's id and its reader                                             |
+| `src/main/runtime/orca-runtime-bots.ts`                            | `requestTurnEnded`'s neighbours          | `outsideTurnEnded` sends a finished turn's answer to the conversation that asked                                     |
+| `src/main/startup/cloud-startup/main-process-connector-startup.ts` | the desktop-only block                   | `photonChannel(runtime).startStreams()`, which does nothing when nothing is connected                                |
+| `src/main/runtime/rpc/methods/bots-connectors.ts`                  | `botConnectorServices` call              | passes the bot's photon row, when it has one                                                                         |
+| `src/main/runtime/rpc/methods/rpc-method-registry.ts`              | `...BOT_CONNECT_METHODS`                 | `...BOT_PHOTON_METHODS` beside it                                                                                    |
+| `src/main/runtime/rpc/methods/bots.ts`                             | the `paused` branch of `bots.update`     | a resume replays the channel's held messages, as it already releases held mail                                       |
+| `src/main/runtime/rpc/methods/bots.ts`                             | `bots.delete`'s handler                  | `releaseDeletedPhotonChannel(runtime, botId)`, which releases the numbers and key while the bot still exists         |
+| `src/shared/rpc-contract/rpc-params-catalog.generated.ts`          | eight rows                               | regenerated by `config/scripts/plugin-authoring/rpc-catalog/generate-rpc-params-catalog.mjs`                         |
+| `package.json`                                                     | `dependencies`                           | `socket.io-client`; nothing else, and `@photon-ai/api` is **not** a dependency of this patch                         |
+| `pnpm-workspace.yaml`                                              | `overrides`                              | `ws@<8.22.0: 8.22.0`, so `engine.io-client`'s `~8.21.0` cannot reach an unpatched native socket                      |
+| `pnpm-lock.yaml`                                                   | generated                                | the two additions and that override                                                                                  |
+
+**Fork-owned, all the logic** (`src/main/bots/photon/`, fifteen modules with tests):
+
+- `photon-contract.ts` — the endpoint table as one file: the pinned `Photon-Version` (`2026-07-01`), the
+  stream path and event names, and a zod schema for every shape Orca reads. A wrong guess about a Beta
+  shape therefore fails loudly: `photonParse` throws `PhotonContractError` naming what was being read,
+  and a frame or acknowledgement it cannot parse stops the stream instead of being treated as empty.
+- `photon-api.ts` — the HTTPS client. Every call names the credential it takes, so a project key is never
+  accepted where the account key is required. `read`/`created` parse; `write` does not read a body.
+- `photon-stream.ts`, `photon-inbound.ts`, `photon-thread-map.ts` — the stream, the ask adapter and the one
+  piece of genuinely new state: `conversationId → chatId`, so a second message continues the chat and a new
+  conversation starts another.
+- `photon-inbox.ts`, `photon-cursor.ts`, `photon-outbox.ts`, `photon-store.ts` — the two stores, the retry
+  queue and the non-secret record.
+- `photon-provisioning.ts`, `photon-teardown.ts`, `photon-send.ts`, `photon-service.ts`,
+  `photon-runtime.ts`, `photon-chat-replies.ts` — the saga and its reconciler, the two teardown weights, the
+  send path, and the surface the RPC methods and the turn-end hook call.
+
+**What this does not claim.** Beta is a **preview**: replay is limited to an unpublished retention window
+and is **not** exactly-once, which is why dedupe by message id is mandatory rather than an optimisation. A
+long outage is therefore a gap. The setup text has to say one more thing the code cannot enforce: a newly
+assigned number's inbound is dropped until the line is picked up at token renewal, so the instructions end
+"restart Orca, then text it".
+
+**Deliberately not done, each for its own reason.** The renderer settings card and the Connect / Create /
+Add-member UI — the RPCs are the v1 surface, and a card needs Electron validation and its own STYLEGUIDE
+pass, exactly as the webhook card was deferred. **Every live-account verification**: there is no Photon
+account here, no line and no project, so the test the note calls for (text the bot, quit Orca, text again,
+reopen, confirm the turn runs) is unverified, as is the claim that a new assignment's inbound is dropped
+until renewal — neither is faked. Attachments and length limits (the note lists them as unknown, so a long
+answer is capped into one message rather than pretending an upload works), group chats and the Business
+tier, and Stable. And the sidecar question is settled for Beta, so none was built.
+
+Tests: `photon-stores.test.ts` (the opt-in account key, per-bot key isolation with no secret in the record,
+dedupe, a write-then-crash replay, an id escape refused, a cursor that will not pass a message the inbox
+does not hold, gaps `41 → 47`, no rewind, per-purpose isolation, thread continuation across a restart,
+outbox retry and its attempt cap), `photon-api.test.ts` (the real HTTP surfaces: the pinned version header,
+a bearer credential, an unknown shape refused, a non-JSON body refused, a 404 read as absence, replayed
+create / key-mint / assignment all returning the first result, a taken slug refused, the closure reported
+as still closing then closed, slug determinism), `photon-provisioning.test.ts` (the whole saga, a re-run
+finding one project, resuming after the key mint failed and after the number was refused, one derived
+create key, the reconciler repairing an unpersisted assignment and a stale slug and saying so when the
+project is gone, release keeping the project, a wrong-slug deletion refused, a still-closing deletion never
+reported as success, the closure polled to terminal), `photon-stream.test.ts` (subscribe with the saved
+cursor, resubscribe from the _moved_ cursor, a forgotten resubscribe caught by the liveness assertion
+rather than by silence, `stalled` on an unacknowledged subscribe, a frame delivered, a failing handler
+stopping the stream, an unreadable frame refused), `photon-inbound.test.ts` (same id twice runs once,
+continuation versus a new conversation, the right `BotRequestPerson` and the member role, an unknown handle
+ignored with the cursor still advanced, the cursor held when the turn could not start, that replay running
+after a restart, a handled replay absorbed, a gap resumed), `photon-send.test.ts` (one send for sixteen
+progress items, a long answer folded to one attachment, a cold start refused, a failed send kept and
+retried with the same key), `photon-turn-result.test.ts` (the turn's own message, not a later turn's; a
+progress-only turn sending nothing), and `photon-service.test.ts` (creating before connecting refused with
+a sentence that says what to do, the opt-in key, one project, add and release, the `orca bot connectors`
+row, a bot delete keeping the project, and no row for a bot with no project). Everything network-facing ran
+against a **real loopback HTTP server** (`photon-fake-server.test-fixture.ts`) with knobs to fail a key
+mint, an assignment and a send, and with real idempotency replay — a mock that cannot fail is not a test.
+
+### `local(lint)`: the iMessage channel's work off the main thread, and two upstream warnings fixed rather than recorded
+
+The channel's stores were synchronous, and every one of their reads and writes runs on a delivery or a
+turn end rather than once at startup — a blocking read there stalls every window on Electron's main
+thread. They now use `node:fs/promises` and `writeSecureFileAsync`, the same two the webhook store uses,
+so `check:main-sync-fs-ratchet` charges them **nothing**: 0 sync fs calls in `photon-store.ts`,
+`photon-inbox.ts`, `photon-outbox.ts`, `photon-cursor.ts` and `photon-thread-map.ts`, where the first
+version of this patch charged twelve.
+
+What is left is `check:main-blocking-helper-ratchet`, and it is left because it cannot be removed while
+using the sanctioned helper: `writeSecureFileAsync` publishes with a synchronous `renameSync` on purpose
+("Sync so the check above and the publish share a turn: a sign-out's clear cannot land between them"), so
+every file that calls it is charged by design. Six rows, one per module, each with the same evidence —
+the identical shape `local(webhooks)` records for the same helper in the same file:
+
+```
+1 src/main/bots/photon/photon-cursor.ts    # per delivery and per turn end, through writePhotonJson: …
+1 src/main/bots/photon/photon-files.ts     # …
+1 src/main/bots/photon/photon-inbox.ts     # …
+1 src/main/bots/photon/photon-outbox.ts    # …
+2 src/main/bots/photon/photon-store.ts     # …
+1 src/main/bots/photon/photon-thread-map.ts # …
+```
+
+Six rows is more than the webhook store's two, and the difference is the file count rather than the calls:
+each module keeps one store, so the charge lands once per file. Collapsing them would mean one store class
+for four different file shapes, which is worse code than six documented rows. Every read in all six is
+asynchronous; nothing here reads on the message path.
+
+**Two upstream warnings, one claim each, both fixed rather than allowlisted.**
+`useIpynbDocumentEditing.ts:153` carried an `react-hooks(exhaustive-deps)` warning: `fileId` in
+`flushSourceDrafts`'s dependency array, which the callback never reads — it works off
+`sourceDraftsRef`, `draftBasesRef` and `contentRef`, all stable, plus `latestCells`. `pnpm lint` runs
+oxlint with `--deny-warnings`, so the warning was a failing step. It reproduced on `main` at
+`9d8c6c8cb64` when oxlint ran on that file alone, so it is not this branch's bug; the repair is the
+dependency list `[latestCells]`, which is what the hook actually closes over, and no behaviour changes.
+
+Recorded as an anchor because it is an upstream file:
+
+| File                                                                                               | Anchor                                         | Change                                                                                                               |
+| -------------------------------------------------------------------------------------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `src/renderer/src/components/editor/notebook/document/useIpynbDocumentEditing.ts`                  | `flushSourceDrafts`'s dependency array         | `[fileId, latestCells]` → `[latestCells]`; `fileId` was never read by the callback                                   |
+| `src/renderer/src/components/editor/rich-markdown/document/useRichMarkdownPendingSerialization.ts` | `flushPendingSerialization`'s dependency array | the same claim in the markdown editor: `fileId` removed, and it is read only by the neighbouring hook two lines down |
+
+`local/lint-known-red.json` therefore keeps **no** entry for this branch, and the one the gate reported as
+stale — `check:code-quality:changed`, `wholeStep`, left from the 2026-11-20 sync — is gone, because the
+changed checks run clean here.
+
+### `local(test)`: one `host-load` flake seen on the iMessage branch, and why the red set was left alone
+
+`local/unit-known-red.json` has been empty of entries since the 2026-10-31 sweep, and this branch leaves
+it that way. What it saw, because a flake nobody records is one nobody believes:
+
+`src/main/google/google-key-download-watch.test.ts` `takes the key once the browser renames it to its
+final name, ignoring other files` failed the full gate **three times in a row** at `25689fb920` with
+`Test timed out in 30000ms` on the `await rename`, while the same file passes **4/4 standalone**
+(`--maxWorkers=1`, three consecutive runs). Nothing in this branch touches `src/main/google/`. The tests
+themselves are the evidence for the other direction: the full suite was green at `9cc8c07d76`
+(`27758 passed, 0 failed`), red at `25689fb920` on that one case, and green again at `6bd42822f9`
+(`27759 passed, 0 failed, 0 allowlisted`) — the same code path each time, which is what "under load"
+means here rather than "broken".
+
+- **No entry was added.** The red set is the machine's assertion about what is _reliably_ red on it, and
+  this case is not: it passed the gate at this branch's HEAD. An allowlist entry that the next run does
+  not need is exactly the slack the file warns about, and it would also have had to re-reconcile
+  `observedRun` — `tests/tools/unit-gate.test.mjs` pins a new entry to a fresh run, so adding one means
+  replacing the 2026-10-29 reconciliation and moving its fifty `prunedSince` rows out of the assertion.
+  That is a real cost, and it is not this branch's to pay for a red it cannot reproduce.
+- **The test was not edited either.** A 30 s `fs.watch` deadline is upstream's to widen; changing an
+  upstream suite in the fork costs more at the next sync than the red costs now, which is the same rule
+  that keeps the other classes out of the fork's files.
+- **What to do if it comes back.** It is a `host-load` class with the text above: `Test timed out in
+  30000ms` on `google-key-download-watch.test.ts`. Recording it properly means a fresh `observedRun`
+  (one failing record, one allowlisted) and the fifty historical prune rows kept somewhere that is not
+  the assertion — the plan sketched in this branch's review replies.

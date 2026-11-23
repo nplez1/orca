@@ -19,7 +19,10 @@ import { botSessionToolServers, currentBotToolsRevision } from './bot-tools-file
 import { botToolsEpoch, type BotLaunchedTools } from './bot-tools-revision'
 import { botOfHomeWorkspace } from '../../shared/bots/bot-homes'
 import { createBotTurnContext } from './bot-turn-context'
-import type { TurnEndedVerdict } from '../native-chat/agent-session-wire/structured-agent-session-turn-context'
+import type {
+  TurnEndedRows,
+  TurnEndedVerdict
+} from '../native-chat/agent-session-wire/structured-agent-session-turn-context'
 import type { BotChatJournal } from './bot-turn-rows'
 import type { BotRecentChatsSection } from './bot-recent-chats'
 import { BOT_FIRST_RUN_RULES } from './bot-preamble'
@@ -57,6 +60,11 @@ export function botStructuredSessionWiring(deps: {
   lookAround: Pick<BotLookAroundStore, 'botOfLook' | 'botOfTidyUp' | 'lookTurnIsQuiet'>
   /** A turn ended: one that worked on another bot's request and left it unanswered tells that bot. */
   requestTurnEnded?: (sessionId: string, ended?: TurnEndedVerdict) => void
+  outsideTurnEnded?: (
+    sessionId: string,
+    turnId: string,
+    readItems: (since: number | null) => Promise<TurnEndedRows>
+  ) => void
   /** The bots the host holds when this is installed; none when it has no store yet. */
   botsAtInstall?: readonly Bot[]
   /** What the bot's other chats did lately, as a turn of this chat may hear of it. */
@@ -298,6 +306,7 @@ export function botStructuredSessionWiring(deps: {
         deps.work.turnEnded(sessionId)
         deps.requestTurnEnded?.(sessionId, ended)
         turnContext.turnEnded?.(sessionId, turnId, readItems, writeNote)
+        deps.outsideTurnEnded?.(sessionId, turnId, readItems)
       }
     },
     // A look reads through its allow-list; a tidy-up only replies, its new memory in its reply.
