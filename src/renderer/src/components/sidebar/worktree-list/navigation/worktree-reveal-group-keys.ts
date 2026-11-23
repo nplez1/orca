@@ -63,7 +63,15 @@ function foldKeysByAncestor(args: {
       )
       .map((worktree) => ({ worktree, repo: args.repoMap.get(worktree.repoId) }))
     const members = buildHostOrderedMembers(sameBranch, args.repoMap, args.defaultHostId, undefined)
-    const levelWorktrees = members?.map((member) => member.worktree) ?? [ancestor]
+    const memberWorktrees = members?.map((member) => member.worktree) ?? []
+    // Why: a pinned ancestor is never one of the merge's candidates, and its own key
+    // still hides the target — so it stands alone at its level rather than vanishing.
+    const ancestorIdentity = getWorktreeHostIdentity(ancestor)
+    const levelWorktrees = memberWorktrees.some(
+      (worktree) => getWorktreeHostIdentity(worktree) === ancestorIdentity
+    )
+      ? memberWorktrees
+      : [ancestor]
     keysByLevel.push(levelWorktrees.map((worktree) => getWorktreeLineageGroupKey(worktree)))
     candidates = levelWorktrees.flatMap((worktree) => {
       const member = args.plan.preferredByIdentity.get(getWorktreeHostIdentity(worktree))

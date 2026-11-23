@@ -40,11 +40,24 @@ const winRoot = remoteWorktree
 const winMid = onHost(remoteWorktree, remoteHostId, 'wt-win-mid', 'feature')
 const winLeaf = onHost(remoteWorktree, remoteHostId, 'wt-win-leaf', 'feature-ui')
 
+// A third host, so the local root can be pinned without the other two failing to merge.
+const thirdHostId: ExecutionHostId = 'ssh:third-vm'
+const thirdRoot = onHost(
+  remoteWorktree,
+  thirdHostId,
+  'wt-third-root',
+  'refs/heads/feature/super-critical'
+)
+const thirdMid = onHost(remoteWorktree, thirdHostId, 'wt-third-mid', 'feature')
+const thirdLeaf = onHost(remoteWorktree, thirdHostId, 'wt-third-leaf', 'feature-ui')
+
 const parentsByChild: Record<string, Worktree> = {
   [getWorktreeHostIdentity(m5Mid)]: m5Root,
   [getWorktreeHostIdentity(m5Leaf)]: m5Mid,
   [getWorktreeHostIdentity(winMid)]: winRoot,
-  [getWorktreeHostIdentity(winLeaf)]: winMid
+  [getWorktreeHostIdentity(winLeaf)]: winMid,
+  [getWorktreeHostIdentity(thirdMid)]: thirdRoot,
+  [getWorktreeHostIdentity(thirdLeaf)]: thirdMid
 }
 
 function occurrenceKey(worktree: Worktree): string {
@@ -86,6 +99,7 @@ const repoMap = new Map([
   [remoteRepo.id, remoteRepo]
 ])
 const worktrees = [m5Root, m5Mid, m5Leaf, winRoot, winMid, winLeaf]
+const threeHostWorktrees = [...worktrees, thirdRoot, thirdMid, thirdLeaf]
 
 function revealKeys(target: Worktree, collapsed: ReadonlySet<string>): string[] {
   return getWorktreeRevealCollapsedGroupKeys({
@@ -119,6 +133,41 @@ describe('getWorktreeRevealCollapsedGroupKeys with a merged hierarchy', () => {
     const rootGroups = [getWorktreeLineageGroupKey(m5Root), getWorktreeLineageGroupKey(winRoot)]
 
     expect(revealKeys(m5Leaf, new Set(rootGroups))).toEqual(rootGroups)
+  })
+
+  it('keeps a pinned ancestor own key, which the merge never offers as a candidate', () => {
+    const pinnedPlan = planFor(threeHostWorktrees)
+    for (const occurrence of pinnedPlan.preferredByIdentity.values()) {
+      if (occurrence.row === m5Root) {
+        occurrence.placement = 'pinned'
+      }
+    }
+    const midGroups = [
+      getWorktreeLineageGroupKey(m5Mid),
+      getWorktreeLineageGroupKey(winMid),
+      getWorktreeLineageGroupKey(thirdMid)
+    ]
+
+    const keys = getWorktreeRevealCollapsedGroupKeys({
+      occurrencePlan: pinnedPlan,
+      worktree: m5Leaf,
+      worktrees: threeHostWorktrees,
+      worktreeLineageById: {},
+      repoMap,
+      defaultHostId: LOCAL_EXECUTION_HOST_ID,
+      hostScopedGroups: false,
+      collapsedGroups: new Set([...midGroups, getWorktreeLineageGroupKey(m5Root)]),
+      groupBy: 'repo',
+      pinnedDisplayPolicy: 'single-location',
+      prCache: null,
+      workspaceStatuses: [],
+      projectGroups: [],
+      projectGrouping: { projects: [project], projectHostSetups },
+      mergeSameBranchCards: true
+    })
+
+    expect(keys).toContain(getWorktreeLineageGroupKey(m5Root))
+    expect(keys).toContain(getWorktreeLineageGroupKey(m5Mid))
   })
 
   it('leaves keys alone when no merge happened', () => {
