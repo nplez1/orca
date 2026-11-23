@@ -281,8 +281,7 @@ export function botOwnTool(server: BotToolServer, folder: string): BotOwnTool {
 }
 
 /** Any agent's session in a bot's home folder gets that bot's own tools and token; any other session none.
- *  `launched` comes from the same read as the tools, so a write during launch can't look applied. `repos`
- *  names the repository the launch sits in, when the host already knows one, so the App picks its install. */
+ *  `launched` comes from the same read as the tools, so a write during launch can't look applied. */
 export async function botSessionToolServers(
   bots: readonly Pick<Bot, 'id' | 'name' | 'folderWorkspaceId'>[],
   record: { provider: string; location: { workspaceId: string } },
