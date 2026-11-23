@@ -89,7 +89,6 @@ async function readRawSnapshot(folder: string): Promise<BotToolsSnapshot> {
     text,
     file: parsed.data,
     servers,
-    // A header-only edit keeps the file and its credential id, so the saved values count too.
     version: createHash('sha256')
       .update(text ?? '')
       .update(botToolCredentialsFingerprint(folder, credentialsOf(servers)))
@@ -136,7 +135,6 @@ function writeServers(
     const { headers, credential, ...rest } = server
     const signIn = credential ? readBotToolOAuth(folder, credential) : null
     if (signIn && signIn.url !== server.url) {
-      // A new address is another app to sign in to: the old sign-in goes, and a new one starts out.
       const id = newBotToolCredentialId()
       signIns.set(id, server.url)
       return { ...unknown, ...rest, credential: id }
