@@ -6,12 +6,11 @@ import type { BotToolsCli } from './bot-tools-host'
 import { botToolRelay, type BotToolRelay } from './tool-relay/bot-tool-relay'
 import { BOT_TOOLS_TOKEN_ENV } from '../../shared/agent-session/lifecycle/launch/agent-session-caller-env'
 import { botGhShimEnv, withBotGhShimOnPath } from './fork-gh-shim'
-import { botGithubAppEnv } from './bot-gh-app-identity'
 const LOOPBACK_HOSTS = ['127.0.0.1', 'localhost', '::1']
 
 /** A bot's servers ready for its CLI; only `BotLaunchTools.for` makes one, so no saved value slips through. */
 export class BotLaunchTools {
-  static readonly none = new BotLaunchTools([], {}, {}, false)
+  static readonly none = new BotLaunchTools([], {}, {}, false, false)
   // A private member makes the type nominal: a plain object with the same fields isn't one.
   declare private readonly nominal: true
 
@@ -22,7 +21,9 @@ export class BotLaunchTools {
     /** Added to the environment of the commands the CLI runs, not the CLI's own. */
     readonly commandEnv: Readonly<Record<string, string>>,
     /** Some tool goes through the relay, so the CLI must reach loopback directly. */
-    readonly relayed: boolean
+    readonly relayed: boolean,
+    /** The CLI snapshots its own env to disk, so a secret belongs only to the commands it runs. */
+    private readonly commandsOnly: boolean
   ) {}
 
   /**
@@ -40,11 +41,7 @@ export class BotLaunchTools {
     }
     const { origin, token } = await relay.grant(bot.botId, bot.folder)
     const tokenEnv = { [BOT_TOOLS_TOKEN_ENV]: token }
-    // The App's token rides with the shim: one is the bot's `gh`, the other is who it acts as.
-    const shimEnv = {
-      ...(await botGhShimEnv({ id: bot.botId, ...(bot.name ? { name: bot.name } : {}) })),
-      ...(await botGithubAppEnv())
-    }
+    const shimEnv = await botGhShimEnv({ id: bot.botId, ...(bot.name ? { name: bot.name } : {}) })
     // Claude and Pi expand `${VAR}` in a server's headers, so their config names only the variable.
     const authorization = ENV_REFERENCING_AGENTS.has(bot.agent)
       ? `Bearer \${${BOT_TOOLS_TOKEN_ENV}}`
@@ -65,8 +62,34 @@ export class BotLaunchTools {
       }),
       commandsOnly ? shimEnv : { ...tokenEnv, ...shimEnv },
       commandsOnly ? tokenEnv : {},
-      servers.some((server) => 'url' in server && server.credential)
+      servers.some((server) => 'url' in server && server.credential),
+      commandsOnly
     )
+  }
+
+  /**
+   * The App's token, which belongs to one session launch: a tool check or a sign-in never carries it, and
+   * Codex gets it in the env of the commands it runs rather than its own, which it snapshots to disk.
+   */
+  withGithubAppEnv(appEnv: Readonly<Record<string, string>>): BotLaunchTools {
+    if (Object.keys(appEnv).length === 0) {
+      return this
+    }
+    return this.commandsOnly
+      ? new BotLaunchTools(
+          this.servers,
+          this.env,
+          { ...this.commandEnv, ...appEnv },
+          this.relayed,
+          true
+        )
+      : new BotLaunchTools(
+          this.servers,
+          { ...this.env, ...appEnv },
+          this.commandEnv,
+          this.relayed,
+          false
+        )
   }
 }
 

@@ -5,10 +5,11 @@ import { join } from 'node:path'
 import { z } from 'zod'
 import { getSecretStore, hasSecretStore } from '../../../shared/secure-storage/secret-store'
 import { writeSecureFileAsync } from '../../../shared/secure-storage/secure-file-async-write'
-import { isGithubAppBotLogin } from '../../../shared/github/app/github-app-identity'
+import { githubAppBotLogin } from '../../../shared/github/app/github-app-identity'
 import { getCanonicalUserDataPath } from '../../persistence/loading-store/user-data-path'
 
-const Envelope = z.string().regex(/^(?:sealed|plain):[A-Za-z0-9+/=]*$/)
+/** Sealed only: Orca never writes a key in the clear, so an envelope it cannot unseal is not one of ours. */
+const Envelope = z.string().regex(/^sealed:[A-Za-z0-9+/=]*$/)
 
 const Installation = z.object({
   id: z.number().int().positive(),
@@ -38,11 +39,7 @@ export type GithubAppCredentials = {
 
 /** The App's login. Derived rather than stored, so a renamed App is not two identities. */
 export function githubAppLogin(slug: string): string {
-  const login = `${slug.trim()}[bot]`
-  if (!isGithubAppBotLogin(login)) {
-    throw new Error('github-app: the app slug cannot be empty')
-  }
-  return login
+  return githubAppBotLogin(slug)
 }
 
 export function githubAppCredentialsPath(): string {
@@ -64,18 +61,12 @@ function seal(value: string): string {
 }
 
 function unseal(envelope: string): string {
-  const [kind, payload = ''] = envelope.split(':', 2)
-  const bytes = Buffer.from(payload, 'base64')
-  if (kind !== 'plain') {
-    assertCanSeal()
-    return getSecretStore().decryptString(bytes)
-  }
-  // A `plain:` envelope on a sealing host was not written by Orca: refuse rather than trust it.
-  if (hasSecretStore() && getSecretStore().isEncryptionAvailable()) {
-    throw new Error('github-app: refusing an unsealed key on a host that seals')
-  }
-  return bytes.toString('utf8')
+  const [, payload = ''] = envelope.split(':', 2)
+  assertCanSeal()
+  return getSecretStore().decryptString(Buffer.from(payload, 'base64'))
 }
+
+const UNREADABLE = 'github-app: the stored App credentials are not readable; connect the App again'
 
 /** The stored App, or null when none is connected. Throws when a file exists but does not parse. */
 export async function readGithubAppCredentials(): Promise<GithubAppCredentials | null> {
@@ -88,12 +79,17 @@ export async function readGithubAppCredentials(): Promise<GithubAppCredentials |
     }
     throw error
   }
-  const parsed: unknown = JSON.parse(text)
+  // A parse failure names a slice of the sealed ciphertext; the detail belongs in the log, not in a message.
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(text)
+  } catch (error) {
+    console.warn('[github-app] the stored App credentials did not parse', error)
+    throw new Error(UNREADABLE)
+  }
   const stored = Stored.safeParse(parsed)
   if (!stored.success) {
-    throw new Error(
-      'github-app: the stored App credentials are not readable; connect the App again'
-    )
+    throw new Error(UNREADABLE)
   }
   return {
     appId: stored.data.appId,

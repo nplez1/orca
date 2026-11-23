@@ -1599,6 +1599,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'github.addPRReviewCommentReply': PRReviewCommentReply,
   'github.app.connect': GithubAppConnect,
   'github.app.disconnect': null,
+  'github.app.refresh': null,
   'github.app.status': null,
   'github.countWorkItems': WorkItemsCount,
   'github.createIssue': CreateIssue,

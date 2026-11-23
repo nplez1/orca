@@ -16,7 +16,7 @@ import type { BotChatRow } from '../../shared/bots/bot-chat-row'
 import { soulSpecialty } from '../../shared/bot-roster'
 import type { BotLookAroundStore } from './bot-look-around-store'
 import { botSessionToolServers, currentBotToolsRevision } from './bot-tools-file'
-import { botToolsEpoch, type BotLaunchedTools } from './bot-tools-revision'
+import { botLaunchToolsChecks, type BotLaunchedTools } from './bot-tools-revision'
 import { botOfHomeWorkspace } from '../../shared/bots/bot-homes'
 import { createBotTurnContext } from './bot-turn-context'
 import type {
@@ -213,7 +213,13 @@ export function botStructuredSessionWiring(deps: {
       }
     },
     resolveSessionToolServers: async (record, launchDirectory) => {
-      const { tools, launched } = await botSessionToolServers(bots(), record, launchDirectory)
+      const { tools, launched } = await botSessionToolServers(
+        bots(),
+        record,
+        launchDirectory,
+        undefined,
+        deps.store().getRepos()
+      )
       if (launched) {
         launchedTools.set(record.sessionId, launched)
       } else {
@@ -221,19 +227,10 @@ export function botStructuredSessionWiring(deps: {
       }
       return tools
     },
-    launchTools: {
-      changed: async (sessionId) => {
-        const launched = launchedTools.get(sessionId)
-        return (
-          launched !== undefined &&
-          (await currentBotToolsRevision(launched.folder)) !== launched.revision
-        )
-      },
-      outdated: (sessionId) => {
-        const launched = launchedTools.get(sessionId)
-        return launched !== undefined && botToolsEpoch(launched.folder) !== launched.epoch
-      }
-    },
+    launchTools: botLaunchToolsChecks(
+      (sessionId) => launchedTools.get(sessionId),
+      currentBotToolsRevision
+    ),
     prepareSessionLinkedSkills: async (record) => {
       const bot = botOfRecord(record)
       return bot ? syncLinkedSkills(bot) : NO_LINKED_SKILLS

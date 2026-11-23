@@ -78,9 +78,29 @@ export function GitHubAppSetupSteps({
           label={t('bots.github.app.step.createLink', 'Open GitHub’s new App page')}
         />
         <p className="text-xs text-muted-foreground">
+          {t(
+            'bots.github.app.step.createOrg',
+            'For an organization’s repositories, open https://github.com/organizations/<org>/settings/apps/new for that organization instead: an App created under your personal account cannot be installed on an organization.'
+          )}
+        </p>
+        <p className="text-xs text-muted-foreground">
           {t('bots.github.app.step.createIntro', 'Fill the form in like this:')}
         </p>
         <ul className="divide-y divide-border rounded-md border border-border">
+          <SettingRow
+            name={t('bots.github.app.step.appName', 'App name')}
+            detail={t(
+              'bots.github.app.step.appNameValue',
+              'Any name, for example “Orca bots”. GitHub turns it into the slug bots appear as: <slug>[bot].'
+            )}
+          />
+          <SettingRow
+            name={t('bots.github.app.step.homepage', 'Homepage URL')}
+            detail={t(
+              'bots.github.app.step.homepageValue',
+              'Any URL you own — https://github.com/<you> is fine. Nothing reads it.'
+            )}
+          />
           <SettingRow
             name={t('bots.github.app.step.webhook', 'Webhook')}
             detail={t(
@@ -92,19 +112,15 @@ export function GitHubAppSetupSteps({
             name={t('bots.github.app.step.installScope', 'Where can this App be installed?')}
             detail={t(
               'bots.github.app.step.installScopeValue',
-              'Only on this account — or on the organization whose repositories the bots work in.'
+              '“Only on this account” for your own repositories, “Any account” when an organization’s repositories are the ones the bots work in. GitHub offers only those two.'
             )}
           />
           <SettingRow
             name={t('bots.github.app.step.permissions', 'Repository permissions')}
             detail={t(
               'bots.github.app.step.permissionsValue',
-              'Exactly these, and nothing else. Metadata: Read is added for you.'
+              'These four, and nothing else. Metadata: Read is added for you.'
             )}
-          />
-          <SettingRow
-            name={t('bots.github.app.step.contents', 'Contents: Read and write')}
-            detail={t('bots.github.app.step.contentsWhy', 'Push branches.')}
           />
           <SettingRow
             name={t('bots.github.app.step.pullRequests', 'Pull requests: Read and write')}
@@ -116,13 +132,6 @@ export function GitHubAppSetupSteps({
           <SettingRow
             name={t('bots.github.app.step.issues', 'Issues: Read and write')}
             detail={t('bots.github.app.step.issuesWhy', 'Comment on issues.')}
-          />
-          <SettingRow
-            name={t('bots.github.app.step.workflows', 'Workflows: Read and write')}
-            detail={t(
-              'bots.github.app.step.workflowsWhy',
-              'Push branches that change .github/workflows.'
-            )}
           />
           <SettingRow
             name={t('bots.github.app.step.checks', 'Checks: Read')}
@@ -140,6 +149,12 @@ export function GitHubAppSetupSteps({
             detail={t('bots.github.app.step.eventsValue', 'None.')}
           />
         </ul>
+        <p className="text-xs text-muted-foreground">
+          {t(
+            'bots.github.app.step.optionalPermissions',
+            'Add Contents: Read and write and Workflows: Read and write only if you also want a bot’s git pushes to run as the App. Nothing here needs them: pushes still use your own git login.'
+          )}
+        </p>
       </Step>
       <Step
         number="2"
@@ -151,8 +166,14 @@ export function GitHubAppSetupSteps({
         />
         <p className="text-xs text-muted-foreground">
           {t(
+            'bots.github.app.step.installOrg',
+            'An App owned by an organization is not on that page: open https://github.com/organizations/<org>/settings/apps for the organization instead.'
+          )}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          {t(
             'bots.github.app.step.installNote',
-            'On the App’s page, choose Install App, then the account and the repositories. All repositories works too: Orca shows which repositories the App covers.'
+            'On the App’s page, choose Install App, then the account and the repositories. All repositories works too: Orca shows which repositories the App covers, and Refresh picks up ones you add later.'
           )}
         </p>
       </Step>
@@ -160,7 +181,7 @@ export function GitHubAppSetupSteps({
         <p className="text-xs text-muted-foreground">
           {t(
             'bots.github.app.step.addIntro',
-            'On the same settings page, copy the App ID and generate a private key.'
+            'On the App’s own settings page, copy the App ID and generate a private key.'
           )}
         </p>
         <GitHubAppConnectForm hostId={hostId} onConnected={onConnected} />

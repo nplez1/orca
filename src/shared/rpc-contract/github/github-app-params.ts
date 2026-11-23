@@ -39,6 +39,8 @@ export type GithubAppStatus =
       /** `<slug>[bot]`: who a bot's GitHub actions are authored by. */
       login: string
       installations: GithubAppInstallationView[]
+      /** The installation a bot acts as, so Settings names one instead of implying every one is used. */
+      activeInstallationId?: number
       /** Known only once a token has been minted; a status read never mints one. */
       tokenExpiresAt?: string
     }

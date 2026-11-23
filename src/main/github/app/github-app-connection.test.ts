@@ -44,7 +44,7 @@ vi.mock('./github-app-installation-token', async (importOriginal) => {
   return { ...actual, forgetInstallationTokens: forgotten }
 })
 
-const { connectGithubApp, disconnectGithubApp, githubAppStatus } =
+const { connectGithubApp, disconnectGithubApp, githubAppStatus, refreshGithubApp } =
   await import('./github-app-connection')
 
 type Reply = { status?: number; body: unknown }
@@ -175,7 +175,8 @@ describe('githubAppStatus', () => {
       login: 'lab-agent-np[bot]',
       installations: [
         { id: 181472560, account: 'nplez1', repositorySelection: 'selected', repositories: [] }
-      ]
+      ],
+      activeInstallationId: 181472560
     })
     expect(JSON.stringify(status)).not.toContain('PRIVATE KEY')
   })
@@ -200,10 +201,99 @@ describe('disconnectGithubApp', () => {
       privateKeyPem,
       installations: []
     }
+    const { fetch } = responder([])
 
-    await disconnectGithubApp()
+    await disconnectGithubApp({ fetch })
 
     expect(store.stored).toBeNull()
     expect(forgotten).toHaveBeenCalled()
+  })
+
+  it('still disconnects when GitHub refuses to revoke the token it minted', async () => {
+    reset()
+    store.stored = {
+      appId: 5739055,
+      slug: 'lab-agent-np',
+      privateKeyPem,
+      installations: []
+    }
+    const { fetch } = responder([[/installation\/token$/, { status: 404, body: {} }]])
+
+    await expect(disconnectGithubApp({ fetch })).resolves.toBeUndefined()
+    expect(store.stored).toBeNull()
+  })
+
+  it('wins over a connect that is still waiting on GitHub', async () => {
+    reset()
+    const gate = Promise.withResolvers<void>()
+    const fetch: GithubAppFetch = async (url) => {
+      await gate.promise
+      return new Response(
+        JSON.stringify(
+          url.endsWith('/app')
+            ? { id: 5739055, slug: 'lab-agent-np' }
+            : [{ id: 1, account: { login: 'nplez1' }, repository_selection: 'all' }]
+        )
+      )
+    }
+
+    const connecting = connectGithubApp({ appId: 5739055, privateKey: privateKeyPem, fetch })
+    await disconnectGithubApp({ fetch: responder([]).fetch })
+    gate.resolve()
+
+    await expect(connecting).rejects.toThrow(/nothing was stored/)
+    expect(store.writes).toHaveLength(0)
+  })
+})
+
+describe('refreshGithubApp', () => {
+  it('rewrites what is stored, so a repository added on GitHub needs no second paste', async () => {
+    reset()
+    store.stored = {
+      appId: 5739055,
+      slug: 'lab-agent-np',
+      privateKeyPem,
+      installations: [
+        { id: 181472560, account: 'nplez1', repositorySelection: 'selected', repositories: [] }
+      ]
+    }
+    const { fetch } = responder([
+      [/\/app$/, { body: { id: 5739055, slug: 'lab-agent-np' } }],
+      [
+        /\/app\/installations\?/,
+        {
+          body: [{ id: 181472560, account: { login: 'nplez1' }, repository_selection: 'selected' }]
+        }
+      ],
+      [/access_tokens$/, { status: 201, body: { token: 'ghs_abc' } }],
+      [
+        /\/installation\/repositories/,
+        { body: { repositories: [{ full_name: 'nplez1/orca' }, { full_name: 'nplez1/other' }] } }
+      ]
+    ])
+
+    const status = await refreshGithubApp({ fetch })
+
+    expect(store.writes).toHaveLength(1)
+    expect(status).toMatchObject({
+      connected: true,
+      installations: [
+        {
+          id: 181472560,
+          repositorySelection: 'selected',
+          repositories: ['nplez1/orca', 'nplez1/other']
+        }
+      ]
+    })
+    // The identity did not change, so a running session's token is still the App's.
+    expect(forgotten).not.toHaveBeenCalled()
+  })
+
+  it('refuses to re-read an App that is not connected', async () => {
+    reset()
+
+    await expect(refreshGithubApp({ fetch: responder([]).fetch })).rejects.toThrow(
+      /No GitHub App is connected/
+    )
   })
 })

@@ -1,5 +1,5 @@
-// Settings › Bots: the optional GitHub App a computer's bots act as, so their comments and pushes are
-// authored by `<slug>[bot]` instead of by whoever is signed in to `gh`.
+// Settings › Bots: the optional GitHub App a computer's bots act as, so their comments, reviews and pull
+// requests are authored by `<slug>[bot]` instead of by whoever is signed in to `gh`.
 import React, { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { SettingsSubsectionHeader } from '@/components/settings/form-controls/SettingsFormControls'
@@ -24,14 +24,23 @@ function installUrl(login: string): string {
 }
 
 function InstallationRow({
-  installation
+  installation,
+  active
 }: {
   installation: GithubAppInstallationView
+  active: boolean
 }): React.JSX.Element {
   const t = useTranslate()
   return (
     <li className="px-3 py-2">
-      <p className="text-xs font-medium">{installation.account}</p>
+      <p className="flex items-center gap-1.5 text-xs font-medium">
+        {installation.account}
+        {active ? (
+          <span className="rounded-sm border border-border px-1 text-2xs text-muted-foreground">
+            {t('bots.github.app.inUse', 'In use')}
+          </span>
+        ) : null}
+      </p>
       <p className="text-xs break-words text-muted-foreground">
         {installation.repositorySelection === 'all'
           ? t('bots.github.app.allRepositories', 'All repositories')
@@ -55,6 +64,24 @@ function ConnectedApp({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const expiresAt = app.tokenExpiresAt ? new Date(app.tokenExpiresAt) : null
+  const inUse = app.installations.find(
+    (installation) => installation.id === app.activeInstallationId
+  )
+
+  /** A repository added on GitHub, or a second installation, without pasting the key again. */
+  const refresh = (): void => {
+    setBusy(true)
+    setError(null)
+    void githubAppCalls(hostId)
+      .refresh()
+      .then(onChanged, (caught: unknown) => {
+        setError(
+          githubAppErrorMessage(caught) ??
+            t('bots.github.app.refreshFailed', 'Could not re-read the App from GitHub.')
+        )
+      })
+      .finally(() => setBusy(false))
+  }
 
   const disconnect = (): void => {
     setBusy(true)
@@ -82,6 +109,15 @@ function ConnectedApp({
                 'Bots act on GitHub as this App, not as your GitHub account.'
               )}
             </p>
+            {inUse ? (
+              <p className="text-xs text-muted-foreground">
+                {t(
+                  'bots.github.app.activeInstallation',
+                  'Bots act through the installation on {{account}}.',
+                  { account: inUse.account }
+                )}
+              </p>
+            ) : null}
           </div>
           <Button
             size="xs"
@@ -92,16 +128,29 @@ function ConnectedApp({
           >
             {t('bots.github.app.addRepositories', 'Add repositories')}
           </Button>
+          <Button size="xs" variant="outline" disabled={busy} onClick={refresh}>
+            {t('bots.github.app.refresh', 'Refresh')}
+          </Button>
           <Button size="xs" variant="ghost" disabled={busy} onClick={disconnect}>
             {t('bots.github.app.disconnect', 'Disconnect')}
           </Button>
         </div>
         <ul className="divide-y divide-border border-t border-border">
           {app.installations.map((installation) => (
-            <InstallationRow key={installation.id} installation={installation} />
+            <InstallationRow
+              key={installation.id}
+              installation={installation}
+              active={installation.id === app.activeInstallationId}
+            />
           ))}
         </ul>
       </div>
+      <p className="text-xs text-muted-foreground">
+        {t(
+          'bots.github.app.githubComOnly',
+          'The App’s token is for github.com. On a GitHub Enterprise host a bot’s gh keeps acting as your own sign-in.'
+        )}
+      </p>
       {expiresAt ? (
         <p className="text-xs text-muted-foreground">
           {t(
@@ -145,7 +194,7 @@ export function GitHubAppSettings({
         connected
           ? t(
               'bots.github.app.descriptionConnected',
-              'Your bots act on GitHub as {{login}}, so their comments and pushes are theirs.',
+              'Your bots act on GitHub as {{login}}, so their comments, reviews and pull requests are theirs.',
               { login: connected.login }
             )
           : hostName

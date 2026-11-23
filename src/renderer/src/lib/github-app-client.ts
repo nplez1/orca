@@ -16,6 +16,7 @@ export function githubAppCalls(hostId: ExecutionHostId) {
     status: (): Promise<GithubAppStatus> => callRuntimeRpc(target, 'github.app.status', null),
     connect: (params: GithubAppConnectParams): Promise<GithubAppStatus> =>
       callRuntimeRpc(target, 'github.app.connect', params),
+    refresh: (): Promise<GithubAppStatus> => callRuntimeRpc(target, 'github.app.refresh', null),
     disconnect: (): Promise<null> => callRuntimeRpc(target, 'github.app.disconnect', null)
   }
 }

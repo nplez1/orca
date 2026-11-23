@@ -8,6 +8,9 @@ import { useTranslate } from '@/i18n/use-translate'
 import { githubAppCalls, githubAppErrorMessage } from '@/lib/github-app-client'
 import type { ExecutionHostId } from '../../../../../shared/execution-host/execution-host'
 
+/** A paste is a key only if it carries the header GitHub's .pem does; anything else is the wrong paste. */
+const PRIVATE_KEY_HEADER = /-----BEGIN (?:RSA )?PRIVATE KEY-----/
+
 export function GitHubAppConnectForm({
   hostId,
   onConnected
@@ -24,6 +27,8 @@ export function GitHubAppConnectForm({
   const [privateKey, setPrivateKey] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /** The field the last refusal was about, so `aria-invalid` names the one to fix. */
+  const [invalid, setInvalid] = useState<'appId' | 'privateKey' | null>(null)
   const parsedAppId = Number(appId.trim())
   const ready =
     Number.isInteger(parsedAppId) && parsedAppId > 0 && privateKey.trim().length > 0 && !busy
@@ -34,6 +39,7 @@ export function GitHubAppConnectForm({
     }
     setBusy(true)
     setError(null)
+    setInvalid(null)
     void githubAppCalls(hostId)
       .connect({ appId: parsedAppId, privateKey })
       .then(
@@ -43,7 +49,13 @@ export function GitHubAppConnectForm({
           onConnected()
         },
         (caught: unknown) => {
-          // A malformed paste is worth clearing; a refused id is worth keeping so it can be corrected.
+          // A paste that is not a key is cleared so it can be pasted again; a refused id is kept, so the
+          // key stays with it and the id can be corrected.
+          const pastedAKey = PRIVATE_KEY_HEADER.test(privateKey)
+          setInvalid(pastedAKey ? 'appId' : 'privateKey')
+          if (!pastedAKey) {
+            setPrivateKey('')
+          }
           setError(
             githubAppErrorMessage(caught) ??
               t('bots.github.app.add.failed', 'Could not add the App on this computer.')
@@ -71,9 +83,13 @@ export function GitHubAppConnectForm({
           autoComplete="off"
           spellCheck={false}
           className="h-7 max-w-40"
-          aria-invalid={appId.trim().length > 0 && !(parsedAppId > 0)}
+          aria-invalid={invalid === 'appId' || (appId.trim().length > 0 && !(parsedAppId > 0))}
+          aria-describedby={error && invalid === 'appId' ? errorId : undefined}
           value={appId}
-          onChange={(event) => setAppId(event.target.value)}
+          onChange={(event) => {
+            setAppId(event.target.value)
+            setInvalid(null)
+          }}
           placeholder={t('bots.github.app.add.appIdPlaceholder', '123456')}
         />
         <p className="text-xs text-muted-foreground">
@@ -92,11 +108,14 @@ export function GitHubAppConnectForm({
           variant="code"
           autoComplete="off"
           spellCheck={false}
-          aria-invalid={error !== null}
-          aria-describedby={error ? errorId : undefined}
+          aria-invalid={invalid === 'privateKey'}
+          aria-describedby={error && invalid === 'privateKey' ? errorId : undefined}
           className="h-24"
           value={privateKey}
-          onChange={(event) => setPrivateKey(event.target.value)}
+          onChange={(event) => {
+            setPrivateKey(event.target.value)
+            setInvalid(null)
+          }}
           placeholder={t(
             'bots.github.app.add.keyPlaceholder',
             'Paste the .pem GitHub downloaded, or pick the file'
@@ -136,6 +155,7 @@ export function GitHubAppConnectForm({
               void file.text().then((text) => {
                 setPrivateKey(text)
                 setError(null)
+                setInvalid(null)
               })
             }
           }}

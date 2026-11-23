@@ -15,6 +15,11 @@ import type { Bot } from '../../shared/bot-types'
 import { folderWorkspaceKey } from '../../shared/workspace/identity/workspace-scope'
 import { BotLaunchTools } from './bot-launch-tools'
 import {
+  botGithubAppLaunch,
+  githubRepoFullNameOfLaunch,
+  type LaunchRepo
+} from './bot-gh-app-identity'
+import {
   advanceBotToolsEpoch,
   botToolsEpoch,
   botToolsRevision,
@@ -241,8 +246,8 @@ export function changeBotToolServers(
   })
 }
 
-/** The revision a launch would read now; concurrent asks for one folder share a read. */
-const revisionReads = new Map<string, Promise<string>>()
+/** The revision a launch would read now; concurrent asks for one folder share a read. */ const revisionReads =
+  new Map<string, Promise<string>>()
 export function currentBotToolsRevision(folder: string): Promise<string> {
   const running = revisionReads.get(folder)
   if (running) {
@@ -279,12 +284,14 @@ export function botOwnTool(server: BotToolServer, folder: string): BotOwnTool {
 }
 
 /** Any agent's session in a bot's home folder gets that bot's own tools and token; any other session none.
- *  `launched` comes from the same read as the tools, so a write during launch can't look applied. */
+ *  `launched` comes from the same read as the tools, so a write during launch can't look applied. `repos`
+ *  names the repository the launch sits in, when the host already knows one, so the App picks its install. */
 export async function botSessionToolServers(
   bots: readonly Pick<Bot, 'id' | 'name' | 'folderWorkspaceId'>[],
   record: { provider: string; location: { workspaceId: string } },
   launchDirectory: string,
-  relay: Pick<BotToolRelay, 'grant'> = botToolRelay
+  relay: Pick<BotToolRelay, 'grant'> = botToolRelay,
+  repos: readonly LaunchRepo[] = []
 ): Promise<{ tools: BotLaunchTools; launched: BotLaunchedTools | null }> {
   const bot = bots.find(
     (entry) => folderWorkspaceKey(entry.folderWorkspaceId) === record.location.workspaceId
@@ -295,16 +302,22 @@ export async function botSessionToolServers(
   // Read before the file: a write in between makes this launch look stale, never current.
   const epoch = botToolsEpoch(launchDirectory)
   const snapshot = await readBotToolsSnapshot(launchDirectory)
+  const app = await botGithubAppLaunch({
+    repoFullName: githubRepoFullNameOfLaunch(repos, launchDirectory)
+  })
   return {
-    tools: await BotLaunchTools.for(
-      relay,
-      { botId: bot.id, name: bot.name, folder: launchDirectory, agent: record.provider },
-      snapshot.servers
-    ),
+    tools: (
+      await BotLaunchTools.for(
+        relay,
+        { botId: bot.id, name: bot.name, folder: launchDirectory, agent: record.provider },
+        snapshot.servers
+      )
+    ).withGithubAppEnv(app.env),
     launched: {
       folder: launchDirectory,
       revision: botToolsRevision(snapshot.version, epoch),
-      epoch
+      epoch,
+      appIdentity: { epoch: app.epoch, installationId: app.installationId }
     }
   }
 }

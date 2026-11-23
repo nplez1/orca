@@ -13,12 +13,7 @@ export type GithubAppJwtClaims = { iat: number; exp: number; iss: number }
 
 /** The login an App acts as. GitHub appends `[bot]` and reserves the suffix for Apps, so it is a safe marker. */
 export function githubAppBotLogin(slug: string): string {
-  const trimmed = slug.trim()
-  return trimmed ? `${trimmed}${GITHUB_APP_BOT_SUFFIX}` : ''
-}
-
-export function isGithubAppBotLogin(login: string): boolean {
-  return login.trim().toLowerCase().endsWith(GITHUB_APP_BOT_SUFFIX)
+  return `${slug.trim()}${GITHUB_APP_BOT_SUFFIX}`
 }
 
 /** `iss` is the App id, not the installation id — the two are different numbers and only one signs. */
@@ -58,4 +53,28 @@ export function githubAppCoversRepo(input: {
     return 'all'
   }
   return input.repositories.some((repo) => sameRepo(repo, input.repoFullName)) ? 'selected' : 'none'
+}
+
+/**
+ * The installation a bot acts as: the one covering `repoFullName` when that repo is known, else the first,
+ * which is the only answer a Settings read can give.
+ */
+export function githubAppInstallationFor<
+  T extends { repositorySelection: GithubAppRepositorySelection; repositories: readonly string[] }
+>(installations: readonly T[], repoFullName?: string | null): T | null {
+  if (!repoFullName) {
+    return installations[0] ?? null
+  }
+  return (
+    installations.find(
+      (installation) =>
+        githubAppCoversRepo({
+          repositorySelection: installation.repositorySelection,
+          repositories: installation.repositories,
+          repoFullName
+        }) !== 'none'
+    ) ??
+    installations[0] ??
+    null
+  )
 }

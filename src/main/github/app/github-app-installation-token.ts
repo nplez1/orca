@@ -65,3 +65,13 @@ export function forgetInstallationTokens(installationId?: number): void {
 export function cachedInstallationTokenExpiry(installationId: number): number | null {
   return cache.get(installationId)?.expiresAtMs ?? null
 }
+
+/** The token itself, so a disconnect can hand it back to GitHub; null when none is held. */
+export function cachedInstallationToken(installationId: number): string | null {
+  return cache.get(installationId)?.token ?? null
+}
+
+/** Every installation this host is holding a token for, so a disconnect can revoke each one. */
+export function cachedInstallationIds(): number[] {
+  return [...cache.keys()]
+}

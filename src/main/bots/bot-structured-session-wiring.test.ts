@@ -9,6 +9,7 @@ import { localBotHomeFilesystem } from './bot-home'
 import { createBotMemoryRecord } from './bot-memory-record'
 import { botStructuredSessionWiring } from './bot-structured-session-wiring'
 import { writeBotToolServers } from './bot-tools-file'
+import { advanceAppIdentityEpoch } from '../github/app/github-app-identity-epoch'
 import { useBotToolCredentialsRoot } from './bot-tool-credentials'
 import type { BotChatRow } from '../../shared/bots/bot-chat-row'
 import { NO_BOT_CHAT_JOURNAL } from './bot-turn-rows'
@@ -100,6 +101,44 @@ describe("a bot chat's tools", () => {
     expect(wiring.launchTools.outdated('chat-1')).toBe(true)
     expect(await wiring.launchTools.changed('look-around')).toBe(false)
     expect(wiring.launchTools.outdated('look-around')).toBe(false)
+  })
+
+  it('reads as changed once the App it launched as is connected or disconnected, with no tools change', async () => {
+    const folder = mkdtempSync(join(tmpdir(), 'bot-wiring-'))
+    dirs.push(folder)
+    const bot = makeTestBot({ id: 'scout', folderWorkspaceId: 'scout-home', agent: 'claude' })
+    const wiring = botStructuredSessionWiring({
+      store: () => ({ getBots: () => [bot], getRepos: () => [] }),
+      bots: {
+        endFirstRun: async () => undefined,
+        memory: createBotMemoryRecord(localBotHomeFilesystem)
+      },
+      chats: NO_BOT_CHAT_JOURNAL,
+      work: { turnNote: async () => null, handedOver: () => undefined, turnEnded: () => undefined },
+      lookAround: { botOfLook: () => null, botOfTidyUp: () => null, lookTurnIsQuiet: () => false }
+    })
+    const launch = (sessionId: string) =>
+      wiring.resolveSessionToolServers(
+        agentSessionRecordFixture({
+          sessionId,
+          provider: 'claude',
+          location: { workspaceId: folderWorkspaceKey('scout-home') }
+        }),
+        folder
+      )
+    await launch('chat-1')
+    // No App connected: its absence is not a reason to start the chat again on every turn.
+    expect(await wiring.launchTools.changed('chat-1')).toBe(false)
+    expect(wiring.launchTools.outdated('chat-1')).toBe(false)
+
+    advanceAppIdentityEpoch()
+
+    expect(await wiring.launchTools.changed('chat-1')).toBe(true)
+    expect(wiring.launchTools.outdated('chat-1')).toBe(true)
+
+    // The next launch records the new identity, so it settles again rather than restarting forever.
+    await launch('chat-1')
+    expect(wiring.launchTools.outdated('chat-1')).toBe(false)
   })
 })
 

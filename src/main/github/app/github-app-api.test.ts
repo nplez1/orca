@@ -65,7 +65,7 @@ describe('readGithubApp', () => {
 
     const missing = responder([{ status: 404, body: { message: 'Integration not found' } }])
     await expect(readGithubApp({ ...keyPair, fetch: missing.fetch })).rejects.toThrow(
-      /app id and the installation id/
+      /app id, and that the key/
     )
   })
 })
