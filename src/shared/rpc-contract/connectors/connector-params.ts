@@ -12,7 +12,8 @@ export const CONNECTOR_REPLY_ERROR_CODES = [
   // A bot's Chat, which answers whichever direct message wrote last; its final message still posts.
   'bot_chat_reply',
   // The chat's conversation names a bot that is gone, off, or lives in another home.
-  'not_this_bots_conversation'
+  'not_this_bots_conversation',
+  'no_review_on_imessage'
 ] as const
 
 // What a reply answers when its host can't post for anyone: an SSH relay, an older host, or connectors off or signed out.

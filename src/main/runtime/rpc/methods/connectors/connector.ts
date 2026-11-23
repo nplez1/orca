@@ -11,6 +11,9 @@ import { chatPaneKey } from '../../../../external-conversations/external-convers
 import type { OrcaRuntimeService } from '../../../orca-runtime'
 import { defineMethod } from '../../core'
 import { botTurnFor } from '../../../../bots/bot-turn-for'
+import { botOfSession } from '../../../../bots/bot-session-tabs'
+import { PhotonReplyRefusal, postPhotonReply } from '../../../../bots/photon/photon-connector-reply'
+import { photonServiceOf } from '../../../../bots/photon/photon-runtime'
 import { sessionCallerOf } from '../../../orchestration/addressing/orchestration-caller-identity'
 import { CONNECTOR_ACT_METHOD } from '../connector-act'
 import { CONNECTOR_REACT_METHOD } from '../connector-react'
@@ -33,11 +36,40 @@ export const CONNECTOR_METHODS = [
     params: ConnectorReply,
     handler: async (params, context) => {
       const { replyId, text, review } = params
-      const target = requireSeam(context.runtime).replyTarget(
+      const seam = context.runtime.getExternalConversationSeam()
+      const target = seam?.replyTarget(
         'paneKey' in params ? params.paneKey : chatPaneKey(params.sessionId)
       )
+      // fork-comment-ok: photon is fork-only, and without this a real channel refuses its own threads
+      // A channel with no cloud in the middle answers before the cloud-only resolution and the seam
+      // check below refuse it; null means the chat is not one that channel opened.
+      const chatSessionId = 'sessionId' in params ? params.sessionId : null
+      const photon = !target && chatSessionId ? photonServiceOf(context.runtime) : null
+      const photonBot =
+        photon && chatSessionId && context.runtime.bots.enabled()
+          ? botOfSession(context.runtime.bots, chatSessionId)
+          : null
+      if (photon && photonBot && chatSessionId) {
+        try {
+          const local = await postPhotonReply(photon, {
+            botId: photonBot.id,
+            chatId: chatSessionId,
+            text,
+            replyId,
+            review
+          })
+          if (local) {
+            return local
+          }
+        } catch (error) {
+          if (error instanceof PhotonReplyRefusal) {
+            throw new Error(error.code)
+          }
+          throw error
+        }
+      }
       if (!target) {
-        throw new Error('not_a_cloud_conversation')
+        throw new Error(seam ? 'not_a_cloud_conversation' : 'connectors_disabled')
       }
       // A bot posts only into the conversation its chat is bound to, as that bot.
       const botRefusal = botReplyRefusal(

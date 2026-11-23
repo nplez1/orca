@@ -347,6 +347,11 @@ export class PhotonService {
     })
   }
 
+  /** The conversation a chat answers, or null when this chat is not one the channel opened. */
+  async conversationForChat(botId: string, chatId: string): Promise<string | null> {
+    return this.deps.threads.conversationFor(botId, chatId)
+  }
+
   /** Sends a finished chat turn's answer to the conversation that asked, if this chat is one this
    *  channel opened. Silent otherwise: a bot's ordinary chats post nowhere. */
   async sendChatTurnResult(input: {

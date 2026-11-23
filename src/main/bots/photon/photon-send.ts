@@ -61,7 +61,8 @@ export type PhotonSendDeps = {
 
 export type PhotonSendOutcome =
   | { sent: true; entryId: string; truncated: boolean }
-  | { sent: false; entryId: string; error: string }
+  // `settled`: the entry is no longer the outbox's, because a concurrent attempt sent or forgot it.
+  | { sent: false; entryId: string; error: string; settled?: true }
 
 /** Why a send was refused before it was ever attempted. */
 export class PhotonColdStartError extends Error {
@@ -150,7 +151,7 @@ export class PhotonSendPath {
       // `gone`: a concurrent attempt settled it, or the bot was released while this one was in flight.
       // Reporting that as undelivered would tell the owner someone is owed a reply that was delivered.
       this.log('[photon] a send failed after its entry was already settled or forgotten', message)
-      return { sent: false, entryId: entry.id, error: message }
+      return { sent: false, entryId: entry.id, error: message, settled: true }
     }
   }
 }
