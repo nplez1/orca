@@ -102,7 +102,10 @@ export async function appBoundRepoGitLaunchEnv(input: {
   if (!binding || !isAppGhAccountBinding(binding)) {
     return {}
   }
-  assertAppBoundRepoNotWsl(input.repo, binding)
+  // A bot's own `gh` works over WSL; only its git cannot run the helper, so the push is refused, not the launch.
+  if (input.repo.wslDistro) {
+    return {}
+  }
   const path = join(
     botsRootFolder(),
     '.git-config',

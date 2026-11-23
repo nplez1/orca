@@ -169,9 +169,10 @@ login would author the commit as someone else.
   user-level `pushInsteadOf` for the same URL. Settings says the App pushes for the project, not that a
   hand-typed push in a session is verified.
 - **WSL is refused, not half-supported.** Orca's helper is a command on this host and a distro's git
-  cannot run it, so an App-bound project whose git runs inside a distro fails with a message naming the
-  distro instead of pushing as that distro's own GitHub login. `gh` in a bot session is unaffected —
-  its token crosses into WSL through `WSLENV` — but a push is not.
+  cannot run it, so Orca's own push for an App-bound project whose git runs inside a distro fails with a
+  message naming the distro instead of pushing as that distro's own GitHub login. A bot session still
+  launches in such a project — its `gh` works, because that token crosses into WSL through `WSLENV` —
+  but a `git push` typed in that session runs as the distro's own login.
 - **The generated config file replaces the session's global config.** `GIT_CONFIG_GLOBAL` points at a
   file Orca writes, and that file re-includes the user's own global configs by path so their settings
   survive. What does not survive: a write to the global config during the session (a tool that edits
