@@ -6,12 +6,18 @@ import {
   type GhCapabilityTarget
 } from './gh-capability-state'
 import { invalidateGhAccountTokenCache, resolveGhAccountToken } from './gh-account-token'
-import { normalizeGhAccountBinding } from '../../../shared/github/accounts/account-binding'
+import {
+  isAppGhAccountBinding,
+  normalizeGhAccountBinding
+} from '../../../shared/github/accounts/account-binding'
 import type {
   GhAccountBindingInventory,
   GhAccountBindingValidationResult
 } from '../../../shared/github/accounts/auth-types'
 import type { LocalGitExecOptions } from '../repositories/github-repository-identity'
+import { githubAppBotLogin, githubRepoOwner } from '../../../shared/github/app/github-app-identity'
+import { readGithubAppCredentials } from '../app/github-app-credentials'
+import { appInstallationForOwner, GITHUB_APP_HOST } from '../app/github-app-bound-token'
 
 function capabilityTargetFromLocalGitOptions(
   localGitOptions: LocalGitExecOptions = {}
@@ -44,13 +50,34 @@ export async function listGhAccountBindingInventory(
     : diagnostic.accounts
   return {
     capability,
-    accounts
+    accounts,
+    ...(await connectedApps(requiredHost, localGitOptions))
   }
+}
+
+async function connectedApps(
+  requiredHost: string | undefined,
+  localGitOptions: LocalGitExecOptions
+): Promise<{ apps: { host: string; user: string; kind: 'app' }[] }> {
+  const apps: { host: string; user: string; kind: 'app' }[] = []
+  if (requiredHost && requiredHost !== GITHUB_APP_HOST) {
+    return { apps }
+  }
+  const credentials = await readGithubAppCredentials().catch(() => null)
+  if (!credentials) {
+    return { apps }
+  }
+  const owner = githubRepoOwner(localGitOptions.ghAccountRepoFullName)
+  if (owner && !appInstallationForOwner(credentials.installations, owner)) {
+    return { apps }
+  }
+  apps.push({ host: GITHUB_APP_HOST, user: githubAppBotLogin(credentials.slug), kind: 'app' })
+  return { apps }
 }
 
 /** Fails closed: a binding is only `ok` when the CLI supports multi-account and the login exists on this host. */
 export async function validateGhAccountBinding(
-  bindingInput: { host: string; user: string },
+  bindingInput: { host: string; user: string; kind?: 'user' | 'app' },
   localGitOptions: LocalGitExecOptions = {},
   options: { requiredHost?: string } = {}
 ): Promise<GhAccountBindingValidationResult> {
@@ -62,6 +89,13 @@ export async function validateGhAccountBinding(
   const requiredHost = options.requiredHost?.trim().toLowerCase() || undefined
   if (requiredHost && binding.host !== requiredHost) {
     return { ok: false, error: 'gh_bound_account_unavailable' }
+  }
+
+  // fork-comment-ok: an App binding skips gh's version probe and keyring entirely, which the call below cannot say.
+  if (isAppGhAccountBinding(binding)) {
+    const { apps } = await connectedApps(requiredHost, localGitOptions)
+    const offered = apps.some((entry) => entry.host === binding.host && entry.user === binding.user)
+    return offered ? { ok: true, binding } : { ok: false, error: 'github_app_unavailable' }
   }
 
   const inventory = await listGhAccountBindingInventory(localGitOptions, { requiredHost })

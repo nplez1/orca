@@ -87,7 +87,11 @@ export function resolveGitHubProjectAccount(context: GitHubRepoContext) {
     matches = repos.filter((repo) => owners.has(repo.id))
   }
   return matches.length === 1
-    ? { ghAccount: normalizeGhAccountBinding(matches[0].ghAccount) ?? undefined }
+    ? {
+        ghAccount: normalizeGhAccountBinding(matches[0].ghAccount) ?? undefined,
+        ghAccountRepoFullName:
+          matches[0].gitRemoteIdentity?.canonicalKey.split('/').slice(1).join('/') || undefined
+      }
     : null
 }
 

@@ -26,8 +26,8 @@ type RepositoryGitHubAccountSectionProps = {
   forceVisible?: boolean
 }
 
-function accountKey(host: string, user: string): string {
-  return `${host.toLowerCase()}\0${user.toLowerCase()}`
+function accountKey(binding: Pick<GhAccountBinding, 'host' | 'user' | 'kind'>): string {
+  return `${binding.host.toLowerCase()}\0${binding.user.toLowerCase()}\0${binding.kind ?? 'user'}`
 }
 
 // Radix forbids empty item values; use a sentinel for inherited ambient login.
@@ -99,11 +99,15 @@ export function RepositoryGitHubAccountSection({
   const capabilityUnsupported = inventory?.capability === 'unsupported'
   const capabilityUnknown = inventory?.capability === 'unknown'
   const capabilityBlocksBinding = capabilityUnsupported || capabilityUnknown
-  const selectedKey = repo.ghAccount ? accountKey(repo.ghAccount.host, repo.ghAccount.user) : ''
+  const selectedKey = repo.ghAccount ? accountKey(repo.ghAccount) : ''
   const inventoryAccounts = inventory?.accounts ?? []
+  const inventoryApps = inventory?.apps ?? []
   const selectedInInventory = Boolean(
     repo.ghAccount &&
-    inventoryAccounts.some((entry) => accountKey(entry.host, entry.user) === selectedKey)
+    (inventoryAccounts.some(
+      (entry) => accountKey({ host: entry.host, user: entry.user }) === selectedKey
+    ) ||
+      inventoryApps.some((entry) => accountKey(entry) === selectedKey))
   )
 
   const applyBinding = async (requested: GhAccountBinding | null) => {
@@ -139,10 +143,15 @@ export function RepositoryGitHubAccountSection({
                         'auto.components.settings.RepositoryGitHubAccountSection.invalidBinding',
                         'That GitHub account binding is invalid.'
                       )
-                    : t(
-                        'auto.components.settings.RepositoryGitHubAccountSection.unavailable',
-                        'That GitHub account is unavailable on this runtime.'
-                      )
+                    : validation.error === 'github_app_unavailable'
+                      ? t(
+                          'auto.components.settings.RepositoryGitHubAccountSection.appUnavailable',
+                          'The GitHub App is not connected, or not installed on this project’s owner.'
+                        )
+                      : t(
+                          'auto.components.settings.RepositoryGitHubAccountSection.unavailable',
+                          'That GitHub account is unavailable on this runtime.'
+                        )
           )
           return
         }
@@ -252,12 +261,19 @@ export function RepositoryGitHubAccountSection({
               return
             }
             const account = inventoryAccounts.find(
-              (entry) => accountKey(entry.host, entry.user) === value
+              (entry) => accountKey({ host: entry.host, user: entry.user }) === value
             )
-            if (!account || account.source !== 'keyring') {
+            if (account) {
+              if (account.source !== 'keyring') {
+                return
+              }
+              void applyBinding({ host: account.host, user: account.user })
               return
             }
-            void applyBinding({ host: account.host, user: account.user })
+            const app = inventoryApps.find((entry) => accountKey(entry) === value)
+            if (app) {
+              void applyBinding(app)
+            }
           }}
         >
           <SelectTrigger size="sm" className="w-full" aria-labelledby={selectLabelId}>
@@ -281,7 +297,7 @@ export function RepositoryGitHubAccountSection({
               </SelectItem>
             ) : null}
             {inventoryAccounts.map((account) => {
-              const key = accountKey(account.host, account.user)
+              const key = accountKey({ host: account.host, user: account.user })
               const disabled = account.source !== 'keyring' || capabilityBlocksBinding
               const label =
                 account.source === 'keyring'
@@ -293,10 +309,31 @@ export function RepositoryGitHubAccountSection({
                 </SelectItem>
               )
             })}
+            {inventoryApps.map((app) => {
+              const key = accountKey(app)
+              return (
+                <SelectItem key={key} value={key}>
+                  {t(
+                    'auto.components.settings.RepositoryGitHubAccountSection.appOption',
+                    '{{user}} (GitHub App)',
+                    { user: app.user }
+                  )}
+                </SelectItem>
+              )
+            })}
           </SelectContent>
         </Select>
       </div>
 
+      {repo.ghAccount?.kind === 'app' ? (
+        <p className="text-xs text-muted-foreground">
+          {t(
+            'auto.components.settings.RepositoryGitHubAccountSection.appBound',
+            'Issue, pull request and git push calls for this project act as {{user}}. A push that touches .github/workflows is rejected: that needs the Workflows permission, which the App does not ask for.',
+            { user: repo.ghAccount.user }
+          )}
+        </p>
+      ) : null}
       {capabilityUnsupported ? (
         <p className="text-xs text-muted-foreground">
           {t(

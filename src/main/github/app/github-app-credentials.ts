@@ -17,7 +17,9 @@ const Installation = z.object({
   account: z.string().min(1),
   repositorySelection: z.enum(['all', 'selected']),
   /** `owner/name`, lowercase-compared when checked against a repo. */
-  repositories: z.array(z.string().min(1))
+  repositories: z.array(z.string().min(1)),
+  /** Contents: write, which a push needs; null when GitHub did not report the installation's permissions. */
+  contentsWrite: z.boolean().nullish()
 })
 
 const Stored = z.object({

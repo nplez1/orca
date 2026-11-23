@@ -119,7 +119,7 @@ export function GitHubAppSetupSteps({
             name={t('bots.github.app.step.permissions', 'Repository permissions')}
             detail={t(
               'bots.github.app.step.permissionsValue',
-              'These four, and nothing else. Metadata: Read is added for you.'
+              'These five, and nothing else. Metadata: Read is added for you.'
             )}
           />
           <SettingRow
@@ -132,6 +132,13 @@ export function GitHubAppSetupSteps({
           <SettingRow
             name={t('bots.github.app.step.issues', 'Issues: Read and write')}
             detail={t('bots.github.app.step.issuesWhy', 'Comment on issues.')}
+          />
+          <SettingRow
+            name={t('bots.github.app.step.contents', 'Contents: Read and write')}
+            detail={t(
+              'bots.github.app.step.contentsWhy',
+              'Push commits and branches. Without it a push as the App is rejected.'
+            )}
           />
           <SettingRow
             name={t('bots.github.app.step.checks', 'Checks: Read')}
@@ -152,7 +159,7 @@ export function GitHubAppSetupSteps({
         <p className="text-xs text-muted-foreground">
           {t(
             'bots.github.app.step.optionalPermissions',
-            'Leave Contents: Read and write and Workflows: Read and write off. Orca does not use them yet: a bot’s comments, reviews and pull requests need only the permissions above, and git pushes still use your own login.'
+            'Leave Workflows: Read and write off. Orca does not request it, so a push that touches .github/workflows is rejected by GitHub until the App is given it on GitHub — grant it there if the bots push workflows.'
           )}
         </p>
       </Step>

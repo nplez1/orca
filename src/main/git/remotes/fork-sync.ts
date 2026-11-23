@@ -11,6 +11,7 @@ import {
 } from '../command-runner/git-runtime-options'
 import { gitExecFileAsync } from '../command-runner/git-exec-file'
 import { abortSignalWithTimeout } from '../../lib/abort-signal-with-timeout'
+import { assertAppBoundPushUrl } from './app-bound-push-url'
 
 export async function gitSyncForkDefaultBranch(
   worktreePath: string,
@@ -20,12 +21,16 @@ export async function gitSyncForkDefaultBranch(
   const signal = abortSignalWithTimeout(options.signal, 60_000)
   try {
     return await syncForkDefaultBranch(
-      (args) =>
-        gitExecFileAsync(args, {
+      async (args) => {
+        if (args[0] === 'push' && args[1]) {
+          await assertAppBoundPushUrl(worktreePath, args[1], options)
+        }
+        return await gitExecFileAsync(args, {
           ...gitOptionsForWorktree(worktreePath, options),
           timeout: 60_000,
           signal
-        }),
+        })
+      },
       { expectedUpstream }
     )
   } catch (error) {

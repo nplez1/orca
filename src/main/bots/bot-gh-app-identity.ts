@@ -1,9 +1,11 @@
 // A bot's `gh` acting as the connected GitHub App, so a bot's comments, reviews and pull requests are
 // authored by `slug[bot]` and never by the person who happens to be signed in.
 import { isPathInsideOrEqual } from '../../shared/file-access/cross-platform-path'
+import type { GhAccountBinding } from '../../shared/github/accounts/account-binding'
 import {
   githubAppInstallationFor,
-  githubAppTokenNeedsRefresh
+  githubAppTokenNeedsRefresh,
+  githubRepoFullNameFromRemoteKey
 } from '../../shared/github/app/github-app-identity'
 import { readGithubAppCredentials } from '../github/app/github-app-credentials'
 import { appIdentityEpoch } from '../github/app/github-app-identity-epoch'
@@ -62,8 +64,18 @@ export async function botGithubAppLaunch(
   }
 }
 
-/** A repo as far as this needs it: where it is on disk, and the remote key that names it on GitHub. */
-export type LaunchRepo = { path: string; gitRemoteIdentity?: { canonicalKey: string } | null }
+/** A repo as far as this needs it: where it is on disk, the worktrees it owns, the remote key that names it on
+ *  GitHub, the distro its git runs inside, and the account bound to it, so a push typed in a bot's terminal
+ *  acts as the same identity its gh does. */
+export type LaunchRepo = {
+  path: string
+  /** Registered worktree folders, which live outside `path`: a launch there is still this project. */
+  worktreePaths?: readonly string[]
+  /** The distro this project's git runs inside, where Orca's own helper cannot run. */
+  wslDistro?: string
+  gitRemoteIdentity?: { canonicalKey: string } | null
+  ghAccount?: GhAccountBinding
+}
 
 /** The identity a launch recorded, as `BotLaunchedTools.appIdentity` holds it. */
 export type LaunchedAppIdentity = {
@@ -88,29 +100,48 @@ export function botGithubAppIdentityOutdated(
   return launched.installationId !== null && githubAppTokenNeedsRefresh(launched.expiresAtMs, nowMs)
 }
 
-const GITHUB_HOST = 'github.com'
-
 /**
- * The `owner/name` of the repository a launch directory sits in, when Orca already knows one. A bot's own
- * home is not in a repository, so this is usually nothing — and then the App's first installation is used.
+ * The repos a launch directory sits in, deepest first. A project's worktrees live outside its own folder, so
+ * its registered worktrees count as it: a bot working in one is working in that project.
  */
+function launchReposOf(
+  repos: readonly LaunchRepo[],
+  launchDirectory: string
+): readonly LaunchRepo[] {
+  return (
+    repos
+      .map((repo) => ({
+        repo,
+        depth: [repo.path, ...(repo.worktreePaths ?? [])]
+          .filter((folder) => folder && isPathInsideOrEqual(folder, launchDirectory))
+          .reduce((deepest, folder) => Math.max(deepest, folder.length), 0)
+      }))
+      .filter((entry) => entry.depth > 0)
+      // The deepest match wins: a repository inside another one's folder is the one being worked in.
+      .sort((a, b) => b.depth - a.depth)
+      .map((entry) => entry.repo)
+  )
+}
+
+/** The `owner/name` of the repository a launch directory sits in, when Orca already knows one. A bot's own
+ *  home is not in a repository, so this is usually nothing — and then the App's first installation is used. */
 export function githubRepoFullNameOfLaunch(
   repos: readonly LaunchRepo[],
   launchDirectory: string
 ): string | undefined {
-  const candidates = repos
-    .filter((repo) => repo.path && isPathInsideOrEqual(repo.path, launchDirectory))
-    // The deepest match wins: a repository inside another one's folder is the one being worked in.
-    .sort((a, b) => b.path.length - a.path.length)
-  for (const repo of candidates) {
-    const key = repo.gitRemoteIdentity?.canonicalKey?.trim()
-    if (!key) {
-      continue
-    }
-    const [host, ...tail] = key.split('/')
-    if (host?.toLowerCase() === GITHUB_HOST && tail.length === 2) {
-      return tail.join('/')
+  for (const repo of launchReposOf(repos, launchDirectory)) {
+    const fullName = githubRepoFullNameFromRemoteKey(repo.gitRemoteIdentity?.canonicalKey)
+    if (fullName) {
+      return fullName
     }
   }
   return undefined
+}
+
+/** The registered repo a launch directory sits in, if any: the same deepest match the App identity uses. */
+export function launchRepoOf(
+  repos: readonly LaunchRepo[],
+  launchDirectory: string
+): LaunchRepo | undefined {
+  return launchReposOf(repos, launchDirectory)[0]
 }

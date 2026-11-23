@@ -21,7 +21,8 @@ export const GITHUB_ACCOUNT_BINDING_METHODS = [
     handler: async (params, { runtime }) =>
       runtime.validateGitHubAccountBinding(params.repo, {
         host: params.host,
-        user: params.user
+        user: params.user,
+        ...(params.kind ? { kind: params.kind } : {})
       })
   })
 ]

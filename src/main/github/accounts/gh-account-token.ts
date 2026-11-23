@@ -4,9 +4,14 @@ import type { GhCaptureLifetimeHooks } from '../../git/command-runner/hosted-cli
 import { addWslEnvKeys } from '../../../shared/shell/wsl/wsl-env'
 import {
   ghTokenEnvVarForHost,
+  isAppGhAccountBinding,
   normalizeGhAccountBinding,
   type GhAccountBinding
 } from '../../../shared/github/accounts/account-binding'
+import {
+  createGhBoundAccountHostMismatchError,
+  createGhBoundAccountUnavailableError
+} from './gh-bound-account-errors'
 import {
   createGhMultiAccountUnsupportedError,
   getGhExecutionHostKey,
@@ -14,6 +19,12 @@ import {
   normalizeGhCapabilityTarget,
   type GhCapabilityTarget
 } from './gh-capability-state'
+import { githubRepoOwner } from '../../../shared/github/app/github-app-identity'
+import { githubAppBoundToken } from '../app/github-app-bound-token'
+import { readGithubAppCredentials } from '../app/github-app-credentials'
+import { getMainHttpClient } from '../../network/http-client'
+
+export { createGhBoundAccountHostMismatchError, createGhBoundAccountUnavailableError }
 
 const TOKEN_RESOLVE_TIMEOUT_MS = 10_000
 const POSITIVE_TTL_MS = 5 * 60_000
@@ -83,35 +94,13 @@ function pruneTokenCache(now: number): void {
   }
 }
 
-export function createGhBoundAccountUnavailableError(
-  binding: GhAccountBinding
-): Error & { code: 'gh_bound_account_unavailable'; stderr: string } {
-  const message = `Bound GitHub account ${binding.user}@${binding.host} is unavailable on this runtime.`
-  return Object.assign(new Error(message), {
-    code: 'gh_bound_account_unavailable' as const,
-    stderr: message
-  })
-}
-
-export function createGhBoundAccountHostMismatchError(
-  binding: GhAccountBinding,
-  host: string | undefined
-): Error & { code: 'gh_bound_account_host_mismatch'; stderr: string } {
-  const message = host
-    ? `Bound GitHub account host ${binding.host} does not match request host ${host}.`
-    : `Bound GitHub account ${binding.user}@${binding.host} requires an explicit matching host.`
-  return Object.assign(new Error(message), {
-    code: 'gh_bound_account_host_mismatch' as const,
-    stderr: message
-  })
-}
-
 /** Resolves a short-lived token for `binding`, cached 5 min positive / 30 s negative per execution host. */
 export async function resolveGhAccountToken(
   bindingInput: GhAccountBinding,
   target: GhCapabilityTarget = {},
   nowMs = Date.now(),
-  hooks?: GhCaptureLifetimeHooks
+  hooks?: GhCaptureLifetimeHooks,
+  repoFullName?: string
 ): Promise<string> {
   const binding = normalizeGhAccountBinding(bindingInput)
   if (!binding) {
@@ -119,6 +108,11 @@ export async function resolveGhAccountToken(
   }
 
   const normalizedTarget = normalizeGhCapabilityTarget(target)
+  if (isAppGhAccountBinding(binding)) {
+    // fork-comment-ok: not cached here, because installationToken already shares one mint and refreshes early.
+    return resolveAppGhAccountToken(binding, repoFullName)
+  }
+
   const capability = await getGhMultiAccountCapability(normalizedTarget, nowMs, hooks)
   if (capability === 'unsupported') {
     throw createGhMultiAccountUnsupportedError()
@@ -193,6 +187,37 @@ export async function resolveGhAccountToken(
   }
 }
 
+async function resolveAppGhAccountToken(
+  binding: GhAccountBinding,
+  repoFullName: string | undefined
+): Promise<string> {
+  const owner = githubRepoOwner(repoFullName)
+  try {
+    const minted = await githubAppBoundToken({
+      host: binding.host,
+      owner,
+      credentials: await readGithubAppCredentials(),
+      fetch: getMainHttpClient().fetch
+    })
+    return minted.token
+  } catch (error) {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      error.code === 'gh_bound_account_unavailable'
+    ) {
+      throw error
+    }
+    throw createGhBoundAccountUnavailableError(
+      binding,
+      `The GitHub App could not mint a token for ${owner ?? binding.host}: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    )
+  }
+}
+
 /** Drops ambient GH_TOKEN/GH_HOST/GH_REPO so a bound call cannot inherit the globally active login. */
 export function stripAmbientGhTokenEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const next = { ...env }
@@ -235,8 +260,9 @@ export function invalidateGhAccountTokenCache(binding?: GhAccountBinding | null)
     tokenCache.clear()
     return
   }
+  const suffix = `\0${normalized.host}\0${normalized.user}`
   for (const key of tokenCache.keys()) {
-    if (key.endsWith(`\0${normalized.host}\0${normalized.user}`)) {
+    if (key.endsWith(suffix) || key.includes(`${suffix}\0`)) {
       tokenCache.delete(key)
     }
   }

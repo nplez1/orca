@@ -829,6 +829,11 @@
           "projectNeedsRemote": "Add a remote to this project first",
           "projectSetupNeedsServer": "Set this project up from a Remote Orca Server on that host"
         },
+        "RepositoryGitHubAccountSection": {
+          "appBound": "Issue, pull request and git push calls for this project act as {{user}}. A push that touches .github/workflows is rejected: that needs the Workflows permission, which the App does not ask for.",
+          "appOption": "{{user}} (GitHub App)",
+          "appUnavailable": "The GitHub App is not connected, or not installed on this project’s owner."
+        },
         "CliSection": {
           "9fd4023db0": "Show in File Manager"
         },
@@ -1541,6 +1546,8 @@
         "activeInstallation": "Bots act through the installation on {{account}}.",
         "allRepositories": "All repositories",
         "connectedAs": "Bots act on GitHub as this App, not as your GitHub account.",
+        "contentsMissing": "This installation has no Contents: write, so a push as the App will be rejected. Give the App that permission on GitHub, then Refresh.",
+        "contentsUnknown": "Orca has not read this installation’s permissions yet, so it cannot tell whether a push as the App will be allowed. Refresh to read them.",
         "description": "Optional. Let your bots act on GitHub as an App you own, instead of as your GitHub account.",
         "descriptionConnected": "Your bots act on GitHub as {{login}}, so their comments, reviews and pull requests are theirs.",
         "descriptionOnHost": "Optional. Let the bots on {{host}} act on GitHub as an App you own, instead of as your GitHub account.",
@@ -1563,6 +1570,8 @@
           "appNameValue": "Any name, for example “Orca bots”. GitHub turns it into the slug bots appear as: <slug>[bot].",
           "checks": "Checks: Read",
           "checksWhy": "See whether its own pull request is green.",
+          "contents": "Contents: Read and write",
+          "contentsWhy": "Push commits and branches. Without it a push as the App is rejected.",
           "create": "Create the App on GitHub",
           "createIntro": "Fill the form in like this:",
           "createLink": "Open GitHub’s new App page",
@@ -1579,9 +1588,9 @@
           "installScopeValue": "“Only on this account” for your own repositories, “Any account” when an organization’s repositories are the ones the bots work in. GitHub offers only those two.",
           "issues": "Issues: Read and write",
           "issuesWhy": "Comment on issues.",
-          "optionalPermissions": "Leave Contents: Read and write and Workflows: Read and write off. Orca does not use them yet: a bot’s comments, reviews and pull requests need only the permissions above, and git pushes still use your own login.",
+          "optionalPermissions": "Leave Workflows: Read and write off. Orca does not request it, so a push that touches .github/workflows is rejected by GitHub until the App is given it on GitHub — grant it there if the bots push workflows.",
           "permissions": "Repository permissions",
-          "permissionsValue": "These four, and nothing else. Metadata: Read is added for you.",
+          "permissionsValue": "These five, and nothing else. Metadata: Read is added for you.",
           "pullRequests": "Pull requests: Read and write",
           "pullRequestsWhy": "Open pull requests, comment on them and review them.",
           "webhook": "Webhook",

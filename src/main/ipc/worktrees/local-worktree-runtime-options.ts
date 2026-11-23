@@ -1,5 +1,7 @@
 import { resolve } from 'node:path'
 import type { RuntimeStore } from '../../runtime/construction/runtime-store-contract'
+import type { GitRuntimeOptions } from '../../git/command-runner/git-runtime-options'
+import { appBoundRepoGitEnv } from '../../github/app/github-app-bound-repo-git'
 import {
   getLocalProjectWorktreeGitOptions,
   type LocalProjectWorktreeGitOptions
@@ -84,4 +86,21 @@ export function getLocalGitOptionsForRegisteredWorktree(
     store,
     getLocalRepoForRegisteredWorktree(store, worktreePath, resolvedWorktreePath)
   )
+}
+
+export async function getLocalRemoteSyncGitOptions(
+  store: RuntimeStore,
+  worktreePath: string,
+  resolvedWorktreePath: string
+): Promise<GitRuntimeOptions> {
+  const options = getLocalGitOptionsForRegisteredWorktree(store, worktreePath, resolvedWorktreePath)
+  const repo = getLocalRepoForRegisteredWorktree(store, worktreePath, resolvedWorktreePath)
+  // fork-comment-ok: a distro's git cannot run Orca's helper, so the binding is refused rather than pushed as its login.
+  const env = repo
+    ? await appBoundRepoGitEnv({
+        ...repo,
+        ...(options.wslDistro ? { wslDistro: options.wslDistro } : {})
+      })
+    : undefined
+  return env ? { ...options, env } : options
 }

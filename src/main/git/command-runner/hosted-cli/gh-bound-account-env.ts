@@ -54,8 +54,8 @@ export async function resolveBoundGhExecEnv(
   }
   const target = { cwd: options.cwd, wslDistro: resolved.wsl?.distro ?? options.wslDistro }
   const token = hooks
-    ? await resolveGhAccountToken(normalized, target, undefined, hooks)
-    : await resolveGhAccountToken(normalized, target)
+    ? await resolveGhAccountToken(normalized, target, undefined, hooks, options.repoFullName)
+    : await resolveGhAccountToken(normalized, target, undefined, undefined, options.repoFullName)
   return buildBoundGhChildEnv({
     baseEnv: options.env ?? process.env,
     binding: normalized,

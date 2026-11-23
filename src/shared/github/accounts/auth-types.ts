@@ -35,6 +35,7 @@ export type GhMultiAccountCapability = 'supported' | 'unsupported' | 'unknown'
 export type GhAccountBindingInventory = {
   capability: GhMultiAccountCapability
   accounts: GhAuthAccount[]
+  apps?: GhAccountBinding[]
 }
 
 export type GhAccountBindingValidationError =
@@ -43,6 +44,7 @@ export type GhAccountBindingValidationError =
   | 'gh_bound_account_unavailable'
   | 'gh_bound_account_not_keyring'
   | 'invalid_binding'
+  | 'github_app_unavailable'
 
 export type GhAccountBindingValidationResult =
   | { ok: true; binding: GhAccountBinding }

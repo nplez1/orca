@@ -4,7 +4,7 @@ import { gitFastForward, gitPull, gitPush } from '../../../git/remotes/remote'
 import { gitPullRebaseFromBase } from '../../../git/remotes/remote-rebase'
 import { validateGitPushTarget } from '../../../git/remotes/push-target-validation'
 import { resolveRegisteredWorktreePath } from '../../worktrees/removal/registered-worktree-roots-cache'
-import { getLocalGitOptionsForRegisteredWorktree } from '../../worktrees/local-worktree-runtime-options'
+import { getLocalRemoteSyncGitOptions } from '../../worktrees/local-worktree-runtime-options'
 import {
   ipcGitWorktreeTarget,
   materializeWorktreePushTargetRemote
@@ -33,11 +33,7 @@ export function registerGitRemoteBranchMutationHandlers(context: FilesystemHandl
       const publish = args.publish === true
       requireReachableGitRoute(getConnectionExecutionHostId(args.connectionId))
       const worktreePath = await resolveRegisteredWorktreePath(args.worktreePath, store)
-      const gitOptions = getLocalGitOptionsForRegisteredWorktree(
-        store,
-        args.worktreePath,
-        worktreePath
-      )
+      const gitOptions = await getLocalRemoteSyncGitOptions(store, args.worktreePath, worktreePath)
       const materializedPushTarget = args.pushTarget
         ? await materializeWorktreePushTargetRemote(
             worktreePath,
@@ -75,11 +71,7 @@ export function registerGitRemoteBranchMutationHandlers(context: FilesystemHandl
     ): Promise<void> => {
       requireReachableGitRoute(getConnectionExecutionHostId(args.connectionId))
       const worktreePath = await resolveRegisteredWorktreePath(args.worktreePath, store)
-      const gitOptions = getLocalGitOptionsForRegisteredWorktree(
-        store,
-        args.worktreePath,
-        worktreePath
-      )
+      const gitOptions = await getLocalRemoteSyncGitOptions(store, args.worktreePath, worktreePath)
       const materializedPushTarget = args.pushTarget
         ? await materializeWorktreePushTargetRemote(
             worktreePath,
@@ -116,11 +108,7 @@ export function registerGitRemoteBranchMutationHandlers(context: FilesystemHandl
     ): Promise<void> => {
       requireReachableGitRoute(getConnectionExecutionHostId(args.connectionId))
       const worktreePath = await resolveRegisteredWorktreePath(args.worktreePath, store)
-      const gitOptions = getLocalGitOptionsForRegisteredWorktree(
-        store,
-        args.worktreePath,
-        worktreePath
-      )
+      const gitOptions = await getLocalRemoteSyncGitOptions(store, args.worktreePath, worktreePath)
       const materializedPushTarget = args.pushTarget
         ? await materializeWorktreePushTargetRemote(
             worktreePath,
@@ -152,11 +140,7 @@ export function registerGitRemoteBranchMutationHandlers(context: FilesystemHandl
     ): Promise<void> => {
       requireReachableGitRoute(getConnectionExecutionHostId(args.connectionId))
       const worktreePath = await resolveRegisteredWorktreePath(args.worktreePath, store)
-      const gitOptions = getLocalGitOptionsForRegisteredWorktree(
-        store,
-        args.worktreePath,
-        worktreePath
-      )
+      const gitOptions = await getLocalRemoteSyncGitOptions(store, args.worktreePath, worktreePath)
       await gitPullRebaseFromBase(worktreePath, args.baseRef, {
         ...gitOptions,
         admissionTier: 'interactive'

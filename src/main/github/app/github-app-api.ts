@@ -133,15 +133,30 @@ export async function listGithubAppInstallations(input: {
     if (typeof record.id !== 'number' || typeof account !== 'string') {
       return []
     }
+    const contentsWrite = readContentsWrite(record)
     return [
       {
         id: record.id,
         account,
         repositorySelection: selection,
-        repositories: []
+        repositories: [],
+        ...(contentsWrite === null ? {} : { contentsWrite })
       }
     ]
   })
+}
+
+/**
+ * Whether the installation may push. `permissions` is in GitHub's installation object; when it is absent the
+ * answer is null (not verified) rather than a guess, so nothing claims a push will work without having read it.
+ */
+function readContentsWrite(installation: Record<string, unknown>): boolean | null {
+  const permissions = fields(installation.permissions)
+  const contents = permissions.contents
+  if (contents === 'write') {
+    return true
+  }
+  return contents === undefined ? null : false
 }
 
 export async function mintInstallationToken(input: {

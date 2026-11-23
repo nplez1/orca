@@ -24,6 +24,7 @@ export type GitHubRepoContext = {
   admissionTier?: GitAdmissionTier
   /** SSH keeps the binding even when cwd is omitted from gh options. */
   ghAccount?: GhAccountBinding
+  ghAccountRepoFullName?: string
   /** Captured authority; a known unbound project also overrides caller account input. */
   ghAccountFromProject?: boolean
 }
@@ -32,6 +33,7 @@ export type LocalGitExecOptions = {
   wslDistro?: string
   admissionTier?: GitAdmissionTier
   ghAccount?: GhAccountBinding
+  ghAccountRepoFullName?: string
 }
 
 export type GitHubRemoteIdentityProbeOptions = {
@@ -82,7 +84,10 @@ export function githubRepoContext(
     connectionId: connectionId ?? null,
     ...(localGitOptions.wslDistro ? { wslDistro: localGitOptions.wslDistro } : {}),
     ...(localGitOptions.admissionTier ? { admissionTier: localGitOptions.admissionTier } : {}),
-    ...(localGitOptions.ghAccount ? { ghAccount: localGitOptions.ghAccount } : {})
+    ...(localGitOptions.ghAccount ? { ghAccount: localGitOptions.ghAccount } : {}),
+    ...(localGitOptions.ghAccountRepoFullName
+      ? { ghAccountRepoFullName: localGitOptions.ghAccountRepoFullName }
+      : {})
   }
   const scope = operations.getStore()
   const pinned =
@@ -98,6 +103,7 @@ export function githubRepoContext(
   return Object.freeze({
     ...context,
     ghAccount: binding,
+    ghAccountRepoFullName: account.ghAccountRepoFullName,
     ghAccountFromProject: pinned ? pinned.ghAccountFromProject === true : project !== null
   })
 }
@@ -108,15 +114,20 @@ export function ghRepoExecOptions(context: GitHubRepoContext): {
   wslDistro?: string
   admissionTier?: GitAdmissionTier
   ghAccount?: GhAccountBinding
+  repoFullName?: string
 } {
   const account = context.ghAccount ? { ghAccount: context.ghAccount } : {}
+  const repoFullName = context.ghAccountRepoFullName
+    ? { repoFullName: context.ghAccountRepoFullName }
+    : {}
   return context.connectionId
     ? { ...account }
     : {
         cwd: context.repoPath,
         ...(context.wslDistro ? { wslDistro: context.wslDistro } : {}),
         ...(context.admissionTier ? { admissionTier: context.admissionTier } : {}),
-        ...account
+        ...account,
+        ...repoFullName
       }
 }
 

@@ -15,6 +15,7 @@ import {
   withRepoRefMaintenancePaused
 } from '../refs/maintenance/local-repo-ref-maintenance'
 import { validateGitPushTarget } from './push-target-validation'
+import { assertAppBoundPushUrl } from './app-bound-push-url'
 import { gitExecFileAsync } from '../command-runner/git-exec-file'
 import { fetchForkRemoteWithStaleRefspecRepair } from '../refs/fork-remotes/fork-remote-stale-branch-refspec'
 import { runWithGitReadCacheInvalidation } from '../source-control/git-read-cache-invalidation'
@@ -41,6 +42,7 @@ export async function gitPush(
       : await resolveConfiguredGitPushTarget((args) =>
           gitExecFileAsync(args, gitOptionsForWorktree(worktreePath, options))
         )
+    await assertAppBoundPushUrl(worktreePath, target?.remote ?? 'origin', options)
     const args = [
       'push',
       ...(options.forceWithLease ? ['--force-with-lease'] : []),

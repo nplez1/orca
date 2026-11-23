@@ -176,6 +176,7 @@ export const ghMutationsAndProjectsApi = {
     repoId?: string
     host: string
     user: string
+    kind?: 'user' | 'app'
   }): Promise<GhAccountBindingValidationResult> =>
     ipcRenderer.invoke('gh:validateAccountBinding', args),
   listAccessibleProjects: (

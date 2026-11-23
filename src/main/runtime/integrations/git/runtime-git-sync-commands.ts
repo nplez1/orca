@@ -11,6 +11,7 @@ import type { LocalGitProvider } from '../../../providers/git/local-provider'
 import {
   localGitOptionsForTarget,
   requireRuntimeGitProvider,
+  runtimeRemoteSyncGitEnv,
   type RuntimeGitCommandHost,
   type RuntimeGitTarget
 } from './runtime-git-command-target'
@@ -23,7 +24,7 @@ export class RuntimeGitSyncCommands {
     target: RuntimeGitTarget,
     pushTarget: GitPushTarget | undefined
   ): Promise<{ provider: LocalGitProvider; pushTarget: GitPushTarget | undefined }> {
-    const provider = requireRuntimeGitProvider(target)
+    const provider = requireRuntimeGitProvider(target, await runtimeRemoteSyncGitEnv(target))
     const materialized = pushTarget
       ? await materializeWorktreePushTargetRemote(
           target.worktree.path,
@@ -76,10 +77,10 @@ export class RuntimeGitSyncCommands {
     expectedUpstream: GitForkSyncExpectedUpstream
   ): Promise<GitForkSyncResult> {
     const target = await this.host.resolveRuntimeGitTarget(worktreeSelector)
-    return requireRuntimeGitProvider(target).syncForkDefaultBranch(
-      target.worktree.path,
-      expectedUpstream
-    )
+    return requireRuntimeGitProvider(
+      target,
+      await runtimeRemoteSyncGitEnv(target)
+    ).syncForkDefaultBranch(target.worktree.path, expectedUpstream)
   }
 
   async pullRuntimeGit(

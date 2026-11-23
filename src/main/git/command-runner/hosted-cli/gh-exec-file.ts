@@ -47,7 +47,8 @@ export type GhExecOptions = Omit<GitExecOptions, 'cwd' | 'stdin'> & {
   // Pin API/repo shorthand to its host, including GHES, and scope rate-limit state there.
   host?: string
   /** Per-project account binding; the runner resolves and injects a child-only token. */
-  ghAccount?: { host: string; user: string }
+  ghAccount?: { host: string; user: string; kind?: 'user' | 'app' }
+  repoFullName?: string
 }
 
 function nonInteractiveGhEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {

@@ -64,7 +64,12 @@ export function validateRepositoryGhAccountBinding(
     return callRuntimeRpc<GhAccountBindingValidationResult>(
       runtimeTarget,
       'github.validateAccountBinding',
-      { repo: repo.id, host: binding.host, user: binding.user },
+      {
+        repo: repo.id,
+        host: binding.host,
+        user: binding.user,
+        ...(binding.kind ? { kind: binding.kind } : {})
+      },
       { timeoutMs: LOCAL_GH_ACCOUNT_IPC_TIMEOUT_MS }
     )
   }
@@ -73,7 +78,8 @@ export function validateRepositoryGhAccountBinding(
       repoPath: repo.path,
       repoId: repo.id,
       host: binding.host,
-      user: binding.user
+      user: binding.user,
+      ...(binding.kind ? { kind: binding.kind } : {})
     }),
     LOCAL_GH_ACCOUNT_IPC_TIMEOUT_MS,
     'validateAccountBinding'

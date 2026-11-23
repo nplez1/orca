@@ -7,6 +7,7 @@ import type { Repo } from '../../../../shared/repository/repo-types'
 import type { GitPushTarget, GitWorktreeInfo, Worktree } from '../../../../shared/worktree/types'
 import type { GitRuntimeOptions } from '../../../git/command-runner/git-runtime-options'
 import { getWorktreeSharedLinkPaths } from '../../../git/worktrees/content-paths/worktree-shared-directories'
+import { appBoundRepoGitEnv } from '../../../github/app/github-app-bound-repo-git'
 import {
   ExecutionHostNotDispatchableError,
   resolveGitRouteForHost
@@ -83,11 +84,25 @@ export function requireLocalRuntimeGitRoute(
 }
 
 /** A provider for the target's own host; an `ssh:` host and a `runtime:` host both throw. */
-export function requireRuntimeGitProvider(target: RuntimeGitTarget): LocalGitProvider {
+export function requireRuntimeGitProvider(
+  target: RuntimeGitTarget,
+  env?: NodeJS.ProcessEnv
+): LocalGitProvider {
   return requireLocalRuntimeGitRoute(target).createProvider({
     ...localGitOptionsForTarget(target),
+    ...(env ? { env } : {}),
     getSharedLinkPaths: () => (target.repo ? getWorktreeSharedLinkPaths(target.repo) : [])
   })
+}
+
+export async function runtimeRemoteSyncGitEnv(
+  target: RuntimeGitTarget
+): Promise<NodeJS.ProcessEnv | undefined> {
+  if (!target.repo) {
+    return undefined
+  }
+  const { wslDistro } = localGitOptionsForTarget(target)
+  return await appBoundRepoGitEnv({ ...target.repo, ...(wslDistro ? { wslDistro } : {}) })
 }
 
 export function localGitOptionsForTarget(target: RuntimeGitTarget): GitRuntimeOptions {

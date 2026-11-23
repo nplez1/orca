@@ -151,6 +151,22 @@ function ConnectedApp({
           'The App’s token is for github.com. On a GitHub Enterprise host a bot’s gh keeps acting as your own sign-in.'
         )}
       </p>
+      {inUse && inUse.canPush === false ? (
+        <p role="alert" className="text-xs text-destructive">
+          {t(
+            'bots.github.app.contentsMissing',
+            'This installation has no Contents: write, so a push as the App will be rejected. Give the App that permission on GitHub, then Refresh.'
+          )}
+        </p>
+      ) : null}
+      {inUse && inUse.canPush === null ? (
+        <p className="text-xs text-muted-foreground">
+          {t(
+            'bots.github.app.contentsUnknown',
+            'Orca has not read this installation’s permissions yet, so it cannot tell whether a push as the App will be allowed. Refresh to read them.'
+          )}
+        </p>
+      ) : null}
       {expiresAt ? (
         <p className="text-xs text-muted-foreground">
           {t(
