@@ -6,6 +6,7 @@ import type { BotToolsCli } from './bot-tools-host'
 import { botToolRelay, type BotToolRelay } from './tool-relay/bot-tool-relay'
 import { BOT_TOOLS_TOKEN_ENV } from '../../shared/agent-session/lifecycle/launch/agent-session-caller-env'
 import { botGhShimEnv, withBotGhShimOnPath } from './fork-gh-shim'
+import { botGithubAppEnv } from './bot-gh-app-identity'
 const LOOPBACK_HOSTS = ['127.0.0.1', 'localhost', '::1']
 
 /** A bot's servers ready for its CLI; only `BotLaunchTools.for` makes one, so no saved value slips through. */
@@ -39,7 +40,11 @@ export class BotLaunchTools {
     }
     const { origin, token } = await relay.grant(bot.botId, bot.folder)
     const tokenEnv = { [BOT_TOOLS_TOKEN_ENV]: token }
-    const shimEnv = await botGhShimEnv({ id: bot.botId, ...(bot.name ? { name: bot.name } : {}) })
+    // The App's token rides with the shim: one is the bot's `gh`, the other is who it acts as.
+    const shimEnv = {
+      ...(await botGhShimEnv({ id: bot.botId, ...(bot.name ? { name: bot.name } : {}) })),
+      ...(await botGithubAppEnv())
+    }
     // Claude and Pi expand `${VAR}` in a server's headers, so their config names only the variable.
     const authorization = ENV_REFERENCING_AGENTS.has(bot.agent)
       ? `Bearer \${${BOT_TOOLS_TOKEN_ENV}}`
