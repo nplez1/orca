@@ -5641,28 +5641,30 @@ row, a bot delete keeping the project, and no row for a bot with no project). Ev
 against a **real loopback HTTP server** (`photon-fake-server.test-fixture.ts`) with knobs to fail a key
 mint, an assignment and a send, and with real idempotency replay — a mock that cannot fail is not a test.
 
-### `local(test)`: one `host-load` flake re-recorded on the iMessage branch
+### `local(test)`: one `host-load` flake seen on the iMessage branch, and why the red set was left alone
 
-`local/unit-known-red.json` had been empty since the 2026-10-31 sweep, and this branch puts it back to
-one entry — the mechanism the file exists for, not a mute button. `src/main/google/google-key-download-watch.test.ts`
-`takes the key once the browser renames it to its final name, ignoring other files` failed the full gate
-three times in a row at `25689fb920` with `Test timed out in 30000ms` on the `await rename`, while the
-same file passes **4/4 standalone** (`--maxWorkers=1`, three consecutive runs) and the whole suite was
-green at its parent revision `9cc8c07d76` an hour earlier (`27758 passed, 0 failed`). Nothing in this
-branch touches `src/main/google/`; what it does touch is `package.json`, which is a global input, and
-that is why the gate could not treat the flake as inert on its own.
+`local/unit-known-red.json` has been empty of entries since the 2026-10-31 sweep, and this branch leaves
+it that way. What it saw, because a flake nobody records is one nobody believes:
 
-- `class: 'host-load'`, `owner: 'upstream'`, `flaky: true` — the deadline is real and belongs to the
-  suite, and the evidence is a load-induced timeout on a `fs.watch` case, which is what `flaky: true`
-  documents: a red seen to vary. The entry prunes itself the moment the gate stops producing it.
-- The test was **not** edited. How it behaves under load is upstream's to fix, and changing an upstream
-  suite in the fork costs more at the next sync than the red costs now (the same rule that keeps the
-  other classes out of the fork's files).
-- **The reconciliation, stated because the file's own arithmetic test pins it.** A new entry cannot be
-  added to `local/unit-known-red.json` on top of an old run: `tests/tools/unit-gate.test.mjs` requires
-  `observedRun.allowlisted === entries.length + prunedSince.length`, so an entry that was never in the
-  recorded run has no place in it. `observedRun` is therefore this branch's gate run at `0a8fa3bde4`
-  (one failing record, one allowlisted, nothing fixed), and the previous run's fifty `prunedSince` rows
-  — the 2026-10-29 sweep, each with its commit and reason — are kept verbatim under
-  `prunedBeforeThisRun`, which is history rather than an assertion about this run. Nothing was
-  re-derived by editing a number, and none of the fifty repairs was undone.
+`src/main/google/google-key-download-watch.test.ts` `takes the key once the browser renames it to its
+final name, ignoring other files` failed the full gate **three times in a row** at `25689fb920` with
+`Test timed out in 30000ms` on the `await rename`, while the same file passes **4/4 standalone**
+(`--maxWorkers=1`, three consecutive runs). Nothing in this branch touches `src/main/google/`. The tests
+themselves are the evidence for the other direction: the full suite was green at `9cc8c07d76`
+(`27758 passed, 0 failed`), red at `25689fb920` on that one case, and green again at `6bd42822f9`
+(`27759 passed, 0 failed, 0 allowlisted`) — the same code path each time, which is what "under load"
+means here rather than "broken".
+
+- **No entry was added.** The red set is the machine's assertion about what is _reliably_ red on it, and
+  this case is not: it passed the gate at this branch's HEAD. An allowlist entry that the next run does
+  not need is exactly the slack the file warns about, and it would also have had to re-reconcile
+  `observedRun` — `tests/tools/unit-gate.test.mjs` pins a new entry to a fresh run, so adding one means
+  replacing the 2026-10-29 reconciliation and moving its fifty `prunedSince` rows out of the assertion.
+  That is a real cost, and it is not this branch's to pay for a red it cannot reproduce.
+- **The test was not edited either.** A 30 s `fs.watch` deadline is upstream's to widen; changing an
+  upstream suite in the fork costs more at the next sync than the red costs now, which is the same rule
+  that keeps the other classes out of the fork's files.
+- **What to do if it comes back.** It is a `host-load` class with the text above: `Test timed out in
+  30000ms` on `google-key-download-watch.test.ts`. Recording it properly means a fresh `observedRun`
+  (one failing record, one allowlisted) and the fifty historical prune rows kept somewhere that is not
+  the assertion — the plan sketched in this branch's review replies.
