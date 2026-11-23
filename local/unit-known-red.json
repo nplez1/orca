@@ -644,7 +644,16 @@
       "match": "^Unknown Error: BuildMessage: ModuleNotFound resolving \"http://localhost:3000/.*monaco-editor.*ts\\.worker\\.js\\?worker_file&type=module\" \\(entry point\\)$"
     }
   ],
-  "entries": [],
+  "entries": [
+    {
+      "file": "src/main/google/google-key-download-watch.test.ts",
+      "test": "takes the key once the browser renames it to its final name, ignoring other files",
+      "class": "host-load",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md \u00a7 `local(test)`: an fs.watch deadline in an untouched upstream suite that misses 30 s only while the full suite saturates this box; it passes 4/4 standalone and the same suite was green an hour earlier at the parent revision.",
+      "flaky": true
+    }
+  ],
   "prunedSince": [
     {
       "file": "config/scripts/ci-managed-ssh-execution.test.mjs",
