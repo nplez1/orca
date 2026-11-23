@@ -83,22 +83,23 @@ export async function readGithubAppCredentials(): Promise<GithubAppCredentials |
   try {
     text = await readFile(githubAppCredentialsPath(), 'utf8')
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
       return null
     }
     throw error
   }
-  const parsed = Stored.safeParse(JSON.parse(text) as unknown)
-  if (!parsed.success) {
+  const parsed: unknown = JSON.parse(text)
+  const stored = Stored.safeParse(parsed)
+  if (!stored.success) {
     throw new Error(
       'github-app: the stored App credentials are not readable; connect the App again'
     )
   }
   return {
-    appId: parsed.data.appId,
-    slug: parsed.data.slug,
-    privateKeyPem: unseal(parsed.data.privateKey),
-    installations: parsed.data.installations
+    appId: stored.data.appId,
+    slug: stored.data.slug,
+    privateKeyPem: unseal(stored.data.privateKey),
+    installations: stored.data.installations
   }
 }
 

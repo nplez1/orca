@@ -1521,5 +1521,67 @@
     "antigravity": {
       "scope": "Manage the native agy account on {{host}}."
     }
+  },
+  "bots": {
+    "github": {
+      "app": {
+        "add": {
+          "appIdHint": "The number on the App’s settings page, next to “App ID”. It is not the number in the installation’s URL.",
+          "appIdLabel": "App ID",
+          "appIdPlaceholder": "123456",
+          "checking": "Checking with GitHub…",
+          "failed": "Could not add the App on this computer.",
+          "keyLabel": "Private key",
+          "keyPlaceholder": "Paste the .pem GitHub downloaded, or pick the file",
+          "keyStays": "The key is locked by this computer’s keyring and never leaves it.",
+          "pickFile": "Choose .pem file",
+          "submit": "Add App"
+        },
+        "addRepositories": "Add repositories",
+        "allRepositories": "All repositories",
+        "connectedAs": "Bots act on GitHub as this App, not as your GitHub account.",
+        "description": "Optional. Let your bots act on GitHub as an App you own, instead of as your GitHub account.",
+        "descriptionConnected": "Your bots act on GitHub as {{login}}, so their comments and pushes are theirs.",
+        "descriptionOnHost": "Optional. Let the bots on {{host}} act on GitHub as an App you own, instead of as your GitHub account.",
+        "disconnect": "Disconnect",
+        "disconnectFailed": "Could not disconnect the App.",
+        "optional": "Orca and its bots keep using your signed-in gh account as they do today. Adding an App only changes who a bot’s GitHub actions are authored by.",
+        "readFailed": "Could not read the GitHub App on this computer.",
+        "readFailedOnHost": "Could not read the GitHub App on {{host}}.",
+        "retry": "Try again",
+        "step": {
+          "actions": "Actions: Read",
+          "actionsWhy": "Read a failed run’s logs.",
+          "add": "Add it to Orca",
+          "addIntro": "On the same settings page, copy the App ID and generate a private key.",
+          "checks": "Checks: Read",
+          "checksWhy": "See whether its own pull request is green.",
+          "contents": "Contents: Read and write",
+          "contentsWhy": "Push branches.",
+          "create": "Create the App on GitHub",
+          "createIntro": "Fill the form in like this:",
+          "createLink": "Open GitHub’s new App page",
+          "events": "Which events would you like to subscribe to?",
+          "eventsValue": "None.",
+          "install": "Install it on the repositories the bots work in",
+          "installLink": "Open your Apps",
+          "installNote": "On the App’s page, choose Install App, then the account and the repositories. All repositories works too: Orca shows which repositories the App covers.",
+          "installScope": "Where can this App be installed?",
+          "installScopeValue": "Only on this account — or on the organization whose repositories the bots work in.",
+          "issues": "Issues: Read and write",
+          "issuesWhy": "Comment on issues.",
+          "permissions": "Repository permissions",
+          "permissionsValue": "Exactly these, and nothing else. Metadata: Read is added for you.",
+          "pullRequests": "Pull requests: Read and write",
+          "pullRequestsWhy": "Open pull requests, comment on them and review them.",
+          "webhook": "Webhook",
+          "webhookValue": "Inactive. Nothing needs to reach Orca.",
+          "workflows": "Workflows: Read and write",
+          "workflowsWhy": "Push branches that change .github/workflows."
+        },
+        "title": "GitHub App",
+        "tokenExpires": "A token it minted expires at {{time}}. Bots mint a new one when it does."
+      }
+    }
   }
 }

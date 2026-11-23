@@ -60,3 +60,8 @@ export function forgetInstallationTokens(installationId?: number): void {
   }
   cache.delete(installationId)
 }
+
+/** When a token already minted for this installation expires; null when none is held. Never mints one. */
+export function cachedInstallationTokenExpiry(installationId: number): number | null {
+  return cache.get(installationId)?.expiresAtMs ?? null
+}

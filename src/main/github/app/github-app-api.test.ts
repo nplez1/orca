@@ -52,8 +52,9 @@ describe('readGithubApp', () => {
     })
 
     expect(calls[0]?.url).toBe('https://api.github.com/app')
-    const headers = calls[0]?.init?.headers as Record<string, string>
-    expect(headers.Authorization.startsWith('Bearer eyJ')).toBe(true)
+    expect(calls[0]?.init?.headers).toMatchObject({
+      Authorization: expect.stringMatching(/^Bearer eyJ/)
+    })
   })
 
   it('separates a refused key from a missing App, because the fixes differ', async () => {

@@ -20,6 +20,12 @@ export class GithubAppRequestError extends Error {
   }
 }
 
+/** GitHub's JSON as fields to narrow; a non-object answers as none, which every caller then refuses. */
+function fields(value: unknown): Record<string, unknown> {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the typeof guard proves an object
+  return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {}
+}
+
 function refusal(status: number): string {
   if (status === 401) {
     return 'GitHub refused the App credentials (401): the key and the app id do not belong together'
@@ -50,7 +56,8 @@ async function appRequest(
   if (!response.ok) {
     throw new GithubAppRequestError(response.status, refusal(response.status))
   }
-  return (await response.json()) as unknown
+  const body: unknown = await response.json()
+  return body
 }
 
 export type GithubAppIdentity = { id: number; slug: string }
@@ -62,10 +69,7 @@ export async function readGithubApp(input: {
   fetch: GithubAppFetch
   nowMs?: number
 }): Promise<GithubAppIdentity> {
-  const body = (await appRequest({ ...input, nowMs: input.nowMs ?? Date.now() }, '/app')) as {
-    id?: unknown
-    slug?: unknown
-  }
+  const body = fields(await appRequest({ ...input, nowMs: input.nowMs ?? Date.now() }, '/app'))
   if (typeof body.id !== 'number' || typeof body.slug !== 'string' || !body.slug) {
     throw new Error('github-app: GitHub’s app response did not name the App')
   }
@@ -79,27 +83,25 @@ export async function listGithubAppInstallations(input: {
   fetch: GithubAppFetch
   nowMs?: number
 }): Promise<GithubAppInstallation[]> {
-  const body = (await appRequest(
+  const body = await appRequest(
     { ...input, nowMs: input.nowMs ?? Date.now() },
     '/app/installations?per_page=100'
-  )) as unknown
+  )
   if (!Array.isArray(body)) {
     throw new Error('github-app: GitHub’s installations response was not a list')
   }
-  return body.flatMap((entry): GithubAppInstallation[] => {
-    const record = entry as {
-      id?: unknown
-      account?: { login?: unknown }
-      repository_selection?: unknown
-    }
+  const entries: unknown[] = body
+  return entries.flatMap((entry): GithubAppInstallation[] => {
+    const record = fields(entry)
     const selection = record.repository_selection === 'all' ? 'all' : 'selected'
-    if (typeof record.id !== 'number' || typeof record.account?.login !== 'string') {
+    const account = fields(record.account).login
+    if (typeof record.id !== 'number' || typeof account !== 'string') {
       return []
     }
     return [
       {
         id: record.id,
-        account: record.account.login,
+        account,
         repositorySelection: selection,
         repositories: []
       }
@@ -116,11 +118,15 @@ export async function mintInstallationToken(input: {
   nowMs?: number
 }): Promise<{ token: string; expiresAtMs: number }> {
   const nowMs = input.nowMs ?? Date.now()
-  const body = (await appRequest(
-    { ...input, nowMs },
-    `/app/installations/${input.installationId}/access_tokens`,
-    { method: 'POST' }
-  )) as { token?: unknown; expires_at?: unknown }
+  const body = fields(
+    await appRequest(
+      { ...input, nowMs },
+      `/app/installations/${input.installationId}/access_tokens`,
+      {
+        method: 'POST'
+      }
+    )
+  )
   if (typeof body.token !== 'string' || !body.token) {
     throw new Error('github-app: GitHub’s token response carried no token')
   }
@@ -143,12 +149,13 @@ export async function listInstallationRepositories(input: {
   if (!response.ok) {
     throw new GithubAppRequestError(response.status, refusal(response.status))
   }
-  const body = (await response.json()) as { repositories?: unknown }
+  const body = fields(await response.json())
   if (!Array.isArray(body.repositories)) {
     throw new Error('github-app: GitHub’s repository response was not a list')
   }
-  return body.repositories.flatMap((entry) => {
-    const fullName = (entry as { full_name?: unknown }).full_name
+  const repositories: unknown[] = body.repositories
+  return repositories.flatMap((entry) => {
+    const fullName = fields(entry).full_name
     return typeof fullName === 'string' && fullName ? [fullName] : []
   })
 }
