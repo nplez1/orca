@@ -85,7 +85,7 @@ function serviceWith(io: PhotonIoFactory) {
     sendPath,
     streams: new PhotonStreams({ store, cursors, inbound, sendPath, io, log: () => {} })
   })
-  return { runtime, store, threads, outbox }
+  return { runtime, store, threads, outbox, inbox }
 }
 
 const service = () => serviceWith(io)
@@ -304,6 +304,42 @@ describe('the channel', () => {
     ).rejects.toThrow(/confirmation names/)
     expect((await streaming.runtime.streamStatus('b1'))?.state).toBe(before?.state)
     expect(await streaming.store.bot('b1')).not.toBeNull()
+  })
+})
+
+describe('a parked message', () => {
+  it('is offered another chance at startup, which is the only route back it has', async () => {
+    // Parked means handled, so `unhandled()` skips it and the stream never sees it again. Without the
+    // startup unpark the route back is "an acked message that is never answered", which is what the
+    // design forbids — so the service, not just the store, has to call it.
+    const { runtime, store, inbox } = service()
+    await store.putBot({
+      botId: 'b1',
+      projectId: 'pho_prj_parked',
+      slug: 'orca-bot-scout-7dc96f77',
+      organizationId: 'org_1'
+    })
+    await store.putProjectKey('b1', { keyId: 'k1', secret: 'pho_sk_1' })
+    await inbox.claim(
+      'pho_prj_parked',
+      {
+        id: 'msg_1',
+        conversationId: 'conv_1',
+        sender: { handle: '+15551230000' },
+        text: 'any news?',
+        createdAt: 1
+      },
+      41
+    )
+    await inbox.park('pho_prj_parked', 'msg_1', 'This chat is closed.')
+    expect(await inbox.parked('pho_prj_parked')).toHaveLength(1)
+
+    runtime.startStreams()
+
+    // The replay that follows consumes the entry in this fixture (no assigned handle, so it is ignored
+    // and acked), which is why the assertion is on the route back rather than on what the replay did
+    // with it: the parked set emptying is the unpark, and it cannot empty any other way.
+    await vi.waitFor(async () => expect(await inbox.parked('pho_prj_parked')).toEqual([]))
   })
 })
 

@@ -23,6 +23,12 @@ export function photonPathSegment(id: string): string {
   return id.replaceAll('%', '%25').replaceAll(':', '%3A')
 }
 
+/** A file name back to the id it was made from: the other half of `photonPathSegment`, decoded in the
+ *  opposite order, so a literal `%` written as `%25` survives the round trip. */
+export function photonPathSegmentId(segment: string): string {
+  return segment.replaceAll('%3A', ':').replaceAll('%25', '%')
+}
+
 const inDir = (userDataPath: string, ...parts: string[]): string =>
   join(userDataPath, PHOTON_DIR, ...parts)
 

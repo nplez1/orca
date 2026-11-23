@@ -136,14 +136,20 @@ export class PhotonSendPath {
       return { sent: true, entryId: entry.id, truncated: entry.truncated }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      const kept = await this.deps.outbox.fail(entry.id, message)
-      if (kept === null) {
-        // The horizon passed: the answer stops being retried, but it is recorded as owed rather than
-        // dropped quietly, and the design's promise is bounded by a time the owner can see.
+      const outcome = await this.deps.outbox.fail(entry.id, message)
+      if (outcome.kind === 'dropped') {
+        // The horizon passed and *this* call ended it: the answer stops being retried, but it is recorded
+        // as owed rather than dropped quietly.
         await this.deps.noteUndelivered?.(entry.botId, message)
         return { sent: false, entryId: entry.id, error: message }
       }
-      this.log('[photon] could not send a turn result; it is kept for a retry', message)
+      if (outcome.kind === 'kept') {
+        this.log('[photon] could not send a turn result; it is kept for a retry', message)
+        return { sent: false, entryId: entry.id, error: message }
+      }
+      // `gone`: a concurrent attempt settled it, or the bot was released while this one was in flight.
+      // Reporting that as undelivered would tell the owner someone is owed a reply that was delivered.
+      this.log('[photon] a send failed after its entry was already settled or forgotten', message)
       return { sent: false, entryId: entry.id, error: message }
     }
   }

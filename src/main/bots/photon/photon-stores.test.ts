@@ -114,6 +114,36 @@ describe('the account key and a bot’s project key', () => {
     expect(readFileSync(store.recordPath, 'utf-8')).toBe('{ not json')
   })
 
+  it('publishes a change only after the write lands, so a reader mid-write sees the disk', async () => {
+    // The store's comment claimed this and the code did not give it: the mutation was applied to live
+    // state for the whole write, so `bot()` could read a record that a failing write would then discard.
+    // Here the write fails and the reader never sees the change at all.
+    const store = new PhotonStore(userDataPath)
+    await store.putBot({
+      botId: 'b1',
+      projectId: 'p1',
+      slug: 'orca-bot-one',
+      organizationId: 'org_1'
+    })
+    // A directory where the record file goes: every write to it fails, whatever the platform, and the
+    // record was already loaded, so this is the write path and not the unreadable-file path.
+    rmSync(store.recordPath, { force: true })
+    mkdirSync(store.recordPath, { recursive: true })
+
+    const failures: unknown[] = []
+    const pending = store
+      .putBot({ botId: 'b2', projectId: 'p2', slug: 'orca-bot-two', organizationId: 'org_1' })
+      .catch((error: unknown) => failures.push(error))
+    // A reader while the write is in flight: no b2, because nothing has been published.
+    expect(await store.bot('b2')).toBeNull()
+    await pending
+
+    expect(failures).toHaveLength(1)
+    // And after the failure the store still serves the record that is on disk.
+    expect(await store.bot('b2')).toBeNull()
+    expect((await store.bot('b1'))?.slug).toBe('orca-bot-one')
+  })
+
   it('never logs the text of an unreadable secrets file, which is part of a key', async () => {
     const store = new PhotonStore(userDataPath)
     mkdirSync(join(userDataPath, 'local-photon'), { recursive: true })
@@ -199,13 +229,53 @@ describe('the inbox, which is both the crash guard and the dedupe index', () => 
     })
   })
 
-  it('encodes a colon, which NTFS would turn into an alternate data stream', async () => {
+  it('encodes a colon, which NTFS would turn into an alternate data stream', () => {
     // `a:b.json` is not a file name on NTFS: it opens a stream `readdir` never lists, so the write lands
     // somewhere the store cannot find again and the cursor stops at not-in-inbox. Photon's alphabet is
     // unpublished, so the character is encoded rather than assumed away.
     expect(photonPathSegment('msg:1')).toBe('msg%3A1')
     expect(photonPathSegment('msg%3A1')).not.toBe(photonPathSegment('msg:1'))
     expect(photonPathSegment('msg_1')).toBe('msg_1')
+  })
+
+  it('round-trips a colon id through a restart, so the store finds its own files again', async () => {
+    // The encoder alone is not the property: a listing hands back *file names*, so a store that encodes
+    // but never decodes reports `has(rawId)` false after a restart — the cursor sticks at that message —
+    // and `unhandled()` asks for the encoded name again and opens `msg%253A1.json`, which does not exist.
+    // A fresh store, with no in-memory set, is what a restart looks like.
+    const first = new PhotonInbox(new PhotonStore(userDataPath))
+    await first.claim('p1', message({ id: 'msg:1', text: 'hash: one' }), 41)
+    await first.claim('p1', message({ id: 'msg_2' }), 47)
+
+    const restarted = new PhotonInbox(new PhotonStore(userDataPath))
+    expect(await restarted.has('p1', 'msg:1')).toBe(true)
+    expect((await restarted.ids('p1')).sort()).toEqual(['msg:1', 'msg_2'])
+    expect((await restarted.read('p1', 'msg:1'))?.text).toBe('hash: one')
+    expect((await restarted.unhandled('p1')).map((entry) => entry.messageId).sort()).toEqual([
+      'msg:1',
+      'msg_2'
+    ])
+
+    // And the cursor: `advance` needs `has(rawId)`, which is what stuck it before.
+    const cursors = new PhotonCursorStore(new PhotonStore(userDataPath))
+    expect(
+      await cursors.advance('p1', 41, {
+        inboxHas: (id) => restarted.has('p1', id),
+        messageId: 'msg:1'
+      })
+    ).toEqual({ advanced: true, seq: 41 })
+  })
+
+  it('round-trips a literal percent, so an encoded name cannot be decoded into another id', async () => {
+    // `%` is encoded first, so `msg%3A1` (a literal) and `msg:1` stay distinct files *and* distinct ids.
+    const first = new PhotonInbox(new PhotonStore(userDataPath))
+    await first.claim('p1', message({ id: 'msg%3A1' }), 41)
+    await first.claim('p1', message({ id: 'msg:2' }), 47)
+
+    const restarted = new PhotonInbox(new PhotonStore(userDataPath))
+    expect((await restarted.ids('p1')).sort()).toEqual(['msg%3A1', 'msg:2'])
+    expect((await restarted.read('p1', 'msg%3A1'))?.messageId).toBe('msg%3A1')
+    expect((await restarted.read('p1', 'msg:2'))?.messageId).toBe('msg:2')
   })
 
   it('refuses a message id that could escape its directory', async () => {
@@ -384,13 +454,33 @@ describe('the outbox', () => {
     })
     for (let attempt = 0; attempt < 50; attempt += 1) {
       clock += 60_000
-      expect(await outbox.fail('s1', 'still failing')).not.toBeNull()
+      expect(await outbox.fail('s1', 'still failing')).toMatchObject({ kind: 'kept' })
     }
     expect(await outbox.entries()).toHaveLength(1)
-    expect(await outbox.droppedAnswers()).toEqual([])
   })
 
-  it('gives up when the horizon passes, keeps the answer, and can be asked what it dropped', async () => {
+  it('reports nothing when the entry was already settled or forgotten, which is not the same as dropped', async () => {
+    // `retryPending` runs from every tick as `void`, so it can overlap a live `sendTurnResult`. A `null`
+    // for both "the horizon passed" and "the entry is gone" told the owner someone was owed a reply that
+    // one of the two attempts had in fact delivered.
+    let clock = 1_000
+    const outbox = new PhotonOutbox(new PhotonStore(userDataPath), () => clock)
+    await outbox.enqueue({
+      id: 's1',
+      botId: 'b1',
+      projectId: 'p1',
+      conversationId: 'c1',
+      body: 'the build is green'
+    })
+    // A concurrent attempt delivered it.
+    await outbox.settle('s1')
+    clock += PHOTON_OUTBOX_HORIZON_MS
+
+    expect(await outbox.fail('s1', 'still failing')).toEqual({ kind: 'gone' })
+    expect(await outbox.entries()).toEqual([])
+  })
+
+  it('gives up when the horizon passes, and says that is what happened', async () => {
     let clock = 1_000
     const outbox = new PhotonOutbox(new PhotonStore(userDataPath), () => clock)
     await outbox.enqueue({
@@ -403,11 +493,11 @@ describe('the outbox', () => {
     await outbox.fail('s1', 'still failing')
     clock += PHOTON_OUTBOX_HORIZON_MS
 
-    expect(await outbox.fail('s1', 'still failing')).toBeNull()
-    // Out of the retry queue, but not gone: the answer is nameable rather than a silent gap.
+    const dropped = await outbox.fail('s1', 'still failing')
+    expect(dropped).toMatchObject({ kind: 'dropped' })
+    // Out of the retry queue for good, and nothing about it left behind to grow with the bot's history:
+    // the count and reason live on the record, which is what the status shows.
     expect(await outbox.entries()).toEqual([])
-    const dropped = await outbox.droppedAnswers()
-    expect(dropped).toHaveLength(1)
-    expect(dropped[0]).toMatchObject({ body: 'the build is green', lastError: 'still failing' })
+    expect(await outbox.fail('s1', 'still failing')).toEqual({ kind: 'gone' })
   })
 })

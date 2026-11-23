@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { PhotonInboundMessage } from './photon-contract'
+import { PHOTON_INBOX_PARK_HORIZON_MS } from './photon-inbox'
 import { inboundHarness } from './photon-inbound.test-harness'
 
 let userDataPath: string
@@ -75,37 +76,63 @@ describe('a paused bot', () => {
 })
 
 describe('a message nothing can deliver', () => {
-  it('is parked after a few attempts, named, and stops blocking the messages behind it', async () => {
-    // A thread pointing at a deleted or retired chat throws the same way every time. Replaying it
-    // forever is worse than either answering or losing it: the entry would stay unhandled, so
-    // `blocked-by-unhandled` stops the cursor and every later message queues behind one that can never
-    // be dealt with — the bot goes deaf for good, with the owner seeing only log lines.
-    const test = harness({ failSend: true })
-    // The bad message's conversation is already bound, so it takes the follow-up path that fails.
+  it('is not parked for a failure measured in seconds, and is parked once the horizon passes', async () => {
+    // The horizon is time, not a count. The stream resumes after 1 s, 2 s, 4 s, and at startup two
+    // replays can consume attempts on one entry back to back — so a count of three parked a message that
+    // a provider blip would have delivered a moment later, and a parked entry is marked handled, so
+    // nothing would ever answer it.
+    let clock = 1_000
+    const test = harness({ failSend: true, now: () => clock })
     await test.threads.bind('b1', 'conv_1', { chatId: 'chat_1', handle: '+15551230000' })
-    const attempts: number[] = []
-    for (let attempt = 1; attempt <= 3; attempt += 1) {
-      attempts.push(
-        await test.inbound
-          .handle({ botId: 'b1', projectId: 'p1', seq: 41, message: message() })
-          .then(
-            (outcome) => (outcome.kind === 'parked' ? attempt : -attempt),
-            () => -attempt
-          )
-      )
-    }
 
-    // Two attempts threw (the stream resumes from the checkpoint between them), the third parked it.
-    expect(attempts).toEqual([-1, -2, 3])
-    const parked = await test.inbox.read('p1', 'msg_1')
-    expect(parked?.parkedReason).toMatch(/This chat is closed/)
-    // Parked means handled, so the cursor may pass it and later messages are not stuck behind it.
-    expect(parked?.handledAt).toBeDefined()
+    // Three failures a few seconds apart: still a retry, not a verdict.
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      clock += 3_000
+      await expect(
+        test.inbound.handle({ botId: 'b1', projectId: 'p1', seq: 41, message: message() })
+      ).rejects.toThrow(/This chat is closed/)
+    }
+    expect(await test.inbox.parked('p1')).toEqual([])
+    expect(await test.cursors.read('p1')).toBe(0)
+
+    // Past the horizon the same message stops being retried, and stops blocking the cursor.
+    clock += PHOTON_INBOX_PARK_HORIZON_MS
+    const parked = await test.inbound.handle({
+      botId: 'b1',
+      projectId: 'p1',
+      seq: 41,
+      message: message()
+    })
+    expect(parked.kind).toBe('parked')
+    const entry = await test.inbox.read('p1', 'msg_1')
+    expect(entry?.parkedReason).toMatch(/This chat is closed/)
+    expect(entry?.handledAt).toBeDefined()
     expect(await test.cursors.read('p1')).toBe(41)
     expect(await test.inbox.unhandled('p1')).toEqual([])
     expect(test.parked).toEqual(['This chat is closed.'])
-    // The message itself is kept, not deleted: the answer the person is waiting for is still readable.
+  })
+
+  it('gives a parked message another chance, which is the only route back it has', async () => {
+    // Once parked, the entry has `handledAt`, so `unhandled()` skips it and no live path would ever retry
+    // it: an acked message that is never answered. The startup replay unparks first.
+    let clock = 1_000
+    const test = harness({ failSend: true, now: () => clock })
+    await test.threads.bind('b1', 'conv_1', { chatId: 'chat_1', handle: '+15551230000' })
+    await test.inbound
+      .handle({ botId: 'b1', projectId: 'p1', seq: 41, message: message() })
+      .catch(() => undefined)
+    clock += PHOTON_INBOX_PARK_HORIZON_MS
+    await test.inbound
+      .handle({ botId: 'b1', projectId: 'p1', seq: 41, message: message() })
+      .catch(() => undefined)
     expect(await test.inbox.parked('p1')).toHaveLength(1)
+
+    // A restart: the entry is out of the parked set and back in the stream's way, so it is retried.
+    expect(await test.inbox.unpark('p1')).toBe(1)
+    expect(await test.inbox.parked('p1')).toEqual([])
+    expect(await test.inbox.unhandled('p1')).toHaveLength(1)
+    // And the next attempt is judged from now, not from the failure that parked it.
+    expect((await test.inbox.read('p1', 'msg_1'))?.firstFailedAt).toBeUndefined()
   })
 
   it('retries a delivery that only fails once, rather than parking it', async () => {

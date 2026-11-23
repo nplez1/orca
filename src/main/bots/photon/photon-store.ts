@@ -29,6 +29,9 @@ import {
 } from './photon-store-paths'
 import { sealPhotonSecret, unsealPhotonSecret } from './photon-secrets'
 
+/** What one queued change may touch: the record and the secrets, as the draft it is applied to. */
+type StoredDraft = { record: StoredRecord | null; secrets: StoredSecrets | null }
+
 /** A file this store cannot read is never silently replaced: overwriting it would orphan a live project
  *  and erase every key. The caller gets this and decides, rather than the store losing the data. */
 export class PhotonStoreUnreadableError extends Error {
@@ -157,16 +160,16 @@ export class PhotonStore {
    *  off removes a key that was already stored rather than leaving it behind; the key handed over still
    *  works for this session, because the alternative is a toggle that has to be on for anything to run. */
   saveAccount(settings: PhotonAccountSettings, accountKey: string | undefined): Promise<void> {
-    return this.change(() => {
-      this.record = { ...(this.record ?? emptyRecord()), account: settings }
-      this.secrets = { ...(this.secrets ?? emptySecrets()) }
+    return this.change((draft) => {
+      draft.record = { ...(draft.record ?? emptyRecord()), account: settings }
+      draft.secrets = { ...(draft.secrets ?? emptySecrets()) }
       if (accountKey !== undefined) {
         this.sessionAccountKey = accountKey
       }
       if (settings.storesKey && accountKey) {
-        this.secrets.accountKey = sealPhotonSecret(accountKey)
+        draft.secrets.accountKey = sealPhotonSecret(accountKey)
       } else {
-        delete this.secrets.accountKey
+        delete draft.secrets.accountKey
       }
     })
   }
@@ -217,9 +220,9 @@ export class PhotonStore {
       undeliveredAnswerCount: input.undeliveredAnswerCount ?? 0,
       createdAt: input.createdAt ?? Date.now()
     }
-    await this.change(() => {
-      const bots = (this.record?.bots ?? []).filter((entry) => entry.botId !== saved.botId)
-      this.record = { ...(this.record ?? emptyRecord()), bots: [...bots, saved] }
+    await this.change((draft) => {
+      const bots = (draft.record?.bots ?? []).filter((entry) => entry.botId !== saved.botId)
+      draft.record = { ...(draft.record ?? emptyRecord()), bots: [...bots, saved] }
     })
     return saved
   }
@@ -239,21 +242,21 @@ export class PhotonStore {
     mutate: (record: PhotonBotRecord) => PhotonBotRecord | null
   ): Promise<PhotonBotRecord | null> {
     let saved: PhotonBotRecord | null = null
-    const publish = (next: PhotonBotRecord): void => {
+    const publish = (draft: StoredDraft, next: PhotonBotRecord): void => {
       saved = next
-      this.record = {
-        ...(this.record ?? emptyRecord()),
-        bots: (this.record?.bots ?? []).map((entry) => (entry.botId === next.botId ? next : entry))
+      draft.record = {
+        ...(draft.record ?? emptyRecord()),
+        bots: (draft.record?.bots ?? []).map((entry) => (entry.botId === next.botId ? next : entry))
       }
     }
-    return this.change(() => {
-      const record = (this.record?.bots ?? []).find((entry) => entry.botId === botId)
+    return this.change((draft) => {
+      const record = (draft.record?.bots ?? []).find((entry) => entry.botId === botId)
       if (!record) {
         return
       }
       const next = mutate(structuredClone(record))
       if (next) {
-        publish(next)
+        publish(draft, next)
       }
     }).then(() => saved)
   }
@@ -288,12 +291,12 @@ export class PhotonStore {
 
   /** Drops one bot's own project key, keeping its record: what a released channel is left with. */
   forgetProjectKey(botId: string): Promise<void> {
-    return this.change(() => {
-      if (!this.secrets) {
+    return this.change((draft) => {
+      if (!draft.secrets) {
         return
       }
-      const { [botId]: _dropped, ...rest } = this.secrets.projectKeys
-      this.secrets = { ...this.secrets, projectKeys: rest }
+      const { [botId]: _dropped, ...rest } = draft.secrets.projectKeys
+      draft.secrets = { ...draft.secrets, projectKeys: rest }
     })
   }
 
@@ -303,14 +306,14 @@ export class PhotonStore {
    * tombstone, and this is only called once the project is gone or the owner starts over.
    */
   forgetBot(botId: string): Promise<void> {
-    return this.change(() => {
-      this.record = {
-        ...(this.record ?? emptyRecord()),
-        bots: (this.record?.bots ?? []).filter((entry) => entry.botId !== botId)
+    return this.change((draft) => {
+      draft.record = {
+        ...(draft.record ?? emptyRecord()),
+        bots: (draft.record?.bots ?? []).filter((entry) => entry.botId !== botId)
       }
-      if (this.secrets) {
-        const { [botId]: _dropped, ...rest } = this.secrets.projectKeys
-        this.secrets = { ...this.secrets, projectKeys: rest }
+      if (draft.secrets) {
+        const { [botId]: _dropped, ...rest } = draft.secrets.projectKeys
+        draft.secrets = { ...draft.secrets, projectKeys: rest }
       }
     })
   }
@@ -326,9 +329,9 @@ export class PhotonStore {
   }
 
   putProjectKey(botId: string, key: { keyId: string; secret: string }): Promise<void> {
-    return this.change(() => {
-      const secrets = this.secrets ?? emptySecrets()
-      this.secrets = {
+    return this.change((draft) => {
+      const secrets = draft.secrets ?? emptySecrets()
+      draft.secrets = {
         ...secrets,
         projectKeys: {
           ...secrets.projectKeys,
@@ -349,11 +352,15 @@ export class PhotonStore {
     return stored ? { kind: 'project', key: stored.secret } : null
   }
 
-  /** One change at a time, then one write. A queued change reads the state its predecessor left, so two
-   *  overlapping writes cannot each clone the same record and lose the other's bot. The change is applied
-   *  to a **clone** and only published once the write has landed: otherwise a failed write leaves memory
-   *  ahead of the disk, and the next reader trusts a record that is not there. */
-  private change(mutate: () => void): Promise<void> {
+  /**
+   * One change at a time, then one write. A queued change reads the state its predecessor left, so two
+   * overlapping writes cannot each clone the same record and lose the other's bot.
+   *
+   * The change is applied to a **draft** and swapped in only once the write has landed, which is the same
+   * shape `photon-thread-map.ts` uses: a reader that arrives mid-write sees the record that is on disk,
+   * not a mutation that may yet fail. A failed write therefore publishes nothing and needs no rollback.
+   */
+  private change(mutate: (draft: StoredDraft) => void): Promise<void> {
     const run = this.queue.then(async () => {
       await this.load()
       // A file that could not be read is never replaced: that would erase the projects and keys it names.
@@ -364,24 +371,28 @@ export class PhotonStore {
       if (unreadable.secrets) {
         throw new PhotonStoreUnreadableError(this.secretsPath)
       }
-      const held = { record: this.record, secrets: this.secrets }
-      this.record = structuredClone(this.record)
-      this.secrets = structuredClone(this.secrets)
-      try {
-        mutate()
-        // Durable, because a record that vanished would orphan a live project the user paid capacity for.
-        // Only what actually changed is rewritten, so a send does not rewrite the whole secrets file.
-        if (JSON.stringify(this.record) !== JSON.stringify(held.record)) {
-          await writePhotonJson(this.recordPath, this.record ?? emptyRecord())
-        }
-        if (JSON.stringify(this.secrets) !== JSON.stringify(held.secrets)) {
-          await writePhotonJson(this.secretsPath, this.secrets ?? emptySecrets())
-        }
-      } catch (error) {
-        // Nothing was published, so memory still matches the disk.
-        this.record = held.record
-        this.secrets = held.secrets
-        throw error
+      const draft: StoredDraft = {
+        record: structuredClone(this.record),
+        secrets: structuredClone(this.secrets)
+      }
+      mutate(draft)
+      // Durable, because a record that vanished would orphan a live project the user paid capacity for.
+      // Only what actually changed is rewritten, so a send does not rewrite the whole secrets file.
+      const recordChanged = JSON.stringify(draft.record) !== JSON.stringify(this.record)
+      const secretsChanged = JSON.stringify(draft.secrets) !== JSON.stringify(this.secrets)
+      if (recordChanged) {
+        await writePhotonJson(this.recordPath, draft.record ?? emptyRecord())
+      }
+      if (secretsChanged) {
+        await writePhotonJson(this.secretsPath, draft.secrets ?? emptySecrets())
+      }
+      // Published only now: everything above can still throw, and nothing a reader could have seen has
+      // moved if it did.
+      if (recordChanged) {
+        this.record = draft.record
+      }
+      if (secretsChanged) {
+        this.secrets = draft.secrets
       }
     })
     // The queue outlives a failed write, so one refusal does not wedge every later change.

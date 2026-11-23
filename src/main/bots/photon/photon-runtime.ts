@@ -141,6 +141,23 @@ export function photonChannel(runtime: OrcaRuntimeService): PhotonService {
   return built
 }
 
+/** What `orca bot connectors` says about one bot's channel, or null when the channel has no complete
+ *  number for it. A bot provisioned only through its project and key is not connected: it has no number,
+ *  so nobody can text it. */
+export async function photonConnectorRow(
+  store: PhotonStore,
+  botId: string
+): Promise<{ phoneNumber: string | null; handles: string[] } | null> {
+  const record = await store.bot(botId)
+  if (!record || record.released || record.completedThrough !== 'assignment') {
+    return null
+  }
+  return {
+    phoneNumber: record.phoneNumber ?? null,
+    handles: record.assignments.map((entry) => entry.handle)
+  }
+}
+
 /** What a settings card or `orca bot connectors` shows, without opening a stream to find out. */
 export async function photonChannelStatus(
   service: PhotonService,

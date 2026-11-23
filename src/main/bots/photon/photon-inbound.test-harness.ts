@@ -44,11 +44,13 @@ export type HarnessOptions = {
   refusedSend?: string
   /** A follow-up that fails the way a deleted or retired chat's does, every time. */
   failSend?: boolean
+  /** The clock the inbox judges its retry horizon by. */
+  now?: () => number
 }
 
 export function inboundHarness(userDataPath: string, options: HarnessOptions = {}) {
   const store = new PhotonStore(userDataPath)
-  const inbox = new PhotonInbox(store)
+  const inbox = new PhotonInbox(store, options.now)
   const cursors = new PhotonCursorStore(store)
   const threads = new PhotonThreadMap(store)
   const calls: Call[] = []

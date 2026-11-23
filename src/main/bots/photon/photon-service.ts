@@ -21,6 +21,7 @@ import {
 } from './photon-credentials'
 import type { PhotonStreamStatus } from './photon-stream'
 import type { PhotonStreams } from './photon-streams'
+import { photonConnectorRow } from './photon-runtime'
 import { photonCanSealSecrets as photonSeals } from './photon-secrets'
 import type { PhotonStore } from './photon-store'
 import type {
@@ -251,26 +252,17 @@ export class PhotonService {
     return people
   }
 
-  /** What `orca bot connectors` says about one bot's channel, or null when the channel has no complete
-   *  number for it. A bot provisioned only through its project and key is not connected: it has no
-   *  number, so nobody can text it. */
+  /** The bot's record as `orca bot connectors` needs it: a bot with no number is not connected. */
   async statusFor(
     botId: string
   ): Promise<{ phoneNumber: string | null; handles: string[] } | null> {
-    const record = await this.deps.store.bot(botId)
-    if (!record || record.released || record.completedThrough !== 'assignment') {
-      return null
-    }
-    return {
-      phoneNumber: record.phoneNumber ?? null,
-      handles: record.assignments.map((entry) => entry.handle)
-    }
+    return photonConnectorRow(this.deps.store, botId)
   }
 
   /** Whether this bot has a channel at all, which is what a bot delete checks before releasing one. */
   async hasChannel(botId: string): Promise<boolean> {
-    const record = await this.deps.store.bot(botId)
-    return record !== null && (!record.released || record.assignments.length > 0)
+    const held = await this.deps.store.bot(botId)
+    return held !== null && (!held.released || held.assignments.length > 0)
   }
 
   /** Whether this chat is one the channel answers: the check a turn end makes before reading a journal. */
@@ -291,12 +283,19 @@ export class PhotonService {
     }
   }
 
-  /** Replays a live bot's unhandled messages; a released one has none to replay. */
+  /** Replays a live bot's unhandled messages; a released one has none to replay. Parked messages come
+   *  back first: a restart is when whatever made one undeliverable may have changed, and nothing else
+   *  would ever ask again — a parked entry is marked handled, so `unhandled()` skips it. */
   private async replayBot(botId: string): Promise<void> {
     const record = await this.deps.store.bot(botId)
-    if (record && !record.released) {
-      this.replay(botId, record.projectId)
+    if (!record || record.released) {
+      return
     }
+    const unparked = await this.deps.inbox.unpark(record.projectId)
+    if (unparked > 0) {
+      this.log('[photon] giving', unparked, 'parked message(s) another chance')
+    }
+    this.replay(botId, record.projectId)
   }
 
   /** Replays one bot's held messages, for a bot that has just been resumed from a pause. */
@@ -309,10 +308,12 @@ export class PhotonService {
     void this.deps.streams.start(botId)
   }
 
+  /** Stops one bot's stream, for a release: the stream is long-lived state the service owns. */
   stopStream(botId: string): void {
     this.deps.streams.stop(botId)
   }
 
+  /** The status a listing shows, or null when this bot has no stream. */
   streamStatus(botId: string): PhotonStreamStatus | null {
     return this.deps.streams.status(botId)
   }
@@ -372,9 +373,7 @@ export class PhotonService {
 
   /** Retries everything waiting for one bot. Called by the health tick and by an explicit request. */
   async retryPending(botId: string): Promise<PhotonSendOutcome[]> {
-    return this.deps.sendPath.retryPending(
-      botId,
-      await requirePhotonProjectCredential(this.deps.store, botId)
-    )
+    const credential = await requirePhotonProjectCredential(this.deps.store, botId)
+    return this.deps.sendPath.retryPending(botId, credential)
   }
 }

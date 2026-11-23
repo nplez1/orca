@@ -24,21 +24,28 @@ const OutboxEntry = z.object({
 })
 export type PhotonOutboxEntry = z.infer<typeof OutboxEntry>
 
-const OutboxFile = z.object({
-  entries: z.array(OutboxEntry).default([]),
-  /** Answers Orca stopped trying to send. Kept, with the reason, so the gap is nameable. */
-  dropped: z.array(OutboxEntry).default([])
-})
+const OutboxFile = z.object({ entries: z.array(OutboxEntry).default([]) })
 type OutboxFile = z.infer<typeof OutboxFile>
 
 /**
  * How long an answer is retried. **Time, not attempts**: a count is only honest if something tries
  * often enough to reach it, and the send is retried once per health tick, so twelve attempts was
  * roughly fifteen minutes of a dropped connection losing an answer to a console line. Six hours is a
- * horizon a person can be asleep through and still find their answer, and it ends rather than retries
- * forever.
+ * horizon a person can be asleep through and still find their answer.
+ *
+ * What is kept when it ends, and what is not: the **count and the last reason** go on the bot's record
+ * (`undeliveredAnswerCount`, `lastUndeliveredReason`) and are shown by `bots.photon.status`, so the owner
+ * can see that someone is owed a reply. The body itself is **not** retained — it belongs to a conversation
+ * with a person, an unbounded array of them outlives the bot, and a count is what a status can honestly
+ * carry.
  */
 export const PHOTON_OUTBOX_HORIZON_MS = 6 * 60 * 60 * 1000
+
+/** What `fail` found: still queued, ended by this call, or no longer there at all. */
+export type PhotonOutboxFail =
+  | { kind: 'kept'; entry: PhotonOutboxEntry }
+  | { kind: 'dropped'; entry: PhotonOutboxEntry }
+  | { kind: 'gone' }
 
 export class PhotonOutbox {
   private file: OutboxFile | null = null
@@ -100,48 +107,51 @@ export class PhotonOutbox {
     })
   }
 
-  /** A send that did not land: kept with what went wrong until the retry horizon passes, then dropped
-   *  from the queue but **kept in `dropped`**, so the answer is not simply gone. Returns null when the
-   *  horizon has passed, which is what the caller reports as an undelivered answer. */
-  async fail(id: string, error: string): Promise<PhotonOutboxEntry | null> {
-    let kept: PhotonOutboxEntry | null = null
+  /**
+   * A send that did not land. Three answers, because the caller has three different things to say and
+   * conflating them told the owner someone was owed a reply that had in fact been delivered:
+   *
+   * - `kept`: still inside the horizon, so it stays queued and the next tick retries it.
+   * - `dropped`: the horizon passed and this call is what ended it — the only case worth reporting.
+   * - `gone`: the entry is no longer queued. A concurrent attempt settled it, or `forget()` removed it
+   *   with its bot. Nothing to report: the answer either landed or was deliberately discarded.
+   */
+  async fail(id: string, error: string): Promise<PhotonOutboxFail> {
+    let outcome: PhotonOutboxFail = { kind: 'gone' }
     await this.change((file) => {
       const entries: PhotonOutboxEntry[] = []
+      let found = false
       for (const entry of file.entries) {
         if (entry.id !== id) {
           entries.push(entry)
           continue
         }
+        found = true
         const attempts = entry.attempts + 1
         const firstFailedAt = entry.firstFailedAt ?? this.now()
         if (this.now() - firstFailedAt >= PHOTON_OUTBOX_HORIZON_MS) {
+          // Counted and named on the record; the body is not kept, so nothing here grows with the bot's
+          // history and `forget()` has no extra array to filter.
           console.warn(
             '[photon] giving up on an outbound message after',
             Math.round((this.now() - firstFailedAt) / 60_000),
             'minutes:',
             error
           )
-          file.dropped = [
-            ...file.dropped,
-            { ...entry, attempts, firstFailedAt, droppedAt: this.now(), lastError: error }
-          ]
+          outcome = {
+            kind: 'dropped',
+            entry: { ...entry, attempts, firstFailedAt, droppedAt: this.now(), lastError: error }
+          }
           continue
         }
-        kept = { ...entry, attempts, firstFailedAt, lastError: error }
+        const kept = { ...entry, attempts, firstFailedAt, lastError: error }
+        outcome = { kind: 'kept', entry: kept }
         entries.push(kept)
       }
       file.entries = entries
-      return true
+      return found
     })
-    return kept
-  }
-
-  /** The answers Orca gave up on, newest first: what a listing shows instead of a silent gap. */
-  async droppedAnswers(): Promise<PhotonOutboxEntry[]> {
-    await this.load()
-    return [...(this.file?.dropped ?? [])].sort(
-      (left, right) => (right.droppedAt ?? 0) - (left.droppedAt ?? 0)
-    )
+    return outcome
   }
 
   /** Drops everything for a bot whose record is going away. */
@@ -171,13 +181,13 @@ export class PhotonOutbox {
       }
       console.warn('[photon] the outbox is unreadable; starting empty', parsed.error.issues)
     }
-    this.file = { entries: [], dropped: [] }
+    this.file = { entries: [] }
   }
 
   private change(mutate: (file: OutboxFile) => boolean): Promise<void> {
     const run = this.queue.then(async () => {
       await this.load()
-      const file = structuredClone(this.file ?? { entries: [], dropped: [] })
+      const file = structuredClone(this.file ?? { entries: [] })
       if (!mutate(file)) {
         return
       }

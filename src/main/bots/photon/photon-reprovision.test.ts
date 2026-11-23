@@ -123,8 +123,10 @@ describe('what a re-run must not erase', () => {
       account: { organizationId: 'org_1', credential: account }
     })
 
-    expect(outcome.record.slug).not.toBe(store.bot('b1'))
+    // Awaited: `store.bot` is async, so comparing the slug to it compared a string to a Promise and
+    // could never fail.
     const first = await store.bot('b1')
+    expect(outcome.record.slug).not.toBe(first?.slug)
     expect(outcome.record.projectId).not.toBe(first?.projectId)
     expect(server.state.projects.size).toBe(2)
   })

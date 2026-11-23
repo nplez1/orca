@@ -184,6 +184,54 @@ describe('an answer the horizon passed on', () => {
   })
 })
 
+describe('a send whose entry is gone by the time it fails', () => {
+  it('is not reported as an undelivered answer', async () => {
+    // `retryPending` runs from every tick as `void`, so it overlaps live sends. If the entry is settled or
+    // forgotten while an attempt is in flight, that failure is not a lost answer — counting it told the
+    // owner someone was owed a reply that had in fact been delivered, or that belonged to a bot released
+    // minutes ago.
+    let clock = 1_000
+    const store = new PhotonStore(userDataPath)
+    const outbox = new PhotonOutbox(store, () => clock)
+    const threads = new PhotonThreadMap(store)
+    await threads.bind('b1', 'conv_1', { chatId: 'chat_1', handle: '+15551230000' })
+    const owed: string[] = []
+    const api = new PhotonApi({ baseUrl: server.baseUrl })
+    const sendPath = new PhotonSendPath({
+      api,
+      outbox,
+      threads,
+      log: () => {},
+      noteUndelivered: (_botId, reason) => {
+        owed.push(reason)
+      }
+    })
+    server.state.failNextSend = 503
+    await sendPath.sendTurnResult({
+      botId: 'b1',
+      projectId: 'pho_prj_1',
+      conversationId: 'conv_1',
+      credential,
+      text: 'the build is green',
+      turnId: 'turn_1'
+    })
+    expect(await outbox.pendingFor('b1')).toHaveLength(1)
+
+    // The bot is released while the retry is in flight: the entry goes, and the failure that follows is
+    // about an answer nobody is waiting for any more.
+    const sendMessage = api.sendMessage.bind(api)
+    api.sendMessage = async () => {
+      await outbox.forget('b1')
+      clock += 6 * 60 * 60 * 1000
+      throw new Error('This chat is closed.')
+    }
+    await sendPath.retryPending('b1', credential)
+    api.sendMessage = sendMessage
+
+    expect(owed).toEqual([])
+  })
+})
+
 describe('a send that fails', () => {
   it('leaves the turn’s result recorded and retries it rather than letting it vanish', async () => {
     const test = await harness()

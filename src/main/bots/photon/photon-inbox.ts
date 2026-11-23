@@ -8,6 +8,7 @@
 import { z } from 'zod'
 import { PhotonInboundMessageSchema, type PhotonInboundMessage } from './photon-contract'
 import { listPhotonDir, readPhotonJson, writePhotonJson } from './photon-files'
+import { photonPathSegmentId } from './photon-store-paths'
 import type { PhotonStore } from './photon-store'
 
 const InboxEntrySchema = z.object({
@@ -25,9 +26,10 @@ const InboxEntrySchema = z.object({
   /** Set once the message has been dispatched to a turn or deliberately ignored. Absent means a crash
    *  landed between the write and the dispatch, so a replay must run it. */
   handledAt: z.number().optional(),
-  /** How many times a dispatch has been attempted and failed. Durable, so a crash mid-retry cannot
-   *  restart the count and replay the same undeliverable message forever. */
+  /** How many times a dispatch has been attempted and failed, and when the first one was: the horizon is
+   *  measured from the clock, so a restart cannot restart it either. */
   attempts: z.number().int().nonnegative().default(0),
+  firstFailedAt: z.number().optional(),
   /** Set when Orca gave up: the message is kept, named, and out of the stream's way. */
   parkedAt: z.number().optional(),
   parkedReason: z.string().optional()
@@ -42,16 +44,21 @@ export type PhotonInboxClaim =
   | { action: 'skip'; entry: PhotonInboxEntry }
 
 /**
- * How many times one message may fail to dispatch before Orca parks it. A thread whose chat was deleted
- * or retired fails the same way every time, and replaying it forever makes the bot deaf for good: the
- * cursor refuses to pass an unhandled entry, so every later message queues behind a message that can
- * never be delivered. Three attempts is enough for a transient failure (the stream resumes with backoff
- * between them) and small enough that a repeatable one stops quickly.
+ * How long one message may keep failing before Orca parks it.
+ *
+ * **Time, not a count.** The stream resumes with a 1 s, 2 s, 4 s … backoff, and at startup `replayPending`
+ * and the stream's own replay can each consume an attempt on one entry back to back — so a budget of three
+ * attempts was about three *seconds* of a provider blip, which parked a message that would have been
+ * delivered a moment later. A parked entry is marked handled, so nothing replays it and the person's text
+ * is never answered: "never loses a message it acked" needs a horizon measured in the failure, not in
+ * ticks. The outbox already made this choice for the same reason.
  */
-export const PHOTON_INBOX_MAX_ATTEMPTS = 3
+export const PHOTON_INBOX_PARK_HORIZON_MS = 15 * 60 * 1000
 
 /** Message ids become file names, so anything that could escape the directory is refused. */
-const SAFE_ID = /^[A-Za-z0-9._:-]{1,200}$/
+// `%` is legal in an id: it is encoded to `%25` on disk, so an id that contains one round-trips. The
+// rest of the set keeps a path traversal out, which is what this guard is for.
+const SAFE_ID = /^[A-Za-z0-9._:%-]{1,200}$/
 
 export function photonInboxIdIsSafe(messageId: string): boolean {
   return SAFE_ID.test(messageId) && messageId !== '.' && messageId !== '..'
@@ -112,15 +119,16 @@ export class PhotonInbox {
   }
 
   /** Counts a failed dispatch, durably and before the retry: a crash mid-retry must not reset the count
-   *  and leave the message replaying for good. Returns the entry's attempt count after the increment. */
+   *  and leave the message replaying for good. Returns how long it has been failing, which is the number
+   *  the horizon is measured against. */
   async recordAttempt(projectId: string, messageId: string): Promise<number> {
     const held = await this.read(projectId, messageId)
     if (!held) {
       return 0
     }
-    const attempts = held.attempts + 1
-    await this.write({ ...held, attempts })
-    return attempts
+    const firstFailedAt = held.firstFailedAt ?? this.now()
+    await this.write({ ...held, attempts: held.attempts + 1, firstFailedAt })
+    return this.now() - firstFailedAt
   }
 
   /** Gives up on one message: kept on disk, named, and marked handled so the cursor may pass it. This is
@@ -146,7 +154,7 @@ export class PhotonInbox {
     return parked
   }
 
-  /** The messages Orca gave up on, newest first: what a listing shows instead of a silent gap. */
+  /** The messages Orca gave up on, newest first. */
   async parked(projectId: string): Promise<PhotonInboxEntry[]> {
     const parked: PhotonInboxEntry[] = []
     for (const messageId of await this.idsOf(projectId)) {
@@ -156,6 +164,22 @@ export class PhotonInbox {
       }
     }
     return parked.sort((left, right) => (right.parkedAt ?? 0) - (left.parkedAt ?? 0))
+  }
+
+  /**
+   * Gives every parked message another chance, and says how many. A parked entry is marked handled, so
+   * `unhandled()` skips it and nothing else would ever replay it: without a route back the route is "an
+   * acked message that is never answered". Startup is where it belongs, because a restart is exactly when
+   * what made it fail may have changed — the runtime is up, the chat exists again. The horizon restarts
+   * with it, so a message that keeps failing parks again rather than replaying on every read.
+   */
+  async unpark(projectId: string): Promise<number> {
+    const parked = await this.parked(projectId)
+    for (const entry of parked) {
+      const { handledAt: _handled, parkedAt: _parked, parkedReason: _why, ...rest } = entry
+      await this.write({ ...rest, attempts: 0, firstFailedAt: undefined })
+    }
+    return parked.length
   }
 
   async has(projectId: string, messageId: string): Promise<boolean> {
@@ -239,7 +263,10 @@ export class PhotonInbox {
     const ids = new Set<string>()
     for (const name of await listPhotonDir(this.store.inboxDir(projectId))) {
       if (name.endsWith('.json')) {
-        ids.add(name.slice(0, -'.json'.length))
+        // Decoded, so the set holds the ids the rest of this class is handed. The file name carries an
+        // encoded id (a `:` in a name is an alternate data stream on NTFS); leaving it encoded made
+        // `has(rawId)` false after a restart, which stuck the cursor at that message for good.
+        ids.add(photonPathSegmentId(name.slice(0, -'.json'.length)))
       }
     }
     return ids

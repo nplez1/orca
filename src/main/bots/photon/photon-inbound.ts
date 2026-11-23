@@ -12,7 +12,11 @@
 // the chain means the repeat arrives after the first has been marked handled.
 import type { BotRequestPerson } from '../../../shared/bots/bot-acts-for'
 import type { PhotonCursorStore } from './photon-cursor'
-import { PHOTON_INBOX_MAX_ATTEMPTS, type PhotonInbox, type PhotonInboxEntry } from './photon-inbox'
+import {
+  PHOTON_INBOX_PARK_HORIZON_MS,
+  type PhotonInbox,
+  type PhotonInboxEntry
+} from './photon-inbox'
 import type { PhotonInboundMessage } from './photon-contract'
 import type { PhotonThreadMap } from './photon-thread-map'
 
@@ -216,16 +220,16 @@ export class PhotonInbound {
       // losing it: the entry stays unhandled, so `blocked-by-unhandled` stops the cursor and every
       // later message queues behind one that will never be dealt with. So it is parked, named, and
       // counted, and the owner can see it instead of a bot that has quietly gone deaf.
-      const attempts = await inbox.recordAttempt(input.projectId, messageId)
+      const failingFor = await inbox.recordAttempt(input.projectId, messageId)
       const reason = error instanceof Error ? error.message : String(error)
-      if (attempts < PHOTON_INBOX_MAX_ATTEMPTS) {
+      if (failingFor < PHOTON_INBOX_PARK_HORIZON_MS) {
         throw error
       }
       await inbox.park(input.projectId, messageId, reason)
       this.log(
-        '[photon] parking a message nothing can deliver after',
-        attempts,
-        'attempts:',
+        '[photon] parking a message nothing has been able to deliver for',
+        Math.round(failingFor / 60_000),
+        'minutes:',
         reason
       )
       await this.deps.noteParkedMessage?.(input.botId, reason)
