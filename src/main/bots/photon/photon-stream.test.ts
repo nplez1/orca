@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { PhotonIoFactory, PhotonSocket } from './photon-stream'
 import { PhotonStream } from './photon-stream'
+import { PhotonStreamFrameSchema } from './photon-contract'
 
 /** A socket a test can drive: it records what was emitted, and can be told to drop and reconnect. */
 class FakeSocket implements PhotonSocket {
@@ -39,7 +40,9 @@ type TestTimer = {
   cancelled: boolean
 }
 
-function harness(options: { cursor?: () => number } = {}) {
+function harness(
+  options: { cursor?: () => number; onFrame?: (frame: unknown) => void | Promise<void> } = {}
+) {
   const sockets: FakeSocket[] = []
   const timers: TestTimer[] = []
   let cursor = 41
@@ -57,6 +60,7 @@ function harness(options: { cursor?: () => number } = {}) {
     readCursor: options.cursor ?? (() => cursor),
     onFrame: (frame) => {
       frames.push(frame)
+      return options.onFrame?.(frame)
     },
     livenessTimeoutMs: 5_000,
     log: () => {},
@@ -135,12 +139,72 @@ describe('the stream', () => {
     test.socket().fire('subscribed', { projectId: 'pho_prj_1', startSeq: 41 })
     expect(() => test.stream.assertLive()).not.toThrow()
 
-    // The socket comes back but nothing subscribes: connected and deaf.
+    // The resubscribe went out and was never acknowledged — what a reconnect that forgot to ask for the
+    // cursor looks like from here. The liveness deadline is what turns it into a refusal rather than
+    // silence.
     test.socket().fire('disconnect')
+    test.timers.at(-1)?.callback()
+    expect(test.stream.status()).toMatchObject({ connected: false, subscribed: false })
+    expect(() => test.stream.assertLive()).toThrow(/not connected|never resubscribed/)
+  })
+
+  it('delivers frames in order even when an early one is slow', async () => {
+    // Frames share one cursor, so a later frame finishing first would move it past an earlier one.
+    const order: number[] = []
+    const test = harness({
+      onFrame: async (raw) => {
+        const seq = PhotonStreamFrameSchema.parse(raw).seq
+        if (seq === 41) {
+          await new Promise((resolve) => setTimeout(resolve, 20))
+        }
+        order.push(seq)
+      }
+    })
+    test.stream.start()
     test.socket().fire('connect')
-    // Simulate the bug this assertion exists for: the subscribe acknowledgement never arrives.
-    expect(test.stream.status()).toMatchObject({ connected: true, subscribed: false })
-    expect(() => test.stream.assertLive()).toThrow(/never resubscribed/)
+    test.socket().fire('message', frame(41))
+    test.socket().fire('message', frame(47))
+    await new Promise((resolve) => setTimeout(resolve, 40))
+
+    expect(order).toEqual([41, 47])
+  })
+
+  it('resumes itself after a handler failure instead of going deaf until restart', () => {
+    let attempts = 0
+    const test = harness({
+      onFrame: () => {
+        attempts += 1
+        throw new Error('the chat refused the prompt')
+      }
+    })
+    test.stream.start()
+    test.socket().fire('connect')
+    test.socket().fire('message', frame(42))
+
+    return new Promise<void>((resolve) => setTimeout(resolve, 10)).then(() => {
+      expect(test.stream.status()).toMatchObject({
+        state: 'stopped',
+        stoppedBy: 'handler-failure'
+      })
+      // The resume is armed, not abandoned: the timer it scheduled starts a fresh socket.
+      const resume = test.timers.at(-1)
+      expect(resume?.cancelled).toBe(false)
+      resume?.callback()
+
+      expect(test.sockets).toHaveLength(2)
+      expect(test.stream.status()).toMatchObject({ state: 'connecting', resumes: 1 })
+      expect(test.stream.status().stoppedBy).toBeUndefined()
+      expect(attempts).toBe(1)
+    })
+  })
+
+  it('reports a refused handshake rather than sitting in a silent connecting state', () => {
+    const test = harness()
+    test.stream.start()
+    test.socket().fire('connect_error', new Error('middleware refused'))
+
+    expect(test.stream.status()).toMatchObject({ state: 'connecting', connected: false })
+    expect(() => test.stream.assertLive()).toThrow(/not connected/)
   })
 
   it('goes stalled when a subscribe is not acknowledged in time, and says so rather than looking healthy', () => {
@@ -195,11 +259,12 @@ describe('the stream', () => {
     expect(sockets[0]?.disconnected).toBe(true)
   })
 
-  it('refuses a frame it cannot read instead of treating it as empty', () => {
+  it('refuses a frame it cannot read instead of treating it as empty', async () => {
     const test = harness()
     test.stream.start()
     test.socket().fire('connect')
     test.socket().fire('message', { seq: 'not a number' })
+    await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(test.stream.status()).toMatchObject({ state: 'stopped', stoppedBy: 'contract' })
     expect(test.frames).toEqual([])

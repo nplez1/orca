@@ -62,6 +62,7 @@ export function botStructuredSessionWiring(deps: {
   requestTurnEnded?: (sessionId: string, ended?: TurnEndedVerdict) => void
   outsideTurnEnded?: (
     sessionId: string,
+    turnId: string,
     readItems: (since: number | null) => Promise<TurnEndedRows>
   ) => void
   /** The bots the host holds when this is installed; none when it has no store yet. */
@@ -305,7 +306,7 @@ export function botStructuredSessionWiring(deps: {
         deps.work.turnEnded(sessionId)
         deps.requestTurnEnded?.(sessionId, ended)
         turnContext.turnEnded?.(sessionId, turnId, readItems, writeNote)
-        deps.outsideTurnEnded?.(sessionId, readItems)
+        deps.outsideTurnEnded?.(sessionId, turnId, readItems)
       }
     },
     // A look reads through its allow-list; a tidy-up only replies, its new memory in its reply.

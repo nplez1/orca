@@ -20,13 +20,23 @@ function turnItemIdOf(rows: TurnEndedRows): string | null {
 }
 
 /**
- * The one message a finished turn sends, or null when there is nothing to send. Read from the turn's
- * own rows, so a progress tick or a second turn's prose can never become the answer.
+ * The one message a finished turn sends, or null when there is nothing to send. Scoped to `turnId` when
+ * one is given, so a second turn that has already started cannot make the first answer read from it.
  */
-export function photonTurnResultText(rows: TurnEndedRows): string | null {
+export function photonTurnResultText(rows: TurnEndedRows, turnId?: string): string | null {
   const turnItemId = turnItemIdOf(rows)
   if (!turnItemId) {
     return null
+  }
+  if (turnId !== undefined) {
+    const own = rows.items.find((item) => item.itemId === turnItemId)
+    const held = own ? readAgentJournalTurn(own.body) : null
+    if (held !== null && held.turnId !== turnId) {
+      // The journal's newest turn is not the one that ended, which happens when a queued message has
+      // already started. Its prose is not this turn's answer, so nothing is sent rather than the
+      // wrong turn's words.
+      return null
+    }
   }
   const prose = structuredAgentSessionTurnAssistantMessage(rows.items, turnItemId).trim()
   return prose.length > 0 ? prose : null

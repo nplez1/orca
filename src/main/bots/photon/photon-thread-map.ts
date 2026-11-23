@@ -23,8 +23,20 @@ export type PhotonThread = z.infer<typeof ThreadSchema>
 const ThreadFileSchema = z.object({ threads: z.record(z.string(), ThreadSchema) })
 type ThreadFile = z.infer<typeof ThreadFileSchema>
 
+/** A thread map Orca cannot read. Binding on top of it would rewrite the file and lose every
+ *  conversation it mapped, so a bind refuses and says why; reading alone still answers "unknown". */
+export class PhotonThreadMapUnreadableError extends Error {
+  constructor(readonly path: string) {
+    super(
+      `Orca cannot read the Photon thread map at ${path}, so it will not overwrite it: move the file aside and every mapped conversation starts a new chat.`
+    )
+    this.name = 'PhotonThreadMapUnreadableError'
+  }
+}
+
 export class PhotonThreadMap {
   private readonly cache = new Map<string, ThreadFile>()
+  private readonly unreadable = new Set<string>()
 
   constructor(
     private readonly store: PhotonStore,
@@ -93,26 +105,41 @@ export class PhotonThreadMap {
     if (cached) {
       return cached
     }
-    let file: ThreadFile = { threads: {} }
-    try {
-      const parsed = ThreadFileSchema.safeParse(
-        JSON.parse(readFileSync(this.store.threadPath(botId), 'utf-8'))
-      )
-      if (parsed.success) {
-        file = parsed.data
-      } else {
-        console.warn('[photon] a bot thread map is unreadable; starting empty', parsed.error.issues)
-      }
-    } catch (error) {
-      if (!isMissingFileError(error)) {
-        console.warn('[photon] could not read a thread map', error)
-      }
-    }
+    const path = this.store.threadPath(botId)
+    const file = this.read(botId, path)
     this.cache.set(botId, file)
     return file
   }
 
+  private read(botId: string, path: string): ThreadFile {
+    let text: string
+    try {
+      text = readFileSync(path, 'utf-8')
+    } catch (error) {
+      if (!isMissingFileError(error)) {
+        console.warn('[photon] could not read a thread map; treating its conversations as unknown')
+      }
+      return { threads: {} }
+    }
+    let raw: unknown
+    try {
+      raw = JSON.parse(text)
+    } catch {
+      this.unreadable.add(botId)
+      return { threads: {} }
+    }
+    const parsed = ThreadFileSchema.safeParse(raw)
+    if (!parsed.success) {
+      this.unreadable.add(botId)
+      return { threads: {} }
+    }
+    return parsed.data
+  }
+
   private write(botId: string, file: ThreadFile): void {
+    if (this.unreadable.has(botId)) {
+      throw new PhotonThreadMapUnreadableError(this.store.threadPath(botId))
+    }
     const path = this.store.threadPath(botId)
     mkdirSync(dirname(path), { recursive: true, mode: 0o700 })
     writeDurableSecureJsonFile(path, file)

@@ -1,11 +1,13 @@
 # iMessage via Photon: the chat channel
 
-**Status:** design note, 2026-11-21. Nothing built. Companion to `talking-to-bots.md`.
+**Status:** design note, 2026-11-21; **built** in PR #454 (fork, `local(bots)`), with `LOCAL-PATCHES.md`
+§ `local(bots)` as the ledger of what actually shipped and where its anchors are. Companion to
+`talking-to-bots.md`.
 **Why:** that note names the gap — no third-party conversational channel — and stops at "pick one". This one
 picks it. The owner already talks to Hermes this way, so the channel is the one actually in use: it is on
 every device, needs no new app, and no one has to be persuaded to install anything.
 **Placement:** fork patch, all of it new code. There is no Photon or iMessage code anywhere in Orca today —
-the import guide can only *name* an `imessage` channel it cannot bring over
+the import guide can only _name_ an `imessage` channel it cannot bring over
 (`skill-guides/orca-cli/references/bot-import.md:85` lists Telegram/WhatsApp/Discord as "not available here
 yet"; iMessage is in the same hole).
 
@@ -13,15 +15,15 @@ yet"; iMessage is in the same hole).
 
 This is the fact the whole design hangs on: **Photon is an outbound persistent connection, not a webhook.**
 
-| Property | Detail |
-|---|---|
-| Inbound | `spectrum-ts` holds a long-lived **gRPC stream**; no webhook URL, no public endpoint, no signing secret. Works behind NAT. |
-| Hermes' shape | a supervised **Node sidecar** over loopback (Hermes is Python, so the TS SDK needs a separate process) |
-| Credentials | `PHOTON_PROJECT_ID` + `PHOTON_PROJECT_SECRET` for a Spectrum project |
-| Account | a Photon account (app.photon.codes) plus a phone number — **not** an Orca account |
-| The bot's number | Photon assigns a line; users text *that*, not the owner's number. Free tier: shared pool (different recipients may see different numbers, each conversation stable); Business: dedicated number |
-| Chats | DMs and groups; groups opt-in via mention patterns |
-| Access control | an allowed-users list, or pair-by-code, with allow-all explicitly off |
+| Property         | Detail                                                                                                                                                                                          |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Inbound          | `spectrum-ts` holds a long-lived **gRPC stream**; no webhook URL, no public endpoint, no signing secret. Works behind NAT.                                                                      |
+| Hermes' shape    | a supervised **Node sidecar** over loopback (Hermes is Python, so the TS SDK needs a separate process)                                                                                          |
+| Credentials      | `PHOTON_PROJECT_ID` + `PHOTON_PROJECT_SECRET` for a Spectrum project                                                                                                                            |
+| Account          | a Photon account (app.photon.codes) plus a phone number — **not** an Orca account                                                                                                               |
+| The bot's number | Photon assigns a line; users text _that_, not the owner's number. Free tier: shared pool (different recipients may see different numbers, each conversation stable); Business: dedicated number |
+| Chats            | DMs and groups; groups opt-in via mention patterns                                                                                                                                              |
+| Access control   | an allowed-users list, or pair-by-code, with allow-all explicitly off                                                                                                                           |
 
 Two consequences matter here:
 
@@ -43,8 +45,8 @@ afternoon traffic across thousands of tenants is why the old architecture "re-de
 every delivery". Resolution happens per message, and a message from a user of your account reaches **your**
 bots, not anyone else's.
 
-The routing key is a **pair, scoped to the account**: *(the pool number the message arrived on, the sender's
-handle)*. The sender half cannot be skipped, because on the shared pool only **phone-number** senders route at
+The routing key is a **pair, scoped to the account**: _(the pool number the message arrived on, the sender's
+handle)_. The sender half cannot be skipped, because on the shared pool only **phone-number** senders route at
 all — an Apple-ID **email** handle gets an automatic "can't route" reply. That pair is also why a number may
 differ per recipient while staying stable within one conversation: the allocation is what makes the pair unique.
 
@@ -54,7 +56,7 @@ Two things follow, and both are what the UI needs:
 - **The number is observable, not configured.** `imessage(space).phone` reports the number handling a
   conversation, so settings can show what Photon actually routed instead of a typed-in field.
 
-What the number does *not* do on its own is distinguish bots. That is decided by how the binding is configured
+What the number does _not_ do on its own is distinguish bots. That is decided by how the binding is configured
 in your Photon account, which leaves one question with one dashboard answer.
 
 ### A. One binding per bot — the default
@@ -71,23 +73,23 @@ bot.photon = { projectId: 'pho_prj_…' }   // secret in the secure store, keyed
 ```
 
 **The deciding fact is settled by the provisioning API, not by a dashboard check.** A shared-line
-*assignment* is created per **(project, sender handle)** and returns that project's number for that person
+_assignment_ is created per **(project, sender handle)** and returns that project's number for that person
 (`photon.projects.platforms.imessage.assignments.create({ path: { id }, body: { handle } })` →
 `assignedPhoneNumber`), and "only messages from the assigned sender reach this shared-line connection". So one
 bot = one project = one number, and two bots give the same person two numbers — which is the provider's own
-model, not something Orca has to invent. See *Provisioning from Orca* below for the calls.
+model, not something Orca has to invent. See _Provisioning from Orca_ below for the calls.
 
 ### B. One number, several bots — no longer a co-equal model
 
 Now that a number is assigned per project rather than shared by hand, running several bots behind one number is
 the shape that costs extra work: one assignment, one stream, and Orca dispatching inside it. It is still worth
-specifying because it is what a *single* number forces, not because the provider nudges you towards it.
+specifying because it is what a _single_ number forces, not because the provider nudges you towards it.
 
-| Piece | Where it already is |
-|---|---|
-| Several bots in one conversation, each with its own session and transcript | `BotGroup` — `members`, `threads`, own hidden home folder (`bot-group-schema.ts`) |
-| Who was addressed | `botGroupMentions()` — `@name` / `@everyone`, ignores code and quoted prose, reports `match: 'ambiguous'` rather than guessing (`bot-group-mentions.ts`) |
-| What an unaddressed message does | `replyMode: { kind: 'bot', botId } \| { kind: 'all' } \| { kind: 'mentions' }` (`bot-group-schema.ts:8`) |
+| Piece                                                                      | Where it already is                                                                                                                                      |
+| -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Several bots in one conversation, each with its own session and transcript | `BotGroup` — `members`, `threads`, own hidden home folder (`bot-group-schema.ts`)                                                                        |
+| Who was addressed                                                          | `botGroupMentions()` — `@name` / `@everyone`, ignores code and quoted prose, reports `match: 'ambiguous'` rather than guessing (`bot-group-mentions.ts`) |
+| What an unaddressed message does                                           | `replyMode: { kind: 'bot', botId } \| { kind: 'all' } \| { kind: 'mentions' }` (`bot-group-schema.ts:8`)                                                 |
 
 **This is a DM room, not an iMessage group chat.** Group creation is not merely unreported on Free/Pro, it is
 unavailable — `space.create()` with several users throws `UnsupportedError`, and Group Messaging is a Business
@@ -99,12 +101,12 @@ conversation; Orca's job is deciding who answers inside it.**
 
 ### Where the boundary sits
 
-| Thing | Level | Why |
-|---|---|---|
-| Photon **project** (id + secret) | bot | the endpoint that receives; one per bot by default |
-| **Number** (the pool line) | conversation | the address a person texts; observed per conversation via `imessage(space).phone` |
-| Photon **user list** (10 on Free) | account | metered upstream of Orca — see access control |
-| Who may ask | bot | the existing Who-can-ask list, mirrored rather than duplicated |
+| Thing                             | Level        | Why                                                                               |
+| --------------------------------- | ------------ | --------------------------------------------------------------------------------- |
+| Photon **project** (id + secret)  | bot          | the endpoint that receives; one per bot by default                                |
+| **Number** (the pool line)        | conversation | the address a person texts; observed per conversation via `imessage(space).phone` |
+| Photon **user list** (10 on Free) | account      | metered upstream of Orca — see access control                                     |
+| Who may ask                       | bot          | the existing Who-can-ask list, mirrored rather than duplicated                    |
 
 Adding a second bot never means buying a second line, and never means a second number to hand out.
 
@@ -120,8 +122,10 @@ exists. `orca bot connectors` lists it, so a bot can tell its owner what it is r
 ### Edge cases the model already covers
 
 - A **paused bot** holds its mail rather than answering (`bot-paused-mail.ts`).
-- An **unknown sender** files one access request; it never becomes an instruction — *on tiers where Orca sees
-  the sender at all* (Photon's user list may refuse them first; that is one of the open questions).
+- An **unknown sender** never becomes an instruction. There is no access-request queue on this channel: Photon
+  only delivers senders its own assignment list holds, so an unknown handle means _this computer's_ mirror of
+  that list is stale — usually an assignment made upstream that was never persisted here. It is counted on the
+  record (`unknownSenderCount`, shown in `bots.photon.status`) and repaired by `bots.photon.reconcile`.
 - A **deleted bot** drops its project binding with it — the binding is fork-owned state beside the bot, not
   inside Photon.
 
@@ -130,13 +134,13 @@ exists. `orca bot connectors` lists it, so a bot can tell its owner what it is r
 The whole setup is API-driven in **Beta (2.0)** — `https://api.photon.codes/v1`, client `@photon-ai/api` — which
 is what turns "paste a project key" into "connect once, then create a bot". Four endpoints, each idempotent:
 
-| Step | Call | Credential | Idempotency |
-|---|---|---|---|
-| Create the agent (a project) | `POST /v1/organizations/{organizationId}/projects` | **account service key** (`pho_ask_…`) — "Project API keys cannot create projects"; Service Identity keys and M2M tokens may also create | caller-chosen **slug is immutable** and can never be reused by an active *or deleted* project, so it is the natural key — and a one-way door |
-| Mint that bot's key | create project API key | account key, at provisioning time | required `Idempotency-Key`; the secret is returned **only here and on idempotent replay** |
-| Give it a number | `…imessage.assignments.create({ body: { handle } })` | project key with `platforms:write` | `Idempotency-Key` |
-| Admit another person | same call, that person's handle | project key `platforms:write` | `Idempotency-Key` per handle |
-| Delete the agent (explicit cleanup only) | `DELETE /v1/projects/{projectId}`, then `getProjectClosureStatus` | **account key** — "a project API key is not an accepted credential" | required `Idempotency-Key`; deletion is asynchronous |
+| Step                                     | Call                                                              | Credential                                                                                                                              | Idempotency                                                                                                                                  |
+| ---------------------------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Create the agent (a project)             | `POST /v1/organizations/{organizationId}/projects`                | **account service key** (`pho_ask_…`) — "Project API keys cannot create projects"; Service Identity keys and M2M tokens may also create | caller-chosen **slug is immutable** and can never be reused by an active _or deleted_ project, so it is the natural key — and a one-way door |
+| Mint that bot's key                      | create project API key                                            | account key, at provisioning time                                                                                                       | required `Idempotency-Key`; the secret is returned **only here and on idempotent replay**                                                    |
+| Give it a number                         | `…imessage.assignments.create({ body: { handle } })`              | project key with `platforms:write`                                                                                                      | `Idempotency-Key`                                                                                                                            |
+| Admit another person                     | same call, that person's handle                                   | project key `platforms:write`                                                                                                           | `Idempotency-Key` per handle                                                                                                                 |
+| Delete the agent (explicit cleanup only) | `DELETE /v1/projects/{projectId}`, then `getProjectClosureStatus` | **account key** — "a project API key is not an accepted credential"                                                                     | required `Idempotency-Key`; deletion is asynchronous                                                                                         |
 
 Every request pins `Photon-Version` (the API contract date, served as `2026-07-01` when omitted) so a contract
 bump cannot change behaviour under a shipped build.
@@ -144,16 +148,16 @@ bump cannot change behaviour under a shipped build.
 Three facts that shape the code more than the happy path:
 
 - **The account key can mint keys.** `POST /v1/account/service-keys` accepts "an account access token **or an
-existing account service key"`, so provisioning is unattended after one manual key creation — the user pastes
-one key once, and nothing later needs a dashboard session. Keys need an explicit expiry and cannot be read back.
+  existing account service key"`, so provisioning is unattended after one manual key creation — the user pastes
+  one key once, and nothing later needs a dashboard session. Keys need an explicit expiry and cannot be read back.
 - **The organization id is a second id.** Project creation is scoped to it, so Orca stores `{ organizationId,
-accountKey }` for the host and `{ projectId, slug, key }` per bot.
+  accountKey }` for the host and `{ projectId, slug, key }` per bot.
 - **Deletion burns the slug forever.** A slug "cannot be reserved or held by any active or deleted project",
   which makes delete-and-recreate impossible under the same name and turns the teardown default around: releasing
   the assignment is reversible, deleting the project is not.
 
 That last row is the important simplification: **"who can message this bot" and "assign its number" are the same
-endpoint.** The assignment list *is* the allowlist, so Orca's Who-can-ask stops being a second ACL to be kept in
+endpoint.** The assignment list _is_ the allowlist, so Orca's Who-can-ask stops being a second ACL to be kept in
 sync and becomes a UI over the provider's own records — the earlier worry about running two ACLs dissolves.
 
 **Slug discipline.** Create the project with a deterministic slug such as `orca-bot-scout` (3–63 lowercase
@@ -168,7 +172,7 @@ and is revocable on its own. So:
 - the account key is **opt-in to store** (a toggle, not a default), because the alternative to storing it is
   re-pasting it for each new bot;
 - each bot stores only its own project key, in the same secure store and file discipline as its Slack tokens;
-- losing a project key is *recoverable but not readable* — mint a replacement and revoke the old, which is the
+- losing a project key is _recoverable but not readable_ — mint a replacement and revoke the old, which is the
   flow the UI has to offer instead of a "show key" affordance.
 
 **Provisioning is a saga, because each step can half-succeed.** Project created but key mint failed; key minted
@@ -177,7 +181,7 @@ step is idempotent and the number comes back on replay, so the fix is a **reconc
 (`platforms:read`, `project:read`) and repairs the record — not a rollback, which would delete a resource that
 cost the user capacity.
 
-**Deleting a bot must not silently delete a Photon project.** It *can* — `DELETE /v1/projects/{id}` exists,
+**Deleting a bot must not silently delete a Photon project.** It _can_ — `DELETE /v1/projects/{id}` exists,
 needs the account key, runs asynchronously (`getProjectClosureStatus`), and ends with a final invoice — but it is
 the one irreversible step: the slug is burned for every future project, and the assignment that came with it
 cannot be rebuilt under the same name. So the default stays **release the assignment and revoke the key**, with
@@ -200,14 +204,14 @@ attributed to the page it came from, because the two disagree.
 
 **On Beta (what this design builds on):**
 
-| Limit | What it counts | Consequence |
-|---|---|---|
-| **25 shared iMessage assignments per project** (Free; 100 Pro) | the sender-per-project assignments above; included in the plan | **per project**, so ten people across five bots is ten assignments *in each project* — not fifty against one pool. Bots do not compete for headcount |
-| **No per-message iMessage usage fee** | "Photon does not charge per-message usage fees for iMessage, WhatsApp, or Telegram sends" | there is no message budget to ration. Batching stays, as hygiene rather than as a quota |
-| **Group Messaging API: No** (Free and Pro) | group creation and the group-event stream | a multi-bot iMessage *group chat* needs Business; a DM room (Model B) does not |
-| **Dedicated lines: 50 per project maximum** (Business) | $250/line/month, and auto-release on downgrade | irrelevant unless a stable, user-chosen number ever matters |
+| Limit                                                          | What it counts                                                                            | Consequence                                                                                                                                          |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **25 shared iMessage assignments per project** (Free; 100 Pro) | the sender-per-project assignments above; included in the plan                            | **per project**, so ten people across five bots is ten assignments _in each project_ — not fifty against one pool. Bots do not compete for headcount |
+| **No per-message iMessage usage fee**                          | "Photon does not charge per-message usage fees for iMessage, WhatsApp, or Telegram sends" | there is no message budget to ration. Batching stays, as hygiene rather than as a quota                                                              |
+| **Group Messaging API: No** (Free and Pro)                     | group creation and the group-event stream                                                 | a multi-bot iMessage _group chat_ needs Business; a DM room (Model B) does not                                                                       |
+| **Dedicated lines: 50 per project maximum** (Business)         | $250/line/month, and auto-release on downgrade                                            | irrelevant unless a stable, user-chosen number ever matters                                                                                          |
 
-**On Stable (the SDK path this design deliberately does *not* use):** 5,000 messages per server per day
+**On Stable (the SDK path this design deliberately does _not_ use):** 5,000 messages per server per day
 (rejected past the limit), 50 new conversations per line per day, and "up to 10 users". Those are the numbers
 quoted earlier in this doc's history, and they describe the product we are not integrating: Stable meters users
 and sends, Beta meters assignments per project and charges nothing per iMessage send.
@@ -239,32 +243,32 @@ supervision.
 
 The one thing to verify before committing to that: whether the SDK pulls a native gRPC binding or
 `@grpc/grpc-js`. `grpc-js` is pure JavaScript and packages into Electron cleanly; a native binding means
-`electron-rebuild`, asar unpacking and three platforms of pain — and *then* the sidecar is the better
+`electron-rebuild`, asar unpacking and three platforms of pain — and _then_ the sidecar is the better
 answer, using the Node runtime Orca already ships (`orcad`).
 
 **Committing to Beta answers this too:** the Beta transport is Socket.IO over HTTP with cursors, not gRPC, and
 the provisioning API is plain HTTPS. Both are pure-JS, so the in-process route stops being conditional — the
 native-binding risk was a property of the Stable SDK, which this design no longer uses.
 
-| Route | When it wins | Cost |
-|---|---|---|
-| **In-process** (chosen) | on a pure-JS client, and Beta is one | a new dependency in the app bundle |
-| Sidecar | native gRPC (Stable's path), or a stream that crashes main | a process to supervise, a loopback protocol, and the same failure surface the webhook listener already has |
+| Route                   | When it wins                                               | Cost                                                                                                       |
+| ----------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| **In-process** (chosen) | on a pure-JS client, and Beta is one                       | a new dependency in the app bundle                                                                         |
+| Sidecar                 | native gRPC (Stable's path), or a stream that crashes main | a process to supervise, a loopback protocol, and the same failure surface the webhook listener already has |
 
 ## Offline delivery: answered, and it is good news
 
 The question that mattered was what happens to a message sent while Orca is closed. **Photon retains events
 and replays them from a cursor**, so the answer is: it is delivered on reconnect, within retained history.
-The Beta API documents this precisely (`docs.photon.codes/docs/beta/websocket/cursors.md`, *Cursors, replay,
-and checkpointing*):
+The Beta API documents this precisely (`docs.photon.codes/docs/beta/websocket/cursors.md`, _Cursors, replay,
+and checkpointing_):
 
-| Rule | What it means for the fork |
-|---|---|
-| `startSeq: 0` starts with **new** events only; a positive `startSeq` resumes **after** that cursor | a first-ever start deliberately skips history; a resume passes the last processed cursor as-is, never `+1` |
-| Cursors are **opaque non-negative safe integers, and may contain gaps** | never do arithmetic on them; never assume the next one is `last + 1` |
+| Rule                                                                                                                            | What it means for the fork                                                                                           |
+| ------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `startSeq: 0` starts with **new** events only; a positive `startSeq` resumes **after** that cursor                              | a first-ever start deliberately skips history; a resume passes the last processed cursor as-is, never `+1`           |
+| Cursors are **opaque non-negative safe integers, and may contain gaps**                                                         | never do arithmetic on them; never assume the next one is `last + 1`                                                 |
 | **Persist a cursor only after its handler succeeds**; on failure stop the stream and resume from the last successful checkpoint | advancing on receipt is a data-loss bug: a crash between receipt and a finished turn would skip the work permanently |
-| Store them **per project and per consumer purpose** | an independent integration must not overwrite this one's progress |
-| Replay is **limited to retained history**; it is "not an unlimited archive", and **not an exactly-once guarantee** | dedupe by message id is mandatory, and a long outage is a gap |
+| Store them **per project and per consumer purpose**                                                                             | an independent integration must not overwrite this one's progress                                                    |
+| Replay is **limited to retained history**; it is "not an unlimited archive", and **not an exactly-once guarantee**              | dedupe by message id is mandatory, and a long outage is a gap                                                        |
 
 ### The design that follows from it
 
@@ -273,7 +277,7 @@ Two stores, and the split is the whole point:
 1. **Orca's inventory** — the message payload, written before any turn starts, keyed by message id. This is the
    crash guard and the dedupe index: a replay of a message you already have is a no-op.
 2. **Photon's cursor** — advanced only once the message is durably in that inventory. The handler Photon
-   means by "succeeds" is *"accepted into Orca's queue"*, not *"the agent finished answering"*.
+   means by "succeeds" is _"accepted into Orca's queue"_, not _"the agent finished answering"_.
 
 That reading is what keeps both promises: Photon never replays work Orca already owns, and Orca never loses a
 message it acked. A turn that takes four minutes therefore cannot hold the cursor, which is what makes
@@ -304,7 +308,7 @@ stream message → dedupe by message id → BotRequestPerson { source: 'photon',
 ```
 
 Reliability rules, borrowed from the webhook design because they are the same problem — and **answered by
-Photon's own contract**, see *Offline delivery* below:
+Photon's own contract**, see _Offline delivery_ below:
 
 - **Two stores, not one.** A message id written to disk before the turn starts (so a crash mid-run replays
   instead of dropping), and a Photon **cursor** advanced only once that message is durably in Orca's store.
@@ -348,7 +352,7 @@ shared-type edit, done once.
   recipients, and shown from the SDK's own `imessage(space).phone` rather than a typed-in field. Automatic
   contact cards are Business-only (`Contact Sharing: No` on Free), so on the target tier saving the thread once
   is the whole story.
-- `source: 'photon'` plus the sender's phone handle means the bot knows *which* person is texting — the half of
+- `source: 'photon'` plus the sender's phone handle means the bot knows _which_ person is texting — the half of
   the identity requirement GitHub mode gave up.
 - The honest ceiling to state in the UI: **25 shared iMessage assignments per project on Free** (100 on Pro),
   with no groups below Business — and the quota is per project, so several bots do not compete for one pool.
@@ -357,27 +361,27 @@ shared-type edit, done once.
 
 `talking-to-bots.md`'s step 2 was "one real channel, Gmail first". **iMessage replaces it**:
 
-| Step | Channel | Why it moves |
-|---|---|---|
-| 0 | `orca bot ask` | unchanged — the primitive |
-| 1 | loopback `POST /ask` | unchanged — the substrate, and a cheap way to exercise the ask/reply plumbing before a channel exists |
-| 2 | **iMessage via Photon** | outbound-only, a real separate identity, and the channel already in daily use |
-| 3 | GitHub presence conventions | unchanged |
-| later | Gmail, Telegram, Slack Socket Mode | only if a need appears; each is a worse fit for identity, endpoint or effort |
+| Step  | Channel                            | Why it moves                                                                                          |
+| ----- | ---------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| 0     | `orca bot ask`                     | unchanged — the primitive                                                                             |
+| 1     | loopback `POST /ask`               | unchanged — the substrate, and a cheap way to exercise the ask/reply plumbing before a channel exists |
+| 2     | **iMessage via Photon**            | outbound-only, a real separate identity, and the channel already in daily use                         |
+| 3     | GitHub presence conventions        | unchanged                                                                                             |
+| later | Gmail, Telegram, Slack Socket Mode | only if a need appears; each is a worse fit for identity, endpoint or effort                          |
 
 ## Edit list
 
-| Piece | Path | Kind |
-|---|---|---|
-| Photon client: stream, dedupe store, reconnect, send | new `src/main/bots/photon/*` | fork-owned |
-| Provisioning: project, key, assignments, reconciler | new `src/main/bots/photon/provisioning.ts` | fork-owned |
-| Stream → ask adapter, thread ↔ chat mapping | new, beside the existing `bot-automation-sessions` adapter | fork-owned |
-| Reply → Photon send | new `fork-photon-results.ts`, one call site at run end | fork-owned + 1 hunk |
-| Secure storage for account key and per-bot project keys | reuse `writeDurableSecureJsonFile` (`src/shared/secure-storage/secure-file`) | none |
-| `photon` as an asker source | `src/shared/connectors/external-conversation-link.ts` | upstream, one union member |
-| Connect / Create bot / Add member RPCs | one RPC method each, beside the existing bot connector RPCs | additive |
-| Link/unlink surface (settings + RPC) | `src/renderer/src/components/settings/bots/*` | additive |
-| Maybe: teach `bot list` to name the channel | `references/bots.md` | upstream, 1 line |
+| Piece                                                   | Path                                                                         | Kind                       |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------- | -------------------------- |
+| Photon client: stream, dedupe store, reconnect, send    | new `src/main/bots/photon/*`                                                 | fork-owned                 |
+| Provisioning: project, key, assignments, reconciler     | new `src/main/bots/photon/photon-provisioning.ts`                            | fork-owned                 |
+| Stream → ask adapter, thread ↔ chat mapping             | new, beside the existing `bot-automation-sessions` adapter                   | fork-owned                 |
+| Reply → Photon send                                     | new `photon-send.ts` / `photon-chat-replies.ts`, one call site at run end    | fork-owned + 1 hunk        |
+| Secure storage for account key and per-bot project keys | reuse `writeDurableSecureJsonFile` (`src/shared/secure-storage/secure-file`) | none                       |
+| `photon` as an asker source                             | `src/shared/connectors/external-conversation-link.ts`                        | upstream, one union member |
+| Connect / Create bot / Add member RPCs                  | one RPC method each, beside the existing bot connector RPCs                  | additive                   |
+| Link/unlink surface (settings + RPC)                    | `src/renderer/src/components/settings/bots/*`                                | additive                   |
+| Maybe: teach `bot list` to name the channel             | `references/bots.md`                                                         | upstream, 1 line           |
 
 Note the size honestly: this is the largest single piece in the whole set of notes — a new third-party
 integration with its own failure modes — and it is the one with no upstream precedent to copy inside Orca.
@@ -388,10 +392,10 @@ integration with its own failure modes — and it is the one with no upstream pr
   thread mapping (two messages in one conversation continue one chat; a new conversation starts another).
 - Cursor discipline, the ones that would be silent bugs: a crash between inbox-write and turn start replays;
   a crash after the inbox-write but before the cursor advance replays harmlessly (dedupe absorbs it);
-  advancing the cursor on *receipt* is caught by a test that asserts it does not happen; a cursor with gaps
+  advancing the cursor on _receipt_ is caught by a test that asserts it does not happen; a cursor with gaps
   (`41 → 47`) resumes without assuming `+1`; a reconnect that forgets to resubscribe is caught by a
   liveness assertion rather than by silence.
-- Unit: an unknown handle files one access request and never becomes an instruction; a known member's text
+- Unit: an unknown handle never becomes an instruction and is counted as a stale mirror; a known member's text
   arrives with the right `BotRequestPerson`.
 - Unit: **provisioning is idempotent end to end** — the same slug returns the existing project instead of a
   second one; a replayed assignment with the same `Idempotency-Key` yields the same number; a replayed key mint
@@ -408,7 +412,7 @@ integration with its own failure modes — and it is the one with no upstream pr
   emits many progress items; long output becomes one attachment, not N messages; and a send is never addressed to
   a conversation absent from the inbox, which keeps the bot out of the cold-start path entirely.
 - Setup, not unit-testable and therefore stated in the UI: a freshly created project's inbound is dropped until
-the line is picked up at token renewal, so the instructions end with "restart Orca, then text it".
+  the line is picked up at token renewal, so the instructions end with "restart Orca, then text it".
 - One live test against a real Photon line: text the bot, get one answer; then **quit Orca, text it again,
   reopen, and confirm the turn runs** — that is the replay property this channel is chosen for, and the only
   way to prove it. Restart mid-conversation and confirm the thread continues rather than restarting.
@@ -436,7 +440,7 @@ the line is picked up at token renewal, so the instructions end with "restart Or
   no limit; a burst of long turns is the one thing that would reveal it. Treat the per-turn cap as the guard until
   measured.
 - **Is the dashboard's binding the whole story?** Ownership resolves per message at Photon's proxy, from the
-  pair *(number, sender handle)*. The dashboard is the only place that binding is visible, so the setup copy has
+  pair _(number, sender handle)_. The dashboard is the only place that binding is visible, so the setup copy has
   to match what it actually shows — one check on a real account, not an inference from either doc.
 - **Does self-hosting lift the assignment quota and the group API?** On Beta the caps are assignments per project
   and (below Business) groups, which is what self-hosting would have to change to be worth it.

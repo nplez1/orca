@@ -122,6 +122,16 @@ export async function startFakePhotonServer(): Promise<FakePhotonServer> {
       return
     }
 
+    // GET /organizations/:id/projects — how a taken slug is looked up rather than retried forever.
+    if (method === 'GET' && parts[0] === 'organizations' && parts[2] === 'projects') {
+      send(response, 200, {
+        projects: [...state.projects.values()].filter(
+          (project) => project.organizationId === parts[1]
+        )
+      })
+      return
+    }
+
     // GET|DELETE /projects/:id  and  /projects/:id/closure
     if (parts[0] === 'projects' && parts.length === 2) {
       const project = state.projects.get(parts[1] ?? '')
@@ -226,7 +236,9 @@ export async function startFakePhotonServer(): Promise<FakePhotonServer> {
         const id = nextId('pho_asn')
         const assignment = {
           id,
-          handle,
+          // The provider normalises a handle before assigning it, so a typed `(555) 123-4567` comes
+          // back as `+15551234567`. A fake that echoed the input could not catch Orca comparing the two.
+          handle: normaliseHandle(handle),
           assignedPhoneNumber: `+1555${String(1000 + state.assignments.size)}`,
           projectId
         }
@@ -289,6 +301,16 @@ export async function startFakePhotonServer(): Promise<FakePhotonServer> {
       }),
     injectRaw: (method, path, status, body) => raw.set(`${method} ${path}`, { status, body })
   }
+}
+
+/** A phone number or Apple-ID email in the form the provider stores it. */
+function normaliseHandle(handle: string): string {
+  const trimmed = handle.trim().toLowerCase()
+  if (trimmed.includes('@')) {
+    return trimmed
+  }
+  const digits = trimmed.replace(/[^0-9]/g, '')
+  return digits.length === 0 ? trimmed : `+1${digits.replace(/^1/, '')}`
 }
 
 /** A request body as a JSON object; anything else reads as no fields rather than failing the server. */

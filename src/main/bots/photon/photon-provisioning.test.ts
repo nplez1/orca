@@ -239,7 +239,38 @@ describe('teardown', () => {
     expect(server.state.deleted).toEqual([])
     expect(server.state.projects.has(projectId)).toBe(true)
     expect(server.state.assignments.size).toBe(0)
-    expect(store.bot('b1')).toBeNull()
+    // A tombstone rather than nothing: `deleteProject` throws "No Photon project is recorded" for a bot
+    // whose record is gone, which made the separately confirmed cleanup unreachable.
+    expect(store.bot('b1')).toMatchObject({ released: true, projectId, assignments: [] })
+    expect(store.projectCredential('b1')).toBeNull()
+  })
+
+  it('does not revoke the key while a number is still unreleased, so a retry can authenticate', async () => {
+    const { store } = await provisioned()
+    // The release fails; the key must survive it, or the retry authenticates with a revoked key and
+    // 401s forever.
+    const broken = new PhotonTeardown({
+      api: new PhotonApi({ baseUrl: server.baseUrl }),
+      store,
+      log: () => {},
+      sleep: async () => {}
+    })
+    // The number release is what fails; a 500 on that DELETE is the shape of a provider hiccup.
+    const assignmentId = store.bot('b1')?.assignments[0]?.assignmentId
+    const projectId = store.bot('b1')?.projectId
+    server.injectRaw(
+      'DELETE',
+      `/projects/${projectId}/platforms/imessage/assignments/${assignmentId}`,
+      500,
+      '{"error":"unavailable"}'
+    )
+
+    const outcome = await broken.releaseBot({ botId: 'b1', account })
+
+    expect(outcome.problems.join(' ')).toMatch(/could not release/)
+    expect(outcome.revokedKey).toBe(false)
+    expect(server.state.keys.size).toBe(1)
+    expect(store.bot('b1')?.released).not.toBe(true)
   })
 
   it('refuses a project deletion whose confirmation names a different slug', async () => {

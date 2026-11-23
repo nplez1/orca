@@ -2,7 +2,9 @@
 // any turn starts. This is the crash guard and the dedupe index at once — replay is not exactly-once,
 // so a message id Orca already handled must be a no-op rather than a second run, while a message Orca
 // wrote down but never dispatched must run again on replay. That distinction is the `handledAt` mark,
-// and it is the whole reason this store is separate from the cursor.
+// and it is the whole reason this store is separate from the cursor. Each entry carries the `seq` it
+// arrived on, so the entries with no `handledAt` can be replayed in order after a crash without waiting
+// for Photon to redeliver them.
 import { mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import { z } from 'zod'
 import { writeDurableSecureJsonFile } from '../../../shared/secure-storage/secure-file'
@@ -12,6 +14,9 @@ import type { PhotonStore } from './photon-store'
 
 const InboxEntrySchema = z.object({
   messageId: z.string().min(1),
+  /** The stream position it arrived on. Kept so an unhandled entry can be replayed and its cursor
+   *  advanced without Photon redelivering it. */
+  seq: z.number().int().nonnegative().safe().optional(),
   projectId: z.string().min(1),
   conversationId: z.string().min(1),
   sender: PhotonInboundMessageSchema.shape.sender,
@@ -52,7 +57,7 @@ export class PhotonInbox {
    * and happens before the caller starts anything, which is the point of the store; `markHandled` is
    * what the caller says afterwards.
    */
-  claim(projectId: string, message: PhotonInboundMessage): PhotonInboxClaim {
+  claim(projectId: string, message: PhotonInboundMessage, seq?: number): PhotonInboxClaim {
     if (!photonInboxIdIsSafe(message.id)) {
       throw new Error(`Photon message id is not usable as a file name: ${message.id.slice(0, 80)}`)
     }
@@ -62,6 +67,7 @@ export class PhotonInbox {
     }
     const entry: PhotonInboxEntry = {
       messageId: message.id,
+      ...(seq === undefined ? {} : { seq }),
       projectId,
       conversationId: message.conversationId,
       sender: message.sender,
@@ -114,6 +120,30 @@ export class PhotonInbox {
 
   ids(projectId: string): string[] {
     return [...this.idsOf(projectId)]
+  }
+
+  /** Every entry Orca wrote down and never dealt with, oldest stream position first. This is what a
+   *  restart replays: without it, a message whose dispatch never happened depends on Photon choosing
+   *  to redeliver it, which replay is not obligated to do. */
+  unhandled(projectId: string): PhotonInboxEntry[] {
+    const entries: PhotonInboxEntry[] = []
+    for (const messageId of this.idsOf(projectId)) {
+      const entry = this.read(projectId, messageId)
+      if (entry && entry.handledAt === undefined) {
+        entries.push(entry)
+      }
+    }
+    return entries.sort((left, right) => (left.seq ?? 0) - (right.seq ?? 0))
+  }
+
+  /** The oldest entry at or below `seq` that Orca never dealt with, ignoring `except`. The cursor may
+   *  not move past one of these: Photon only replays after the highest cursor it was given, so a cursor
+   *  that stepped over an unhandled message would make it unreachable. */
+  unhandledAtOrBelow(projectId: string, seq: number, except: string): string | null {
+    const found = this.unhandled(projectId).find(
+      (entry) => entry.messageId !== except && (entry.seq ?? Number.POSITIVE_INFINITY) <= seq
+    )
+    return found?.messageId ?? null
   }
 
   private write(entry: PhotonInboxEntry): void {

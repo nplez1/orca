@@ -23,10 +23,13 @@ export const PhotonConnectParams = z.object({
   storesKey: z.boolean().default(false)
 })
 
-/** Create the bot's project, mint its key and give it a number, in one retryable step. */
+/** Create the bot's project, mint its key and give it a number, in one retryable step. `accountKey` is
+ *  the per-call alternative to storing the account service key: it is held in memory for the session
+ *  and never written unless `bots.photon.connect` was told to keep it. */
 export const PhotonCreateBotParams = z.object({
   botId: Id,
-  handle: Handle
+  handle: Handle,
+  accountKey: z.string().trim().min(8).max(512).optional()
 })
 
 /** Add someone by creating their assignment, which is the same call that returns their number. */
@@ -37,6 +40,10 @@ export const PhotonReleaseMemberParams = z.object({ botId: Id, handle: Handle })
 
 /** Delete a bot. Releases its numbers and revokes its key; the project stays. */
 export const PhotonReleaseBotParams = z.object({ botId: Id })
+
+/** Finish a half-provisioned bot: re-mint a missing key, rebuild the assignment list from the
+ *  provider's, and say what was repaired. */
+export const PhotonReconcileParams = z.object({ botId: Id })
 
 /** The one irreversible step. `confirmSlug` must name the slug that will be burned. */
 export const PhotonDeleteProjectParams = z.object({ botId: Id, confirmSlug: Id })
@@ -56,6 +63,8 @@ export type PhotonChannelStatus = {
   organizationId: string | null
   /** Whether the account key is stored, which is the owner's choice rather than a default. */
   accountKeyStored: boolean
+  /** Whether this host can seal a key it is asked to keep. */
+  accountKeySealed: boolean
   bots: {
     botId: string
     slug: string
@@ -64,6 +73,11 @@ export type PhotonChannelStatus = {
     phoneNumber: string | null
     /** The handles that may text it. This list is the allowlist, not a copy of one. */
     handles: string[]
-    stream: 'live' | 'deaf' | 'stopped' | 'not started'
+    stream: 'live' | 'deaf' | 'stopped' | 'not started' | 'released'
+    /** The channel was let go: its numbers and key are gone and its project is all that is left. */
+    released: boolean
+    /** Messages from handles this bot has no assignment for. Non-zero means the assignment list here
+     *  has drifted from the provider's, and `bots.photon.reconcile` is the repair. */
+    unknownSenderCount: number
   }[]
 }

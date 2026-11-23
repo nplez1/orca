@@ -25,6 +25,8 @@ import { readPairedBotRosters, withPairedBotRosters } from '../../../bots/paired
 import { botOfSession } from '../../../bots/bot-session-tabs'
 import { openEmptyBotChat, runtimeBotChatTreeHost } from '../../../bots/bot-chat-tree-host'
 import { forgetDeletedBotTools } from './bots-tools'
+import { releaseDeletedPhotonChannel } from './bots-photon-release'
+import { photonChannel } from '../../../bots/photon/photon-runtime'
 import { composioBotsOf } from './bots-composio'
 import { ownerOnly } from './bots-caller-gates'
 import { BOT_CREATE_METHOD } from './bots-create'
@@ -59,6 +61,7 @@ async function updateBot(params: BotUpdateParams, context: RpcContext) {
   } else if (params.updates.paused === false && !bot.paused) {
     // Every resume, not only a seen transition: a pause still being saved reads as unpaused here.
     releaseHeldBotMail(context.runtime, bot)
+    photonChannel(context.runtime).releaseHeld(bot.id)
   }
   const { removeMember, removeMembers = [], addMembers = [] } = params.updates
   // Who can ask decides who may make this host run commands, so the device that changed it is kept on record.
@@ -243,6 +246,7 @@ export const BOT_METHODS = [
         await composioBotsOf(runtime).willDelete(bot.id)
         await forgetDeletedBotTools(runtime, bot)
       }
+      await releaseDeletedPhotonChannel(runtime, params.botId)
       const deleted = await runtime.bots.delete(params)
       if (bot) {
         releaseDeletedBotLinks(runtime, bot)

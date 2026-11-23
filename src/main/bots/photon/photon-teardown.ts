@@ -87,8 +87,11 @@ export class PhotonTeardown {
         problems.push(`could not release ${assignment.handle}: ${messageOf(error)}`)
       }
     }
+    // The key is revoked only once every number is released, because a revoked key cannot authenticate
+    // the retry: a release that failed with the key already gone would 401 forever and strand the bot.
+    // The record is kept either way, as a tombstone naming the project its deletion still has to burn.
     let revokedKey = false
-    if (record.keyId) {
+    if (record.keyId && problems.length === 0) {
       try {
         await api.revokeProjectKey(input.account, record.projectId, record.keyId)
         revokedKey = true
@@ -100,8 +103,19 @@ export class PhotonTeardown {
         }
       }
     }
-    if (problems.length === 0) {
-      store.forgetBot(input.botId)
+    if (revokedKey || problems.length === 0) {
+      // The numbers and the key are gone; the record stays so the project can still be deleted, which
+      // is the only thing left that needs the slug. `forgetBot` happens when the project is closed.
+      store.putBot({
+        ...record,
+        released: true,
+        releasedAt: Date.now(),
+        assignments: [],
+        ...(revokedKey ? { keyId: undefined } : {})
+      })
+      if (revokedKey) {
+        store.forgetProjectKey(input.botId)
+      }
     }
     return { botId: input.botId, released, revokedKey, projectKept: true, problems }
   }

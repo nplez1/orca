@@ -12,6 +12,7 @@ import {
   PhotonAssignmentSchema,
   PhotonClosureSchema,
   PhotonProjectKeySchema,
+  PhotonProjectListSchema,
   PhotonProjectSchema,
   photonParse,
   type PhotonAssignment,
@@ -39,9 +40,11 @@ export class PhotonApiError extends Error {
     readonly status: number,
     readonly method: string,
     readonly path: string,
+    /** What the server said, already cut to something a log can carry. Never a success body: a 2xx
+     *  that was not JSON is reported as such, because that body can be a mint's new key. */
     readonly body: string
   ) {
-    super(`Photon ${method} ${path} failed: ${status} ${body.slice(0, 300)}`)
+    super(`Photon ${method} ${path} failed: ${status} ${body}`)
     this.name = 'PhotonApiError'
   }
 
@@ -61,6 +64,11 @@ type CallRequest = {
 }
 
 const JSON_HEADERS = { 'content-type': 'application/json', accept: 'application/json' }
+
+/** An error payload as one bounded line: enough to name the problem, short enough not to carry a body. */
+function describe(body: string): string {
+  return body.replace(/\s+/g, ' ').trim().slice(0, 200)
+}
 
 export class PhotonApi {
   private readonly baseUrl: string
@@ -93,6 +101,21 @@ export class PhotonApi {
       idempotencyKey: input.idempotencyKey,
       body: { slug: input.slug, name: input.name }
     })
+  }
+
+  /** Lists the organization's projects, which is how a slug that is already taken is adopted rather
+   *  than retried forever: the slug is the natural key and two bots with one name derive the same one. */
+  async findProjectBySlug(
+    credential: PhotonCredential,
+    organizationId: string,
+    slug: string
+  ): Promise<PhotonProject | null> {
+    const listed = await this.read(credential, PhotonProjectListSchema, 'project list', {
+      method: 'GET',
+      path: `/organizations/${encodeURIComponent(organizationId)}/projects`,
+      missingIsNull: true
+    })
+    return listed?.projects.find((project) => project.slug === slug) ?? null
   }
 
   /** Reads a project back, which is how the reconciler learns what a half-finished saga really did. */
@@ -242,7 +265,8 @@ export class PhotonApi {
       if (request.missingIsNull && response.status === 404) {
         return null
       }
-      throw new PhotonApiError(response.status, request.method, request.path, body)
+      // An error payload is the server's message about what went wrong, cut to a log line.
+      throw new PhotonApiError(response.status, request.method, request.path, describe(body))
     }
     if (body.length === 0) {
       return null
@@ -250,11 +274,12 @@ export class PhotonApi {
     try {
       return JSON.parse(body)
     } catch {
+      // Never echo this body: on a 2xx it can be a freshly minted key, and a log is not where that goes.
       throw new PhotonApiError(
         response.status,
         request.method,
         request.path,
-        `not JSON: ${body.slice(0, 300)}`
+        'the response was not JSON'
       )
     }
   }

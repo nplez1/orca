@@ -37,10 +37,10 @@ export function installMainProcessConnectorCloud(serve: boolean): void {
     kind: serve ? 'serve' : 'desktop',
     isFenced: () => state.isQuitting
   })
+  photonChannel(runtime).startStreams()
   if (serve) {
     return
   }
-  photonChannel(runtime).startStreams()
   powerMonitor.on('resume', host.refreshLinearLogins)
   registerGoogleSetupHandlers()
   registerSlackHandOffHandlers(() => runtime.getConnectorCloud())

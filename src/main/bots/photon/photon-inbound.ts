@@ -3,9 +3,15 @@
 // the other way round, because advancing on receipt would lose a message that a crash interrupted. The
 // handler Photon means by "success" is "accepted into Orca's queue", not "the agent finished answering",
 // which is what lets a four-minute turn hold no cursor at all.
+//
+// Two things make that order hold rather than merely describe it. Messages are handled **one at a time
+// per project**, because they share one cursor: concurrent handlers let a later seq finish first and
+// move the cursor past an earlier message that then fails, and Photon never redelivers it. And a
+// message already being handled is refused rather than run again, because Photon documents duplicate
+// delivery and two of the same text would open two chats.
 import type { BotRequestPerson } from '../../../shared/bots/bot-acts-for'
 import type { PhotonCursorStore } from './photon-cursor'
-import type { PhotonInbox } from './photon-inbox'
+import type { PhotonInbox, PhotonInboxEntry } from './photon-inbox'
 import type { PhotonInboundMessage } from './photon-contract'
 import type { PhotonThreadMap } from './photon-thread-map'
 
@@ -19,6 +25,11 @@ export type PhotonInboundDeps = {
   /** The bot's people by handle. Only an assigned handle reaches the stream, so this is the allowlist
    *  as the provider holds it rather than a second ACL Orca keeps in sync. */
   people: (botId: string) => Map<string, PhotonPerson>
+  /** Whether the bot is paused, in which case its mail waits rather than starting a turn. */
+  paused?: (botId: string) => boolean
+  /** Records that a sender Orca has no assignment for reached the stream, which means this computer's
+   *  mirror of the provider's allowlist is stale rather than that the sender is a stranger. */
+  noteUnknownSender?: (botId: string) => void
   /** Starts a conversation the message opens; resolves the chat that will answer it. */
   startConversation: (input: {
     botId: string
@@ -26,7 +37,9 @@ export type PhotonInboundDeps = {
     person: BotRequestPerson
     title: string
   }) => Promise<{ chatId: string }>
-  /** Delivers into a chat that already exists, which is how a follow-up continues one conversation. */
+  /** Delivers into a chat that already exists, which is how a follow-up continues one conversation.
+   *  Throws when the chat refused the message: a refusal is not a delivery, and acking it would lose
+   *  the owner's text silently. */
   sendToChat: (input: {
     botId: string
     chatId: string
@@ -39,10 +52,12 @@ export type PhotonInboundDeps = {
 export type PhotonInboundOutcome =
   /** The message started a new chat, or continued the one its conversation already had. */
   | { kind: 'ran'; messageId: string; chatId: string; continued: boolean }
-  /** A replay of something Orca already handled; nothing ran, which is the point. */
+  /** A replay of something Orca already handled, or of a delivery already in hand; nothing ran. */
   | { kind: 'replayed'; messageId: string }
   /** Recorded, deliberately not acted on: the sender is not one of the bot's people. */
   | { kind: 'ignored'; messageId: string; reason: 'unknown-handle' }
+  /** Recorded and deliberately held: the bot is paused, so this is replayed when it resumes. */
+  | { kind: 'held'; messageId: string }
 
 /** Handles compare case-insensitively and without the separators people type in a phone number. */
 export function normalisePhotonHandle(handle: string): string {
@@ -50,21 +65,92 @@ export function normalisePhotonHandle(handle: string): string {
   return trimmed.includes('@') ? trimmed : trimmed.replace(/[^0-9+]/g, '')
 }
 
+/** Only the last four digits: enough to recognise whose message was dropped, not enough to be a
+ *  phone number in a log. */
+export function photonHandleTail(handle: string): string {
+  const normalised = normalisePhotonHandle(handle)
+  return normalised.length <= 4 ? '…' : `…${normalised.slice(-4)}`
+}
+
 export class PhotonInbound {
   private readonly log: (message: string, ...rest: unknown[]) => void
+  /** One chain per project: the cursor is shared, so the handlers must be ordered. */
+  private readonly queues = new Map<string, Promise<void>>()
+  /** Message ids currently being dispatched, so a duplicate delivery is dropped rather than run. */
+  private readonly inFlight = new Set<string>()
 
   constructor(private readonly deps: PhotonInboundDeps) {
     this.log = deps.log ?? ((message, ...rest) => console.warn(message, ...rest))
   }
 
-  async handle(input: {
+  /** Handles one frame, in order behind everything else for this project. */
+  handle(input: {
+    botId: string
+    projectId: string
+    seq: number
+    message: PhotonInboundMessage
+  }): Promise<PhotonInboundOutcome> {
+    return this.serialise(input.projectId, () => this.handleInOrder(input))
+  }
+
+  /**
+   * Replays what Orca wrote down and never dealt with, oldest first. This is the recovery the crash
+   * guard exists for: a message whose dispatch never happened would otherwise depend on Photon choosing
+   * to redeliver it, which replay is not obligated to do. Runs in the same order as live frames, so a
+   * recovered message cannot overtake one that arrived after it.
+   */
+  async recover(input: { botId: string; projectId: string }): Promise<PhotonInboundOutcome[]> {
+    const outcomes: PhotonInboundOutcome[] = []
+    for (const entry of this.deps.inbox.unhandled(input.projectId)) {
+      const seq = entry.seq
+      if (seq === undefined) {
+        this.log(
+          '[photon] an inbox entry has no stream position, so it cannot be replayed; it stays for inspection',
+          entry.messageId.slice(0, 40)
+        )
+        continue
+      }
+      outcomes.push(
+        await this.handle({
+          botId: input.botId,
+          projectId: input.projectId,
+          seq,
+          message: messageOf(entry)
+        })
+      )
+    }
+    return outcomes
+  }
+
+  private serialise<T>(projectId: string, work: () => Promise<T>): Promise<T> {
+    const previous = this.queues.get(projectId) ?? Promise.resolve()
+    const next = previous.then(work, work)
+    // The chain never rejects: a failed item is that item's caller's problem, not the queue's.
+    this.queues.set(
+      projectId,
+      next.then(
+        () => undefined,
+        () => undefined
+      )
+    )
+    return next
+  }
+
+  private async handleInOrder(input: {
     botId: string
     projectId: string
     seq: number
     message: PhotonInboundMessage
   }): Promise<PhotonInboundOutcome> {
     const { inbox, threads } = this.deps
-    const claim = inbox.claim(input.projectId, input.message)
+    const messageId = input.message.id
+    if (this.inFlight.has(`${input.projectId}:${messageId}`)) {
+      // A duplicate delivery of a message already being dispatched. Running it again is the double-run
+      // this whole store exists to prevent.
+      this.log('[photon] dropping a duplicate delivery of a message already in hand')
+      return { kind: 'replayed', messageId }
+    }
+    const claim = inbox.claim(input.projectId, input.message, input.seq)
     if (claim.action === 'skip') {
       // Already Orca's, already dispatched. Moving the cursor is all that is left, and it is safe
       // because the message is durably in the inbox.
@@ -74,48 +160,57 @@ export class PhotonInbound {
 
     const person = this.personFor(input.botId, input.message)
     if (!person) {
-      // An unknown handle never becomes an instruction. On this channel it should not even reach the
-      // stream, so this is a defensive branch rather than the access-request path: the answer is "add
-      // them, then they can text", not a queue that never fills.
+      // Photon only delivers senders its own assignment list holds, so "unknown" means this computer's
+      // mirror is stale — usually an assignment that was made upstream and never persisted here. It is
+      // recorded and acked (there is nothing to answer and nothing to retry), and counted so a listing
+      // can say the mirror needs repairing.
       this.log(
-        '[photon] ignoring a message from an unassigned handle',
-        normalisePhotonHandle(input.message.sender.handle)
+        '[photon] ignoring a message from a handle this bot has no assignment for; its mirror is stale',
+        photonHandleTail(input.message.sender.handle)
       )
-      inbox.markHandled(input.projectId, input.message.id)
-      this.advance(input, input.message.id)
-      return { kind: 'ignored', messageId: input.message.id, reason: 'unknown-handle' }
+      this.deps.noteUnknownSender?.(input.botId)
+      inbox.markHandled(input.projectId, messageId)
+      this.advance(input, messageId)
+      return { kind: 'ignored', messageId, reason: 'unknown-handle' }
     }
 
-    const known = threads.chatIdFor(input.botId, input.message.conversationId)
-    if (known) {
-      await this.deps.sendToChat({
+    if (this.deps.paused?.(input.botId)) {
+      // Held, not dropped: no `handledAt` and no cursor move means the recovery replays it when the bot
+      // is resumed, which is the same shape as a crash between the write and the dispatch.
+      this.log('[photon] the bot is paused; its message waits in the inbox')
+      return { kind: 'held', messageId }
+    }
+
+    this.inFlight.add(`${input.projectId}:${messageId}`)
+    try {
+      const known = threads.chatIdFor(input.botId, input.message.conversationId)
+      if (known) {
+        await this.deps.sendToChat({
+          botId: input.botId,
+          chatId: known,
+          text: input.message.text,
+          person
+        })
+        inbox.markHandled(input.projectId, messageId)
+        this.advance(input, messageId)
+        return { kind: 'ran', messageId, chatId: known, continued: true }
+      }
+
+      const started = await this.deps.startConversation({
         botId: input.botId,
-        chatId: known,
         text: input.message.text,
-        person
+        person,
+        title: photonConversationTitle(input.message)
       })
-      inbox.markHandled(input.projectId, input.message.id)
-      this.advance(input, input.message.id)
-      return { kind: 'ran', messageId: input.message.id, chatId: known, continued: true }
-    }
-
-    const started = await this.deps.startConversation({
-      botId: input.botId,
-      text: input.message.text,
-      person,
-      title: photonConversationTitle(input.message)
-    })
-    threads.bind(input.botId, input.message.conversationId, {
-      chatId: started.chatId,
-      handle: normalisePhotonHandle(input.message.sender.handle)
-    })
-    inbox.markHandled(input.projectId, input.message.id)
-    this.advance(input, input.message.id)
-    return {
-      kind: 'ran',
-      messageId: input.message.id,
-      chatId: started.chatId,
-      continued: false
+      threads.bind(input.botId, input.message.conversationId, {
+        chatId: started.chatId,
+        handle: normalisePhotonHandle(input.message.sender.handle)
+      })
+      inbox.markHandled(input.projectId, messageId)
+      this.advance(input, messageId)
+      return { kind: 'ran', messageId, chatId: started.chatId, continued: false }
+    } finally {
+      this.inFlight.delete(`${input.projectId}:${messageId}`)
     }
   }
 
@@ -124,12 +219,22 @@ export class PhotonInbound {
   private advance(input: { projectId: string; seq: number }, messageId: string): void {
     const result = this.deps.cursors.advance(input.projectId, input.seq, {
       inboxHas: (id) => this.deps.inbox.has(input.projectId, id),
-      messageId
+      messageId,
+      unhandledAtOrBelow: (seq) =>
+        this.deps.inbox.unhandledAtOrBelow(input.projectId, seq, messageId)
     })
     if (!result.advanced && result.reason === 'not-in-inbox') {
       this.log(
         '[photon] refusing to advance a cursor past a message the inbox does not hold',
-        messageId
+        messageId.slice(0, 40)
+      )
+    }
+    if (!result.advanced && result.reason === 'blocked-by-unhandled') {
+      // Correct, and worth saying: the cursor stops at the older message until it is dealt with, and the
+      // recovery replays it.
+      this.log(
+        '[photon] holding the cursor at an earlier message that was never dealt with',
+        result.messageId.slice(0, 40)
       )
     }
   }
@@ -149,6 +254,17 @@ export class PhotonInbound {
       workspaceId: null,
       role: found.role
     }
+  }
+}
+
+/** An inbox entry as the message it held, for a replay that has no frame to read. */
+function messageOf(entry: PhotonInboxEntry): PhotonInboundMessage {
+  return {
+    id: entry.messageId,
+    conversationId: entry.conversationId,
+    sender: entry.sender,
+    text: entry.text,
+    createdAt: entry.createdAt
   }
 }
 

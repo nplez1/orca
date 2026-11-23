@@ -61,11 +61,11 @@ describe('one send per finished turn', () => {
 
     const outcome = await test.sendPath.sendTurnResult({
       botId: 'b1',
-      botName: 'Scout',
       projectId: 'pho_prj_1',
       conversationId: 'conv_1',
       credential,
-      text: finalText
+      text: finalText,
+      turnId: 'turn_1'
     })
 
     expect(outcome.sent).toBe(true)
@@ -77,29 +77,46 @@ describe('one send per finished turn', () => {
     expect(turnResultText([{ role: 'progress', text: 'still working' }])).toBeNull()
   })
 
-  it('folds a long answer into one attachment rather than several messages', async () => {
+  it('cuts a long answer to one message and says so, rather than claiming a file it never sent', async () => {
     const test = harness()
     const long = 'line\n'.repeat(2_000)
-    const payload = foldTurnResult(long, { botName: 'Scout' })
-    expect(payload.kind).toBe('attachment')
-    if (payload.kind !== 'attachment') {
-      throw new Error('expected an attachment')
-    }
-    expect(payload.attachment.filename).toMatch(/^scout-answer-[0-9a-f]{8}\.md$/)
-    expect(payload.attachment.content).toBe(long.trim())
+    const payload = foldTurnResult(long, { inlineMax: 280 })
+    expect(payload.kind).toBe('text')
+    expect(payload.truncated).toBe(true)
+    expect(payload.body).toMatch(/cut here/)
+    // The old copy promised "the full answer is in the attached file" while nothing was uploaded.
+    expect(payload.body).not.toMatch(/attached/i)
 
     const outcome = await test.sendPath.sendTurnResult({
       botId: 'b1',
-      botName: 'Scout',
       projectId: 'pho_prj_1',
       conversationId: 'conv_1',
       credential,
-      text: long
+      text: long,
+      turnId: 'turn_1'
     })
 
-    expect(outcome).toMatchObject({ sent: true, kind: 'attachment' })
+    expect(outcome).toMatchObject({ sent: true, truncated: true })
     expect(server.state.sent).toHaveLength(1)
-    expect(server.state.sent[0]?.text).toMatch(/the full answer is in the attached file/)
+    expect(server.state.sent[0]?.text).toMatch(/cut here/)
+  })
+
+  it('sends two identical answers in one thread as two messages', async () => {
+    // Keyed on the text, the second "Yes." would be a no-op or a replayed response and the person would
+    // hear one answer to two questions.
+    const test = harness()
+    for (const turnId of ['turn_1', 'turn_2']) {
+      await test.sendPath.sendTurnResult({
+        botId: 'b1',
+        projectId: 'pho_prj_1',
+        conversationId: 'conv_1',
+        credential,
+        text: 'Yes.',
+        turnId
+      })
+    }
+
+    expect(server.state.sent.map((entry) => entry.text)).toEqual(['Yes.', 'Yes.'])
   })
 
   it('refuses to send to a conversation Orca never had', async () => {
@@ -110,7 +127,8 @@ describe('one send per finished turn', () => {
         projectId: 'pho_prj_1',
         conversationId: 'conv_unknown',
         credential,
-        text: 'hello?'
+        text: 'hello?',
+        turnId: 'turn_1'
       })
     ).rejects.toBeInstanceOf(PhotonColdStartError)
     expect(server.state.sent).toEqual([])
@@ -127,14 +145,15 @@ describe('a send that fails', () => {
       projectId: 'pho_prj_1',
       conversationId: 'conv_1',
       credential,
-      text: 'the build is green'
+      text: 'the build is green',
+      turnId: 'turn_1'
     })
     expect(failed.sent).toBe(false)
     expect(test.outbox.pendingFor('b1')).toHaveLength(1)
     expect(server.state.sent).toEqual([])
 
     const retried = await test.sendPath.retryPending('b1', credential)
-    expect(retried).toEqual([{ sent: true, entryId: expect.any(String), kind: 'text' }])
+    expect(retried).toEqual([{ sent: true, entryId: expect.any(String), truncated: false }])
     expect(server.state.sent).toEqual([
       { conversationId: 'conv_1', text: 'the build is green', idempotencyKey: expect.any(String) }
     ])
@@ -149,7 +168,8 @@ describe('a send that fails', () => {
       projectId: 'pho_prj_1',
       conversationId: 'conv_1',
       credential,
-      text: 'the build is green'
+      text: 'the build is green',
+      turnId: 'turn_1'
     })
     const pendingKey = test.outbox.pendingFor('b1')[0]?.id
     await test.sendPath.retryPending('b1', credential)

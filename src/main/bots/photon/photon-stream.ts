@@ -1,8 +1,12 @@
 // Photon's inbound stream: Socket.IO over HTTP, no webhook and no public endpoint, so it works behind
-// NAT. The one thing that must be right is the reconnect: Socket.IO reconnects the socket on its own,
-// but the server disables session recovery, so the application must subscribe again with its saved
-// cursor. A reconnect that forgets to resubscribe hears nothing while looking healthy — which is why
-// this reports `subscribed` separately from `connected` and arms a liveness deadline that says so.
+// NAT. Two things must be right. The reconnect: Socket.IO reconnects the socket on its own, but the
+// server disables session recovery, so the application must subscribe again with its saved cursor — a
+// reconnect that forgets to resubscribe hears nothing while looking healthy, which is why `subscribed`
+// is reported separately from `connected` and a liveness deadline turns the gap into `stalled`.
+// And the order: frames are handled one at a time, in delivery order, because they share one cursor.
+// Handled concurrently, a later frame's cursor advance can cover an earlier frame that then fails, and
+// that earlier message is never redelivered. A handler failure stops the stream and schedules a resume
+// from the checkpoint, so one bad message does not make the bot deaf until restart.
 import {
   PHOTON_STREAM_EVENTS,
   PHOTON_STREAM_PATH,
@@ -42,7 +46,11 @@ export type PhotonStreamStatus = {
   /** How many times this stream has subscribed; a reconnect raises it again. */
   subscribes: number
   /** Why it stopped, when it did. */
-  stoppedBy?: 'handler-failure' | 'closed' | 'contract'
+  stoppedBy?: 'handler-failure' | 'closed' | 'contract' | 'unreadable-checkpoint'
+  /** How many times the stream has resumed itself after a failure. */
+  resumes: number
+  /** A resume is scheduled; the stream is down but not abandoned. */
+  resumeInMs?: number
 }
 
 export type PhotonStreamOptions = {
@@ -52,9 +60,12 @@ export type PhotonStreamOptions = {
   credential: string
   /** Read fresh on every subscribe, so a reconnect resumes after what Orca has already checkpointed. */
   readCursor: () => number
-  /** Handles one frame. Throwing stops the stream, which is how a failed handler resumes from the
-   *  last successful checkpoint instead of skipping the message it could not take. */
+  /** Handles one frame. Throwing stops the stream and resumes it from the last successful
+   *  checkpoint, which is how a message the handler could not take is retried rather than skipped. */
   onFrame: (frame: PhotonStreamFrame) => void | Promise<void>
+  /** How long to wait before resuming after a handler failure. Raised per consecutive failure, so a
+   *  repeatable failure backs off instead of hot-looping. */
+  resumeDelayMs?: (attempt: number) => number
   /** How long a connected socket may sit unsubscribed before the status reads `stalled`. */
   livenessTimeoutMs?: number
   log?: (message: string, ...rest: unknown[]) => void
@@ -67,6 +78,12 @@ export type PhotonTimer = { cancel: () => void }
 
 const DEFAULT_LIVENESS_MS = 15_000
 
+/** 1s, 2s, 4s … capped at five minutes: long enough that a repeatable failure stops burning the
+ *  provider's reconnect budget, short enough that a transient one is back before a person notices. */
+function backoffMs(attempt: number): number {
+  return Math.min(5 * 60_000, 1_000 * 2 ** Math.min(attempt - 1, 8))
+}
+
 export class PhotonStream {
   private socket: PhotonSocket | null = null
   private state: PhotonStreamState = 'idle'
@@ -76,6 +93,10 @@ export class PhotonStream {
   private subscribes = 0
   private stoppedBy: PhotonStreamStatus['stoppedBy']
   private liveness: PhotonTimer | null = null
+  private resume: PhotonTimer | null = null
+  private resumes = 0
+  private resumeInMs: number | undefined
+  private queue: Promise<void> = Promise.resolve()
   private readonly log: (message: string, ...rest: unknown[]) => void
   private readonly setTimer: (callback: () => void, ms: number) => PhotonTimer
   private readonly clearTimer: (timer: PhotonTimer) => void
@@ -110,13 +131,23 @@ export class PhotonStream {
     socket.on('connect', () => this.onConnect())
     socket.on('disconnect', () => this.onDisconnect())
     socket.on(PHOTON_STREAM_EVENTS.subscribed, (ack: unknown) => this.onSubscribed(ack))
-    socket.on(PHOTON_STREAM_EVENTS.message, (frame: unknown) => void this.onMessage(frame))
+    socket.on(PHOTON_STREAM_EVENTS.message, (frame: unknown) => this.enqueue(frame))
     socket.on(PHOTON_STREAM_EVENTS.error, (error: unknown) =>
       this.log('[photon] stream error', error)
     )
+    // A server-forced disconnect or a middleware refusal arrives here and nowhere else: without it a
+    // refused handshake is a permanent silent `connecting`.
+    socket.on('connect_error', (error: unknown) => {
+      this.log('[photon] the stream could not connect; it retries on its own', error)
+      if (this.state !== 'stopped') {
+        this.state = 'connecting'
+      }
+    })
   }
 
+  /** Stops for good: no resume is scheduled, and the socket is left down. */
   stop(stoppedBy: PhotonStreamStatus['stoppedBy'] = 'closed'): void {
+    this.cancelResume()
     this.disarmLiveness()
     this.socket?.disconnect()
     this.socket = null
@@ -133,7 +164,9 @@ export class PhotonStream {
       subscribed: this.subscribed,
       startSeq: this.startSeq,
       subscribes: this.subscribes,
-      ...(this.stoppedBy ? { stoppedBy: this.stoppedBy } : {})
+      resumes: this.resumes,
+      ...(this.stoppedBy ? { stoppedBy: this.stoppedBy } : {}),
+      ...(this.resumeInMs === undefined ? {} : { resumeInMs: this.resumeInMs })
     }
   }
 
@@ -206,26 +239,69 @@ export class PhotonStream {
     }
   }
 
+  /** Frames are queued, not raced: they advance one shared cursor, so a later frame finishing first
+   *  would move it past an earlier message that has not been taken yet. */
+  private enqueue(frame: unknown): void {
+    const delivery = (): Promise<void> => this.onMessage(frame)
+    this.queue = this.queue.then(delivery, delivery)
+  }
+
   private async onMessage(frame: unknown): Promise<void> {
+    if (this.state === 'stopped') {
+      return
+    }
     let parsed: PhotonStreamFrame
     try {
       parsed = photonParse(PhotonStreamFrameSchema, 'stream frame', frame)
     } catch (error) {
       // A frame Orca cannot read is a refused stream, not an ignored one: reading it as empty would
-      // silently drop a message the cursor is about to move past.
+      // silently drop a message the cursor is about to move past. Nothing here can be resumed by
+      // itself, because the next resume reads the same broken frame.
       this.log('[photon] refusing a stream frame', error)
       this.stop('contract')
       return
     }
+    // A duplicate delivery needs no guard here: the queue serialises frames, so a repeat arrives after
+    // the first has finished, and the inbox's own dedupe by message id is what refuses it. A second
+    // belt here would be a branch nothing can reach.
     try {
       await this.options.onFrame(parsed)
     } catch (error) {
-      this.log(
-        '[photon] a frame handler failed; stopping so the stream resumes from the checkpoint',
-        error
-      )
-      this.stop('handler-failure')
+      this.log('[photon] a frame handler failed; stopping and resuming from the checkpoint', error)
+      this.failAndResume()
     }
+  }
+
+  /** A handler failure is not the end of the channel: it stops, then resumes from the checkpoint the
+   *  cursor holds, which is the message it could not take. A repeatable failure backs off, so it
+   *  neither hammers the provider nor lies about being live. */
+  private failAndResume(): void {
+    this.cancelResume()
+    this.disarmLiveness()
+    this.socket?.disconnect()
+    this.socket = null
+    this.connected = false
+    this.subscribed = false
+    this.state = 'stopped'
+    this.stoppedBy = 'handler-failure'
+    const delay = this.options.resumeDelayMs?.(this.resumes + 1) ?? backoffMs(this.resumes + 1)
+    this.resumeInMs = delay
+    this.resume = this.setTimer(() => {
+      this.resume = null
+      this.resumeInMs = undefined
+      this.resumes += 1
+      this.stoppedBy = undefined
+      this.start()
+    }, delay)
+    this.log('[photon] the stream will resume in', delay, 'ms')
+  }
+
+  private cancelResume(): void {
+    if (this.resume !== null) {
+      this.clearTimer(this.resume)
+      this.resume = null
+    }
+    this.resumeInMs = undefined
   }
 
   private armLiveness(): void {

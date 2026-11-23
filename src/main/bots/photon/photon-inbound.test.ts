@@ -2,13 +2,9 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import type { BotRequestPerson } from '../../../shared/bots/bot-acts-for'
-import { PhotonCursorStore } from './photon-cursor'
-import { PhotonInbound, type PhotonPerson } from './photon-inbound'
-import { PhotonInbox } from './photon-inbox'
-import { PhotonStore } from './photon-store'
-import { PhotonThreadMap } from './photon-thread-map'
 import type { PhotonInboundMessage } from './photon-contract'
+import type { HarnessOptions } from './photon-inbound.test-harness'
+import { inboundHarness } from './photon-inbound.test-harness'
 
 let userDataPath: string
 beforeEach(() => {
@@ -18,35 +14,7 @@ afterEach(() => {
   rmSync(userDataPath, { recursive: true, force: true })
 })
 
-type Call = { kind: 'start' | 'send'; chatId?: string; text: string; person: BotRequestPerson }
-
-function harness(options: { people?: Map<string, PhotonPerson>; failStart?: boolean } = {}) {
-  const store = new PhotonStore(userDataPath)
-  const inbox = new PhotonInbox(store)
-  const cursors = new PhotonCursorStore(store)
-  const threads = new PhotonThreadMap(store)
-  const calls: Call[] = []
-  let chats = 0
-  const inbound = new PhotonInbound({
-    inbox,
-    cursors,
-    threads,
-    people: () => options.people ?? new Map([['+15551230000', { name: 'Sam', role: 'owner' }]]),
-    startConversation: async ({ text, person }) => {
-      if (options.failStart) {
-        throw new Error('the chat would not start')
-      }
-      chats += 1
-      calls.push({ kind: 'start', text, person })
-      return { chatId: `chat_${chats}` }
-    },
-    sendToChat: async ({ chatId, text, person }) => {
-      calls.push({ kind: 'send', chatId, text, person })
-    },
-    log: () => {}
-  })
-  return { inbound, calls, inbox, cursors, threads, store }
-}
+const harness = (options: HarnessOptions = {}) => inboundHarness(userDataPath, options)
 
 const message = (over: Partial<PhotonInboundMessage> = {}): PhotonInboundMessage => ({
   id: 'msg_1',
@@ -134,7 +102,7 @@ describe('an inbound message', () => {
     expect(test.calls[0]?.person.role).toBe('member')
   })
 
-  it('never turns an unknown handle into an instruction', async () => {
+  it('never turns an unknown handle into an instruction, and says the mirror is stale', async () => {
     const test = harness({ people: new Map() })
     const outcome = await test.inbound.handle({
       botId: 'b1',
@@ -145,6 +113,8 @@ describe('an inbound message', () => {
 
     expect(outcome).toEqual({ kind: 'ignored', messageId: 'msg_1', reason: 'unknown-handle' })
     expect(test.calls).toEqual([])
+    // Photon only delivers assigned senders, so this is a stale mirror on Orca's side, not a stranger.
+    expect(test.unknownSenders).toEqual(['b1'])
     // Recorded and checkpointed, so it is not replayed forever, but nothing ran.
     expect(test.cursors.read('p1')).toBe(41)
   })
@@ -169,6 +139,67 @@ describe('the cursor against the inbox', () => {
     // The payload is on disk, but the cursor did not move: a crash here replays the work.
     expect(test.inbox.has('p1', 'msg_1')).toBe(true)
     expect(test.cursors.read('p1')).toBe(0)
+  })
+
+  it('never lets a later frame carry the cursor past one still being dispatched', async () => {
+    // seq 41 opens a new conversation and is slow; seq 47 continues a thread and is fast. Handled
+    // concurrently, 47 advances the cursor to 47 while 41 is still in hand — and 41, which then fails,
+    // is never redelivered because Photon only replays after the highest cursor it was given.
+    let releaseFirst = (): void => {}
+    const firstHeld = new Promise<void>((resolve) => (releaseFirst = resolve))
+    const test = harness({ holdStart: () => firstHeld, failStartFor: 'start X' })
+
+    const slow = test.inbound.handle({
+      botId: 'b1',
+      projectId: 'p1',
+      seq: 41,
+      message: message({ id: 'msg_41', text: 'start X' })
+    })
+    const fast = test.inbound.handle({
+      botId: 'b1',
+      projectId: 'p1',
+      seq: 47,
+      message: message({ id: 'msg_47', text: 'and Y' })
+    })
+
+    // Give the fast one every chance to overtake; it must not touch the cursor.
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(test.cursors.read('p1')).toBe(0)
+    releaseFirst()
+    await expect(slow).rejects.toThrow(/would not start/)
+    await fast
+
+    // 47 ran, and the cursor still has not passed 41: 41 is the next thing Photon would hand over, and
+    // the inbox holds it as unhandled for the recovery to replay. Without that check 47's success would
+    // have moved the cursor to 47 and 41 would never be redelivered.
+    expect(test.cursors.read('p1')).toBe(0)
+    expect(test.inbox.unhandled('p1').map((entry) => entry.messageId)).toEqual(['msg_41'])
+  })
+
+  it('refuses a duplicate delivery of a message that is still being dispatched', async () => {
+    // A drop mid-dispatch resubscribes from the pre-message cursor and Photon redelivers the same id.
+    let release = (): void => {}
+    const held = new Promise<void>((resolve) => (release = resolve))
+    const test = harness({ holdStart: () => held })
+
+    const first = test.inbound.handle({
+      botId: 'b1',
+      projectId: 'p1',
+      seq: 41,
+      message: message()
+    })
+    const duplicate = test.inbound.handle({
+      botId: 'b1',
+      projectId: 'p1',
+      seq: 41,
+      message: message()
+    })
+    release()
+    await first
+
+    expect(await duplicate).toMatchObject({ kind: 'replayed' })
+    // One chat and one run, not two: the second delivery found the first in hand.
+    expect(test.calls).toHaveLength(1)
   })
 
   it('runs a message whose write survived a crash but whose turn never started', async () => {
@@ -206,7 +237,7 @@ describe('the cursor against the inbox', () => {
     expect(test.cursors.read('p1')).toBe(41)
   })
 
-  it('resumes from a gap without assuming the next cursor is one more', async () => {
+  it('resumes from a gap by resubscribing, never by adding one', async () => {
     const test = harness()
     await test.inbound.handle({ botId: 'b1', projectId: 'p1', seq: 41, message: message() })
     await test.inbound.handle({

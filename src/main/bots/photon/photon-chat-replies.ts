@@ -11,26 +11,29 @@ export type PhotonChatReplyHost = {
 }
 
 /** Reads the finished turn and sends its answer to the conversation that asked, if this chat is one the
- *  channel opened. A bot's ordinary chats post nowhere, and a turn with no answer sends nothing. */
+ *  channel opened. A bot's ordinary chats post nowhere and cost no journal read, and a turn with no
+ *  answer sends nothing. */
 export function photonChatTurnEnded(
   host: PhotonChatReplyHost,
-  sessionId: string,
-  readItems: (since: number | null) => Promise<TurnEndedRows>
+  turn: {
+    sessionId: string
+    turnId: string
+    readItems: (since: number | null) => Promise<TurnEndedRows>
+  }
 ): void {
+  const { sessionId, turnId, readItems } = turn
   const channel = photonServiceOf(host)
   const bot: Bot | null = botOfSession(host.bots, sessionId)
   if (!channel || !bot) {
     return
   }
+  // Checked before the read, not after: every bot turn on the host comes through here, and a journal
+  // read it cannot use is a cost paid by chats this channel never opened.
+  if (!channel.answersChat(bot.id, sessionId)) {
+    return
+  }
   void readItems(null)
-    .then((rows) =>
-      channel.sendChatTurnResult({
-        botId: bot.id,
-        botName: bot.name,
-        chatId: sessionId,
-        rows
-      })
-    )
+    .then((rows) => channel.sendChatTurnResult({ botId: bot.id, chatId: sessionId, turnId, rows }))
     .catch((error: unknown) =>
       console.warn('[photon] could not send a finished turn’s answer', error)
     )

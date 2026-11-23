@@ -20,7 +20,9 @@ import { PhotonProvisioner } from './photon-provisioning'
 import { PhotonSendPath } from './photon-send'
 import { PhotonService } from './photon-service'
 import type { PhotonIoFactory } from './photon-stream'
+import { photonCanSealSecrets } from './photon-secrets'
 import { PhotonStore } from './photon-store'
+import { PhotonStreams } from './photon-streams'
 import { PhotonTeardown } from './photon-teardown'
 import { PhotonThreadMap } from './photon-thread-map'
 
@@ -69,6 +71,8 @@ export function photonChannel(runtime: OrcaRuntimeService): PhotonService {
       }
       return service.people(botId)
     },
+    paused: (botId) => runtime.bots.list().find((entry) => entry.id === botId)?.paused === true,
+    noteUnknownSender: (botId) => service?.noteUnknownSender(botId),
     startConversation: async ({ botId, text, person, title }) => {
       const bot = requireBot(runtime, botId)
       const sessionId = await startBotSession(runtime, bot, {
@@ -82,11 +86,40 @@ export function photonChannel(runtime: OrcaRuntimeService): PhotonService {
         .catch((error: unknown) => console.warn('[photon] could not name a conversation', error))
       return { chatId: sessionId }
     },
-    sendToChat: async ({ botId, chatId, text }) => {
-      await runtimeBotChats(runtime).sendToSession(botId, chatId, text)
+    sendToChat: async ({ botId, chatId, text, person }) => {
+      // Who the conversation acts for is recorded per conversation, so a follow-up from someone other
+      // than the person who opened it says *they* are asking rather than inheriting the opener's
+      // authority.
+      runtime.getOrchestrationDb().recordBotConversationActsFor(chatId, { actsFor: [person] })
+      const delivered = await runtimeBotChats(runtime).sendToSession(botId, chatId, text)
+      // A refused or rejected delivery is not a delivery. Marking it handled and advancing the cursor
+      // would lose the owner's message silently, which is the opposite of what this channel promises.
+      if (delivered.outcome.kind === 'refused') {
+        throw new Error(delivered.outcome.refusal.message)
+      }
+      if (
+        delivered.outcome.kind === 'sent' &&
+        delivered.outcome.submission?.dispatchState === 'rejected'
+      ) {
+        throw new Error(
+          delivered.outcome.submission.reason ?? "The bot's chat did not take the prompt."
+        )
+      }
     }
   })
 
+  const sendPath = new PhotonSendPath({ api, outbox, threads })
+  const streams = new PhotonStreams({
+    store,
+    cursors,
+    inbound,
+    sendPath,
+    io: socketFactory,
+    setTimer: (callback, ms) => {
+      const handle = setTimeout(callback, ms)
+      return { cancel: () => clearTimeout(handle) }
+    }
+  })
   const built = new PhotonService({
     store,
     api,
@@ -97,8 +130,8 @@ export function photonChannel(runtime: OrcaRuntimeService): PhotonService {
     provisioner: new PhotonProvisioner({ api, store }),
     teardown: new PhotonTeardown({ api, store }),
     inbound,
-    sendPath: new PhotonSendPath({ api, outbox, threads }),
-    io: socketFactory
+    sendPath,
+    streams
   })
   service = built
   channels.set(runtime, built)
@@ -116,6 +149,7 @@ export function photonChannelStatus(
     connected: account !== null && store.accountCredential() !== null,
     organizationId: account?.organizationId ?? null,
     accountKeyStored: account?.storesKey === true,
+    accountKeySealed: photonCanSealSecrets(),
     bots: store.bots().map((record) => {
       const status = botIds.includes(record.botId) ? service.streamStatus(record.botId) : null
       return {
@@ -124,15 +158,21 @@ export function photonChannelStatus(
         projectId: record.projectId,
         phoneNumber: record.phoneNumber ?? null,
         handles: record.assignments.map((entry) => entry.handle),
-        stream: streamWord(status)
+        stream: streamWord(status, record.released),
+        released: record.released,
+        unknownSenderCount: record.unknownSenderCount
       }
     })
   }
 }
 
 function streamWord(
-  status: ReturnType<PhotonService['streamStatus']>
-): 'live' | 'deaf' | 'stopped' | 'not started' {
+  status: ReturnType<PhotonService['streamStatus']>,
+  released: boolean
+): 'live' | 'deaf' | 'stopped' | 'not started' | 'released' {
+  if (released) {
+    return 'released'
+  }
   if (!status) {
     return 'not started'
   }

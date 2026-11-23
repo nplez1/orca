@@ -15,6 +15,8 @@ const OutboxEntry = z.object({
   projectId: z.string().min(1),
   conversationId: z.string().min(1),
   body: z.string(),
+  /** Whether the answer was cut to fit one message, which the retry line reports rather than hiding. */
+  truncated: z.boolean().default(false),
   createdAt: z.number(),
   attempts: z.number().int().nonnegative().default(0),
   lastError: z.string().optional()
@@ -50,13 +52,20 @@ export class PhotonOutbox {
 
   /** Records a send before it is attempted. Re-enqueuing the same id is a no-op, so a retry that races
    *  a replay cannot double-send. */
-  enqueue(entry: Omit<PhotonOutboxEntry, 'createdAt' | 'attempts'>): PhotonOutboxEntry {
+  enqueue(
+    entry: Omit<PhotonOutboxEntry, 'createdAt' | 'attempts' | 'truncated'> & { truncated?: boolean }
+  ): PhotonOutboxEntry {
     const file = this.read()
     const existing = file.entries.find((candidate) => candidate.id === entry.id)
     if (existing) {
       return existing
     }
-    const saved: PhotonOutboxEntry = { ...entry, createdAt: this.now(), attempts: 0 }
+    const saved: PhotonOutboxEntry = {
+      ...entry,
+      createdAt: this.now(),
+      attempts: 0,
+      truncated: entry.truncated ?? false
+    }
     this.write({ entries: [...file.entries, saved] })
     return saved
   }

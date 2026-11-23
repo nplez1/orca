@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -27,26 +27,98 @@ const message = (over: Partial<PhotonInboundMessage> = {}): PhotonInboundMessage
 })
 
 describe('the account key and a bot’s project key', () => {
-  it('stores the account key only when the owner opted in', () => {
+  it('holds the account key for the session when the owner did not opt in, and writes nothing', () => {
     const store = new PhotonStore(userDataPath)
     store.saveAccount({ organizationId: 'org_1', storesKey: false }, 'pho_ask_secret')
 
-    expect(store.accountKey()).toBeNull()
+    // The default path has to work: a toggle that must be on before anything runs makes "off" broken.
+    expect(store.accountCredential()).toEqual({ kind: 'account', key: 'pho_ask_secret' })
     expect(store.account()).toEqual({ organizationId: 'org_1', storesKey: false })
-    // The organization survives even though the key did not, so the next bot only needs the key.
+    // Nothing about the key reached the disk, which is what "not stored" means.
     expect(JSON.parse(readFileSync(store.recordPath, 'utf-8'))).toMatchObject({
       account: { organizationId: 'org_1' }
     })
+    expect(JSON.parse(readFileSync(store.secretsPath, 'utf-8')).accountKey).toBeUndefined()
   })
 
-  it('stores the account key when the owner opts in, and forgets it when they opt out', () => {
+  it('forgets a session-held account key across a restart, which is what the copy says', () => {
+    const first = new PhotonStore(userDataPath)
+    first.saveAccount({ organizationId: 'org_1', storesKey: false }, 'pho_ask_secret')
+    expect(first.accountCredential()).not.toBeNull()
+
+    const restarted = new PhotonStore(userDataPath)
+    expect(restarted.account()).toEqual({ organizationId: 'org_1', storesKey: false })
+    expect(restarted.accountCredential()).toBeNull()
+  })
+
+  it('persists the account key when the owner opts in, and forgets it when they opt out', () => {
     const store = new PhotonStore(userDataPath)
     store.saveAccount({ organizationId: 'org_1', storesKey: true }, 'pho_ask_secret')
     expect(store.accountKey()).toBe('pho_ask_secret')
 
+    // A restart still has it, which is the whole point of opting in.
+    expect(new PhotonStore(userDataPath).accountKey()).toBe('pho_ask_secret')
+
     store.saveAccount({ organizationId: 'org_1', storesKey: false }, undefined)
-    expect(store.accountKey()).toBeNull()
     expect(JSON.parse(readFileSync(store.secretsPath, 'utf-8')).accountKey).toBeUndefined()
+    expect(new PhotonStore(userDataPath).accountKey()).toBeNull()
+  })
+
+  it('seals a persisted key rather than writing it as plaintext', () => {
+    const store = new PhotonStore(userDataPath)
+    store.saveAccount({ organizationId: 'org_1', storesKey: true }, 'pho_ask_secret')
+
+    const written = readFileSync(store.secretsPath, 'utf-8')
+    expect(written).not.toMatch(/pho_ask_secret/)
+    expect(JSON.parse(written).accountKey).toMatch(/^(sealed|plain):/)
+  })
+
+  it('is not connected when neither a stored nor a session key is available', () => {
+    const store = new PhotonStore(userDataPath)
+    store.saveAccount({ organizationId: 'org_1', storesKey: false }, undefined)
+    expect(store.account()).not.toBeNull()
+    expect(store.accountCredential()).toBeNull()
+  })
+
+  it('refuses to overwrite an unreadable record instead of orphaning its projects', () => {
+    const store = new PhotonStore(userDataPath)
+    store.putBot({ botId: 'b1', projectId: 'p1', slug: 'orca-bot-one', organizationId: 'org_1' })
+    mkdirSync(join(userDataPath, 'local-photon'), { recursive: true })
+    writeFileSync(store.recordPath, '{ not json')
+
+    const reopened = new PhotonStore(userDataPath)
+    expect(() =>
+      reopened.putBot({
+        botId: 'b2',
+        projectId: 'p2',
+        slug: 'orca-bot-two',
+        organizationId: 'org_1'
+      })
+    ).toThrow(/will not overwrite it/)
+    // The file is still there, still unreadable, and still the only copy of what it named.
+    expect(readFileSync(store.recordPath, 'utf-8')).toBe('{ not json')
+  })
+
+  it('never logs the text of an unreadable secrets file, which is part of a key', () => {
+    const store = new PhotonStore(userDataPath)
+    mkdirSync(join(userDataPath, 'local-photon'), { recursive: true })
+    writeFileSync(store.secretsPath, '{"accountKey":"sealed:AAAA",')
+    const logged: unknown[] = []
+    const original = console.warn
+    console.warn = (...args: unknown[]) => {
+      logged.push(args)
+    }
+    try {
+      const reopened = new PhotonStore(userDataPath)
+      try {
+        reopened.saveAccount({ organizationId: 'org_1', storesKey: true }, 'pho_ask_secret')
+      } catch {
+        // Refused, which is the point; the log is what this test is about.
+      }
+    } finally {
+      console.warn = original
+    }
+    expect(JSON.stringify(logged)).not.toMatch(/sealed:AAAA/)
   })
 
   it('keeps each bot’s project key to that bot, and never puts it in the ordinary record', () => {

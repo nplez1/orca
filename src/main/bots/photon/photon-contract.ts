@@ -64,6 +64,9 @@ export const PhotonAssignmentListSchema = z.object({
   assignments: z.array(PhotonAssignmentSchema)
 })
 
+/** The organization's projects, for adopting a slug that is already taken. */
+export const PhotonProjectListSchema = z.object({ projects: z.array(PhotonProjectSchema) })
+
 /** Project deletion is asynchronous and irreversible: the slug is burned for every future project. */
 export const PHOTON_CLOSURE_STATES = ['closing', 'closed', 'failed'] as const
 export const PhotonClosureSchema = z.object({ state: z.enum(PHOTON_CLOSURE_STATES) })

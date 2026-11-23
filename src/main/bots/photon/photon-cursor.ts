@@ -15,11 +15,25 @@ const CursorFileSchema = z.object({
   updatedAt: z.number()
 })
 
+/** A cursor file Orca cannot read. Refusing is the only safe answer: `0` reads as "new events only",
+ *  which would skip the whole retained backlog and look like a healthy start. */
+export class PhotonCursorUnreadableError extends Error {
+  constructor(readonly path: string) {
+    super(
+      `Orca cannot read the Photon cursor at ${path}. Resume is refused rather than started at 0, which would silently skip the backlog Photon still holds: move the file aside to accept the gap, or restore it.`
+    )
+    this.name = 'PhotonCursorUnreadableError'
+  }
+}
+
 /** Why a cursor did not move; both are ordinary, and neither is a failure. */
 export type PhotonCursorAdvance =
   | { advanced: true; seq: number }
   /** The message the cursor would cover is not in Orca's inbox yet, so advancing would lose it. */
   | { advanced: false; reason: 'not-in-inbox' }
+  /** An earlier message is in the inbox and was never dealt with. Moving past it would make it
+   *  unreachable: Photon only replays after the highest cursor it was given. */
+  | { advanced: false; reason: 'blocked-by-unhandled'; messageId: string }
   /** A stored cursor never moves backwards; a rewind is a bug, not a re-read. */
   | { advanced: false; reason: 'behind-stored-cursor'; stored: number }
 
@@ -32,17 +46,28 @@ export class PhotonCursorStore {
   /** The cursor to resume from. Zero is a first-ever start, which Photon reads as new events only —
    *  deliberately skipping history rather than replaying an archive nobody has bounded. */
   read(projectId: string, purpose = PHOTON_CONSUMER_PURPOSE): number {
+    const path = this.store.cursorPath(projectId, purpose)
+    let text: string
     try {
-      const parsed = CursorFileSchema.safeParse(
-        JSON.parse(readFileSync(this.store.cursorPath(projectId, purpose), 'utf-8'))
-      )
-      return parsed.success ? parsed.data.seq : PHOTON_STREAM_START_NEW
+      text = readFileSync(path, 'utf-8')
     } catch (error) {
       if (!isMissingFileError(error)) {
-        console.warn('[photon] could not read a cursor; resuming as a first start', error)
+        // A file that is there and unreadable is not a first start.
+        throw new PhotonCursorUnreadableError(path)
       }
       return PHOTON_STREAM_START_NEW
     }
+    let raw: unknown
+    try {
+      raw = JSON.parse(text)
+    } catch {
+      throw new PhotonCursorUnreadableError(path)
+    }
+    const parsed = CursorFileSchema.safeParse(raw)
+    if (!parsed.success) {
+      throw new PhotonCursorUnreadableError(path)
+    }
+    return parsed.data.seq
   }
 
   /**
@@ -53,11 +78,20 @@ export class PhotonCursorStore {
   advance(
     projectId: string,
     seq: number,
-    evidence: { inboxHas: (messageId: string) => boolean; messageId: string },
+    evidence: {
+      inboxHas: (messageId: string) => boolean
+      messageId: string
+      /** Whether an earlier message is still waiting; the cursor may not pass one. */
+      unhandledAtOrBelow?: (seq: number) => string | null
+    },
     purpose = PHOTON_CONSUMER_PURPOSE
   ): PhotonCursorAdvance {
     if (!evidence.inboxHas(evidence.messageId)) {
       return { advanced: false, reason: 'not-in-inbox' }
+    }
+    const blocked = evidence.unhandledAtOrBelow?.(seq)
+    if (blocked) {
+      return { advanced: false, reason: 'blocked-by-unhandled', messageId: blocked }
     }
     const stored = this.read(projectId, purpose)
     if (seq < stored) {
