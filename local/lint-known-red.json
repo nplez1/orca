@@ -41,11 +41,11 @@
   "recordedAt": "2026-11-20",
   "entries": [
     {
-      "step": "check:code-quality:changed",
-      "wholeStep": true,
-      "class": "sync-sized-diff-not-yet-pushed",
-      "owner": "local(ci)",
-      "evidence": "LOCAL-PATCHES.md \u00a7 local(lint): the 2026-11-20 sync's lint gate. origin/main is still the pre-sync tip, so the changed set is upstream's 1425 commits plus the replayed 579 (25k+ code files) and check-changed-code-quality.mjs spawnSync fails E2BIG before reporting anything (measured 2026-11-20 in /Volumes/Storage/Code/orca/main). The post-merge fix-ups ran clean under ORCA_CODE_QUALITY_BASE=HEAD. Prune on the first run after `git push origin main`."
+      "step": "oxlint",
+      "class": "upstream-exhaustive-deps-warning",
+      "owner": "upstream",
+      "match": "useIpynbDocumentEditing\\.ts:153:6: warning react-hooks\\(exhaustive-deps\\)",
+      "evidence": "LOCAL-PATCHES.md \u00a7 local(lint): a warning in an upstream file this branch does not touch \u2014 `react-hooks(exhaustive-deps)` reports `fileId` as an unnecessary dependency of a `useCallback`, and `pnpm lint` runs oxlint with `--deny-warnings`, so it is red rather than noisy. Reproduced on main (9d8c6c8cb64) by running oxlint on that file alone, and `git diff main --name-only` lists no file under src/renderer for this branch."
     }
   ]
 }

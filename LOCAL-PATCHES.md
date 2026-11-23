@@ -5641,6 +5641,44 @@ row, a bot delete keeping the project, and no row for a bot with no project). Ev
 against a **real loopback HTTP server** (`photon-fake-server.test-fixture.ts`) with knobs to fail a key
 mint, an assignment and a send, and with real idempotency replay — a mock that cannot fail is not a test.
 
+### `local(lint)`: what the iMessage branch's channel does off the main thread, and one foreign red
+
+The channel's stores were synchronous, and every one of their reads and writes runs on a delivery or a
+turn end rather than once at startup — a blocking read there stalls every window on Electron's main
+thread. They now use `node:fs/promises` and `writeSecureFileAsync`, the same two the webhook store uses,
+so `check:main-sync-fs-ratchet` charges them **nothing**: 0 sync fs calls in `photon-store.ts`,
+`photon-inbox.ts`, `photon-outbox.ts`, `photon-cursor.ts` and `photon-thread-map.ts`, where the first
+version of this patch charged twelve.
+
+What is left is `check:main-blocking-helper-ratchet`, and it is left because it cannot be removed while
+using the sanctioned helper: `writeSecureFileAsync` publishes with a synchronous `renameSync` on purpose
+("Sync so the check above and the publish share a turn: a sign-out's clear cannot land between them"), so
+every file that calls it is charged by design. Six rows, one per module, each with the same evidence —
+the identical shape `local(webhooks)` records for the same helper in the same file:
+
+```
+1 src/main/bots/photon/photon-cursor.ts    # per delivery and per turn end, through writePhotonJson: …
+1 src/main/bots/photon/photon-files.ts     # …
+1 src/main/bots/photon/photon-inbox.ts     # …
+1 src/main/bots/photon/photon-outbox.ts    # …
+2 src/main/bots/photon/photon-store.ts     # …
+1 src/main/bots/photon/photon-thread-map.ts # …
+```
+
+Six rows is more than the webhook store's two, and the difference is the file count rather than the calls:
+each module keeps one store, so the charge lands once per file. Collapsing them would mean one store class
+for four different file shapes, which is worse code than six documented rows. Every read in all six is
+asynchronous; nothing here reads on the message path.
+
+**One foreign red, recorded rather than fixed.** `useIpynbDocumentEditing.ts:153:6` carries an
+`react-hooks(exhaustive-deps)` warning about an unnecessary `fileId` dependency, and `pnpm lint` runs
+oxlint with `--deny-warnings`. The file is upstream's, this branch does not touch it (`git diff main
+--name-only` lists nothing under `src/renderer`), and it reproduces on `main` at `9d8c6c8cb64` when oxlint
+runs on that file alone. It is `local/lint-known-red.json`'s first `oxlint` entry, matched on the message:
+its class is `upstream-exhaustive-deps-warning`, not this patch's. The entry the gate reported as stale —
+`check:code-quality:changed`, `wholeStep`, left from the 2026-11-20 sync — is gone, because the changed
+checks run clean here.
+
 ### `local(test)`: one `host-load` flake seen on the iMessage branch, and why the red set was left alone
 
 `local/unit-known-red.json` has been empty of entries since the 2026-10-31 sweep, and this branch leaves
