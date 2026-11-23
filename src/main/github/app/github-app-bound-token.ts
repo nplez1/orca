@@ -1,6 +1,7 @@
 // The installation token a bound App acts with. A user binding asks gh for a token; an App binding has no
 // gh to ask, so it mints one from the App's own key, for the installation covering the repository's owner.
 import {
+  GITHUB_APP_HOST,
   githubAppInstallationFor,
   githubAppInstallationForOwner
 } from '../../../shared/github/app/github-app-identity'
@@ -10,7 +11,7 @@ import type { GithubAppCredentials } from './github-app-credentials'
 import { installationToken } from './github-app-installation-token'
 
 /** The App's token is a github.com token: there is no App path on a GitHub Enterprise host. */
-export const GITHUB_APP_HOST = 'github.com'
+export { GITHUB_APP_HOST }
 
 export type BoundAppToken = { token: string; installationId: number; expiresAtMs: number }
 

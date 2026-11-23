@@ -116,6 +116,9 @@ export function githubAppInstallationFor<
  * The installation that can act on any repository `owner` owns. A `selected` installation names its
  * repositories rather than its owner, so its coverage of an owner is whatever it was given there.
  */
+/** The one host a connected App acts on; the CLI credential helper and the git config both read it. */
+export const GITHUB_APP_HOST = 'github.com'
+
 export function githubAppInstallationForOwner<
   T extends {
     repositorySelection: GithubAppRepositorySelection
