@@ -26,80 +26,94 @@ const message = (over: Partial<PhotonInboundMessage> = {}): PhotonInboundMessage
   ...over
 })
 
+/** The secrets file's contents, or null when the store wrote none: nothing changed, so nothing is written. */
+function secretsOf(store: PhotonStore): { accountKey?: string } | null {
+  try {
+    return JSON.parse(readFileSync(store.secretsPath, 'utf-8'))
+  } catch {
+    return null
+  }
+}
+
 describe('the account key and a bot’s project key', () => {
-  it('holds the account key for the session when the owner did not opt in, and writes nothing', () => {
+  it('holds the account key for the session when the owner did not opt in, and writes nothing', async () => {
     const store = new PhotonStore(userDataPath)
-    store.saveAccount({ organizationId: 'org_1', storesKey: false }, 'pho_ask_secret')
+    await store.saveAccount({ organizationId: 'org_1', storesKey: false }, 'pho_ask_secret')
 
     // The default path has to work: a toggle that must be on before anything runs makes "off" broken.
-    expect(store.accountCredential()).toEqual({ kind: 'account', key: 'pho_ask_secret' })
-    expect(store.account()).toEqual({ organizationId: 'org_1', storesKey: false })
+    expect(await store.accountCredential()).toEqual({ kind: 'account', key: 'pho_ask_secret' })
+    expect(await store.account()).toEqual({ organizationId: 'org_1', storesKey: false })
     // Nothing about the key reached the disk, which is what "not stored" means.
     expect(JSON.parse(readFileSync(store.recordPath, 'utf-8'))).toMatchObject({
       account: { organizationId: 'org_1' }
     })
-    expect(JSON.parse(readFileSync(store.secretsPath, 'utf-8')).accountKey).toBeUndefined()
+    expect(secretsOf(store)?.accountKey).toBeUndefined()
   })
 
-  it('forgets a session-held account key across a restart, which is what the copy says', () => {
+  it('forgets a session-held account key across a restart, which is what the copy says', async () => {
     const first = new PhotonStore(userDataPath)
-    first.saveAccount({ organizationId: 'org_1', storesKey: false }, 'pho_ask_secret')
-    expect(first.accountCredential()).not.toBeNull()
+    await first.saveAccount({ organizationId: 'org_1', storesKey: false }, 'pho_ask_secret')
+    expect(await first.accountCredential()).not.toBeNull()
 
     const restarted = new PhotonStore(userDataPath)
-    expect(restarted.account()).toEqual({ organizationId: 'org_1', storesKey: false })
-    expect(restarted.accountCredential()).toBeNull()
+    expect(await restarted.account()).toEqual({ organizationId: 'org_1', storesKey: false })
+    expect(await restarted.accountCredential()).toBeNull()
   })
 
-  it('persists the account key when the owner opts in, and forgets it when they opt out', () => {
+  it('persists the account key when the owner opts in, and forgets it when they opt out', async () => {
     const store = new PhotonStore(userDataPath)
-    store.saveAccount({ organizationId: 'org_1', storesKey: true }, 'pho_ask_secret')
-    expect(store.accountKey()).toBe('pho_ask_secret')
+    await store.saveAccount({ organizationId: 'org_1', storesKey: true }, 'pho_ask_secret')
+    expect(await store.accountKey()).toBe('pho_ask_secret')
 
     // A restart still has it, which is the whole point of opting in.
-    expect(new PhotonStore(userDataPath).accountKey()).toBe('pho_ask_secret')
+    expect(await new PhotonStore(userDataPath).accountKey()).toBe('pho_ask_secret')
 
-    store.saveAccount({ organizationId: 'org_1', storesKey: false }, undefined)
-    expect(JSON.parse(readFileSync(store.secretsPath, 'utf-8')).accountKey).toBeUndefined()
-    expect(new PhotonStore(userDataPath).accountKey()).toBeNull()
+    await store.saveAccount({ organizationId: 'org_1', storesKey: false }, undefined)
+    expect(secretsOf(store)?.accountKey).toBeUndefined()
+    expect(await new PhotonStore(userDataPath).accountKey()).toBeNull()
   })
 
-  it('seals a persisted key rather than writing it as plaintext', () => {
+  it('seals a persisted key rather than writing it as plaintext', async () => {
     const store = new PhotonStore(userDataPath)
-    store.saveAccount({ organizationId: 'org_1', storesKey: true }, 'pho_ask_secret')
+    await store.saveAccount({ organizationId: 'org_1', storesKey: true }, 'pho_ask_secret')
 
     const written = readFileSync(store.secretsPath, 'utf-8')
     expect(written).not.toMatch(/pho_ask_secret/)
     expect(JSON.parse(written).accountKey).toMatch(/^(sealed|plain):/)
   })
 
-  it('is not connected when neither a stored nor a session key is available', () => {
+  it('is not connected when neither a stored nor a session key is available', async () => {
     const store = new PhotonStore(userDataPath)
-    store.saveAccount({ organizationId: 'org_1', storesKey: false }, undefined)
-    expect(store.account()).not.toBeNull()
-    expect(store.accountCredential()).toBeNull()
+    await store.saveAccount({ organizationId: 'org_1', storesKey: false }, undefined)
+    expect(await store.account()).not.toBeNull()
+    expect(await store.accountCredential()).toBeNull()
   })
 
-  it('refuses to overwrite an unreadable record instead of orphaning its projects', () => {
+  it('refuses to overwrite an unreadable record instead of orphaning its projects', async () => {
     const store = new PhotonStore(userDataPath)
-    store.putBot({ botId: 'b1', projectId: 'p1', slug: 'orca-bot-one', organizationId: 'org_1' })
+    await store.putBot({
+      botId: 'b1',
+      projectId: 'p1',
+      slug: 'orca-bot-one',
+      organizationId: 'org_1'
+    })
     mkdirSync(join(userDataPath, 'local-photon'), { recursive: true })
     writeFileSync(store.recordPath, '{ not json')
 
     const reopened = new PhotonStore(userDataPath)
-    expect(() =>
+    await expect(
       reopened.putBot({
         botId: 'b2',
         projectId: 'p2',
         slug: 'orca-bot-two',
         organizationId: 'org_1'
       })
-    ).toThrow(/will not overwrite it/)
+    ).rejects.toThrow(/will not overwrite it/)
     // The file is still there, still unreadable, and still the only copy of what it named.
     expect(readFileSync(store.recordPath, 'utf-8')).toBe('{ not json')
   })
 
-  it('never logs the text of an unreadable secrets file, which is part of a key', () => {
+  it('never logs the text of an unreadable secrets file, which is part of a key', async () => {
     const store = new PhotonStore(userDataPath)
     mkdirSync(join(userDataPath, 'local-photon'), { recursive: true })
     writeFileSync(store.secretsPath, '{"accountKey":"sealed:AAAA",')
@@ -121,51 +135,61 @@ describe('the account key and a bot’s project key', () => {
     expect(JSON.stringify(logged)).not.toMatch(/sealed:AAAA/)
   })
 
-  it('keeps each bot’s project key to that bot, and never puts it in the ordinary record', () => {
+  it('keeps each bot’s project key to that bot, and never puts it in the ordinary record', async () => {
     const store = new PhotonStore(userDataPath)
-    store.putBot({ botId: 'b1', projectId: 'p1', slug: 'orca-bot-one', organizationId: 'org_1' })
-    store.putBot({ botId: 'b2', projectId: 'p2', slug: 'orca-bot-two', organizationId: 'org_1' })
-    store.putProjectKey('b1', { keyId: 'k1', secret: 'pho_sk_one' })
-    store.putProjectKey('b2', { keyId: 'k2', secret: 'pho_sk_two' })
+    await store.putBot({
+      botId: 'b1',
+      projectId: 'p1',
+      slug: 'orca-bot-one',
+      organizationId: 'org_1'
+    })
+    await store.putBot({
+      botId: 'b2',
+      projectId: 'p2',
+      slug: 'orca-bot-two',
+      organizationId: 'org_1'
+    })
+    await store.putProjectKey('b1', { keyId: 'k1', secret: 'pho_sk_one' })
+    await store.putProjectKey('b2', { keyId: 'k2', secret: 'pho_sk_two' })
 
-    expect(store.projectCredential('b1')).toEqual({ kind: 'project', key: 'pho_sk_one' })
-    expect(store.projectCredential('b2')).toEqual({ kind: 'project', key: 'pho_sk_two' })
+    expect(await store.projectCredential('b1')).toEqual({ kind: 'project', key: 'pho_sk_one' })
+    expect(await store.projectCredential('b2')).toEqual({ kind: 'project', key: 'pho_sk_two' })
     expect(readFileSync(store.recordPath, 'utf-8')).not.toContain('pho_sk_')
 
-    store.forgetBot('b1')
-    expect(store.projectKey('b1')).toBeNull()
-    expect(store.projectKey('b2')).toEqual({ keyId: 'k2', secret: 'pho_sk_two' })
-    expect(store.bot('b1')).toBeNull()
+    await store.forgetBot('b1')
+    expect(await store.projectKey('b1')).toBeNull()
+    expect(await store.projectKey('b2')).toEqual({ keyId: 'k2', secret: 'pho_sk_two' })
+    expect(await store.bot('b1')).toBeNull()
   })
 })
 
 describe('the inbox, which is both the crash guard and the dedupe index', () => {
-  it('runs a message the first time and skips the same id the second time', () => {
+  it('runs a message the first time and skips the same id the second time', async () => {
     const store = new PhotonStore(userDataPath)
     const inbox = new PhotonInbox(store)
-    const first = inbox.claim('p1', message())
+    const first = await inbox.claim('p1', message())
     expect(first.action).toBe('run')
 
-    inbox.markHandled('p1', 'msg_1')
-    const second = inbox.claim('p1', message())
+    await inbox.markHandled('p1', 'msg_1')
+    const second = await inbox.claim('p1', message())
     expect(second.action).toBe('skip')
   })
 
-  it('runs again when a crash landed between the write and the dispatch', () => {
+  it('runs again when a crash landed between the write and the dispatch', async () => {
     const store = new PhotonStore(userDataPath)
     const inbox = new PhotonInbox(store)
-    inbox.claim('p1', message())
+    await inbox.claim('p1', message())
 
     // No markHandled: the process died before the turn was handed over.
-    const replay = new PhotonInbox(new PhotonStore(userDataPath)).claim('p1', message())
+    const replay = await new PhotonInbox(new PhotonStore(userDataPath)).claim('p1', message())
     expect(replay.action).toBe('run')
     expect(replay.entry.text).toBe('is the build green?')
   })
 
-  it('writes the payload to disk before the caller can start anything', () => {
+  it('writes the payload to disk before the caller can start anything', async () => {
     const store = new PhotonStore(userDataPath)
     const inbox = new PhotonInbox(store)
-    inbox.claim('p1', message())
+    await inbox.claim('p1', message())
     // A second, independent reader sees it, so the write is on disk rather than in memory only.
     expect(JSON.parse(readFileSync(store.inboxPath('p1', 'msg_1'), 'utf-8'))).toMatchObject({
       messageId: 'msg_1',
@@ -174,109 +198,123 @@ describe('the inbox, which is both the crash guard and the dedupe index', () => 
     })
   })
 
-  it('refuses a message id that could escape its directory', () => {
+  it('refuses a message id that could escape its directory', async () => {
     const inbox = new PhotonInbox(new PhotonStore(userDataPath))
-    expect(() => inbox.claim('p1', message({ id: '../../etc/passwd' }))).toThrow(/not usable/)
+    await expect(inbox.claim('p1', message({ id: '../../etc/passwd' }))).rejects.toThrow(
+      /not usable/
+    )
   })
 })
 
 describe('the cursor, which is the handoff checkpoint', () => {
-  it('starts at zero, which Photon reads as new events only', () => {
-    expect(new PhotonCursorStore(new PhotonStore(userDataPath)).read('p1')).toBe(0)
+  it('starts at zero, which Photon reads as new events only', async () => {
+    expect(await new PhotonCursorStore(new PhotonStore(userDataPath)).read('p1')).toBe(0)
   })
 
-  it('refuses to advance past a message the inbox does not hold', () => {
+  it('refuses to advance past a message the inbox does not hold', async () => {
     const store = new PhotonStore(userDataPath)
     const cursors = new PhotonCursorStore(store)
     const inbox = new PhotonInbox(store)
 
-    const refused = cursors.advance('p1', 41, {
+    const refused = await cursors.advance('p1', 41, {
       inboxHas: (id) => inbox.has('p1', id),
       messageId: 'msg_1'
     })
     expect(refused).toEqual({ advanced: false, reason: 'not-in-inbox' })
     // The refusal is the assertion: advancing on receipt would be a data-loss bug, and it did not happen.
-    expect(cursors.read('p1')).toBe(0)
+    expect(await cursors.read('p1')).toBe(0)
   })
 
-  it('advances once the message is in the inbox, and resumes from a gap without assuming +1', () => {
+  it('advances once the message is in the inbox, and resumes from a gap without assuming +1', async () => {
     const store = new PhotonStore(userDataPath)
     const cursors = new PhotonCursorStore(store)
     const inbox = new PhotonInbox(store)
-    inbox.claim('p1', message({ id: 'msg_41' }))
-    inbox.claim('p1', message({ id: 'msg_47' }))
+    await inbox.claim('p1', message({ id: 'msg_41' }))
+    await inbox.claim('p1', message({ id: 'msg_47' }))
 
     expect(
-      cursors.advance('p1', 41, { inboxHas: (id) => inbox.has('p1', id), messageId: 'msg_41' })
+      await cursors.advance('p1', 41, {
+        inboxHas: (id) => inbox.has('p1', id),
+        messageId: 'msg_41'
+      })
     ).toEqual({ advanced: true, seq: 41 })
     // 42..46 never arrived, and nothing invents them: the next cursor is the one Photon named.
     expect(
-      cursors.advance('p1', 47, { inboxHas: (id) => inbox.has('p1', id), messageId: 'msg_47' })
+      await cursors.advance('p1', 47, {
+        inboxHas: (id) => inbox.has('p1', id),
+        messageId: 'msg_47'
+      })
     ).toEqual({ advanced: true, seq: 47 })
-    expect(cursors.read('p1')).toBe(47)
-    expect(cursors.read('p1') + 1).toBe(48)
+    expect(await cursors.read('p1')).toBe(47)
+    expect((await cursors.read('p1')) + 1).toBe(48)
   })
 
-  it('never moves backwards, because a rewind is a bug rather than a re-read', () => {
+  it('never moves backwards, because a rewind is a bug rather than a re-read', async () => {
     const store = new PhotonStore(userDataPath)
     const cursors = new PhotonCursorStore(store)
     const inbox = new PhotonInbox(store)
-    inbox.claim('p1', message({ id: 'msg_41' }))
-    inbox.claim('p1', message({ id: 'msg_47' }))
-    cursors.advance('p1', 47, { inboxHas: (id) => inbox.has('p1', id), messageId: 'msg_47' })
+    await inbox.claim('p1', message({ id: 'msg_41' }))
+    await inbox.claim('p1', message({ id: 'msg_47' }))
+    await cursors.advance('p1', 47, { inboxHas: (id) => inbox.has('p1', id), messageId: 'msg_47' })
 
     expect(
-      cursors.advance('p1', 41, { inboxHas: (id) => inbox.has('p1', id), messageId: 'msg_41' })
+      await cursors.advance('p1', 41, {
+        inboxHas: (id) => inbox.has('p1', id),
+        messageId: 'msg_41'
+      })
     ).toEqual({ advanced: false, reason: 'behind-stored-cursor', stored: 47 })
-    expect(cursors.read('p1')).toBe(47)
+    expect(await cursors.read('p1')).toBe(47)
   })
 
-  it('keeps one cursor per project and per consumer purpose', () => {
+  it('keeps one cursor per project and per consumer purpose', async () => {
     const store = new PhotonStore(userDataPath)
     const cursors = new PhotonCursorStore(store)
     const inbox = new PhotonInbox(store)
-    inbox.claim('p1', message({ id: 'msg_41' }))
-    cursors.advance('p1', 41, { inboxHas: (id) => inbox.has('p1', id), messageId: 'msg_41' })
+    await inbox.claim('p1', message({ id: 'msg_41' }))
+    await cursors.advance('p1', 41, { inboxHas: (id) => inbox.has('p1', id), messageId: 'msg_41' })
 
-    expect(cursors.read('p1', 'another-integration')).toBe(0)
-    expect(cursors.read('p2')).toBe(0)
+    expect(await cursors.read('p1', 'another-integration')).toBe(0)
+    expect(await cursors.read('p2')).toBe(0)
   })
 })
 
 describe('the thread map', () => {
-  it('continues one chat for one conversation and starts another for a new one', () => {
+  it('continues one chat for one conversation and starts another for a new one', async () => {
     const store = new PhotonStore(userDataPath)
     const threads = new PhotonThreadMap(store)
-    threads.bind('b1', 'conv_1', { chatId: 'chat_1', handle: '+15551230000' })
+    await threads.bind('b1', 'conv_1', { chatId: 'chat_1', handle: '+15551230000' })
 
-    expect(threads.chatIdFor('b1', 'conv_1')).toBe('chat_1')
-    expect(threads.chatIdFor('b1', 'conv_2')).toBeNull()
-    expect(threads.knows('b1', 'conv_2')).toBe(false)
+    expect(await threads.chatIdFor('b1', 'conv_1')).toBe('chat_1')
+    expect(await threads.chatIdFor('b1', 'conv_2')).toBeNull()
+    expect(await threads.knows('b1', 'conv_2')).toBe(false)
   })
 
-  it('survives a restart, so a mid-conversation restart continues rather than restarting', () => {
+  it('survives a restart, so a mid-conversation restart continues rather than restarting', async () => {
     const store = new PhotonStore(userDataPath)
-    new PhotonThreadMap(store).bind('b1', 'conv_1', { chatId: 'chat_1', handle: '+15551230000' })
+    await new PhotonThreadMap(store).bind('b1', 'conv_1', {
+      chatId: 'chat_1',
+      handle: '+15551230000'
+    })
 
-    expect(new PhotonThreadMap(new PhotonStore(userDataPath)).chatIdFor('b1', 'conv_1')).toBe(
+    expect(await new PhotonThreadMap(new PhotonStore(userDataPath)).chatIdFor('b1', 'conv_1')).toBe(
       'chat_1'
     )
   })
 
-  it('reports a different pool line for the same conversation without losing the chat', () => {
+  it('reports a different pool line for the same conversation without losing the chat', async () => {
     const threads = new PhotonThreadMap(new PhotonStore(userDataPath))
-    threads.bind('b1', 'conv_1', {
+    await threads.bind('b1', 'conv_1', {
       chatId: 'chat_1',
       handle: '+15551230000',
       phoneNumber: '+15550101'
     })
-    threads.bind('b1', 'conv_1', {
+    await threads.bind('b1', 'conv_1', {
       chatId: 'chat_1',
       handle: '+15551230000',
       phoneNumber: '+15550202'
     })
 
-    expect(threads.thread('b1', 'conv_1')).toMatchObject({
+    expect(await threads.thread('b1', 'conv_1')).toMatchObject({
       chatId: 'chat_1',
       phoneNumber: '+15550202'
     })
@@ -284,32 +322,56 @@ describe('the thread map', () => {
 })
 
 describe('the outbox', () => {
-  it('keeps a failed send and retries it rather than letting the result vanish', () => {
+  it('keeps a failed send and retries it rather than letting the result vanish', async () => {
     const outbox = new PhotonOutbox(new PhotonStore(userDataPath))
-    outbox.enqueue({ id: 's1', botId: 'b1', projectId: 'p1', conversationId: 'c1', body: 'done' })
+    await outbox.enqueue({
+      id: 's1',
+      botId: 'b1',
+      projectId: 'p1',
+      conversationId: 'c1',
+      body: 'done'
+    })
 
-    outbox.fail('s1', 'socket hang up')
-    expect(outbox.pendingFor('b1')).toEqual([
+    await outbox.fail('s1', 'socket hang up')
+    expect(await outbox.pendingFor('b1')).toEqual([
       expect.objectContaining({ id: 's1', attempts: 1, lastError: 'socket hang up' })
     ])
 
-    outbox.settle('s1')
-    expect(outbox.pendingFor('b1')).toEqual([])
+    await outbox.settle('s1')
+    expect(await outbox.pendingFor('b1')).toEqual([])
   })
 
-  it('does not enqueue the same send twice', () => {
+  it('does not enqueue the same send twice', async () => {
     const outbox = new PhotonOutbox(new PhotonStore(userDataPath))
-    outbox.enqueue({ id: 's1', botId: 'b1', projectId: 'p1', conversationId: 'c1', body: 'done' })
-    outbox.enqueue({ id: 's1', botId: 'b1', projectId: 'p1', conversationId: 'c1', body: 'done' })
-    expect(outbox.entries()).toHaveLength(1)
+    await outbox.enqueue({
+      id: 's1',
+      botId: 'b1',
+      projectId: 'p1',
+      conversationId: 'c1',
+      body: 'done'
+    })
+    await outbox.enqueue({
+      id: 's1',
+      botId: 'b1',
+      projectId: 'p1',
+      conversationId: 'c1',
+      body: 'done'
+    })
+    expect(await outbox.entries()).toHaveLength(1)
   })
 
-  it('gives up after the attempt cap instead of retrying a stale answer forever', () => {
+  it('gives up after the attempt cap instead of retrying a stale answer forever', async () => {
     const outbox = new PhotonOutbox(new PhotonStore(userDataPath))
-    outbox.enqueue({ id: 's1', botId: 'b1', projectId: 'p1', conversationId: 'c1', body: 'done' })
+    await outbox.enqueue({
+      id: 's1',
+      botId: 'b1',
+      projectId: 'p1',
+      conversationId: 'c1',
+      body: 'done'
+    })
     for (let attempt = 0; attempt < PHOTON_OUTBOX_MAX_ATTEMPTS; attempt += 1) {
-      outbox.fail('s1', 'still failing')
+      await outbox.fail('s1', 'still failing')
     }
-    expect(outbox.entries()).toEqual([])
+    expect(await outbox.entries()).toEqual([])
   })
 })

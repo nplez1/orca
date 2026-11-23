@@ -26,13 +26,16 @@ import { PhotonStreams } from './photon-streams'
 import { PhotonTeardown } from './photon-teardown'
 import { PhotonThreadMap } from './photon-thread-map'
 
-const channels = new WeakMap<object, PhotonService>()
+/** Whoever a channel was built for: the runtime does, and a reply hook only has a bot roster. */
+type PhotonChannelOwner = OrcaRuntimeService | { readonly bots?: unknown }
 
-/** The channel built for this runtime, or null when nothing built one.
+const channels = new WeakMap<PhotonChannelOwner, PhotonService>()
+
+/** The channel built for this owner, or null when nothing built one.
  *  Lookup only: the full service needs the whole runtime, so it is built once where that exists, and every
  *  later caller asks for the instance rather than constructing a second set of stores. */
-export function photonServiceOf(runtime: object): PhotonService | null {
-  return channels.get(runtime) ?? null
+export function photonServiceOf(owner: PhotonChannelOwner): PhotonService | null {
+  return channels.get(owner) ?? null
 }
 
 /** Socket.IO's own factory, narrowed to the slice the stream drives. */
@@ -139,18 +142,19 @@ export function photonChannel(runtime: OrcaRuntimeService): PhotonService {
 }
 
 /** What a settings card or `orca bot connectors` shows, without opening a stream to find out. */
-export function photonChannelStatus(
+export async function photonChannelStatus(
   service: PhotonService,
   store: PhotonStore,
   botIds: readonly string[]
-): PhotonChannelStatus {
-  const account = store.account()
+): Promise<PhotonChannelStatus> {
+  const account = await store.account()
+  const credential = await store.accountCredential()
   return {
-    connected: account !== null && store.accountCredential() !== null,
+    connected: account !== null && credential !== null,
     organizationId: account?.organizationId ?? null,
     accountKeyStored: account?.storesKey === true,
     accountKeySealed: photonCanSealSecrets(),
-    bots: store.bots().map((record) => {
+    bots: (await store.bots()).map((record) => {
       const status = botIds.includes(record.botId) ? service.streamStatus(record.botId) : null
       return {
         botId: record.botId,

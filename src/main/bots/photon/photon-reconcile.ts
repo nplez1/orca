@@ -2,7 +2,7 @@
 // rather than inside it because its job is the opposite of provisioning's — it believes what upstream
 // says and repairs the record to match, including minting the key that can never be read back.
 import type { PhotonApi, PhotonCredential } from './photon-api'
-import { photonKeyMintKey } from './photon-provisioning'
+import { normalisePhotonHandle as normalise, photonKeyMintKey } from './photon-provisioning-keys'
 import type { PhotonStore } from './photon-store'
 import type { PhotonAssignmentRecord, PhotonBotRecord } from './photon-store-schema'
 
@@ -31,7 +31,7 @@ export async function reconcileRecord(
   }
 ): Promise<{ repaired: boolean; record: PhotonBotRecord | null; notes: string[] }> {
   const { api, store } = deps
-  const record = store.bot(input.botId)
+  const record = await store.bot(input.botId)
   if (!record) {
     return { repaired: false, record: null, notes: ['no record to reconcile'] }
   }
@@ -60,7 +60,7 @@ export async function reconcileRecord(
   // merely noted: without it the bot cannot read its stream or send anything.
   let keyId = record.keyId
   let keyGeneration = record.keyGeneration
-  if (!store.projectCredential(input.botId) || !keyId) {
+  if (!(await store.projectCredential(input.botId)) || !keyId) {
     keyGeneration += 1
     const minted = await api.mintProjectKey({
       credential: input.account.credential,
@@ -68,14 +68,14 @@ export async function reconcileRecord(
       name: `orca-bot-${input.botId}`,
       idempotencyKey: photonKeyMintKey(input.botId, keyGeneration)
     })
-    store.putProjectKey(input.botId, { keyId: minted.id, secret: minted.secret })
+    await store.putProjectKey(input.botId, { keyId: minted.id, secret: minted.secret })
     keyId = minted.id
     notes.push('no project key was stored; minted a replacement')
     repaired = true
   }
   // The provider's assignment list is the allowlist, so the record is rebuilt from it rather than
   // from whichever handle this call happens to name.
-  const credential = store.projectCredential(input.botId) ?? input.account.credential
+  const credential = (await store.projectCredential(input.botId)) ?? input.account.credential
   const listed = await api.listAssignments(credential, record.projectId).catch((error: unknown) => {
     notes.push(`could not list assignments: ${messageOf(error)}`)
     return null
@@ -120,7 +120,7 @@ export async function reconcileRecord(
     assignments.find((entry) => entry.handle === ownerHandle)?.phoneNumber ??
     assignments[0]?.phoneNumber ??
     record.phoneNumber
-  const repairedRecord = store.putBot({
+  const repairedRecord = await store.putBot({
     ...record,
     slug,
     keyId,
@@ -150,11 +150,6 @@ function mergeAssignment(
       phoneNumber: assignment.phoneNumber
     }
   ]
-}
-
-function normalise(handle: string): string {
-  const trimmed = handle.trim().toLowerCase()
-  return trimmed.includes('@') ? trimmed : trimmed.replace(/[^0-9+]/g, '')
 }
 
 function messageOf(error: unknown): string {

@@ -59,7 +59,7 @@ export type PhotonStreamOptions = {
   projectId: string
   credential: string
   /** Read fresh on every subscribe, so a reconnect resumes after what Orca has already checkpointed. */
-  readCursor: () => number
+  readCursor: () => number | Promise<number>
   /** Handles one frame. Throwing stops the stream and resumes it from the last successful
    *  checkpoint, which is how a message the handler could not take is retried rather than skipped. */
   onFrame: (frame: PhotonStreamFrame) => void | Promise<void>
@@ -207,8 +207,35 @@ export class PhotonStream {
       return
     }
     // Read on every subscribe rather than once: a reconnect after a turn must resume from what Orca
-    // checkpointed, not from where the stream started.
-    this.startSeq = this.options.readCursor()
+    // checkpointed, not from where the stream started. A cursor file that cannot be read refuses the
+    // stream rather than resuming at 0, which would skip the backlog Photon still holds.
+    let cursor: number | Promise<number>
+    try {
+      cursor = this.options.readCursor()
+    } catch (error) {
+      this.refuseCheckpoint(error)
+      return
+    }
+    if (typeof cursor === 'number') {
+      this.sendSubscribe(socket, cursor)
+      return
+    }
+    void cursor.then(
+      (seq) => this.sendSubscribe(socket, seq),
+      (error: unknown) => this.refuseCheckpoint(error)
+    )
+  }
+
+  private refuseCheckpoint(error: unknown): void {
+    this.log('[photon] refusing to subscribe without a readable cursor', error)
+    this.stop('unreadable-checkpoint')
+  }
+
+  private sendSubscribe(socket: PhotonSocket, cursor: number): void {
+    if (this.socket !== socket || this.state === 'stopped') {
+      return
+    }
+    this.startSeq = cursor
     socket.emit(PHOTON_STREAM_EVENTS.subscribe, {
       projectId: this.options.projectId,
       startSeq: this.startSeq

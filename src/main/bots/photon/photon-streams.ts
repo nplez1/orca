@@ -38,16 +38,16 @@ export class PhotonStreams {
 
   /** Follows every bot that has a key and has not been released. A bot with no project is skipped
    *  rather than failing loudly. */
-  startAll(): void {
-    for (const record of this.deps.store.bots()) {
+  async startAll(): Promise<void> {
+    for (const record of await this.deps.store.bots()) {
       if (!record.released) {
-        this.start(record.botId)
+        await this.start(record.botId)
       }
     }
     this.startHealth()
   }
 
-  start(botId: string): PhotonStreamStatus | null {
+  async start(botId: string): Promise<PhotonStreamStatus | null> {
     const running = this.streams.get(botId)
     if (running && running.status().state !== 'stopped') {
       return running.status()
@@ -55,8 +55,8 @@ export class PhotonStreams {
     // A stream that stopped itself (a handler failure or a refused frame) is replaced rather than
     // reused: returning the dead one early is what left a bot deaf until restart.
     this.streams.delete(botId)
-    const record = this.deps.store.bot(botId)
-    const credential = this.deps.store.projectCredential(botId)
+    const record = await this.deps.store.bot(botId)
+    const credential = await this.deps.store.projectCredential(botId)
     if (!record || record.released || !credential) {
       return null
     }
@@ -108,7 +108,7 @@ export class PhotonStreams {
    * subscribed (`deaf`) is restarted instead of merely reported, and a send that failed is retried
    * instead of sitting in the outbox until the process dies.
    */
-  tick(): void {
+  async tick(): Promise<void> {
     // Snapshot: a restart replaces the entry, and iterating a Map while adding to it would visit the
     // replacement and restart it forever.
     for (const [botId, stream] of Array.from(this.streams)) {
@@ -126,11 +126,11 @@ export class PhotonStreams {
       } catch (error) {
         this.log('[photon] restarting a stream that is not live', botId, messageOf(error))
         this.stop(botId)
-        this.start(botId)
+        await this.start(botId)
       }
     }
-    for (const record of this.deps.store.bots()) {
-      const credential = this.deps.store.projectCredential(record.botId)
+    for (const record of await this.deps.store.bots()) {
+      const credential = await this.deps.store.projectCredential(record.botId)
       if (record.released || !credential) {
         continue
       }

@@ -2,11 +2,8 @@
 // that answers it. A second message in the same conversation continues that chat; a new conversation
 // starts a new one. Persisted per bot, so a restart mid-conversation continues the thread instead of
 // starting over — and the bot only ever answers a conversation it already has.
-import { mkdirSync, readFileSync } from 'node:fs'
-import { dirname } from 'node:path'
 import { z } from 'zod'
-import { writeDurableSecureJsonFile } from '../../../shared/secure-storage/secure-file'
-import { isMissingFileError } from '../../runtime/rpc/server/pairing/device-registry-corruption'
+import { readPhotonJson, writePhotonJson } from './photon-files'
 import type { PhotonStore } from './photon-store'
 
 const ThreadSchema = z.object({
@@ -35,64 +32,71 @@ export class PhotonThreadMapUnreadableError extends Error {
 }
 
 export class PhotonThreadMap {
-  private readonly cache = new Map<string, ThreadFile>()
+  private readonly cache = new Map<string, Promise<ThreadFile>>()
   private readonly unreadable = new Set<string>()
+  private readonly queue = new Map<string, Promise<void>>()
 
   constructor(
     private readonly store: PhotonStore,
     private readonly now: () => number = () => Date.now()
   ) {}
 
-  thread(botId: string, conversationId: string): PhotonThread | null {
-    return this.file(botId).threads[conversationId] ?? null
+  async thread(botId: string, conversationId: string): Promise<PhotonThread | null> {
+    return (await this.file(botId)).threads[conversationId] ?? null
   }
 
   /** The chat that answers this conversation, or null when the bot has never seen it. */
-  chatIdFor(botId: string, conversationId: string): string | null {
-    return this.thread(botId, conversationId)?.chatId ?? null
+  async chatIdFor(botId: string, conversationId: string): Promise<string | null> {
+    return (await this.thread(botId, conversationId))?.chatId ?? null
   }
 
   /** Binds a conversation to the chat that took it. Rebinding updates the phone and handle, which is
    *  how a saved contact keeps working when the provider reports a different pool line. */
-  bind(
+  async bind(
     botId: string,
     conversationId: string,
     bind: { chatId: string; handle: string; phoneNumber?: string }
-  ): PhotonThread {
-    const file = this.file(botId)
-    const existing = file.threads[conversationId]
+  ): Promise<PhotonThread> {
     const at = this.now()
-    const thread: PhotonThread = {
-      chatId: bind.chatId,
-      handle: bind.handle,
-      ...(bind.phoneNumber ? { phoneNumber: bind.phoneNumber } : {}),
-      createdAt: existing?.createdAt ?? at,
-      updatedAt: at
+    let bound: PhotonThread | null = null
+    await this.change(botId, (file) => {
+      const existing = file.threads[conversationId]
+      bound = {
+        chatId: bind.chatId,
+        handle: bind.handle,
+        ...(bind.phoneNumber ? { phoneNumber: bind.phoneNumber } : {}),
+        createdAt: existing?.createdAt ?? at,
+        updatedAt: at
+      }
+      file.threads[conversationId] = bound
+      return true
+    })
+    if (!bound) {
+      throw new PhotonThreadMapUnreadableError(this.store.threadPath(botId))
     }
-    file.threads[conversationId] = thread
-    this.write(botId, file)
-    return thread
+    return bound
   }
 
   /** Drops a conversation, for a bot whose project is being released for good. */
-  forget(botId: string, conversationId: string): void {
-    const file = this.file(botId)
-    if (!(conversationId in file.threads)) {
-      return
-    }
-    delete file.threads[conversationId]
-    this.write(botId, file)
+  async forget(botId: string, conversationId: string): Promise<void> {
+    await this.change(botId, (file) => {
+      if (!(conversationId in file.threads)) {
+        return false
+      }
+      delete file.threads[conversationId]
+      return true
+    })
   }
 
   /** Whether this bot has ever answered on a conversation; the send path's guard against a cold start. */
-  knows(botId: string, conversationId: string): boolean {
-    return this.chatIdFor(botId, conversationId) !== null
+  async knows(botId: string, conversationId: string): Promise<boolean> {
+    return (await this.chatIdFor(botId, conversationId)) !== null
   }
 
   /** The conversation a chat answers, or null when the chat is not one this channel opened. Used at a
    *  turn's end, where the chat is known and the conversation is what has to be found. */
-  conversationFor(botId: string, chatId: string): string | null {
-    for (const [conversationId, thread] of Object.entries(this.file(botId).threads)) {
+  async conversationFor(botId: string, chatId: string): Promise<string | null> {
+    for (const [conversationId, thread] of Object.entries((await this.file(botId)).threads)) {
       if (thread.chatId === chatId) {
         return conversationId
       }
@@ -100,35 +104,27 @@ export class PhotonThreadMap {
     return null
   }
 
-  private file(botId: string): ThreadFile {
+  private file(botId: string): Promise<ThreadFile> {
     const cached = this.cache.get(botId)
     if (cached) {
       return cached
     }
-    const path = this.store.threadPath(botId)
-    const file = this.read(botId, path)
-    this.cache.set(botId, file)
-    return file
+    const reading = this.read(botId)
+    this.cache.set(botId, reading)
+    return reading
   }
 
-  private read(botId: string, path: string): ThreadFile {
-    let text: string
-    try {
-      text = readFileSync(path, 'utf-8')
-    } catch (error) {
-      if (!isMissingFileError(error)) {
-        console.warn('[photon] could not read a thread map; treating its conversations as unknown')
-      }
+  private async read(botId: string): Promise<ThreadFile> {
+    const path = this.store.threadPath(botId)
+    const read = await readPhotonJson(path, 'thread map')
+    if (read.kind === 'missing') {
       return { threads: {} }
     }
-    let raw: unknown
-    try {
-      raw = JSON.parse(text)
-    } catch {
+    if (read.kind === 'unreadable') {
       this.unreadable.add(botId)
       return { threads: {} }
     }
-    const parsed = ThreadFileSchema.safeParse(raw)
+    const parsed = ThreadFileSchema.safeParse(read.value)
     if (!parsed.success) {
       this.unreadable.add(botId)
       return { threads: {} }
@@ -136,12 +132,29 @@ export class PhotonThreadMap {
     return parsed.data
   }
 
-  private write(botId: string, file: ThreadFile): void {
-    if (this.unreadable.has(botId)) {
-      throw new PhotonThreadMapUnreadableError(this.store.threadPath(botId))
-    }
-    const path = this.store.threadPath(botId)
-    mkdirSync(dirname(path), { recursive: true, mode: 0o700 })
-    writeDurableSecureJsonFile(path, file)
+  /** One change at a time per bot, over the state its predecessor left. */
+  private change(botId: string, mutate: (file: ThreadFile) => boolean): Promise<void> {
+    const previous = this.queue.get(botId) ?? Promise.resolve()
+    const run = previous.then(async () => {
+      if (this.unreadable.has(botId)) {
+        throw new PhotonThreadMapUnreadableError(this.store.threadPath(botId))
+      }
+      const file = await this.file(botId)
+      // Mutating a copy keeps the cache consistent if the write fails.
+      const draft = structuredClone(file)
+      if (!mutate(draft)) {
+        return
+      }
+      await writePhotonJson(this.store.threadPath(botId), draft)
+      this.cache.set(botId, Promise.resolve(draft))
+    })
+    this.queue.set(
+      botId,
+      run.then(
+        () => undefined,
+        () => undefined
+      )
+    )
+    return run
   }
 }

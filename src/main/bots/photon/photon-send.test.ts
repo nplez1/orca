@@ -31,24 +31,24 @@ afterEach(() => {
   rmSync(userDataPath, { recursive: true, force: true })
 })
 
-function harness() {
+async function harness() {
   const store = new PhotonStore(userDataPath)
   const outbox = new PhotonOutbox(store)
   const threads = new PhotonThreadMap(store)
-  // The conversation exists because an inbound message opened it, which is the only way one does.
-  threads.bind('b1', 'conv_1', { chatId: 'chat_1', handle: '+15551230000' })
   const sendPath = new PhotonSendPath({
     api: new PhotonApi({ baseUrl: server.baseUrl }),
     outbox,
     threads,
     log: () => {}
   })
+  // The conversation exists because an inbound message opened it, which is the only way one does.
+  await threads.bind('b1', 'conv_1', { chatId: 'chat_1', handle: '+15551230000' })
   return { sendPath, outbox, threads, store }
 }
 
 describe('one send per finished turn', () => {
   it('sends once for a turn that emitted many progress items', async () => {
-    const test = harness()
+    const test = await harness()
     const items = [
       { role: 'user', text: 'is the build green?' },
       { role: 'progress', text: 'reading the workflow' },
@@ -81,7 +81,7 @@ describe('one send per finished turn', () => {
   })
 
   it('cuts a long answer to one message and says so, rather than claiming a file it never sent', async () => {
-    const test = harness()
+    const test = await harness()
     const long = 'line\n'.repeat(2_000)
     const payload = foldTurnResult(long, { inlineMax: 280 })
     expect(payload.kind).toBe('text')
@@ -107,7 +107,7 @@ describe('one send per finished turn', () => {
   it('sends two identical answers in one thread as two messages', async () => {
     // Keyed on the text, the second "Yes." would be a no-op or a replayed response and the person would
     // hear one answer to two questions.
-    const test = harness()
+    const test = await harness()
     for (const turnId of ['turn_1', 'turn_2']) {
       await test.sendPath.sendTurnResult({
         botId: 'b1',
@@ -125,7 +125,7 @@ describe('one send per finished turn', () => {
   })
 
   it('refuses to send to a conversation Orca never had', async () => {
-    const test = harness()
+    const test = await harness()
     await expect(
       test.sendPath.sendTurnResult({
         botId: 'b1',
@@ -142,7 +142,7 @@ describe('one send per finished turn', () => {
 
 describe('a send that fails', () => {
   it('leaves the turn’s result recorded and retries it rather than letting it vanish', async () => {
-    const test = harness()
+    const test = await harness()
     server.state.failNextSend = 503
 
     const failed = await test.sendPath.sendTurnResult({
@@ -154,7 +154,7 @@ describe('a send that fails', () => {
       turnId: 'turn_1'
     })
     expect(failed.sent).toBe(false)
-    expect(test.outbox.pendingFor('b1')).toHaveLength(1)
+    expect(await test.outbox.pendingFor('b1')).toHaveLength(1)
     expect(server.state.sent).toEqual([])
 
     const retried = await test.sendPath.retryPending('b1', credential)
@@ -162,11 +162,11 @@ describe('a send that fails', () => {
     expect(server.state.sent).toMatchObject([
       { conversationId: 'conv_1', text: 'the build is green', idempotencyKey: expect.any(String) }
     ])
-    expect(test.outbox.pendingFor('b1')).toEqual([])
+    expect(await test.outbox.pendingFor('b1')).toEqual([])
   })
 
   it('retries with the same idempotency key, so a send that may have landed is not doubled', async () => {
-    const test = harness()
+    const test = await harness()
     server.state.failNextSend = 500
     await test.sendPath.sendTurnResult({
       botId: 'b1',
@@ -176,7 +176,7 @@ describe('a send that fails', () => {
       text: 'the build is green',
       turnId: 'turn_1'
     })
-    const pendingKey = test.outbox.pendingFor('b1')[0]?.id
+    const pendingKey = (await test.outbox.pendingFor('b1'))[0]?.id
     await test.sendPath.retryPending('b1', credential)
 
     expect(server.state.sent[0]?.idempotencyKey).toBe(`photon-send-${pendingKey}`)

@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { PhotonApi } from './photon-api'
-import { PhotonProvisioner, photonCreateKey } from './photon-provisioning'
+import { PhotonProvisioner } from './photon-provisioning'
+import { photonCreateKey } from './photon-provisioning-keys'
 import { PhotonStore } from './photon-store'
 import { PhotonTeardown } from './photon-teardown'
 import { startFakePhotonServer, type FakePhotonServer } from './photon-fake-server.test-fixture'
@@ -52,7 +53,7 @@ describe('provisioning', () => {
       completedThrough: 'assignment'
     })
     expect(outcome.record.phoneNumber).toBeTruthy()
-    expect(store.projectKey('b1')?.secret).toBeTruthy()
+    expect((await store.projectKey('b1'))?.secret).toBeTruthy()
     expect(server.state.projects.size).toBe(1)
   })
 
@@ -93,7 +94,7 @@ describe('provisioning', () => {
     ).rejects.toThrow()
 
     // The project id was persisted before the failure, so the retry does not make a second project.
-    expect(store.bot('b1')?.completedThrough).toBe('project')
+    expect((await store.bot('b1'))?.completedThrough).toBe('project')
     const resumed = await provisioner(store).provision({
       botId: 'b1',
       botName: 'Scout',
@@ -103,7 +104,7 @@ describe('provisioning', () => {
 
     expect(server.state.projects.size).toBe(1)
     expect(resumed.record.completedThrough).toBe('assignment')
-    expect(store.projectKey('b1')?.secret).toBeTruthy()
+    expect((await store.projectKey('b1'))?.secret).toBeTruthy()
   })
 
   it('resumes after the key was minted but the number was refused', async () => {
@@ -119,8 +120,8 @@ describe('provisioning', () => {
       })
     ).rejects.toThrow()
 
-    expect(store.bot('b1')?.completedThrough).toBe('key')
-    expect(store.projectKey('b1')?.secret).toBeTruthy()
+    expect((await store.bot('b1'))?.completedThrough).toBe('key')
+    expect((await store.projectKey('b1'))?.secret).toBeTruthy()
 
     const resumed = await provisioner(store).provision({
       botId: 'b1',
@@ -149,7 +150,7 @@ describe('the reconciler', () => {
       account: { organizationId: 'org_1', credential: account }
     })
     // Simulate a crash between the assignment succeeding upstream and the record being written.
-    store.putBot({ ...provisioned.record, assignments: [], completedThrough: 'key' })
+    await store.putBot({ ...provisioned.record, assignments: [], completedThrough: 'key' })
 
     const outcome = await provisioner(store).reconcile({
       botId: 'b1',
@@ -172,7 +173,7 @@ describe('the reconciler', () => {
       handle: '+15551230000',
       account: { organizationId: 'org_1', credential: account }
     })
-    store.putBot({ ...provisioned.record, slug: 'orca-bot-stale' })
+    await store.putBot({ ...provisioned.record, slug: 'orca-bot-stale' })
 
     const outcome = await provisioner(store).reconcile({
       botId: 'b1',
@@ -186,7 +187,7 @@ describe('the reconciler', () => {
 
   it('says so instead of pretending when the project is gone upstream', async () => {
     const store = new PhotonStore(userDataPath)
-    store.putBot({
+    await store.putBot({
       botId: 'b1',
       projectId: 'pho_prj_gone',
       slug: 'orca-bot-gone',
@@ -221,7 +222,7 @@ describe('teardown', () => {
       handle: '+15551230000',
       account: { organizationId: 'org_1', credential: account }
     })
-    const projectId = store.bot('b1')?.projectId
+    const projectId = (await store.bot('b1'))?.projectId
     if (!projectId) {
       throw new Error('provisioning wrote no project id')
     }
@@ -241,8 +242,8 @@ describe('teardown', () => {
     expect(server.state.assignments.size).toBe(0)
     // A tombstone rather than nothing: `deleteProject` throws "No Photon project is recorded" for a bot
     // whose record is gone, which made the separately confirmed cleanup unreachable.
-    expect(store.bot('b1')).toMatchObject({ released: true, projectId, assignments: [] })
-    expect(store.projectCredential('b1')).toBeNull()
+    expect(await store.bot('b1')).toMatchObject({ released: true, projectId, assignments: [] })
+    expect(await store.projectCredential('b1')).toBeNull()
   })
 
   it('does not revoke the key while a number is still unreleased, so a retry can authenticate', async () => {
@@ -256,8 +257,8 @@ describe('teardown', () => {
       sleep: async () => {}
     })
     // The number release is what fails; a 500 on that DELETE is the shape of a provider hiccup.
-    const assignmentId = store.bot('b1')?.assignments[0]?.assignmentId
-    const projectId = store.bot('b1')?.projectId
+    const assignmentId = (await store.bot('b1'))?.assignments[0]?.assignmentId
+    const projectId = (await store.bot('b1'))?.projectId
     server.injectRaw(
       'DELETE',
       `/projects/${projectId}/platforms/imessage/assignments/${assignmentId}`,
@@ -270,7 +271,7 @@ describe('teardown', () => {
     expect(outcome.problems.join(' ')).toMatch(/could not release/)
     expect(outcome.revokedKey).toBe(false)
     expect(server.state.keys.size).toBe(1)
-    expect(store.bot('b1')?.released).not.toBe(true)
+    expect((await store.bot('b1'))?.released).not.toBe(true)
   })
 
   it('refuses a project deletion whose confirmation names a different slug', async () => {
@@ -296,7 +297,7 @@ describe('teardown', () => {
     expect(outcome.terminal).toBe(false)
     expect(outcome.message).toMatch(/still closing/)
     // Not success, so the record is kept rather than forgotten.
-    expect(store.bot('b1')).not.toBeNull()
+    expect(await store.bot('b1')).not.toBeNull()
   })
 
   it('polls the closure to a terminal state and only then forgets the record', async () => {
@@ -312,6 +313,6 @@ describe('teardown', () => {
     expect(outcome.state).toBe('closed')
     expect(outcome.terminal).toBe(true)
     expect(outcome.message).toMatch(/never be reused/)
-    expect(store.bot('b1')).toBeNull()
+    expect(await store.bot('b1')).toBeNull()
   })
 })

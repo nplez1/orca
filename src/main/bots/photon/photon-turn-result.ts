@@ -47,6 +47,6 @@ export function photonConversationOfChat(
   threads: PhotonThreadMap,
   botId: string,
   chatId: string
-): string | null {
+): Promise<string | null> {
   return threads.conversationFor(botId, chatId)
 }

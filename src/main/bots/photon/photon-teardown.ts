@@ -61,7 +61,7 @@ export class PhotonTeardown {
     account: PhotonCredential
   }): Promise<PhotonReleaseOutcome> {
     const { api, store } = this.deps
-    const record = store.bot(input.botId)
+    const record = await store.bot(input.botId)
     if (!record) {
       return {
         botId: input.botId,
@@ -71,7 +71,7 @@ export class PhotonTeardown {
         problems: ['no record to release']
       }
     }
-    const credential = store.projectCredential(input.botId) ?? input.account
+    const credential = (await store.projectCredential(input.botId)) ?? input.account
     const problems: string[] = []
     const released: string[] = []
     for (const assignment of record.assignments) {
@@ -106,7 +106,7 @@ export class PhotonTeardown {
     if (revokedKey || problems.length === 0) {
       // The numbers and the key are gone; the record stays so the project can still be deleted, which
       // is the only thing left that needs the slug. `forgetBot` happens when the project is closed.
-      store.putBot({
+      await store.putBot({
         ...record,
         released: true,
         releasedAt: Date.now(),
@@ -114,7 +114,7 @@ export class PhotonTeardown {
         ...(revokedKey ? { keyId: undefined } : {})
       })
       if (revokedKey) {
-        store.forgetProjectKey(input.botId)
+        await store.forgetProjectKey(input.botId)
       }
     }
     return { botId: input.botId, released, revokedKey, projectKept: true, problems }
@@ -132,7 +132,7 @@ export class PhotonTeardown {
     idempotencyKey?: string
   }): Promise<PhotonProjectDeletionOutcome> {
     const { api, store } = this.deps
-    const record = store.bot(input.botId)
+    const record = await store.bot(input.botId)
     if (!record) {
       throw new Error(`No Photon project is recorded for bot ${input.botId}.`)
     }
@@ -148,7 +148,7 @@ export class PhotonTeardown {
     )
     const closure = await this.awaitClosure(input.account, record.projectId)
     if (closure.state === 'closed') {
-      store.forgetBot(input.botId)
+      await store.forgetBot(input.botId)
     }
     return {
       botId: input.botId,

@@ -25,12 +25,12 @@ export type PhotonInboundDeps = {
   threads: PhotonThreadMap
   /** The bot's people by handle. Only an assigned handle reaches the stream, so this is the allowlist
    *  as the provider holds it rather than a second ACL Orca keeps in sync. */
-  people: (botId: string) => Map<string, PhotonPerson>
+  people: (botId: string) => Promise<Map<string, PhotonPerson>>
   /** Whether the bot is paused, in which case its mail waits rather than starting a turn. */
   paused?: (botId: string) => boolean
   /** Records that a sender Orca has no assignment for reached the stream, which means this computer's
    *  mirror of the provider's allowlist is stale rather than that the sender is a stranger. */
-  noteUnknownSender?: (botId: string) => void
+  noteUnknownSender?: (botId: string) => void | Promise<void>
   /** Starts a conversation the message opens; resolves the chat that will answer it. */
   startConversation: (input: {
     botId: string
@@ -100,7 +100,7 @@ export class PhotonInbound {
    */
   async recover(input: { botId: string; projectId: string }): Promise<PhotonInboundOutcome[]> {
     const outcomes: PhotonInboundOutcome[] = []
-    for (const entry of this.deps.inbox.unhandled(input.projectId)) {
+    for (const entry of await this.deps.inbox.unhandled(input.projectId)) {
       const seq = entry.seq
       if (seq === undefined) {
         this.log(
@@ -146,15 +146,15 @@ export class PhotonInbound {
     // A duplicate delivery needs no guard of its own: this chain serialises messages, so a repeat always
     // arrives after the first finished, and `claim` finds its `handledAt` and skips it. A second belt
     // here would be a branch nothing can reach.
-    const claim = inbox.claim(input.projectId, input.message, input.seq)
+    const claim = await inbox.claim(input.projectId, input.message, input.seq)
     if (claim.action === 'skip') {
       // Already Orca's, already dispatched. Moving the cursor is all that is left, and it is safe
       // because the message is durably in the inbox.
-      this.advance(input, claim.entry.messageId)
+      await this.advance(input, claim.entry.messageId)
       return { kind: 'replayed', messageId: claim.entry.messageId }
     }
 
-    const person = this.personFor(input.botId, input.message)
+    const person = await this.personFor(input.botId, input.message)
     if (!person) {
       // Photon only delivers senders its own assignment list holds, so "unknown" means this computer's
       // mirror is stale — usually an assignment that was made upstream and never persisted here. It is
@@ -164,9 +164,9 @@ export class PhotonInbound {
         '[photon] ignoring a message from a handle this bot has no assignment for; its mirror is stale',
         photonHandleTail(input.message.sender.handle)
       )
-      this.deps.noteUnknownSender?.(input.botId)
-      inbox.markHandled(input.projectId, messageId)
-      this.advance(input, messageId)
+      await this.deps.noteUnknownSender?.(input.botId)
+      await inbox.markHandled(input.projectId, messageId)
+      await this.advance(input, messageId)
       return { kind: 'ignored', messageId, reason: 'unknown-handle' }
     }
 
@@ -178,7 +178,7 @@ export class PhotonInbound {
     }
 
     {
-      const known = threads.chatIdFor(input.botId, input.message.conversationId)
+      const known = await threads.chatIdFor(input.botId, input.message.conversationId)
       if (known) {
         await this.deps.sendToChat({
           botId: input.botId,
@@ -186,8 +186,8 @@ export class PhotonInbound {
           text: input.message.text,
           person
         })
-        inbox.markHandled(input.projectId, messageId)
-        this.advance(input, messageId)
+        await inbox.markHandled(input.projectId, messageId)
+        await this.advance(input, messageId)
         return { kind: 'ran', messageId, chatId: known, continued: true }
       }
 
@@ -197,20 +197,23 @@ export class PhotonInbound {
         person,
         title: photonConversationTitle(input.message)
       })
-      threads.bind(input.botId, input.message.conversationId, {
+      await threads.bind(input.botId, input.message.conversationId, {
         chatId: started.chatId,
         handle: normalisePhotonHandle(input.message.sender.handle)
       })
-      inbox.markHandled(input.projectId, messageId)
-      this.advance(input, messageId)
+      await inbox.markHandled(input.projectId, messageId)
+      await this.advance(input, messageId)
       return { kind: 'ran', messageId, chatId: started.chatId, continued: false }
     }
   }
 
   /** The cursor moves only with the inbox entry as evidence, so a caller that never wrote the message
    *  gets a refusal instead of a lost delivery. */
-  private advance(input: { projectId: string; seq: number }, messageId: string): void {
-    const result = this.deps.cursors.advance(input.projectId, input.seq, {
+  private async advance(
+    input: { projectId: string; seq: number },
+    messageId: string
+  ): Promise<void> {
+    const result = await this.deps.cursors.advance(input.projectId, input.seq, {
       inboxHas: (id) => this.deps.inbox.has(input.projectId, id),
       messageId,
       unhandledAtOrBelow: (seq) =>
@@ -232,8 +235,11 @@ export class PhotonInbound {
     }
   }
 
-  private personFor(botId: string, message: PhotonInboundMessage): BotRequestPerson | null {
-    const people = this.deps.people(botId)
+  private async personFor(
+    botId: string,
+    message: PhotonInboundMessage
+  ): Promise<BotRequestPerson | null> {
+    const people = await this.deps.people(botId)
     const found = people.get(normalisePhotonHandle(message.sender.handle))
     if (!found) {
       return null

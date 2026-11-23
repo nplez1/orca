@@ -14,6 +14,27 @@ export type Call = {
   person: BotRequestPerson
 }
 
+/** A gate the harness holds a dispatch at, and the moment it arrived there: ordering assertions wait on
+ *  `began`, never on a timer. */
+export function startGate(): {
+  begin: () => Promise<void>
+  release: () => void
+  began: Promise<void>
+} {
+  let release = (): void => {}
+  let began = (): void => {}
+  const held = new Promise<void>((resolve) => (release = resolve))
+  const started = new Promise<void>((resolve) => (began = resolve))
+  return {
+    begin: () => {
+      began()
+      return held
+    },
+    release: () => release(),
+    began: started
+  }
+}
+
 export type HarnessOptions = {
   people?: Map<string, PhotonPerson>
   failStart?: boolean
@@ -35,9 +56,12 @@ export function inboundHarness(userDataPath: string, options: HarnessOptions = {
     inbox,
     cursors,
     threads,
-    people: () => options.people ?? new Map([['+15551230000', { name: 'Sam', role: 'owner' }]]),
+    people: async () =>
+      options.people ?? new Map([['+15551230000', { name: 'Sam', role: 'owner' }]]),
     paused: () => options.paused === true,
-    noteUnknownSender: (botId) => unknownSenders.push(botId),
+    noteUnknownSender: (botId) => {
+      unknownSenders.push(botId)
+    },
     startConversation: async ({ text, person }) => {
       if (options.holdStart) {
         await options.holdStart()

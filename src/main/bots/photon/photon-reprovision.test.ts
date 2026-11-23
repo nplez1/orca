@@ -43,7 +43,7 @@ describe('what a re-run must not erase', () => {
       handle: '+15551230000',
       account: { organizationId: 'org_1', credential: account }
     })
-    const record = store.bot('b1')
+    const record = await store.bot('b1')
     if (!record) {
       throw new Error('no record')
     }
@@ -55,7 +55,7 @@ describe('what a re-run must not erase', () => {
       handle: '+15559990000',
       credential: { kind: 'project', key: 'pho_sk_1' }
     })
-    store.putBot({
+    await store.putBot({
       ...record,
       assignments: [
         ...record.assignments,
@@ -135,7 +135,7 @@ describe('what a re-run must not erase', () => {
     })
 
     // Comparing the typed form against the returned one made the owner a member.
-    expect(store.bot('b1')?.ownerHandle).toBe('+15551234567')
+    expect((await store.bot('b1'))?.ownerHandle).toBe('+15551234567')
   })
 })
 
@@ -155,7 +155,7 @@ describe('the reconciler reading the provider back', () => {
       handle: '+15559990000',
       idempotencyKey: 'extra-assignment'
     })
-    store.putBot({ ...provisionedBot.record, assignments: [] })
+    await store.putBot({ ...provisionedBot.record, assignments: [] })
 
     const outcome = await provisioner(store).reconcile({
       botId: 'b1',
@@ -174,8 +174,8 @@ describe('the reconciler reading the provider back', () => {
       handle: '+15551230000',
       account: { organizationId: 'org_1', credential: account }
     })
-    store.forgetProjectKey('b1')
-    expect(store.projectCredential('b1')).toBeNull()
+    await store.forgetProjectKey('b1')
+    expect(await store.projectCredential('b1')).toBeNull()
 
     const outcome = await provisioner(store).reconcile({
       botId: 'b1',
@@ -183,14 +183,14 @@ describe('the reconciler reading the provider back', () => {
     })
 
     // The key cannot be read back, so a note alone left the bot unable to hear or answer.
-    expect(store.projectCredential('b1')).not.toBeNull()
+    expect(await store.projectCredential('b1')).not.toBeNull()
     expect(outcome.notes.join(' ')).toMatch(/minted a replacement/)
     expect(outcome.record?.keyGeneration).toBe(provisionedBot.record.keyGeneration + 1)
   })
 
   it('does not claim a bot with a project and a key is complete when no number exists', async () => {
     const store = new PhotonStore(userDataPath)
-    store.putBot({
+    await store.putBot({
       botId: 'b1',
       projectId: 'pho_prj_none',
       slug: 'orca-bot-none',

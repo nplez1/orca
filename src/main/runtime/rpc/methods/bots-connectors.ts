@@ -65,7 +65,7 @@ export const BOT_CONNECTORS_METHOD = defineMethod({
                 ? places.message
                 : 'Orca Cloud could not list them.'
         }
-    const photon = photonServiceOf(runtime)?.statusFor(bot.id)
+    const photon = await photonServiceOf(runtime)?.statusFor(bot.id)
     return {
       bot: bot.name,
       services: botConnectorServices(

@@ -68,12 +68,12 @@ export class PhotonService {
   /** Connect once: the account service key, its organization, and the owner's choice about keeping it.
    *  The key works for this session either way — a toggle that had to be on before anything ran would
    *  make "off" mean "broken". */
-  connect(input: {
+  async connect(input: {
     organizationId: string
     accountKey: string
     storesKey: boolean
-  }): PhotonConnectResult {
-    this.deps.store.saveAccount(
+  }): Promise<PhotonConnectResult> {
+    await this.deps.store.saveAccount(
       { organizationId: input.organizationId, storesKey: input.storesKey },
       input.accountKey
     )
@@ -104,7 +104,7 @@ export class PhotonService {
     if (input.accountKey) {
       this.holdAccountKey(input.accountKey)
     }
-    const account = requirePhotonAccount(this.deps.store)
+    const account = await requirePhotonAccount(this.deps.store)
     const outcome = await this.deps.provisioner.provision({
       botId: input.botId,
       botName: input.botName,
@@ -117,8 +117,8 @@ export class PhotonService {
 
   /** Add someone by creating their assignment — the same call that gives them the number. */
   async addMember(input: { botId: string; handle: string }): Promise<PhotonMemberResult> {
-    const record = requirePhotonLiveRecord(this.deps.store, input.botId)
-    const credential = requirePhotonProjectCredential(this.deps.store, input.botId)
+    const record = await requirePhotonLiveRecord(this.deps.store, input.botId)
+    const credential = await requirePhotonProjectCredential(this.deps.store, input.botId)
     const assignment = await this.deps.provisioner.assign({
       botId: input.botId,
       projectId: record.projectId,
@@ -135,7 +135,7 @@ export class PhotonService {
         phoneNumber: assignment.phoneNumber
       }
     ]
-    this.deps.store.putBot({ ...record, assignments })
+    await this.deps.store.putBot({ ...record, assignments })
     return {
       handle: assignment.handle,
       phoneNumber: assignment.phoneNumber,
@@ -145,7 +145,7 @@ export class PhotonService {
 
   /** Remove someone by releasing their number. Reversible: adding them again gives it back. */
   async releaseMember(input: { botId: string; handle: string }): Promise<{ released: boolean }> {
-    const record = requirePhotonLiveRecord(this.deps.store, input.botId)
+    const record = await requirePhotonLiveRecord(this.deps.store, input.botId)
     const wanted = normalisePhotonHandle(input.handle)
     const assignment = record.assignments.find(
       (entry) => normalisePhotonHandle(entry.handle) === wanted
@@ -154,8 +154,8 @@ export class PhotonService {
       return { released: false }
     }
     const credential =
-      this.deps.store.projectCredential(input.botId) ??
-      requirePhotonAccount(this.deps.store).credential
+      (await this.deps.store.projectCredential(input.botId)) ??
+      (await requirePhotonAccount(this.deps.store)).credential
     try {
       await this.deps.api.releaseAssignment(credential, record.projectId, assignment.assignmentId)
     } catch (error) {
@@ -163,7 +163,7 @@ export class PhotonService {
         throw error
       }
     }
-    this.deps.store.putBot({
+    await this.deps.store.putBot({
       ...record,
       assignments: record.assignments.filter(
         (entry) => entry.assignmentId !== assignment.assignmentId
@@ -176,14 +176,14 @@ export class PhotonService {
   async deleteBot(botId: string): Promise<PhotonReleaseOutcome> {
     // Recorded as released before anything can fail, so a half-finished teardown is retried by the
     // health tick instead of leaving a live stream on a bot that no longer exists.
-    const record = this.deps.store.bot(botId)
+    const record = await this.deps.store.bot(botId)
     if (record && !record.released) {
-      this.deps.store.putBot({ ...record, released: true, releasedAt: Date.now() })
+      await this.deps.store.putBot({ ...record, released: true, releasedAt: Date.now() })
     }
     this.stopStream(botId)
     return this.deps.teardown.releaseBot({
       botId,
-      account: requirePhotonAccount(this.deps.store).credential
+      account: (await requirePhotonAccount(this.deps.store)).credential
     })
   }
 
@@ -194,28 +194,28 @@ export class PhotonService {
   }): Promise<PhotonProjectDeletionOutcome> {
     // Validated before the stream is touched: a typo in the slug or a missing account key must not
     // leave the bot deaf until the next restart.
-    const record = requirePhotonRecord(this.deps.store, input.botId)
+    const record = await requirePhotonRecord(this.deps.store, input.botId)
     if (input.confirmSlug !== record.slug) {
       throw new Error(
         `Refusing to delete project ${record.projectId}: the confirmation names "${input.confirmSlug}" but its slug is "${record.slug}", and the slug can never be reused.`
       )
     }
-    const account = requirePhotonAccount(this.deps.store).credential
+    const account = (await requirePhotonAccount(this.deps.store)).credential
     this.stopStream(input.botId)
     const outcome = await this.deps.teardown.deleteProject({
       botId: input.botId,
       account,
       confirmSlug: input.confirmSlug
     })
-    this.deps.outbox.forget(input.botId)
+    await this.deps.outbox.forget(input.botId)
     return outcome
   }
 
   /** Reads a half-finished saga back and finishes the record, which is what a crash leaves behind. Also
    *  the repair for a bot whose mirror of the provider's allowlist went stale. */
   async reconcile(botId: string): Promise<{ repaired: boolean; notes: string[] }> {
-    const account = requirePhotonAccount(this.deps.store)
-    const ownerHandle = this.deps.store.bot(botId)?.ownerHandle
+    const account = await requirePhotonAccount(this.deps.store)
+    const ownerHandle = (await this.deps.store.bot(botId))?.ownerHandle
     const outcome = await this.deps.provisioner.reconcile({
       botId,
       account,
@@ -225,8 +225,8 @@ export class PhotonService {
   }
 
   /** The bot's people, derived from its assignment list so there is no second ACL to keep in step. */
-  people(botId: string): Map<string, PhotonPerson> {
-    const record = this.deps.store.bot(botId)
+  async people(botId: string): Promise<Map<string, PhotonPerson>> {
+    const record = await this.deps.store.bot(botId)
     const people = new Map<string, PhotonPerson>()
     for (const assignment of record?.assignments ?? []) {
       const handle = normalisePhotonHandle(assignment.handle)
@@ -241,8 +241,10 @@ export class PhotonService {
   /** What `orca bot connectors` says about one bot's channel, or null when the channel has no complete
    *  number for it. A bot provisioned only through its project and key is not connected: it has no
    *  number, so nobody can text it. */
-  statusFor(botId: string): { phoneNumber: string | null; handles: string[] } | null {
-    const record = this.deps.store.bot(botId)
+  async statusFor(
+    botId: string
+  ): Promise<{ phoneNumber: string | null; handles: string[] } | null> {
+    const record = await this.deps.store.bot(botId)
     if (!record || record.released || record.completedThrough !== 'assignment') {
       return null
     }
@@ -253,15 +255,15 @@ export class PhotonService {
   }
 
   /** Whether this bot has a channel at all, which is what a bot delete checks before releasing one. */
-  hasChannel(botId: string): boolean {
-    const record = this.deps.store.bot(botId)
+  async hasChannel(botId: string): Promise<boolean> {
+    const record = await this.deps.store.bot(botId)
     return record !== null && (!record.released || record.assignments.length > 0)
   }
 
   /** Notes that a sender with no assignment here reached the stream: the mirror of the provider's
    *  allowlist is stale, which `bots.photon.reconcile` repairs. */
-  noteUnknownSender(botId: string): void {
-    this.deps.store.noteUnknownSender(botId)
+  noteUnknownSender(botId: string): Promise<void> {
+    return this.deps.store.noteUnknownSender(botId)
   }
 
   /** Whether this chat is one the channel answers, which is the check a turn end makes before reading
@@ -272,14 +274,13 @@ export class PhotonService {
 
   /** Follows every bot that has a key and has not been released, and replays what Orca never dealt with. */
   startStreams(): void {
-    this.deps.streams.startAll()
-    this.replayPending()
+    void this.deps.streams.startAll().then(() => this.replayPending())
   }
 
   /** Replays what Orca wrote down and never dealt with, for every live bot. This is the crash recovery
    *  the inbox exists for, and it runs at startup because that is when a crash is discovered. */
-  replayPending(): void {
-    for (const record of this.deps.store.bots()) {
+  async replayPending(): Promise<void> {
+    for (const record of await this.deps.store.bots()) {
       if (!record.released) {
         this.replay(record.botId, record.projectId)
       }
@@ -287,14 +288,19 @@ export class PhotonService {
   }
 
   /** Replays one bot's held messages, for a bot that has just been resumed from a pause. */
-  releaseHeld(botId: string): void {
-    const record = this.deps.store.bot(botId)
+  async releaseHeld(botId: string): Promise<void> {
+    const record = await this.deps.store.bot(botId)
     if (record && !record.released) {
       this.replay(botId, record.projectId)
     }
   }
 
-  startStream(botId: string): PhotonStreamStatus | null {
+  /** Fire-and-forget on purpose: a caller that provisioned a bot should not wait on its socket. */
+  startStream(botId: string): void {
+    void this.deps.streams.start(botId)
+  }
+
+  async startStreamNow(botId: string): Promise<PhotonStreamStatus | null> {
     return this.deps.streams.start(botId)
   }
 
@@ -311,8 +317,8 @@ export class PhotonService {
   }
 
   /** The health tick: restarts a deaf stream and retries a queued send. */
-  healthTick(): void {
-    this.deps.streams.tick()
+  healthTick(): Promise<void> {
+    return this.deps.streams.tick()
   }
 
   private replay(botId: string, projectId: string): void {
@@ -328,12 +334,12 @@ export class PhotonService {
     text: string
     turnId: string
   }): Promise<PhotonSendOutcome> {
-    const record = requirePhotonLiveRecord(this.deps.store, input.botId)
+    const record = await requirePhotonLiveRecord(this.deps.store, input.botId)
     return this.deps.sendPath.sendTurnResult({
       botId: input.botId,
       projectId: record.projectId,
       conversationId: input.conversationId,
-      credential: requirePhotonProjectCredential(this.deps.store, input.botId),
+      credential: await requirePhotonProjectCredential(this.deps.store, input.botId),
       text: input.text,
       turnId: input.turnId
     })
@@ -347,7 +353,7 @@ export class PhotonService {
     turnId: string
     rows: Parameters<typeof photonTurnResultText>[0]
   }): Promise<PhotonSendOutcome | null> {
-    const conversationId = this.deps.threads.conversationFor(input.botId, input.chatId)
+    const conversationId = await this.deps.threads.conversationFor(input.botId, input.chatId)
     if (!conversationId) {
       return null
     }
@@ -367,7 +373,7 @@ export class PhotonService {
   async retryPending(botId: string): Promise<PhotonSendOutcome[]> {
     return this.deps.sendPath.retryPending(
       botId,
-      requirePhotonProjectCredential(this.deps.store, botId)
+      await requirePhotonProjectCredential(this.deps.store, botId)
     )
   }
 }

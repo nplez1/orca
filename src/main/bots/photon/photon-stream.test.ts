@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { PhotonIoFactory, PhotonSocket } from './photon-stream'
 import { PhotonStream } from './photon-stream'
 import { PhotonStreamFrameSchema } from './photon-contract'
@@ -149,27 +149,42 @@ describe('the stream', () => {
   })
 
   it('delivers frames in order even when an early one is slow', async () => {
-    // Frames share one cursor, so a later frame finishing first would move it past an earlier one.
+    // Frames share one cursor, so a later frame finishing first would move it past an earlier one. Both
+    // the order and the "47 has not run yet" are asserted on what the handler saw, never on a clock.
     const order: number[] = []
+    let releaseFirst = (): void => {}
+    let firstArrived = (): void => {}
+    let bothSeen = (): void => {}
+    const held = new Promise<void>((resolve) => (releaseFirst = resolve))
+    const began = new Promise<void>((resolve) => (firstArrived = resolve))
+    const done = new Promise<void>((resolve) => (bothSeen = resolve))
     const test = harness({
       onFrame: async (raw) => {
         const seq = PhotonStreamFrameSchema.parse(raw).seq
         if (seq === 41) {
-          await new Promise((resolve) => setTimeout(resolve, 20))
+          firstArrived()
+          await held
         }
         order.push(seq)
+        if (order.length === 2) {
+          bothSeen()
+        }
       }
     })
     test.stream.start()
     test.socket().fire('connect')
     test.socket().fire('message', frame(41))
     test.socket().fire('message', frame(47))
-    await new Promise((resolve) => setTimeout(resolve, 40))
 
+    await began
+    // 47 sits behind 41: nothing of it ran while the first was in hand.
+    expect(order).toEqual([])
+    releaseFirst()
+    await done
     expect(order).toEqual([41, 47])
   })
 
-  it('resumes itself after a handler failure instead of going deaf until restart', () => {
+  it('resumes itself after a handler failure instead of going deaf until restart', async () => {
     let attempts = 0
     const test = harness({
       onFrame: () => {
@@ -181,21 +196,18 @@ describe('the stream', () => {
     test.socket().fire('connect')
     test.socket().fire('message', frame(42))
 
-    return new Promise<void>((resolve) => setTimeout(resolve, 10)).then(() => {
-      expect(test.stream.status()).toMatchObject({
-        state: 'stopped',
-        stoppedBy: 'handler-failure'
-      })
-      // The resume is armed, not abandoned: the timer it scheduled starts a fresh socket.
-      const resume = test.timers.at(-1)
-      expect(resume?.cancelled).toBe(false)
-      resume?.callback()
+    // The stop is what the failure produced, waited on rather than slept through.
+    await vi.waitFor(() => expect(test.stream.status().state).toBe('stopped'))
+    expect(test.stream.status()).toMatchObject({ state: 'stopped', stoppedBy: 'handler-failure' })
+    // The resume is armed, not abandoned: the timer it scheduled starts a fresh socket.
+    const resume = test.timers.at(-1)
+    expect(resume?.cancelled).toBe(false)
+    resume?.callback()
 
-      expect(test.sockets).toHaveLength(2)
-      expect(test.stream.status()).toMatchObject({ state: 'connecting', resumes: 1 })
-      expect(test.stream.status().stoppedBy).toBeUndefined()
-      expect(attempts).toBe(1)
-    })
+    expect(test.sockets).toHaveLength(2)
+    expect(test.stream.status()).toMatchObject({ state: 'connecting', resumes: 1 })
+    expect(test.stream.status().stoppedBy).toBeUndefined()
+    expect(attempts).toBe(1)
   })
 
   it('reports a refused handshake rather than sitting in a silent connecting state', () => {
@@ -264,9 +276,10 @@ describe('the stream', () => {
     test.stream.start()
     test.socket().fire('connect')
     test.socket().fire('message', { seq: 'not a number' })
-    await new Promise((resolve) => setTimeout(resolve, 0))
 
-    expect(test.stream.status()).toMatchObject({ state: 'stopped', stoppedBy: 'contract' })
+    await vi.waitFor(() =>
+      expect(test.stream.status()).toMatchObject({ state: 'stopped', stoppedBy: 'contract' })
+    )
     expect(test.frames).toEqual([])
   })
 })

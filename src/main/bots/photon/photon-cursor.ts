@@ -2,12 +2,9 @@
 // the crash guard: it advances only once the message it names is durably in Orca's inbox, which is what
 // keeps Photon from replaying work Orca already owns. Cursors are opaque non-negative integers that may
 // contain gaps, so nothing here does arithmetic on one — a resume passes the stored value as it is.
-import { mkdirSync, readFileSync } from 'node:fs'
-import { dirname } from 'node:path'
 import { z } from 'zod'
-import { writeDurableSecureJsonFile } from '../../../shared/secure-storage/secure-file'
-import { isMissingFileError } from '../../runtime/rpc/server/pairing/device-registry-corruption'
 import { PHOTON_CONSUMER_PURPOSE, PHOTON_STREAM_START_NEW } from './photon-contract'
+import { readPhotonJson, writePhotonJson } from './photon-files'
 import type { PhotonStore } from './photon-store'
 
 const CursorFileSchema = z.object({
@@ -26,7 +23,7 @@ export class PhotonCursorUnreadableError extends Error {
   }
 }
 
-/** Why a cursor did not move; both are ordinary, and neither is a failure. */
+/** Why a cursor did not move; all four are ordinary, and none is a failure. */
 export type PhotonCursorAdvance =
   | { advanced: true; seq: number }
   /** The message the cursor would cover is not in Orca's inbox yet, so advancing would lose it. */
@@ -45,25 +42,16 @@ export class PhotonCursorStore {
 
   /** The cursor to resume from. Zero is a first-ever start, which Photon reads as new events only —
    *  deliberately skipping history rather than replaying an archive nobody has bounded. */
-  read(projectId: string, purpose = PHOTON_CONSUMER_PURPOSE): number {
+  async read(projectId: string, purpose = PHOTON_CONSUMER_PURPOSE): Promise<number> {
     const path = this.store.cursorPath(projectId, purpose)
-    let text: string
-    try {
-      text = readFileSync(path, 'utf-8')
-    } catch (error) {
-      if (!isMissingFileError(error)) {
-        // A file that is there and unreadable is not a first start.
-        throw new PhotonCursorUnreadableError(path)
-      }
+    const read = await readPhotonJson(path, 'cursor')
+    if (read.kind === 'missing') {
       return PHOTON_STREAM_START_NEW
     }
-    let raw: unknown
-    try {
-      raw = JSON.parse(text)
-    } catch {
+    if (read.kind === 'unreadable') {
       throw new PhotonCursorUnreadableError(path)
     }
-    const parsed = CursorFileSchema.safeParse(raw)
+    const parsed = CursorFileSchema.safeParse(read.value)
     if (!parsed.success) {
       throw new PhotonCursorUnreadableError(path)
     }
@@ -72,34 +60,36 @@ export class PhotonCursorStore {
 
   /**
    * Advances the cursor to `seq`, but only when `evidence` says the message that seq covers is already
-   * in Orca's inbox. A caller that has not written the message yet gets `not-in-inbox` and the cursor
-   * stays put, which is the difference between a replay and a lost message.
+   * in Orca's inbox and nothing before it is still waiting. A caller that has not written the message yet
+   * gets `not-in-inbox` and the cursor stays put, which is the difference between a replay and a lost
+   * message.
    */
-  advance(
+  async advance(
     projectId: string,
     seq: number,
     evidence: {
-      inboxHas: (messageId: string) => boolean
+      inboxHas: (messageId: string) => Promise<boolean>
       messageId: string
       /** Whether an earlier message is still waiting; the cursor may not pass one. */
-      unhandledAtOrBelow?: (seq: number) => string | null
+      unhandledAtOrBelow?: (seq: number) => Promise<string | null>
     },
     purpose = PHOTON_CONSUMER_PURPOSE
-  ): PhotonCursorAdvance {
-    if (!evidence.inboxHas(evidence.messageId)) {
+  ): Promise<PhotonCursorAdvance> {
+    if (!(await evidence.inboxHas(evidence.messageId))) {
       return { advanced: false, reason: 'not-in-inbox' }
     }
-    const blocked = evidence.unhandledAtOrBelow?.(seq)
+    const blocked = await evidence.unhandledAtOrBelow?.(seq)
     if (blocked) {
       return { advanced: false, reason: 'blocked-by-unhandled', messageId: blocked }
     }
-    const stored = this.read(projectId, purpose)
+    const stored = await this.read(projectId, purpose)
     if (seq < stored) {
       return { advanced: false, reason: 'behind-stored-cursor', stored }
     }
-    const path = this.store.cursorPath(projectId, purpose)
-    mkdirSync(dirname(path), { recursive: true, mode: 0o700 })
-    writeDurableSecureJsonFile(path, { seq, updatedAt: this.now() })
+    await writePhotonJson(this.store.cursorPath(projectId, purpose), {
+      seq,
+      updatedAt: this.now()
+    })
     return { advanced: true, seq }
   }
 }

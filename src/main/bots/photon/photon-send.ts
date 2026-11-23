@@ -92,11 +92,11 @@ export class PhotonSendPath {
      *  identical answers in one thread are two messages instead of one replayed idempotency key. */
     turnId: string
   }): Promise<PhotonSendOutcome> {
-    if (!this.deps.threads.knows(input.botId, input.conversationId)) {
+    if (!(await this.deps.threads.knows(input.botId, input.conversationId))) {
       throw new PhotonColdStartError(input.conversationId)
     }
     const payload = foldTurnResult(input.text)
-    const entry = this.deps.outbox.enqueue({
+    const entry = await this.deps.outbox.enqueue({
       id: sendId(input.botId, input.conversationId, input.turnId),
       botId: input.botId,
       projectId: input.projectId,
@@ -110,7 +110,7 @@ export class PhotonSendPath {
   /** Retries everything waiting for one bot. A send that lands is forgotten; one that fails is kept. */
   async retryPending(botId: string, credential: PhotonCredential): Promise<PhotonSendOutcome[]> {
     const outcomes: PhotonSendOutcome[] = []
-    for (const entry of this.deps.outbox.pendingFor(botId)) {
+    for (const entry of await this.deps.outbox.pendingFor(botId)) {
       outcomes.push(await this.attempt(entry, credential))
     }
     return outcomes
@@ -130,11 +130,11 @@ export class PhotonSendPath {
         // than arriving twice.
         idempotencyKey: `photon-send-${entry.id}`
       })
-      this.deps.outbox.settle(entry.id)
+      await this.deps.outbox.settle(entry.id)
       return { sent: true, entryId: entry.id, truncated: entry.truncated }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      this.deps.outbox.fail(entry.id, message)
+      await this.deps.outbox.fail(entry.id, message)
       this.log('[photon] could not send a turn result; it is kept for a retry', message)
       return { sent: false, entryId: entry.id, error: message }
     }

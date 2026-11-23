@@ -9,11 +9,16 @@
 // that could itself be lost. The slug is stored, not re-derived, because it is immutable upstream — and
 // a slug that is already taken is looked up and adopted rather than retried forever, because two bots
 // with the same name derive the same slug.
-import { createHash } from 'node:crypto'
 import type { PhotonApi, PhotonCredential } from './photon-api'
 import { PhotonApiError } from './photon-api'
 import { photonSlugForBot } from './photon-contract'
 import { reconcileRecord } from './photon-reconcile'
+import {
+  normalisePhotonHandle as normalise,
+  photonAssignmentKey,
+  photonCreateKey,
+  photonKeyMintKey
+} from './photon-provisioning-keys'
 import type { PhotonStore } from './photon-store'
 import type { PhotonAssignmentRecord, PhotonBotRecord } from './photon-store-schema'
 
@@ -45,30 +50,6 @@ export type PhotonAssignmentResult = {
   phoneNumber: string
 }
 
-/** Stable across restarts, distinct per bot, so a retried create replays instead of making a second
- *  project that consumes capacity and hands out a second number. */
-export function photonCreateKey(botId: string): string {
-  return `photon-create-${botId}`
-}
-
-/** One key per key generation, so each mint is a distinct request: a mint whose response was lost can
- *  never be replayed onto the same key, which is what left an orphan nothing ever revoked. */
-export function photonKeyMintKey(botId: string, generation: number): string {
-  return `photon-key-${botId}-${generation}`
-}
-
-/** One key per bot generation and handle, so re-provisioning cannot replay a released assignment and
- *  show a number that no longer exists. */
-export function photonAssignmentKey(botId: string, generation: number, handle: string): string {
-  const digest = createHash('sha256').update(normalise(handle)).digest('hex').slice(0, 16)
-  return `photon-assign-${botId}-${generation}-${digest}`
-}
-
-function normalise(handle: string): string {
-  const trimmed = handle.trim().toLowerCase()
-  return trimmed.includes('@') ? trimmed : trimmed.replace(/[^0-9+]/g, '')
-}
-
 /** The slug a bot's project is created under, from its stored record when it has one. */
 export function photonSlugFor(input: { botName: string; stored?: PhotonBotRecord | null }): string {
   return input.stored?.slug ?? photonSlugForBot(input.botName)
@@ -87,7 +68,7 @@ export class PhotonProvisioner {
    */
   async provision(input: ProvisionInput): Promise<ProvisionOutcome> {
     const { api, store } = this.deps
-    const existing = store.bot(input.botId)
+    const existing = await store.bot(input.botId)
     if (existing?.released) {
       throw new Error(
         `This bot's Photon channel was released; its project is kept but its numbers are gone. Delete the project first, then create a new channel.`
@@ -121,7 +102,7 @@ export class PhotonProvisioner {
       createdProject = !existing
       // Persist the project id before anything else can fail, so a crash here resumes rather than
       // creating a second project under a slug that would now be taken.
-      store.putBot({
+      await store.putBot({
         botId: input.botId,
         projectId,
         slug: storedSlug,
@@ -138,7 +119,7 @@ export class PhotonProvisioner {
     // Step 2 — the bot's own project key. The secret comes back only here, so a mint whose response
     // was lost cannot be re-read: the repair is a fresh mint in a new generation, and the generation is
     // persisted so the mint's own idempotency key is never reused.
-    const storedKey = store.projectKey(input.botId)
+    const storedKey = await store.projectKey(input.botId)
     let keyId = existing?.keyId
     let keyGeneration = existing?.keyGeneration ?? 0
     if (!storedKey || !keyId) {
@@ -149,7 +130,7 @@ export class PhotonProvisioner {
         name: `orca-bot-${input.botId}`,
         idempotencyKey: photonKeyMintKey(input.botId, keyGeneration)
       })
-      store.putProjectKey(input.botId, { keyId: minted.id, secret: minted.secret })
+      await store.putProjectKey(input.botId, { keyId: minted.id, secret: minted.secret })
       keyId = minted.id
       const previous = existing?.keyId
       if (previous && previous !== minted.id) {
@@ -162,11 +143,11 @@ export class PhotonProvisioner {
         }
       }
     }
-    const afterKey = store.bot(input.botId)
+    const afterKey = await store.bot(input.botId)
     if (!afterKey) {
       throw new Error(`No Photon record was written for bot ${input.botId}.`)
     }
-    store.putBot({
+    await store.putBot({
       ...afterKey,
       keyId,
       keyGeneration,
@@ -183,11 +164,11 @@ export class PhotonProvisioner {
       generation: keyGeneration,
       credential: input.account.credential
     })
-    const beforeAssignment = store.bot(input.botId)
+    const beforeAssignment = await store.bot(input.botId)
     if (!beforeAssignment) {
       throw new Error(`No Photon record was written for bot ${input.botId}.`)
     }
-    const record = store.putBot({
+    const record = await store.putBot({
       ...beforeAssignment,
       keyId,
       keyGeneration,
@@ -215,7 +196,7 @@ export class PhotonProvisioner {
       botId: input.botId,
       projectId: input.projectId,
       handle: input.handle,
-      generation: input.generation ?? this.deps.store.bot(input.botId)?.keyGeneration ?? 0,
+      generation: input.generation ?? (await this.deps.store.bot(input.botId))?.keyGeneration ?? 0,
       credential: input.credential
     })
   }
@@ -251,7 +232,7 @@ export class PhotonProvisioner {
     credential: PhotonCredential
   }): Promise<PhotonAssignmentResult> {
     const { api, store } = this.deps
-    const credential = store.projectCredential(input.botId) ?? input.credential
+    const credential = (await store.projectCredential(input.botId)) ?? input.credential
     const wanted = normalise(input.handle)
     const listed = await api
       .listAssignments(credential, input.projectId)

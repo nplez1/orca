@@ -40,7 +40,7 @@ describe('what the recovery replays', () => {
 
     expect(outcomes.map((outcome) => outcome.kind)).toEqual(['ran'])
     expect(restarted.calls.map((call) => call.text)).toEqual(['is the build green?'])
-    expect(restarted.cursors.read('p1')).toBe(41)
+    expect(await restarted.cursors.read('p1')).toBe(41)
   })
 
   it('replays nothing when everything was handled', async () => {
@@ -64,8 +64,8 @@ describe('a paused bot', () => {
     expect(held).toEqual({ kind: 'held', messageId: 'msg_1' })
     expect(paused.calls).toEqual([])
     // Held, not dropped: no handledAt and no cursor move, so the resume replays it.
-    expect(paused.cursors.read('p1')).toBe(0)
-    expect(paused.inbox.unhandled('p1')).toHaveLength(1)
+    expect(await paused.cursors.read('p1')).toBe(0)
+    expect(await paused.inbox.unhandled('p1')).toHaveLength(1)
 
     const resumed = harness()
     const outcomes = await resumed.inbound.recover({ botId: 'b1', projectId: 'p1' })
@@ -84,7 +84,7 @@ describe('a refused follow-up', () => {
       message: message({ id: 'msg_41', conversationId: 'conv_1' })
     })
     // Pin the conversation to a chat so the second message takes the follow-up path.
-    test.threads.bind('b1', 'conv_2', { chatId: 'chat_1', handle: '+15551230000' })
+    await test.threads.bind('b1', 'conv_2', { chatId: 'chat_1', handle: '+15551230000' })
 
     await expect(
       test.inbound.handle({
@@ -96,8 +96,8 @@ describe('a refused follow-up', () => {
     ).rejects.toThrow('This chat is closed.')
 
     // The refusal is not a delivery: the message stays unhandled for the recovery, not silently acked.
-    expect(test.inbox.read('p1', 'msg_47')?.handledAt).toBeUndefined()
-    expect(test.cursors.read('p1')).toBe(41)
-    expect(test.inbox.unhandled('p1').map((entry) => entry.messageId)).toEqual(['msg_47'])
+    expect((await test.inbox.read('p1', 'msg_47'))?.handledAt).toBeUndefined()
+    expect(await test.cursors.read('p1')).toBe(41)
+    expect((await test.inbox.unhandled('p1')).map((entry) => entry.messageId)).toEqual(['msg_47'])
   })
 })

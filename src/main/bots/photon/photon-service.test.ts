@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Bot } from '../../../shared/bot-types'
 import { botConnectorServices } from '../../../shared/bots/bot-connectors-view'
 import { PhotonApi } from './photon-api'
@@ -66,7 +66,7 @@ function serviceWith(io: PhotonIoFactory) {
     inbox,
     cursors,
     threads,
-    people: () => new Map(),
+    people: async () => new Map(),
     startConversation: async () => ({ chatId: 'chat_1' }),
     sendToChat: async () => {},
     log: () => {}
@@ -84,7 +84,7 @@ function serviceWith(io: PhotonIoFactory) {
     sendPath,
     streams: new PhotonStreams({ store, cursors, inbound, sendPath, io, log: () => {} })
   })
-  return { runtime, store, threads }
+  return { runtime, store, threads, outbox }
 }
 
 const service = () => serviceWith(io)
@@ -97,29 +97,33 @@ describe('the channel', () => {
     ).rejects.toThrow(/not connected/)
   })
 
-  it('keeps the account key only when the owner opts in, and works either way', () => {
+  it('keeps the account key only when the owner opts in, and works either way', async () => {
     const { runtime, store } = service()
     expect(
-      runtime.connect({ organizationId: 'org_1', accountKey: 'pho_ask_1', storesKey: false })
+      await runtime.connect({ organizationId: 'org_1', accountKey: 'pho_ask_1', storesKey: false })
     ).toMatchObject({ stored: false })
     // Nothing was written, and the key still works: "not stored" is not "not connected".
-    expect(store.accountCredential()).toEqual({ kind: 'account', key: 'pho_ask_1' })
-    expect(new PhotonStore(userDataPath).accountCredential()).toBeNull()
+    expect(await store.accountCredential()).toEqual({ kind: 'account', key: 'pho_ask_1' })
+    expect(await new PhotonStore(userDataPath).accountCredential()).toBeNull()
 
-    runtime.connect({ organizationId: 'org_1', accountKey: 'pho_ask_1', storesKey: true })
-    expect(store.accountKey()).toBe('pho_ask_1')
+    await runtime.connect({ organizationId: 'org_1', accountKey: 'pho_ask_1', storesKey: true })
+    expect(await store.accountKey()).toBe('pho_ask_1')
   })
 
   it('creates a bot after a restart on the unstored path, with the key passed to the call', async () => {
     // The blocker: with `storesKey: false` every account-key operation failed, so the default was
     // broken and the toggle was mandatory. The organization is kept; only the key is not.
     const first = service()
-    first.runtime.connect({ organizationId: 'org_1', accountKey: 'pho_ask_1', storesKey: false })
+    await first.runtime.connect({
+      organizationId: 'org_1',
+      accountKey: 'pho_ask_1',
+      storesKey: false
+    })
     await first.runtime.createBot({ botId: 'b0', botName: 'First', handle: '+15551230000' })
 
     // A restart: the session key is gone and the organization is not.
     const restarted = service()
-    expect(restarted.store.accountCredential()).toBeNull()
+    expect(await restarted.store.accountCredential()).toBeNull()
     const created = await restarted.runtime.createBot({
       botId: 'b1',
       botName: 'Scout',
@@ -130,13 +134,16 @@ describe('the channel', () => {
     expect(created.createdProject).toBe(true)
     expect(server.state.projects.size).toBe(2)
     // The pasted key is held for the session and still not written.
-    expect(new PhotonStore(userDataPath).accountKey()).toBeNull()
-    expect(restarted.store.accountCredential()).toEqual({ kind: 'account', key: 'pho_ask_pasted' })
+    expect(await new PhotonStore(userDataPath).accountKey()).toBeNull()
+    expect(await restarted.store.accountCredential()).toEqual({
+      kind: 'account',
+      key: 'pho_ask_pasted'
+    })
   })
 
   it('creates the project once, from the name, and gives the bot a number', async () => {
     const { runtime, store } = service()
-    runtime.connect({ organizationId: 'org_1', accountKey: 'pho_ask_1', storesKey: true })
+    await runtime.connect({ organizationId: 'org_1', accountKey: 'pho_ask_1', storesKey: true })
 
     // The socket factory refuses, so a create that let a stream failure escape would fail here.
     const created = await runtime.createBot({
@@ -146,48 +153,50 @@ describe('the channel', () => {
     })
 
     expect(created.createdProject).toBe(true)
-    expect(store.bot('b1')?.slug).toBe('orca-bot-scout')
+    expect((await store.bot('b1'))?.slug).toBe('orca-bot-scout')
     expect(server.state.projects.size).toBe(1)
-    expect(store.bot('b1')?.phoneNumber).toBeTruthy()
+    expect((await store.bot('b1'))?.phoneNumber).toBeTruthy()
   })
 
   it('adds and releases one person, and the handles are the allowlist', async () => {
     const { runtime } = service()
-    runtime.connect({ organizationId: 'org_1', accountKey: 'pho_ask_1', storesKey: true })
+    await runtime.connect({ organizationId: 'org_1', accountKey: 'pho_ask_1', storesKey: true })
     await runtime.createBot({ botId: 'b1', botName: 'Scout', handle: '+15551230000' })
 
     const added = await runtime.addMember({ botId: 'b1', handle: '+15559990000' })
     expect(added.phoneNumber).toBeTruthy()
-    expect(runtime.people('b1').get('+15559990000')).toMatchObject({ role: 'member' })
-    expect(runtime.people('b1').get('+15551230000')).toMatchObject({ role: 'owner' })
+    expect((await runtime.people('b1')).get('+15559990000')).toMatchObject({ role: 'member' })
+    expect((await runtime.people('b1')).get('+15551230000')).toMatchObject({ role: 'owner' })
 
     await runtime.releaseMember({ botId: 'b1', handle: '+15559990000' })
-    expect(runtime.people('b1').has('+15559990000')).toBe(false)
+    expect((await runtime.people('b1')).has('+15559990000')).toBe(false)
     expect(server.state.assignments.size).toBe(1)
   })
 
   it('tells `orca bot connectors` what the bot answers on and who may text it', async () => {
     const { runtime, store } = service()
-    runtime.connect({ organizationId: 'org_1', accountKey: 'pho_ask_1', storesKey: true })
+    await runtime.connect({ organizationId: 'org_1', accountKey: 'pho_ask_1', storesKey: true })
     await runtime.createBot({ botId: 'b1', botName: 'Scout', handle: '+15551230000' })
 
     const row = botConnectorServices(
       botForRow,
       { gh: 'signed-in', linear: false },
       undefined,
-      runtime.statusFor('b1') ?? undefined
+      (await runtime.statusFor('b1')) ?? undefined
     ).find((entry) => entry.source === 'photon')
 
     expect(row).toMatchObject({ source: 'photon', tool: 'iMessage' })
     expect(row?.detail).toMatch(/\+15551230000/)
-    expect(store.bot('b1')?.assignments.map((entry) => entry.handle)).toEqual(['+15551230000'])
+    expect((await store.bot('b1'))?.assignments.map((entry) => entry.handle)).toEqual([
+      '+15551230000'
+    ])
   })
 
   it('deleting the bot releases the number and keeps the project', async () => {
     const { runtime, store } = service()
-    runtime.connect({ organizationId: 'org_1', accountKey: 'pho_ask_1', storesKey: true })
+    await runtime.connect({ organizationId: 'org_1', accountKey: 'pho_ask_1', storesKey: true })
     await runtime.createBot({ botId: 'b1', botName: 'Scout', handle: '+15551230000' })
-    const projectId = store.bot('b1')?.projectId
+    const projectId = (await store.bot('b1'))?.projectId
 
     const outcome = await runtime.deleteBot('b1')
 
@@ -196,15 +205,15 @@ describe('the channel', () => {
     expect(server.state.projects.has(projectId ?? '')).toBe(true)
     // A tombstone, not nothing: the record still names the project its deletion has to burn, so the
     // separate cleanup stays reachable.
-    expect(store.bot('b1')).toMatchObject({ released: true, projectId, assignments: [] })
+    expect(await store.bot('b1')).toMatchObject({ released: true, projectId, assignments: [] })
     const deleted = await runtime.deleteProject({ botId: 'b1', confirmSlug: 'orca-bot-scout' })
     expect(deleted.terminal).toBe(true)
-    expect(store.bot('b1')).toBeNull()
+    expect(await store.bot('b1')).toBeNull()
   })
 
   it('refuses to admit anybody to a bot it does not have a channel for', async () => {
     const { runtime } = service()
-    runtime.connect({ organizationId: 'org_1', accountKey: 'pho_ask_1', storesKey: true })
+    await runtime.connect({ organizationId: 'org_1', accountKey: 'pho_ask_1', storesKey: true })
     await runtime.createBot({ botId: 'b1', botName: 'Scout', handle: '+15551230000' })
     await runtime.deleteBot('b1')
 
@@ -215,7 +224,7 @@ describe('the channel', () => {
 
   it('reports a half-provisioned bot as not connected rather than as a number to text', async () => {
     const { store, runtime } = service()
-    store.putBot({
+    await store.putBot({
       botId: 'b2',
       projectId: 'p2',
       slug: 'orca-bot-half',
@@ -224,31 +233,30 @@ describe('the channel', () => {
     })
 
     // "add someone to give it one" was the old copy for a bot whose own assignment failed.
-    expect(runtime.statusFor('b2')).toBeNull()
+    expect(await runtime.statusFor('b2')).toBeNull()
   })
 
   it('validates a project deletion before it takes the stream down', async () => {
     const { runtime, store } = service()
-    runtime.connect({ organizationId: 'org_1', accountKey: 'pho_ask_1', storesKey: true })
+    await runtime.connect({ organizationId: 'org_1', accountKey: 'pho_ask_1', storesKey: true })
     await runtime.createBot({ botId: 'b1', botName: 'Scout', handle: '+15551230000' })
-    const streamed = runtime.startStream('b1')
+    const streamed = await runtime.startStreamNow('b1')
 
     // A typo must not leave the bot deaf until the next restart.
     await expect(runtime.deleteProject({ botId: 'b1', confirmSlug: 'wrong' })).rejects.toThrow(
       /confirmation names/
     )
-    expect(runtime.streamStatus('b1')?.state).toBe(streamed?.state)
-    expect(store.bot('b1')).not.toBeNull()
+    expect((await runtime.streamStatus('b1'))?.state).toBe(streamed?.state)
+    expect(await store.bot('b1')).not.toBeNull()
   })
 })
 
 describe('the health tick', () => {
   it('retries a send that failed instead of leaving it in the outbox forever', async () => {
-    const { runtime, store } = service()
-    runtime.connect({ organizationId: 'org_1', accountKey: 'pho_ask_1', storesKey: true })
+    const { runtime, outbox, threads } = service()
+    await runtime.connect({ organizationId: 'org_1', accountKey: 'pho_ask_1', storesKey: true })
     await runtime.createBot({ botId: 'b1', botName: 'Scout', handle: '+15551230000' })
-    const threads = service().threads
-    threads.bind('b1', 'conv_1', { chatId: 'chat_1', handle: '+15551230000' })
+    await threads.bind('b1', 'conv_1', { chatId: 'chat_1', handle: '+15551230000' })
     server.state.failNextSend = 503
 
     // A turn ends and its send fails; nothing used to pick it back up, because `retryPending` had no
@@ -261,12 +269,11 @@ describe('the health tick', () => {
     })
     expect(failed.sent).toBe(false)
 
-    const ticked = service()
-    ticked.runtime.healthTick()
-    await new Promise((resolve) => setTimeout(resolve, 50))
-
-    const pending = new PhotonOutbox(store).pendingFor('b1')
-    expect(pending).toEqual([])
+    // The tick retries the queued send; the outbox emptying is what it reports, polled rather than slept
+    // through so a failure says which send never landed.
+    await runtime.healthTick()
+    await vi.waitFor(async () => expect(await outbox.pendingFor('b1')).toEqual([]))
+    expect(server.state.sent.map((entry) => entry.text)).toEqual(['the build is green'])
   })
 
   it('restarts a stream that is connected but has not subscribed, rather than only calling it deaf', async () => {
@@ -292,15 +299,22 @@ describe('the health tick', () => {
       return socket
     }
     const streaming = serviceWith(socketsIo)
-    streaming.runtime.connect({ organizationId: 'org_1', accountKey: 'pho_ask_1', storesKey: true })
+    await streaming.runtime.connect({
+      organizationId: 'org_1',
+      accountKey: 'pho_ask_1',
+      storesKey: true
+    })
     await streaming.runtime.createBot({ botId: 'b1', botName: 'Scout', handle: '+15551230000' })
+    // `startStream` is fire-and-forget for a caller that just provisioned, so wait for the socket rather
+    // than assuming it exists by the time `createBot` resolves.
+    await vi.waitFor(() => expect(sockets).toHaveLength(1))
     sockets[0]?.connect()
-    expect(streaming.runtime.streamStatus('b1')).toMatchObject({
+    expect(await streaming.runtime.streamStatus('b1')).toMatchObject({
       connected: true,
       subscribed: false
     })
 
-    streaming.runtime.healthTick()
+    await streaming.runtime.healthTick()
 
     // A fresh socket was opened, so the deaf stream was replaced rather than merely reported.
     expect(sockets).toHaveLength(2)
@@ -308,7 +322,7 @@ describe('the health tick', () => {
 })
 
 describe('the connectors row for a bot with no project', () => {
-  it('is absent rather than claiming an iMessage channel that does not exist', () => {
+  it('is absent rather than claiming an iMessage channel that does not exist', async () => {
     const rows = botConnectorServices(botForRow, { gh: 'signed-in', linear: false })
     expect(rows.some((entry) => entry.source === 'photon')).toBe(false)
   })

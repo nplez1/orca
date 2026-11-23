@@ -27,16 +27,16 @@ import { ownerOnly } from './bots-caller-gates'
 /** Either a bot Orca still has, or a channel whose bot is gone but whose record still names a project.
  *  The second case matters: after `bots.delete` a released channel's project deletion is the only thing
  *  left to do, and refusing it would leave the slug and the capacity stranded for good. */
-function requireChannel(
+async function requireChannel(
   params: { botId: string },
   context: { runtime: Parameters<typeof photonChannel>[0] },
   which: { releasedOk: boolean }
-): void {
+): Promise<void> {
   const live = context.runtime.bots.list().some((bot) => bot.id === params.botId)
   if (live) {
     return
   }
-  const record = new PhotonStore(getAppEnvironment().getPath('userData')).bot(params.botId)
+  const record = await new PhotonStore(getAppEnvironment().getPath('userData')).bot(params.botId)
   if (!record || (!which.releasedOk && record.released)) {
     throw new InvalidArgumentError('That bot is gone.')
   }
@@ -70,7 +70,7 @@ export const BOT_PHOTON_CREATE_METHOD = defineMethod({
   params: PhotonCreateBotParams,
   handler: async ({ botId, handle, accountKey }, context) => {
     ownerOnly(context, 'Only the owner can give a bot an iMessage number.')
-    requireChannel({ botId }, context, { releasedOk: false })
+    await requireChannel({ botId }, context, { releasedOk: false })
     const bot = context.runtime.bots.list().find((entry) => entry.id === botId)
     const outcome = await photonChannel(context.runtime).createBot({
       botId,
@@ -93,7 +93,7 @@ export const BOT_PHOTON_ADD_MEMBER_METHOD = defineMethod({
   params: PhotonAddMemberParams,
   handler: async ({ botId, handle }, context) => {
     ownerOnly(context, 'Only your owner changes who may text a bot, in Orca.')
-    requireChannel({ botId }, context, { releasedOk: false })
+    await requireChannel({ botId }, context, { releasedOk: false })
     return photonChannel(context.runtime).addMember({ botId, handle })
   }
 })
@@ -104,7 +104,7 @@ export const BOT_PHOTON_RELEASE_MEMBER_METHOD = defineMethod({
   params: PhotonReleaseMemberParams,
   handler: async ({ botId, handle }, context) => {
     ownerOnly(context, 'Only your owner changes who may text a bot, in Orca.')
-    requireChannel({ botId }, context, { releasedOk: false })
+    await requireChannel({ botId }, context, { releasedOk: false })
     return photonChannel(context.runtime).releaseMember({ botId, handle })
   }
 })
@@ -115,7 +115,7 @@ export const BOT_PHOTON_DELETE_METHOD = defineMethod({
   params: PhotonReleaseBotParams,
   handler: async ({ botId }, context) => {
     ownerOnly(context, 'Only the owner can release a bot’s iMessage channel.')
-    requireChannel({ botId }, context, { releasedOk: true })
+    await requireChannel({ botId }, context, { releasedOk: true })
     return photonChannel(context.runtime).deleteBot(botId)
   }
 })
@@ -126,7 +126,7 @@ export const BOT_PHOTON_DELETE_PROJECT_METHOD = defineMethod({
   params: PhotonDeleteProjectParams,
   handler: async ({ botId, confirmSlug }, context) => {
     ownerOnly(context, 'Only the owner can delete a Photon project; its slug can never be reused.')
-    requireChannel({ botId }, context, { releasedOk: true })
+    await requireChannel({ botId }, context, { releasedOk: true })
     return photonChannel(context.runtime).deleteProject({ botId, confirmSlug })
   }
 })
@@ -139,7 +139,7 @@ export const BOT_PHOTON_RECONCILE_METHOD = defineMethod({
   params: PhotonReconcileParams,
   handler: async ({ botId }, context) => {
     ownerOnly(context, 'Only the owner can repair a bot’s iMessage channel.')
-    requireChannel({ botId }, context, { releasedOk: false })
+    await requireChannel({ botId }, context, { releasedOk: false })
     return photonChannel(context.runtime).reconcile(botId)
   }
 })
