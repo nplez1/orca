@@ -471,15 +471,18 @@ describe('a host with both kinds of hook', () => {
 
     const hearing = saves.hearing(bot)
     expect(hearing.cloudSignedOut).toBe(true)
+    // Why a fragment and not the old wording: upstream #45929 replaced "signed out of Orca" with the
+    // host-facing "This computer isn't signed in to Orca Cloud", which `hostNotSignedIn` builds and
+    // the localization catalogs carry. The cause is what this case is about.
     expect(botEventTriggerRefusal(hearing, saves.cloudRules([slack])!)).toContain(
-      'signed out of Orca'
+      "isn't signed in to Orca Cloud"
     )
     // Its own hook is this computer's, so Orca Cloud is never asked to hear it.
     expect(saves.cloudRules([webhook])).toEqual([])
     expect(botEventTriggerRefusal(hearing, saves.cloudRules([webhook])!)).toBeNull()
     // A hook Orca Cloud made is still the cloud's, and still refused while signed out.
     expect(botEventTriggerRefusal(hearing, saves.cloudRules([cloudHook])!)).toContain(
-      'signed out of Orca'
+      "isn't signed in to Orca Cloud"
     )
     expect(localWebhooks.servesLocally(webhook)).toBe(true)
     expect(localWebhooks.servesLocally(slack)).toBe(false)

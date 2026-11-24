@@ -43,6 +43,7 @@
 5 src/main/codex/hooks/reconciliation/codex-real-home-hook-sweep.ts
 2 src/main/codex/structured/launch/codex-structured-orca-hooks-off.ts
 16 src/main/codex/trust/hooks/hook-trust-promotion.ts
+17 src/main/codex/trust/toml/config-toml-trust.ts
 8 src/main/command-code/hook-service.ts
 1 src/main/composio/composio-key-store.ts
 1 src/main/copilot-credentials/copilot-credentials-store.ts
@@ -55,7 +56,6 @@
 2 src/main/devin/hook-settings.ts
 1 src/main/diagnostics/main-thread-stall-probe.ts
 4 src/main/diagnostics/ui-hang-log-sink.ts
-8 src/main/droid/hook-service.ts
 1 src/main/dsh/hook-settings.ts
 2 src/main/ephemeral-vm-runtime-context-menu.ts
 8 src/main/ephemeral-vm-runtime-extend.ts
@@ -74,8 +74,8 @@
 1 src/main/host-sync/host-settings-credential-ports.ts
 7 src/main/host-sync/host-settings-jenkins-port.ts
 9 src/main/host-sync/host-settings-jira-port.ts
-15 src/main/index.ts
-9 src/main/ipc/app.ts
+14 src/main/index.ts
+8 src/main/ipc/app.ts
 8 src/main/ipc/ephemeral-vm/ephemeral-vm-runtime-handlers.ts
 12 src/main/ipc/ephemeral-vm/ephemeral-vm.ts
 1 src/main/ipc/filesystem/access/filesystem-allowed-roots.ts
@@ -108,6 +108,10 @@
 1 src/main/kiro/hook-settings.ts
 1 src/main/minimax/minimax-api-key-store.ts
 1 src/main/muse/hook-settings.ts
+0 src/main/native-chat/transcript-read-cache.ts
+0 src/main/native-chat/transcript-reader.ts
+0 src/main/native-chat/transcript-tail-reader.ts
+0 src/main/native-chat/transcript-watch.ts
 1 src/main/native-chat/wsl-transcript-gated-fs.ts
 1 src/main/opencode/accounts/opencode-go-api-key-store.ts
 10 src/main/orcad/credentials/orcad-plaintext-credential-migration.ts
@@ -129,7 +133,6 @@
 1 src/main/session-summary/session-summary-host-service.ts
 4 src/main/session-summary/session-summary-scratch.ts
 1 src/main/session-summary/session-summary-store.ts
-1 src/main/session-summary/session-summary-transcript-source.ts
 1 src/main/speech/openai-compatible-speech-provider-store.ts
 2 src/main/startup/main-process-ipc-bootstrap.ts
 2 src/main/startup/open-routing/os-opened-documents.ts

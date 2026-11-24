@@ -94,6 +94,9 @@ function TimerHost({
 function timerModel(set: ReturnType<typeof setters>, gitLab: boolean): ChecksPanelPollingInput {
   return testDouble<ChecksPanelPollingInput>({
     ...set,
+    // Why the empty rows: the hook reads `checks` for the fork's unseen-rollup-run force, and the
+    // double above supplies every field the hook or helper under test reads.
+    checks: [],
     activeGitLabReview: gitLab ? { number: 7, state: 'merged', status: 'success' } : null,
     pr: gitLab ? null : { number: 7, state: 'merged', checksStatus: 'success' },
     prNumber: gitLab ? null : 7,

@@ -118,6 +118,27 @@ describe('descendant lifecycle never settles the pane', () => {
       expect(finished?.payload.subagents).toBeUndefined()
     })
 
+    it('starts a background child right after a cancel, instead of holding it as late work', () => {
+      // Why here as well as in `agent-hook-cancel-verdict-latch.test.ts`: that suite calls the latch
+      // directly, and this one drives the same start through `normalizeAndAccept`, so a fix that never
+      // reaches the production wiring cannot pass both. The fork's pi lane has no
+      // `agent_start:subagent`; its bus publishes a whole `subagent_async_state` snapshot on every post
+      // (convergence-ledger.md § "pi subagent bindings: one binding per channel"), which is why the
+      // latch needed its own rule for this shape (#47627).
+      startTurn()
+      // The Esc: the row settles as an interrupted done, which is what the cancel latch keys on.
+      expect(publishedState('pi', { hook_event_name: 'agent_end', interrupted: true })).toBe('done')
+
+      const started = publish('pi', {
+        hook_event_name: 'subagent_async_state',
+        subagent_runs: [{ id: 'run-1', agent_type: 'uploader' }]
+      })
+      expect(started?.payload.state).toBe('working')
+      expect(started?.payload.subagents).toEqual([
+        expect.objectContaining({ id: 'run-1', state: 'working', agentType: 'uploader' })
+      ])
+    })
+
     it('completes once when the final child wakes the parent for another turn', () => {
       startTurn()
       publish('pi', {

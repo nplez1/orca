@@ -444,15 +444,18 @@ function sourceWithImportedCases(file) {
 }
 
 describe('a title imported from a spec module', () => {
-  it('is found where the spec module writes it', () => {
-    // Why this shape: `src/main/runtime/construction/orca-runtime.test.ts` pulls every case in through
-    // `await import('../orca-runtime-tests/x.spec')`, so the entry's own file names no title at all.
-    const file = 'src/main/runtime/construction/orca-runtime.test.ts'
-    const title = 'OrcaRuntimeService browses runtime server directories before projects are added'
-    expect(importedCaseSpecifiers(sourceWithImportedCases(file)).length).toBeGreaterThan(0)
+  it('falls back to the file itself, which is every file left after #46786', () => {
+    // Why the fallback is the whole case now: upstream #46786 deleted the spec-import barrel this
+    // case used to point at (`src/main/runtime/construction/orca-runtime.test.ts` plus
+    // `src/main/runtime/orca-runtime-tests/*.spec`), and no test in this tree imports its cases from
+    // a `.spec` module any more. `sourceWithImportedCases` is what the two manifest assertions below
+    // read through, so what still needs proving is that a file with no spec imports is read as
+    // itself rather than as nothing.
+    const file = 'src/shared/agent-hook-listener-descendant-lifecycle.test.ts'
+    const title =
+      'descendant lifecycle never settles the pane generic descendant roster bookkeeping (pi) reaps a child whose finish never arrived instead of pinning the pane forever'
+    expect(importedCaseSpecifiers(readFileSync(join(ROOT, file), 'utf8'))).toEqual([])
     expect(titleExistsInSource(title, sourceWithImportedCases(file))).toBe(true)
-    // The same title in the file alone, to prove the follow is what found it.
-    expect(titleExistsInSource(title, readFileSync(join(ROOT, file), 'utf8'))).toBe(false)
   })
 })
 

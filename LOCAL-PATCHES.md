@@ -478,10 +478,22 @@ someone is watching already polls. **The M5-host symptom is upstream's now.** Wh
 polling for a desktop window nobody is watching — hidden or unfocused — so the numbers are already fresh
 when the user looks rather than refreshed on focus.
 
+**The gate is the fork's on the clock and upstream's on a return (2026-11-24).** Upstream's
+`service-activation-refresh` case pins that an _unwatched_ owner return stamps the refetch interval
+without reading, and the first shape of this patch failed it: one `shouldBackgroundPoll` returning
+`true` answered both questions, so an unfocused window coming back read anyway. The gate is now split
+by which question it answers. `shouldBackgroundPoll` is upstream's body, byte for byte, and still owns
+`refreshIfWatched` — the owner return and the focus/show/restore listeners. `shouldTimerPoll` is the
+fork's, and gates the two halves that are _not_ a return: the interval clock in `startTimer`, and the
+deferred startup read `attach` schedules, which runs at first paint when the window is typically not
+focused yet. Both read through one `refreshActiveWindow` so the plan is not written twice.
+
 That costs a probe turn per interval while the endpoint is throttled (see the cost note above), so it is
-a deliberate trade and the one piece of this patch a later reader may reasonably revert: delete the
-`return true` hunk, `fork/service-background-polling.test.ts` and this paragraph, and `usageViewers`
-covers the watched case on its own.
+a deliberate trade and the piece a later reader may reasonably revert: delete `shouldTimerPoll` and
+`refreshIfPolling`, point `startTimer` at `shouldBackgroundPoll`, point
+`scheduleDeferredStartupRefresh` back at `refreshIfWatched`, delete
+`fork/service-background-polling.test.ts` and this paragraph, and `usageViewers` covers the watched
+case on its own.
 
 **Tests that hold the line.** `fork/claude-cli-usage-response.test.ts` pins the payload mapping against
 a captured 2.1.316 reply and the `rate_limit_event` mapping against a captured 2.1.319 event;
@@ -494,10 +506,36 @@ fetch still receives the open wait (a user refresh receives `null`) — both plu
 dropped; `fork/claude-inactive-account-usage.test.ts` pins that a saved-account preview never probes;
 `fork/claude-settings-env-credentials.test.ts` pins the source order (keychain → `.credentials.json` →
 `settings.local.json` → `settings.json`) and that a plain API key in `ANTHROPIC_AUTH_TOKEN` is never
-taken as a plan login; `fork/service-background-polling.test.ts` pins that the timer polls while the
-window is unfocused, hidden and minimized, and stops only when the window is gone.
+taken as a plan login; `fork/service-background-polling.test.ts` pins that the timer and the deferred startup read poll while
+the window is unfocused, hidden and minimized, and stop only when the window is gone.
 The upstream suites that described the endpoint-only platform (win32) now say so through
 `EndpointOnlyClaudeService`, which is the one behaviour split worth reading twice.
+
+### `local(checks)`: the panel forces one read when the PR rollup reports a run it cannot see
+
+Anchor: `src/shared/github/checks/checks-detail-polling-policy.ts` (`rollupReportsUnseenRun`),
+`src/renderer/src/components/right-sidebar/checks-panel/refresh/use-checks-detail-timer.ts` (the
+effect that calls it, and the `checks`/`repo`/`prCacheKey` fields it reads off the panel model).
+
+**The patch.** The sidebar icon reads the PR's rollup while the panel reads its own rows, so a push
+that starts a run can leave the panel showing the previous head's checks until the next poll. When
+the rollup reports a run the panel's rows do not contain, the timer forces one read.
+
+**Why it is not the "second cadence owner" the convergence ledger forbids.**
+`local/sync/convergence-ledger.md` § "Checks panel polling and review refresh" hands _when_ the panel
+refreshes to upstream's `ChecksDetailPollingPolicy`, and says not to re-add a second `pollIntervalRef`
+writer. This sets no interval and writes no cadence: it is an event-driven force that consumes the
+existing `forceNextFetch` path and is subject to the same cooldown and backoff. The named follow-up
+in that ledger entry — re-add the PR-transition refetch as a policy concern if the panel feels stale
+when a new run appears — is what this is; it is simply keyed on the rollup rather than on the review.
+
+**Do not:** make it unconditional. A forced read past a failing endpoint's backoff turns a broken
+endpoint into a retry loop, which is why `forceWanted()` also requires `!policyRef.current.failed`.
+
+**Test note.** Upstream's `checks-panel-read-owner-resets.test.tsx` builds its panel model with
+`testDouble`, whose contract is that each double supplies every field the hook reads — so the double
+carries `checks: []` now that the hook reads it. A model without rows means nothing displayed, and
+the force is correctly idle.
 
 ### `local(usage)`: Claude's spend cap is upstream's, Codex's stays ours
 
@@ -909,8 +947,12 @@ Anchors, both on upstream-owned files and marked `LOCAL(nplez1)`:
   shell/watcher stories, and the Grok lane's own `workingMode` assertion — were retired by upstream's
   2026-11-24 test-inventory pass, as were the Grok/Claude cancel and helper-settlement suites
   (`main-agent-status-parity` went in the 2026-11-08 sync, `server-grok-background-status.test.ts` in
-  the 2026-11-20 sync). The cancel verdict survives as
-  `src/shared/agent-hook-listener/state/agent-hook-cancel-verdict-latch.test.ts`; the
+  the 2026-11-20 sync). The cancel verdict's upstream suite went the same way on 2026-11-24 —
+  `agent-hook-cancel-verdict-latch.test.ts` drives upstream's `agent_start:subagent` event, which this
+  fork's pi lane never emits, so it is a `fork-refactor` deletion in
+  `local/sync/expected-deletions.json`; the invariant it guarded is now
+  `src/shared/agent-hook-listener-descendant-lifecycle.test.ts` › "starts a background child right
+  after a cancel, instead of holding it as late work". The
   helper-settlement badge has no owner at HEAD, so re-homing that case is owed. The
   structured/native-chat lane is deliberately untouched: it still reads a watch loop as monitoring.
 
@@ -3422,6 +3464,26 @@ section stays readable. `tests/tools/fork-process-docs.test.mjs` holds the three
     barrel whose closure is ~1.6k lines of harness upstream deleted, and it is the only consumer; the spec
     goes with them and its coverage is recorded here. `--baseline-init` cannot carry it — that
     baseline is fork-modified test files, and this one is fork-added.
+  - **`check-upstream-file-comments` was re-based, not widened.** Its recorded `base` was still
+    `0c6207e3d7`, the previous sync's base, so every fork comment on a file upstream rewrote in these
+    1,350 commits counted as new — 622 file rows against maxima that described the old ruler. `--init
+    --base 7daf01d99f3 --accept` re-measured at the new base: **4752 lines against 5113**, a 361-line
+    shrink `--prune` then locks in, and 320 per-file maxima. The nine files whose rows moved up by 18
+    lines in total are the sync resolution's own comments, absorbed with the reason recorded in
+    `accepted` rather than deleted; nothing was raised beyond what the tree already carries.
+  - **One upstream suite retired, one repaired, on the pi lane's own terms.**
+    `agent-hook-cancel-verdict-latch.test.ts` (#47627) was a real fork defect: the lane publishes one
+    `subagent_async_state` snapshot per post instead of upstream's `agent_start:subagent`, so a child
+    starting right after Esc was held as late work for the whole 15s window. The latch gained a marked
+    `LOCAL(nplez1)` rule and the suite is kept and green, OMP-lifecycle and replay holds included.
+    `agent-status-extension-held-turn-repost.test.ts` (#48146) is a `fork-refactor` deletion in
+    `expected-deletions.json`: every case needs the two `subagent:async-*` bindings this fork removed,
+    and **its coverage is owed** — the roster lane still reposts a child-held turn and nothing pins
+    that cadence on this tree. See `convergence-ledger.md` § "pi subagent bindings".
+  - **`macos-updater-tests.yml` left `REQUIRED`.** Upstream #46786 deleted the workflow with the
+    updater suites it ran, so the contract named a path no commit on either side carries — a
+    permanently red health check rather than a guard. See § `local(ci)`, which is where the lane
+    table lives.
 
 - **2026-11-20 — merge of upstream `0c6207e3d7` (1,425 commits) into the release line, from
   `1db15d9ff0`** (merge base `1ce376b27e`, rollback tag `archive/pre-sync-1db15d9ff0`, merge commit
@@ -4083,8 +4145,18 @@ equivalent minutes a month, still $0.
 | `dependency-security.yml`   | `pull_request` (path-gated), call, dispatch | supply-chain audit; lockfile/Cargo/patches changes only                  |
 | `mobile.yml`                | `pull_request`, push `main`                 | mobile parity is first-class and no PR lane covered it                   |
 | `node-server-tests.yml`     | `pull_request`, call, schedule, dispatch    | headless/remote server path                                              |
-| `macos-updater-tests.yml`   | `pull_request`, dispatch                    | auto-update correctness, ~7 min of macOS in six runs                     |
 | `performance-contracts.yml` | schedule, `pull_request`, dispatch          | perf regression contract, 21 of 24 runs green                            |
+
+**`macos-updater-tests.yml` left this list on 2026-11-24, and it is the only row that ever has.**
+Upstream deleted the workflow itself in #46786 ("cut the suite to the tests that guard real
+invariants"), together with the updater suites it ran, so the requirement was pointing at a path no
+commit on either side still carries. The entry came out of `REQUIRED` and `EXPECTED_TRIGGERS` in the
+same change, with this paragraph as the record; `check-actions-enablement.mjs` reports a `MISSING`
+required lane and a `STALE` pinned entry for a path that is gone, so leaving it would have been a
+permanently red health check rather than a guard. Nothing is being hidden: a retirement is the one
+edit to that contract that removes work instead of absorbing a finding, and the two fork tests that
+pin contract-against-tree (`tests/tools/actions-enablement.test.mjs`,
+`tests/tools/check-actions-enablement.test.mjs`) went green from the removal itself.
 
 **The ordering is the load-bearing part.** `local/sync/publish-sync.mjs` is the release-line push and
 `check-actions-enablement --fix` in one command, so a lane that is active but not on the list is disabled

@@ -32,7 +32,6 @@ inline src/main/ipc/pty/spawn/spawn-options-assembly.ts
 inline src/main/ipc/repos/repo-clone-lifecycle.ts
 inline src/main/ipc/shell/shell.ts
 inline src/main/ipc/worktrees/worktree-remote.ts
-inline src/main/jira/client.test.ts
 inline src/main/persistence/tracking-repos/repo-update-operations.ts
 inline src/main/pi/managed-extensions/agent-status/agent-status-extension-test-harness.ts
 inline src/main/pi/rpc/launch/rpc-launch-resolution.ts
@@ -42,6 +41,7 @@ inline src/main/rate-limits/service/service-state.ts
 inline src/main/runtime/agent-session/environment/runtime-account-controller.ts
 inline src/main/runtime/construction/runtime-construction.ts
 inline src/main/runtime/construction/runtime-service-state.ts
+inline src/main/runtime/orca-runtime-bots.ts
 inline src/main/runtime/rpc/methods/files/files.ts
 inline src/main/runtime/rpc/server/runtime-rpc-websocket-dispatch.ts
 inline src/main/runtime/terminal/launch/terminal-workspace-scope.ts
@@ -52,7 +52,6 @@ inline src/main/runtime/workspaces/removal/workspace-removal.ts
 inline src/main/ssh/connection/ssh-connection.ts
 inline src/main/ssh/protocol/ssh-channel-multiplexer.ts
 inline src/main/startup/main-process-ready-foundation.ts
-inline src/main/startup/quit/main-process-quit.ts
 inline src/main/updater/lifecycle/updater-setup.ts
 inline src/main/updater/releases/updater-prerelease-feed.ts
 inline src/main/worker-threads/worker-thread-request-queue.ts
