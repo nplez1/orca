@@ -599,12 +599,16 @@ and was held as a late restatement of the cancelled turn for the whole 15s windo
 reading done while the child worked.
 
 The latch carries one marked hunk: a snapshot naming a run the cancelled row did not carry is a start.
-A replay and an OMP `task:subagent:lifecycle` start add nothing the row did not already have, so both
-stay held, which is what upstream's own suite asserts. That suite is kept and green here rather than
-retired, because the defect was the fork's.
+That suite is kept and green here rather than retired, because the defect was the fork's.
 
-**Do not** widen it to "any snapshot is a start": a restatement of the same children is exactly the
-late work this latch exists to swallow.
+Two holds beside it are load-bearing, for two different reasons. A replayed start stays held because of
+the `isReplay` check. An OMP `task:subagent:lifecycle` start stays held because of the **event-name**
+check — it posts `agent_start` and does name a child the cancelled row never carried, and it is still
+held because that child may belong to the cancelled turn, which is what upstream's suite asserts.
+
+**Do not** widen it to "any snapshot is a start" — a restatement of the same children is exactly the
+late work this latch exists to swallow — and **do not** drop the event-name check to "any event naming
+a new child", which is the likelier mistake and would release the OMP start.
 
 **Settlement is the other half.** `session_start` is this lane's descendant-scope reset, so the
 resume placeholder is gated through `gatePaneStateOnDescendants`, an empty live set is never
