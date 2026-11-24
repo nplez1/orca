@@ -34,7 +34,7 @@ vi.mock('./repositories/github-api-repository', async (importOriginal) =>
   )
 )
 
-import { __resetOrcaStarCheckForTests, checkOrcaStarred, starOrca } from './client/fetch/orca-star'
+import { checkOrcaStarred, starOrca } from './client/fetch/orca-star'
 import { resetOriginRepositoryCache } from './client/client-test-harness'
 import { ORCA_REPOSITORY } from '../../shared/orca-repository'
 
@@ -55,7 +55,6 @@ describe('starOrca repository target', () => {
     acquireMock.mockReset()
     releaseMock.mockReset()
     acquireMock.mockResolvedValue(undefined)
-    __resetOrcaStarCheckForTests()
   })
 
   it('stars the repository this build publishes from through the bounded gh runner', async () => {

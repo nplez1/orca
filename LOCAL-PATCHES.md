@@ -3396,7 +3396,7 @@ section stays readable. `tests/tools/fork-process-docs.test.mjs` holds the three
   § 2026-11-24. What a reviewer will want first:
 
   - **The test-retirement rule at 3× the last sync.** `local/sync/upstream-deleted-fork-tests-baseline.json`
-    now records **169 fork-modified test files and 215 fork-added cases** (was 83), all taken as
+    now records **167 fork-modified test files and 237 fork-added cases** (was 83), all taken as
     deletions — restoring a file upstream retired costs a permanent modify/delete conflict on every
     future sync. The retired harnesses that surviving tests still import are the 10 `restore`
     entries, so both halves are asserted rather than rediscovered.

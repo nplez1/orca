@@ -989,11 +989,11 @@ now describe guards upstream retired.
 instead.
 
 **2026-11-24 addendum — the same rule at 3× the scale.** The 2026-11-24 sync of upstream `7daf01d99f3`
-(1,350 commits) took **169 fork-modified test files and 215 fork-added cases** as deletions: upstream
+(1,350 commits) took **167 fork-modified test files and 237 fork-added cases** as deletions: upstream
 retired 6,116 files, 5,217 of them suites, harnesses and fixtures. The baseline carries them with this
 section as the evidence. Ten fork-owned test-support files that surviving tests still import were
 `restore`d instead (`expected-deletions.json`), and the retired-harness imports those restores did not
-cover were re-pointed at the harness upstream kept — never resurrected wholesale. Do not read the 169
+cover were re-pointed at the harness upstream kept — never resurrected wholesale. Do not read the 167
 as one decision to re-litigate: it is this rule, applied to whatever that sync retired.
 
 **2026-10-16 addendum.** Two more of upstream's consolidations were taken with the fork's content

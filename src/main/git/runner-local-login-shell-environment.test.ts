@@ -24,7 +24,6 @@ vi.mock('@orca/process-host/native-executable-resolution', () => ({
 
 import { gitExecFileAsync } from './command-runner/git-exec-file'
 import { gitSpawn } from './command-runner/git-spawn'
-import { _resetGitAdmissionForTests } from './command-runner/admission/git-subprocess-admission'
 import { _configureLocalLoginShellGitEnvironmentForTests } from './command-runner/local-login-shell-git-environment'
 
 function createMockChildProcess(pid: number) {
@@ -52,8 +51,11 @@ function launchOptions(callIndex = 0): CaptureOptions | undefined {
  */
 describe('local login-shell Git environment', () => {
   const originalPath = process.env.PATH
+  const originalAdmissionDisabled = process.env.ORCA_GIT_ADMISSION_DISABLED
 
   beforeEach(() => {
+    // A mocked child that never exits would hold an admission slot into the next test.
+    process.env.ORCA_GIT_ADMISSION_DISABLED = '1'
     execFileMock.mockReset()
     spawnMock.mockReset()
     nativeSpawnMock.mockReset()
@@ -74,8 +76,12 @@ describe('local login-shell Git environment', () => {
   })
 
   afterEach(() => {
-    _resetGitAdmissionForTests()
     _configureLocalLoginShellGitEnvironmentForTests(null)
+    if (originalAdmissionDisabled === undefined) {
+      delete process.env.ORCA_GIT_ADMISSION_DISABLED
+    } else {
+      process.env.ORCA_GIT_ADMISSION_DISABLED = originalAdmissionDisabled
+    }
     delete process.env.ORCA_TEST_HOOK_TOKEN
     delete process.env.ORCA_TEST_AGENT_SOCKET
     if (originalPath === undefined) {
