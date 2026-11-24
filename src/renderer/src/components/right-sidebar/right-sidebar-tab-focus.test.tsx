@@ -99,9 +99,9 @@ function PanelTabs(): React.JSX.Element {
     <div>
       <button
         onClick={(event) => {
-          // Why `=== 0`: #46611 made this parameter `fromKeyboard`, and Enter/Space synthesise a
-          // click with detail 0 — the same expression `activity-bar-buttons.tsx` passes.
-          selectActivityTab('checks', event.detail === 0)
+          // Why `!== 0`: the hook takes `fromPointer`, and #46611's keyboard activation is a click with
+          // detail 0. `right-sidebar-top-activity-bar.tsx` converts the same way.
+          selectActivityTab('checks', event.detail !== 0)
           setTab('checks')
         }}
       >
@@ -109,7 +109,7 @@ function PanelTabs(): React.JSX.Element {
       </button>
       <button
         onClick={(event) => {
-          selectActivityTab('vault', event.detail === 0)
+          selectActivityTab('vault', event.detail !== 0)
           setTab('vault')
         }}
       >
