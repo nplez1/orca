@@ -118,6 +118,7 @@ export function phoneConnectorEntries(input: PhoneConnectorSources): PhoneConnec
     tools: input.tools ? { own: input.tools.own, problems: input.tools.problems ?? {} } : null,
     words: {
       webhooks: t('bots.webhooks.name', 'Webhooks'),
+      photon: t('bots.photon.title', 'iMessage'),
       viaComposio: t('bots.composio.viaComposio', 'via Composio'),
       composioApps: t('bots.composio.toolName', 'Composio apps'),
       titleSeparator: t('bots.connector.titleSeparator', ' · ')
@@ -158,7 +159,7 @@ export function connectorRows(input: ConnectorRowsInput): ReactNode[] {
   const linear = input.linear.status === 'ready' ? input.linear.value : null
   const githubOrgs = githubOrgsOf(bot, input.githubState)
   const separator = t('bots.connector.titleSeparator', ' · ')
-  const mark = (source: 'slack' | 'linear' | 'github') => (
+  const mark = (source: 'slack' | 'linear' | 'github' | 'photon') => (
     <MobileConnectorSourceIcon source={source} size={ICON} />
   )
   const composioFix = (problem: 'key' | 'unread') => {
@@ -258,6 +259,10 @@ export function connectorRows(input: ConnectorRowsInput): ReactNode[] {
         if (input.webhooksRow) {
           rows.push(<Fragment key={entry.key}>{input.webhooksRow}</Fragment>)
         }
+        break
+      // fork-comment-ok: the phone has no Photon surface yet; listing it is the honest half of parity.
+      case 'photon':
+        rows.push(<ListRow key={entry.key} leading={mark('photon')} title={title} />)
         break
       case 'composio': {
         const { connection, problem } = entry
