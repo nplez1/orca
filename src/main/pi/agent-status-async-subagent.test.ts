@@ -396,8 +396,8 @@ describe('pi async subagent runs reach the pane as descendants (STA-6378)', () =
     await emit(harness, RUNNER_EXIT, { runId: 'run-1', state: 'observed' })
     expect(harness.posted.at(-1)?.subagent_runs).toEqual([])
     // The exit shrinks the live set and does not settle the pane: the roster's own onRunnerExit waits
-    // RUNNER_EXIT_GRACE_MS so a late completion or the lead's wake turn lands first, and the settle
-    // after that grace is the roster's suite to pin, not this lane's.
+    // RUNNER_EXIT_GRACE_MS so a late completion or the lead's wake turn lands first. That settle is the
+    // roster's behaviour and has no test of its own, here or upstream.
     expect(harness.accepted.at(-1)?.state).toBe('working')
   })
 
