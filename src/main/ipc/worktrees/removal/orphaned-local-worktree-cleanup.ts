@@ -23,6 +23,8 @@ export async function cleanupOrphanedLocalWorktreeRemoval(args: {
   repoPath: string
   worktreeId: string
   snapshotPruneBatchId?: string
+  signal?: AbortSignal
+  markerOptions?: { expectedMarker?: string; forbidAnyMarker?: boolean }
 }): Promise<void> {
   const { store, runtime } = args.context
   console.warn(
@@ -32,7 +34,9 @@ export async function cleanupOrphanedLocalWorktreeRemoval(args: {
     args.repoPath,
     args.canonicalWorktreePath,
     args.localWorktreeGitOptions,
-    (path) => runtime.closeFileWatchersForRemoval(path)
+    (path) => runtime.closeFileWatchersForRemoval(path),
+    args.signal,
+    args.markerOptions
   )
   // Why: remove failed so git still tracks it (.git/worktrees/<name>); prune or the stale entry keeps its branch locked.
   await pruneGitWorktrees({ cwd: args.repoPath, ...args.localWorktreeGitOptions }).catch(() => {})

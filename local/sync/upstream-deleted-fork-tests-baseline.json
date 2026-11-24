@@ -3,7 +3,7 @@
   "base": "7daf01d99f3d3301bf3c867e293ebb9d1f9a324e",
   "tip": "cc4fefcbaad23d69fd62406099d84551e6280042",
   "accepted": "2026-11-24 sync of upstream 7daf01d99f (1350 commits): upstream retired 6,116 files, 5,217 of them test/spec suites plus their harnesses and fixtures. 170 fork-modified test files went with them, the same 'test inventories retired upstream' rule applied at scale: restoring a file upstream deleted costs a permanent modify/delete conflict on every future sync.",
-  "total": 169,
+  "total": 167,
   "files": {
     "config/scripts/desktop-distribution/linux/package-linux-formats.test.mjs": true,
     "config/scripts/desktop-distribution/runtime-verification/process-host-dev-rebuild.test.ts": true,
@@ -99,8 +99,6 @@
     "src/main/rate-limits/service/service-minimax-usage.test.ts": true,
     "src/main/rate-limits/service/service-refresh-orchestration.test.ts": true,
     "src/main/rate-limits/service/service-zcode-usage.test.ts": true,
-    "src/main/runtime/agent-session/environment/structured-session-cli-login-shell.live-shell.test.ts": true,
-    "src/main/runtime/agent-session/environment/structured-session-cli-login-shell.test.ts": true,
     "src/main/runtime/agent-state-rules/agent-state-rules-live-update.test.ts": true,
     "src/main/runtime/construction/orca-runtime.test.ts": true,
     "src/main/runtime/orca-runtime-test-mocks/setup.spec.ts": true,

@@ -54,8 +54,11 @@ export async function admittedSkill(skillFile: string): Promise<ScannedSkill | n
   }
 }
 
-export async function scanSkillsFolder(skillsDir: string): Promise<ScannedSkill[]> {
-  const files = await findSkillFiles(skillsDir, skillDirectoryMaxDepth('repo'))
+export async function scanSkillsFolder(
+  skillsDir: string,
+  signal?: AbortSignal
+): Promise<ScannedSkill[]> {
+  const files = await findSkillFiles(skillsDir, skillDirectoryMaxDepth('repo'), signal)
   const admitted = await Promise.all(files.map(admittedSkill))
   const byFolder = new Map<string, ScannedSkill>()
   for (const skill of admitted) {

@@ -224,8 +224,8 @@
       "commit": "a8c508f5fb7",
       "upstreamBlob": "e49d377f3f49f976b98dd12f242ec428b773a687",
       "class": "fork-test-support",
-      "status": "restore",
-      "reason": "Test support the surviving task-page linear refresh lifecycle suite imports."
+      "status": "expected-deletion",
+      "reason": "Its only consumer, task-page-linear-refresh-lifecycle.test.tsx, is gone: upstream deleted the whole issue-refresh directory and the fork's only edits there were earlier sync resolutions. The 2026-11-24 review dropped the leftover fixture, and the fork-added drawer fixture beside it that it alone imported; no module at HEAD references either path."
     },
     {
       "path": "src/renderer/src/popout.tsx",

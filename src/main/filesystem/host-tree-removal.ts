@@ -324,11 +324,8 @@ export async function removeUnregisteredHostCheckout(
           }
           const blocking = await deleteHostChildren(root, names)
           if (blocking) {
-            // Nothing here proves whose folder it is, so the caller releases the registration and reports it.
-            throw new LeftoverCheckoutFolderError({
-              path: targetPath,
-              blockingFile: blockingFileOf([blocking])
-            })
+            // No registration to release and nothing proves whose folder it is, so the raw lock message is the retry advice.
+            throw blocking.reason
           }
           swept = true
           if (!(await assertMarkerlessRoot())) {

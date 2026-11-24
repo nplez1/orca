@@ -1,10 +1,19 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   installedAppExecutableCandidates,
   LEGACY_MAC_DAEMON_JOB_LABEL_PREFIX,
+  LINUX_APP_EXECUTABLE_NAME,
+  MAC_APP_EXECUTABLE_NAME,
   MAC_DAEMON_JOB_LABEL_PREFIX,
   macDaemonJobLabelWith
 } from './install-layout-names'
+
+const PACKAGED_LAUNCHERS = {
+  darwin: resolve(__dirname, '../../../resources/darwin/bin/orca'),
+  linux: resolve(__dirname, '../../../resources/linux/bin/orca-ide')
+}
 
 describe('macDaemonJobLabelWith', () => {
   it('names this build, and keeps the pre-rename label the old builds wrote', () => {
@@ -52,6 +61,21 @@ describe('installedAppExecutableCandidates', () => {
       '/opt/Orca NP/orca-np',
       '/opt/orca-np/orca-np'
     ])
+  })
+
+  // Why the shipped script and not the constant: a rename that misses the launcher leaves it
+  // exec'ing an official Orca's bundle, which starts the other app's CLI in this build's session.
+  it('names this build in the packaged launcher scripts', () => {
+    const darwinLauncher = readFileSync(PACKAGED_LAUNCHERS.darwin, 'utf8')
+    expect(darwinLauncher.match(/^ELECTRON="(.*)"$/m)?.[1]).toBe(
+      `$CONTENTS/MacOS/${MAC_APP_EXECUTABLE_NAME}`
+    )
+    expect(darwinLauncher).not.toMatch(/MacOS\/Orca"/)
+
+    const linuxLauncher = readFileSync(PACKAGED_LAUNCHERS.linux, 'utf8')
+    expect(linuxLauncher.match(/^for candidate in (.*); do$/m)?.[1]).toContain(
+      LINUX_APP_EXECUTABLE_NAME
+    )
   })
 
   it('never names an official Orca install', () => {

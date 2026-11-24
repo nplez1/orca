@@ -125,7 +125,7 @@ export function installConnectorHost({
     onBotsWritten: (listener) => runtime.onBotsWritten(listener)
   })
   void webhooks.start()
-  // Only a host with Orca Cloud makes webhooks, as it alone hosts the connector.
+  // Connector upkeep exists only on a host with Orca Cloud, as it alone hosts the connector.
   const connector = runtime.getConnectorCloud()
   if (connector) {
     const composio = installComposioUpkeep(runtime, webhooks)

@@ -275,7 +275,10 @@ async function finishLocalWorktreeRemoval({
           localWorktreeGitOptions,
           repoPath: repo.path,
           worktreeId: args.worktreeId,
-          snapshotPruneBatchId: args.snapshotPruneBatchId
+          snapshotPruneBatchId: args.snapshotPruneBatchId,
+          // Pin the marker `guard.verify()` accepted, or a checkout swapped in since can pass on this recursive delete.
+          signal: checkoutDeleteSignal,
+          markerOptions: guard.markerOptions
         })
         invalidateAuthorizedRootsCacheForRepo(context.store, repoId)
         removalCompleted = true

@@ -49,6 +49,8 @@ function needPage(entry: PhoneConnectorEntry): ConnectorPage | null {
       return entry.problem === 'key' ? { kind: 'composio-key' } : { kind: 'list' }
     case 'app':
       return { kind: 'tool', name: entry.tool.name, signIn: false }
+    // Photon has no phone page (a phone cannot serve iMessage), so a row for it fixes nothing here.
+    case 'photon':
     case 'webhooks':
       return null
   }

@@ -30,7 +30,7 @@ export async function scanSkillsFolder(
   signal?: AbortSignal
 ): Promise<ScannedSkill[]> {
   signal?.throwIfAborted()
-  const skills = await scanSkillsFolderInPlace(skillsDir)
+  const skills = await scanSkillsFolderInPlace(skillsDir, signal)
   signal?.throwIfAborted()
   return skills
 }
