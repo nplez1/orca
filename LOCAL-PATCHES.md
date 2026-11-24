@@ -5760,6 +5760,12 @@ and reads `Bots act as <slug>[bot]`. `src/shared/rpc-contract/github/github-app-
 `github-app-api.ts`, stored beside `contentsWrite`, and shown under the connected App — the setup steps used
 to claim a `.github/workflows` push is always rejected, which was false for any installation that holds it.
 
+**Connecting a bot to Photon is the owner's step.** The iMessage card asks before it creates anything:
+"Connect <bot> to Photon" reveals the handle field, and only that second step runs `bots.photon.create`,
+which makes the project, mints the key and assigns the owner — the owner's handle is required and is the
+bot's first person. Nothing in main provisions on its own: the only caller is that method. The computer's
+Bots page keeps the account alone, because the account is per machine and the agent is per bot.
+
 **A bot's own skills load first, and it can write them.** A bot created from a template already had
 skills written into its home (`skillsFolderFor(agent)`), but nothing loaded that folder explicitly: whether
 they arrived depended on the agent's own cwd conventions, and a skill the bot wrote later was seen by
