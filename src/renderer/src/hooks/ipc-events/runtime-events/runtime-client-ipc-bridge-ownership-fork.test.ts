@@ -230,6 +230,21 @@ it('does not mistake a local repo with the same id for the publishing remote rep
   }
 })
 
+it('accepts a fresh bridge early frame while rejecting the previous bridge frame', async () => {
+  const h = createHarness()
+  try {
+    h.start()()
+    h.start()
+    h.emit(0)
+    h.emit(1)
+    expect(h.getIssue).toHaveBeenCalledOnce()
+    expect(h.getIssue).toHaveBeenCalledWith({ id: 'ISSUE-1', workspaceId: 'workspace-a' })
+  } finally {
+    await h.finish()
+  }
+  expect(h.ipc.removeListener).toHaveBeenCalledOnce()
+})
+
 it('re-reads the host catalog when the client-event subscription goes live', async () => {
   const h = createHarness()
   try {
