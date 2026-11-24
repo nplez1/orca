@@ -1,5 +1,6 @@
-import { existsSync, readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, isAbsolute, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { forkTestFiles } from '../../local/gate-unit.mjs'
 import { quarantinedFiles } from '../../local/unit-lane-files.mjs'
@@ -425,7 +426,7 @@ const SPEC_EXTENSIONS = ['', '.ts', '.tsx', '.mts', '.cts', '.mjs', '.js']
 
 /** A test file's own source plus the `.spec` modules it imports its cases from. */
 function sourceWithImportedCases(file) {
-  const absolute = join(ROOT, file)
+  const absolute = isAbsolute(file) ? file : join(ROOT, file)
   if (!existsSync(absolute)) {
     return ''
   }
@@ -444,15 +445,32 @@ function sourceWithImportedCases(file) {
 }
 
 describe('a title imported from a spec module', () => {
+  // Why a fixture rather than a repo file: the shape this pinned was
+  // `src/main/runtime/construction/orca-runtime.test.ts`, which pulled every case in through
+  // `await import('../orca-runtime-tests/x.spec')` so its own file named no title. That file was one
+  // of the 5,489 test files upstream's "cut the suite to the tests that guard real invariants"
+  // (2cffdeda72c, #46786) deleted in the 2026-11-24 sync, and no `src/**/*.spec.ts` module survives
+  // anywhere in the tree, so there is no real file left to point at. The follow still runs on every
+  // manifest entry, so it is still worth pinning — the fixture reproduces the retired shape exactly
+  // instead of the test asserting something weaker about it.
   it('is found where the spec module writes it', () => {
-    // Why this shape: `src/main/runtime/construction/orca-runtime.test.ts` pulls every case in through
-    // `await import('../orca-runtime-tests/x.spec')`, so the entry's own file names no title at all.
-    const file = 'src/main/runtime/construction/orca-runtime.test.ts'
+    const dir = mkdtempSync(join(tmpdir(), 'unit-gate-spec-import-'))
+    const file = join(dir, 'imported-cases.test.ts')
     const title = 'OrcaRuntimeService browses runtime server directories before projects are added'
-    expect(importedCaseSpecifiers(sourceWithImportedCases(file)).length).toBeGreaterThan(0)
-    expect(titleExistsInSource(title, sourceWithImportedCases(file))).toBe(true)
-    // The same title in the file alone, to prove the follow is what found it.
-    expect(titleExistsInSource(title, readFileSync(join(ROOT, file), 'utf8'))).toBe(false)
+    writeFileSync(file, "await import('./pane-screen-cases.spec')\n")
+    writeFileSync(
+      join(dir, 'pane-screen-cases.spec.ts'),
+      "describe('OrcaRuntimeService', () => { it('browses runtime server directories before projects are added', () => {}) })\n"
+    )
+
+    try {
+      expect(importedCaseSpecifiers(sourceWithImportedCases(file)).length).toBeGreaterThan(0)
+      expect(titleExistsInSource(title, sourceWithImportedCases(file))).toBe(true)
+      // The same title in the file alone, to prove the follow is what found it.
+      expect(titleExistsInSource(title, readFileSync(file, 'utf8'))).toBe(false)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
 

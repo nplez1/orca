@@ -5,7 +5,19 @@
 name; where an older entry reads oddly for the topology it was written in (a `main` that mirrored
 upstream), the date on it is the explanation. `upstream/main` has always meant upstream's.
 
-Last updated **2026-11-20** — `main` merged upstream main @ `0c6207e3d7` (1,425 commits) from
+Last updated **2026-11-24** — `main` merged upstream main @ `7daf01d99f3` (1,350 commits) from
+`cc4fefcbaad` (merge base `0c6207e3d7`, merge `a8c508f5fb7`). **323 conflicted paths** —
+`modify/delete 192, both-rewrote 75, union 42, duplicate-tail 7, rename-replay 5,
+duplicate-members 2` — against an upstream delta that retired **6,116 files, 5,217 of them test
+suites and their harnesses**, and moved only 15 paths. 18 paths were proved mechanically, 177
+modify/delete conflicts taken as deletions (170 fork-modified test files, recorded in
+`local/sync/upstream-deleted-fork-tests-baseline.json`), 10 fork-owned test-support files kept, and
+106 both-modified paths resolved in nine area batches. `pnpm tc` opened at 132 errors. Decisions are
+in [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) § "2026-11-24 sync", the
+narrative in [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) § Sync log. Every local PR branch sits on a
+pre-sync base and needs its own catch-up before it can be opened.
+
+Previous — **2026-11-20** — `main` merged upstream main @ `0c6207e3d7` (1,425 commits) from
 `1db15d9ff0` (merge base `1ce376b27e`, merge `2ed6a05ce78`). **477 conflicted paths** —
 `both-rewrote 248, union 126, modify/delete 81, rename-replay 12, duplicate-tail 7,
 duplicate-members 2, add/add 1`. 77 modify/delete paths and 83 fork-modified test files were settled

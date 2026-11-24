@@ -471,15 +471,17 @@ describe('a host with both kinds of hook', () => {
 
     const hearing = saves.hearing(bot)
     expect(hearing.cloudSignedOut).toBe(true)
+    // Upstream rewrote this copy to name the signed-out host (host-orca-sign-in.ts); the fork never
+    // patched bot-event-sources.ts, so the refusal's wording is upstream's.
     expect(botEventTriggerRefusal(hearing, saves.cloudRules([slack])!)).toContain(
-      'signed out of Orca'
+      "isn't signed in to Orca Cloud"
     )
     // Its own hook is this computer's, so Orca Cloud is never asked to hear it.
     expect(saves.cloudRules([webhook])).toEqual([])
     expect(botEventTriggerRefusal(hearing, saves.cloudRules([webhook])!)).toBeNull()
     // A hook Orca Cloud made is still the cloud's, and still refused while signed out.
     expect(botEventTriggerRefusal(hearing, saves.cloudRules([cloudHook])!)).toContain(
-      'signed out of Orca'
+      "isn't signed in to Orca Cloud"
     )
     expect(localWebhooks.servesLocally(webhook)).toBe(true)
     expect(localWebhooks.servesLocally(slack)).toBe(false)

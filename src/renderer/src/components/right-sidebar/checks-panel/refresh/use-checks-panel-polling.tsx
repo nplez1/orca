@@ -44,7 +44,6 @@ export type ChecksPanelPollingInput = Pick<
     | 'asyncResultKeyRef'
     | 'activeWorktree'
     | 'branch'
-    | 'checks'
     | 'fetchPRChecks'
     | 'isPanelVisible'
     | 'pollIntervalRef'
@@ -59,7 +58,10 @@ export type ChecksPanelPollingInput = Pick<
     | 'setCommentsLoading'
     | 'gitLabProjectRefRef'
   > &
-  Pick<ChecksPanelComposerState, 'isCurrentAsyncResult'>
+  Pick<ChecksPanelComposerState, 'isCurrentAsyncResult'> & {
+    /** The rows already on screen; a timer-only model (the read-owner tests) omits them. */
+    checks?: ChecksPanelControllerState['checks']
+  }
 
 export function useChecksPanelPolling(model: ChecksPanelPollingInput) {
   const modelRef = useRef(model)
@@ -117,7 +119,7 @@ export function useChecksPanelPolling(model: ChecksPanelPollingInput) {
         showsPickedReview
       } = modelRef.current
       const readStartedAt = Date.now()
-      const checksPending = hasUnfinishedChecks(checks)
+      const checksPending = hasUnfinishedChecks(checks ?? [])
       const targetPRNumber = prNumberOverride ?? prNumber
       if (!repo || !targetPRNumber) {
         return

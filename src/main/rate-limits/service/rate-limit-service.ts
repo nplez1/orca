@@ -55,7 +55,8 @@ export class RateLimitService extends RateLimitServiceAccountRefresh {
       return Promise.resolve()
     }
     this.lastOwnerReturnAt = now
-    return this.refreshIfWatched()
+    // An unwatched return stamps the interval but leaves the stale reading to the next watched one.
+    return this.isUsageWatched() ? this.refreshIfWatched() : Promise.resolve()
   }
 
   setCodexHomePathResolver(resolver: CodexHomePathResolver): void {

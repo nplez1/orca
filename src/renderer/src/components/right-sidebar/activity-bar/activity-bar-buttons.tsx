@@ -110,7 +110,7 @@ export function TopActivityOverflowMenu({
   stripItemIds?: ReadonlySet<string>
   items: ActivityBarItem[]
   activeTab: ActiveRightSidebarTab
-  onSelect: (tab: ActiveRightSidebarTab, fromKeyboard: boolean) => void
+  onSelect: (tab: ActiveRightSidebarTab, fromPointer: boolean) => void
   checksStatus?: CheckStatus | null
 }): React.JSX.Element {
   const t = useTranslate()
@@ -197,7 +197,7 @@ export function TopActivityOverflowMenu({
                 <DropdownMenuItem
                   // Focus on More when it opened means the keyboard opened it.
                   onSelect={() =>
-                    onSelect(item.id, focusBeforeOpenRef.current === triggerRef.current)
+                    onSelect(item.id, focusBeforeOpenRef.current !== triggerRef.current)
                   }
                   onKeyDown={openKeyboardContextMenu}
                   data-activity-item-id={item.id}

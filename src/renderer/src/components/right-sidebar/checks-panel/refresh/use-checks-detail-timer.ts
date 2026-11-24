@@ -277,7 +277,7 @@ export function useChecksDetailTimer({
   // when the rollup reports a run the panel cannot see. The other direction resolves itself: the
   // fetch writes its verdict into the PR and hosted-review caches, which is what the icon and the
   // sidebar card read. GitLab has no such write-back, so it is left to the status flip above.
-  const displayedStatus = checks.length > 0 ? derivePRCheckStatus(checks) : null
+  const displayedStatus = checks?.length ? derivePRCheckStatus(checks) : null
   const unseenRollupRun = rollupReportsUnseenRun(
     displayedStatus,
     isGitLabReview ? null : (pr?.checksStatus ?? null)

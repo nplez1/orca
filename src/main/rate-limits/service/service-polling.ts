@@ -53,8 +53,22 @@ export abstract class RateLimitServicePolling extends RateLimitServiceFetchQueue
     }
   }
 
+  /** Whether anyone watches: a paired client's stream, or the focused desktop window. */
+  protected isUsageWatched(): boolean {
+    if (this.usageViewers > 0) {
+      return true
+    }
+    return (
+      this.mainWindow !== null &&
+      !this.mainWindow.isDestroyed() &&
+      this.mainWindow.isVisible() &&
+      !this.mainWindow.isMinimized() &&
+      this.mainWindow.isFocused()
+    )
+  }
+
   protected shouldBackgroundPoll(): boolean {
-    // Poll only while someone watches: a paired client's stream, or the focused desktop window.
+    // Poll only while someone watches: a paired client's stream, or a desktop window that exists.
     if (this.usageViewers > 0) {
       return true
     }

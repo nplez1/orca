@@ -15,8 +15,8 @@ let seenRouteRequestId: number | null = null
 
 export type RightSidebarTabRouting = {
   effectiveTab: ActiveRightSidebarTab
-  /** `fromKeyboard` is false for a pointer-activated tab, which hands focus back to the agent tab. */
-  selectActivityTab: (tab: ActiveRightSidebarTab, fromKeyboard: boolean) => void
+  /** `fromPointer` is false for a keyboard-activated tab, which keeps its own focus. */
+  selectActivityTab: (tab: ActiveRightSidebarTab, fromPointer: boolean) => void
 }
 
 export function useRightSidebarTabRouting({
@@ -89,13 +89,13 @@ export function useRightSidebarTabRouting({
     }
     rememberedFolderTabByWorkspaceKeyRef.current[activeFolderWorkspaceKey] = effectiveTab
   }, [activeFolderWorkspaceKey, effectiveTab, visibleItems])
-  const selectActivityTab = (tab: ActiveRightSidebarTab, fromKeyboard: boolean): void => {
+  const selectActivityTab = (tab: ActiveRightSidebarTab, fromPointer: boolean): void => {
     if (activeFolderWorkspaceKey) {
       rememberedFolderTabByWorkspaceKeyRef.current[activeFolderWorkspaceKey] = tab
     }
     // Why: the tab strip and the panel body need no typed input, so a pointer click
     // hands focus back to the agent tab instead of stranding it on chrome.
-    if (!fromKeyboard) {
+    if (fromPointer) {
       restoreAgentTabFocusAfterGesture(1)
     }
     if (tab === 'explorer') {
@@ -107,7 +107,7 @@ export function useRightSidebarTabRouting({
       openBotConnectorPage(null)
     }
     // A mouse switch leaves focus where it is (#46611); keyboard activation moves into Agents search.
-    setRightSidebarTab(tab, { focusVaultSearch: fromKeyboard })
+    setRightSidebarTab(tab, { focusVaultSearch: !fromPointer })
   }
 
   return { effectiveTab, selectActivityTab }
