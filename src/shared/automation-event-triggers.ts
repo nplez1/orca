@@ -49,8 +49,9 @@ export const AUTOMATION_EVENT_KINDS = {
 
 /**
  * The one event a rule's `fromOwner` may take. On GitHub the bot works as its owner, so the owner's
- * other events (pushes, comments, reviews) would start it on its own work. Every pull request opened
- * under the owner's account counts as theirs, their agents' workers' included.
+ * other events (pushes, comments, reviews) would start it on its own work. A pull request opened by
+ * the owner counts as theirs; one their agents' workers opened as them does not — the own-PR guard
+ * tells the two apart by the head branch, where the cloud cannot — upstream removed its copy (#47879).
  */
 export const OWN_EVENT_KINDS = [{ source: 'github', event: 'pr_opened' }] as const
 

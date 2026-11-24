@@ -42,6 +42,8 @@ Rules for using it:
 
 **Decision:** upstream deleted the module and its suite; the fork keeps them because the bot-work guard (`bot_work` from the gh marker in the event text, the burst cap, the rule's `from=me`) exists only here. The caller is wired through `connector-cloud-install.ts` as above.
 
+**Also keep aligned:** `src/cli/automations/automation-event-words.ts` `SOURCE_NOTES.github` and the `OWN_EVENT_KINDS` doc in `src/shared/automation-event-triggers.ts`. Upstream #47879 states the opposite rule ("a from=me pull request rule starts for every pull request opened under the owner's account, your agents' workers' included") and its help text says so; with the guard kept, both texts are reworded to the fork's rule — the owner's own pull request starts the rule, one a bot or its workers opened as them does not. A sync that touches either text must re-apply the fork's wording, or the shipped `--help` describes behaviour this build does not have.
+
 ### The photon connector row lives in upstream's shared builder now
 
 **Paths:** `src/shared/bots/bot-connector-entries.ts`, `src/renderer/src/components/bots/bot-connector-entries.ts`, `src/renderer/src/components/settings/bots/BotConnectorsSection.tsx`
