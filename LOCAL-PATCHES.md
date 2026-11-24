@@ -123,8 +123,8 @@ went with upstream's bulk test removals and ownership refactors in the 2026-11-2
 itself moved into `updater/releases/`). The prerelease-feed and feed-readiness suites were the last two
 of that family and went in upstream's 2026-11-24 test-inventory pass, so the mapping is covered through
 the two above and the retired updater cases are re-homed in
-`src/main/updater/releases/updater-fork-feed.test.ts` — all but the two REST-list-first update-delay
-cases, which no test covers, as `local/sync/convergence-ledger.md` records.
+`src/main/updater/releases/updater-fork-feed.test.ts` — all but the REST-list-first update-delay
+describe block, whose four cases no test covers, as `local/sync/convergence-ledger.md` records.
 
 **The project's own links follow the same constant.** `src/shared/orca-repository.ts` derives
 `ORCA_REPOSITORY` / `ORCA_REPOSITORY_URL`, plus the scheme-less `ORCA_REPOSITORY_DISPLAY_URL` that

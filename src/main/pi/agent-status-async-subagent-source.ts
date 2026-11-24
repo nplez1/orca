@@ -191,7 +191,7 @@ export function getPiAgentStatusAsyncSubagentSourceLines(kind: PiAgentKind): str
     '        const acted = started ? onAsyncStarted(payload) : onAsyncComplete(payload)',
     '        // Why a forced completed: the roster binds this channel to onRunnerExit, which waits',
     '        // RUNNER_EXIT_GRACE_MS, so without it a pane whose child’s runner exited reads working',
-    '        // for the whole grace. A real completion (the other two channels) has no such wait.',
+    '        // for the whole grace. Only subagent:async-complete is a completion here; the other is a start.',
     "        if (acted) handToRoster(payload, started ? 'started' : 'completed')",
     '      }',
     '      bus.on(channel, listener)',
