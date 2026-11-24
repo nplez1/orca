@@ -17,9 +17,11 @@ export type LinkedProjectSkill = {
   skillFile: string
 }
 
-/** A project a bot links for skills, as a chat about to start loads it. */
+/** A project or a computer folder a bot loads for skills, as a chat about to start loads it. */
 export type LinkedSkillProject = {
   name: string
+  /** `folder`: one of this computer's skill folders, which is nobody's project and reaches no worker. */
+  kind?: 'project' | 'folder'
   repoPath: string
   skills: readonly LinkedProjectSkill[]
 }
@@ -36,7 +38,7 @@ export type LinkedSkills = {
 export const NO_LINKED_SKILLS: LinkedSkills = { root: null, projects: [] }
 
 /** A linked project's skills as a list names them. */
-export type LinkedSkillListing = Pick<LinkedSkillProject, 'name' | 'skills'>
+export type LinkedSkillListing = Pick<LinkedSkillProject, 'name' | 'skills' | 'kind'>
 
 // Codex budgets its skill list at 2% of context; the whole index stays well under that.
 const INDEX_MAX_CHARS = 12_000
@@ -77,11 +79,23 @@ export function linkedSkillsSection(
   if (projects.length === 0) {
     return null
   }
-  const names = projects.map((project) => project.name).join(', ')
+  const linked = projects.filter((project) => project.kind !== 'folder')
+  const folders = projects.filter((project) => project.kind === 'folder')
+  const names = linked.map((project) => project.name).join(', ')
   return [
-    '## Skills from linked projects',
+    // A folder-only list has no projects to name, and a heading that says otherwise would be a lie.
+    folders.length > 0 ? '## Skills' : '## Skills from linked projects',
     '',
-    `Skills from ${names}: use them to plan and drive that project's work; code work still goes to a worker in that project, which has them too; name the skill in the spec.`,
+    ...(linked.length > 0
+      ? [
+          `Skills from ${names}: use them to plan and drive that project's work; code work still goes to a worker in that project, which has them too; name the skill in the spec.`
+        ]
+      : []),
+    ...(folders.length > 0
+      ? [
+          `Skills from this computer's own folders (${folders.map((folder) => folder.name).join(', ')}): they document tools installed here, not a project. No worker has them, so run their commands yourself.`
+        ]
+      : []),
     ...(named
       ? [
           '',

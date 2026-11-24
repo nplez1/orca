@@ -3,14 +3,15 @@
 import React, { useId, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { SettingsSubsectionHeader } from '@/components/settings/form-controls/SettingsFormControls'
 import { useTranslate } from '@/i18n/use-translate'
 import { useAppStore } from '@/store'
 
-/** A path is a folder here only if it names one: a bare word would silently load nothing. */
-function looksLikePath(value: string): boolean {
+/** Whether a folder here is a path main can resolve: absolute, or `~`-rooted, which it expands. */
+export function isSkillFolderPath(value: string): boolean {
   const trimmed = value.trim()
-  return trimmed.length > 1 && (trimmed.includes('/') || trimmed.includes('\\'))
+  return trimmed.startsWith('~/') || (trimmed.length > 1 && trimmed.startsWith('/'))
 }
 
 export function BotSkillFoldersSection(): React.JSX.Element {
@@ -18,11 +19,13 @@ export function BotSkillFoldersSection(): React.JSX.Element {
   const inputId = useId()
   const settings = useAppStore((state) => state.settings)
   const updateSettings = useAppStore((state) => state.updateSettings)
-  const folders = settings?.botSkillFolders ?? []
+  const folders = Array.isArray(settings?.botSkillFolders) ? settings.botSkillFolders : []
   const [draft, setDraft] = useState('')
+  const folder = draft.trim()
+  const duplicate = folders.includes(folder)
+  const valid = isSkillFolderPath(folder) && !duplicate
   const add = (): void => {
-    const folder = draft.trim()
-    if (!looksLikePath(folder) || folders.includes(folder)) {
+    if (!valid) {
       return
     }
     void updateSettings({ botSkillFolders: [...folders, folder] })
@@ -39,15 +42,18 @@ export function BotSkillFoldersSection(): React.JSX.Element {
       />
       {folders.length > 0 ? (
         <ul className="divide-y divide-border rounded-md border border-border">
-          {folders.map((folder) => (
-            <li key={folder} className="flex items-center gap-3 px-3 py-2 text-xs">
-              <span className="min-w-0 flex-1 break-all">{folder}</span>
+          {folders.map((entry) => (
+            <li key={entry} className="flex items-center gap-3 px-3 py-2 text-xs">
+              <span className="min-w-0 flex-1 break-all">{entry}</span>
               <Button
                 size="xs"
                 variant="ghost"
+                aria-label={t('settings.bots.skillFoldersRemoveOne', 'Stop loading {{folder}}', {
+                  folder: entry
+                })}
                 onClick={() =>
                   void updateSettings({
-                    botSkillFolders: folders.filter((entry) => entry !== folder)
+                    botSkillFolders: folders.filter((kept) => kept !== entry)
                   })
                 }
               >
@@ -64,9 +70,9 @@ export function BotSkillFoldersSection(): React.JSX.Element {
           add()
         }}
       >
-        <label htmlFor={inputId} className="sr-only">
+        <Label htmlFor={inputId} className="sr-only">
           {t('settings.bots.skillFoldersAddLabel', 'Folder of skills')}
-        </label>
+        </Label>
         <Input
           id={inputId}
           autoComplete="off"
@@ -75,16 +81,30 @@ export function BotSkillFoldersSection(): React.JSX.Element {
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           placeholder={t('settings.bots.skillFoldersPlaceholder', '~/.agents/skills')}
-          aria-invalid={draft.trim().length > 0 && !looksLikePath(draft)}
+          aria-invalid={folder.length > 0 && !valid}
+          aria-describedby={`${inputId}-hint`}
         />
-        <Button type="submit" size="xs" variant="outline" disabled={!looksLikePath(draft)}>
+        <Button type="submit" size="xs" variant="outline" disabled={!valid}>
           {t('settings.bots.skillFoldersAdd', 'Add folder')}
         </Button>
       </form>
+      <p id={`${inputId}-hint`} className="text-xs text-muted-foreground">
+        {duplicate
+          ? t('settings.bots.skillFoldersDuplicate', 'That folder is already listed.')
+          : folder.length > 0 && !valid && !duplicate
+            ? t(
+                'settings.bots.skillFoldersMustBeAbsolute',
+                'Give a full path, or one that starts with ~/. A relative path means a different folder per chat.'
+              )
+            : t(
+                'settings.bots.skillFoldersWhen',
+                'A change reaches a bot with its next message. Each child must hold a SKILL.md that names the skill; a folder with none loads nothing and is dropped silently.'
+              )}
+      </p>
       <p className="text-xs text-muted-foreground">
         {t(
-          'settings.bots.skillFoldersWhen',
-          'A change reaches a bot with its next message. Each folder’s children must hold a SKILL.md that names the skill.'
+          'settings.bots.skillFoldersShared',
+          'Whatever is in these folders is loaded by every bot on this computer, including bots other people can message. Keep a shared folder to tools you would hand them anyway.'
         )}
       </p>
     </section>

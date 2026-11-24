@@ -7,12 +7,12 @@ import {
   symlinkSync,
   writeFileSync
 } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { Repo } from '../../shared/repository/repo-types'
 import { linkedSkillsSection } from '../native-chat/native-chat-skill-roots'
-import { botSkillProjectViews, linkedSkillProjects } from './bot-skill-projects'
+import { botSkillProjectViews, linkedSkillProjects, resolveSkillRoot } from './bot-skill-projects'
 
 const dirs: string[] = []
 afterEach(() => {
@@ -265,18 +265,31 @@ describe("a computer's skill folders", () => {
     expect(contentsOf(folder).skills).toEqual(['outlook-mail'])
     expect(realpathSync(join(folder, 'skills', 'outlook-mail'))).toBe(mailbox)
     expect(linked.projects).toMatchObject([
-      { name: 'skills', repoPath: join(base, 'agents', 'skills') }
+      { name: join(base, 'agents', 'skills'), kind: 'folder' }
     ])
   })
 
-  it('ignores a folder that holds no skill, rather than reporting an empty project', async () => {
+  it('links one skill once when a project and a folder name the same folder', async () => {
     const base = scratch()
-    mkdirSync(join(base, 'empty'), { recursive: true })
+    const shared = writeSkill(join(base, 'agents', 'skills'), 'outlook-mail')
+    const project = join(base, 'orca')
+    mkdirSync(join(project, '.agents', 'skills'), { recursive: true })
+    symlinkSync(shared, join(project, '.agents', 'skills', 'mail'))
+    const folder = join(base, 'bot')
 
-    const linked = await linkedSkillProjects({ skillProjects: [] }, [], join(base, 'bot'), [
-      join(base, 'empty')
+    await linkedSkillProjects({ skillProjects: ['orca'] }, [repo('orca', project)], folder, [
+      join(base, 'agents', 'skills')
     ])
 
-    expect(linked.projects).toEqual([])
+    expect(contentsOf(folder).skills).toEqual(['outlook-mail'])
+  })
+})
+
+describe('a settings folder as main reads it', () => {
+  it('expands ~ against the real home and refuses anything that is not a path', () => {
+    expect(resolveSkillRoot('~/agents/skills')).toBe(join(homedir(), 'agents', 'skills'))
+    expect(resolveSkillRoot('/opt/orca/skills')).toBe('/opt/orca/skills')
+    // Main's cwd is nobody's home: a relative folder would name a different one per chat.
+    expect(resolveSkillRoot('agents/skills')).toBeNull()
   })
 })

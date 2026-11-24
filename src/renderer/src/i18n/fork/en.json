@@ -1515,7 +1515,11 @@
       "skillFoldersAddLabel": "Folder of skills",
       "skillFoldersPlaceholder": "~/.agents/skills",
       "skillFoldersAdd": "Add folder",
-      "skillFoldersWhen": "A change reaches a bot with its next message. Each folder’s children must hold a SKILL.md that names the skill."
+      "skillFoldersWhen": "A change reaches a bot with its next message. Each child must hold a SKILL.md that names the skill; a folder with none loads nothing and is dropped silently.",
+      "skillFoldersRemoveOne": "Stop loading {{folder}}",
+      "skillFoldersDuplicate": "That folder is already listed.",
+      "skillFoldersMustBeAbsolute": "Give a full path, or one that starts with ~/. A relative path means a different folder per chat.",
+      "skillFoldersShared": "Whatever is in these folders is loaded by every bot on this computer, including bots other people can message. Keep a shared folder to tools you would hand them anyway."
     }
   },
   "terminal": {
@@ -1608,13 +1612,14 @@
         },
         "title": "GitHub App",
         "tokenExpires": "A token it minted expires at {{time}}. Bots mint a new one when it does.",
-        "workflowsWrite": "This installation also has Workflows: write, so a push as the App can change .github/workflows."
+        "workflowsWrite": "This installation also has Workflows: write, so a push as the App can change .github/workflows.",
+        "workflowsMissing": "This installation has no Workflows: write, so a push that changes .github/workflows is refused. Grant it on GitHub, then Refresh."
       }
     },
     "photon": {
       "connectFailed": "Could not connect Photon on this computer.",
       "organizationId": "Photon organization ID",
-      "organizationIdHint": "From your Photon dashboard. Photon assigns the numbers; Orca only asks it for one per bot.",
+      "organizationIdHint": "From your Photon dashboard. Photon assigns the numbers; Orca asks it for one when a bot needs a line.",
       "accountKey": "Account key",
       "storesKey": "Keep the key on this computer, sealed by its keyring. Otherwise it lasts this session.",
       "connect": "Connect Photon",
@@ -1623,7 +1628,6 @@
       "released": "Released",
       "numberPending": "number pending",
       "noHandles": "Nobody may text it yet.",
-      "drift": "{{unknown}} messages from numbers it has no assignment for, and {{parked}} it could not deliver. Repair re-reads the assignment list.",
       "handle": "Phone number or Apple ID",
       "handlePlaceholder": "+15551234567",
       "addMember": "Let them text it",
@@ -1635,10 +1639,21 @@
       "description": "Optional. Text your bots, through your own Photon account. Orca needs no account for it.",
       "readFailed": "Could not read the iMessage channel on this computer.",
       "retry": "Try again",
-      "connectedStored": "Connected, and the key stays on this computer.",
       "connectedSession": "Connected for this session only.",
-      "notSealed": "This computer cannot seal a key, so it is not kept.",
-      "refresh": "Refresh"
+      "refresh": "Refresh",
+      "cannotStoreKey": "This computer has no keyring to seal a key with, so it is not written: the key lasts this session.",
+      "releasedWhatLeft": "Its number and key are gone; only the Photon project is left, and Orca will not burn a project from Settings. Delete that project in Photon if the slug is not needed again.",
+      "removeMemberFor": "Stop {{handle}} texting it",
+      "removeMember": "Remove",
+      "unknownSenders": "{{count}} messages from numbers it has no assignment for. Repair re-reads the assignment list from Photon.",
+      "parked": "{{count}} messages could not be delivered. Last reason: {{reason}}",
+      "parkedUnknown": "not recorded",
+      "undelivered": "{{count}} answers never arrived within its retry window. Last reason: {{reason}}",
+      "releaseConfirmTitle": "Release {{bot}}’s number?",
+      "releaseConfirmBody": "Its numbers are released and its key is revoked. Settings has no way back: giving it a number again needs the project deleted first, which Orca leaves to the Photon dashboard.",
+      "cancel": "Cancel",
+      "connectedSealed": "Connected, and the key is sealed on this computer.",
+      "connectedUnsealed": "Connected, and the stored key is only base64: this host has no keyring to seal it."
     }
   }
 }

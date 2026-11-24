@@ -7,6 +7,7 @@
 export const HOST_SYNC_DISPOSITION_ROWS_A = {
   // ---- hostLocal: names something only this machine has ------------------------------
   workspaceDir: 'hostLocal',
+  botSkillFolders: 'hostLocal',
   hostSettingOverrides: 'hostLocal',
   terminalGpuAcceleration: 'hostLocal',
   terminalWindowsShell: 'hostLocal',
@@ -196,8 +197,6 @@ export const HOST_SYNC_DISPOSITION_ROWS_A = {
   artifactsEnabled: 'replicated',
   artifactSharingEnabled: 'replicated',
   agentSkillSharingEnabled: 'replicated',
-  // Paths on one machine; another host has its own skills tree, so they never travel.
-  botSkillFolders: 'hostLocal',
   nestedWorkerMaxDepth: 'replicated',
   showArtifactsButton: 'replicated',
   showSkillsButton: 'replicated',

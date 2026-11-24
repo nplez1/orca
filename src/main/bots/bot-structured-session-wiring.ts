@@ -32,6 +32,7 @@ import type { BotController } from './bot-controller'
 import type { BotWorkRecord } from './bot-work-record'
 import {
   botLinkedSkillsFolder,
+  linkedSkillKeys,
   linkedSkillListing,
   linkedSkillProjects
 } from './bot-skill-projects'
@@ -152,7 +153,7 @@ export function botStructuredSessionWiring(deps: {
     (sessionId, message) => deps.work.turnNote(sessionId, message),
     deps.bots.memory,
     {
-      projects: (botId) => botById(botId)?.skillProjects ?? null,
+      projects: (botId) => linkedSkillKeys(botById(botId)?.skillProjects, deps.botSkillFolders),
       launchScanned: (sessionId) => launchScans.get(sessionId) ?? null,
       listed: async (botId, projects, sessionId) => {
         const repos = deps.store().getRepos()
@@ -241,7 +242,7 @@ export function botStructuredSessionWiring(deps: {
       }
       try {
         const linked = await syncLinkedSkills(bot)
-        launchScans.set(record.sessionId, bot.skillProjects ?? null)
+        launchScans.set(record.sessionId, linkedSkillKeys(bot.skillProjects, deps.botSkillFolders))
         if (LIVE_SKILLS_PROVIDERS.has(record.provider)) {
           liveSkills.add(record.sessionId)
         } else {

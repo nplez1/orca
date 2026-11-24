@@ -1,6 +1,5 @@
-// The RPC surface for the iMessage channel, beside the other bot connector methods. These are the v1
-// surface: the settings card is deferred, so a client drives connect, create, add and release through
-// here rather than waiting on a UI.
+// The RPC surface for the iMessage channel, beside the other bot connector methods. Settings › Bots is a
+// client of these, so a connection, a number, or who may text a bot is changed here and nowhere else.
 //
 // Every method that *changes* something is `ownerOnly`. Orca's rule is that an agent's CLI never edits
 // who may text a bot, and the permission strings do not enforce it: an unstamped local CLI call reads as

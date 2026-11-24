@@ -1,7 +1,8 @@
 // The projects a bot links for skills: which skills each has, read on this host, and the bot's one
 // skill-only folder its chats load them from.
 import { lstat, mkdir, open, readdir, realpath, rm, symlink } from 'node:fs/promises'
-import { basename, dirname, join } from 'node:path'
+import { homedir } from 'node:os'
+import { basename, dirname, isAbsolute, join } from 'node:path'
 import type { Bot } from '../../shared/bot-types'
 import type { BotSkillProjectView } from '../../shared/bots/bot-skill-projects'
 import type { Repo } from '../../shared/repository/repo-types'
@@ -104,7 +105,13 @@ export function botLinkedSkillsFolder(botId: string): string {
 function skillLinks(skills: readonly ScannedSkill[]): Map<string, string> {
   const links = new Map<string, string>()
   const taken = new Set<string>()
+  const linked = new Set<string>()
   for (const skill of skills) {
+    // One skill under two roots or a project and a root is one link: a second would list it twice.
+    if (linked.has(skill.folder)) {
+      continue
+    }
+    linked.add(skill.folder)
     const base = safeName(basename(skill.folder))
     let link = base
     for (let n = 2; taken.has(link.toLowerCase()); n += 1) {
@@ -195,26 +202,50 @@ export async function linkedSkillListing(
   const scanned = [
     ...(await scanLinkedProjects(ids, repos)).map(({ repo, skills }) => ({
       name: repo.displayName,
-      skills
+      skills,
+      kind: 'project' as const
     })),
     ...(await scanSkillRoots(roots))
   ]
-  return scanned.map(({ name, skills }) => ({
+  return scanned.map(({ name, skills, kind }) => ({
     name,
+    kind,
     skills: skills.map(({ folder: _folder, ...skill }) => skill)
   }))
 }
 
-/** A computer's skill folders, scanned as roots: each child is a skill, so the folder itself is the
- *  skills directory. This is how a tree kept outside Orca (`~/.agents/skills`) reaches every bot. */
+/** A settings folder as main reads it: `~` expanded, and null for what is not a path at all — main's
+ *  cwd is nobody's home, so a relative one names a different folder per chat and is never guessed at. */
+export function resolveSkillRoot(root: string): string | null {
+  const path = root.startsWith('~/') ? join(homedir(), root.slice(2)) : root
+  return isAbsolute(path) ? path : null
+}
+
+/** A bot's linked-skill keys: its projects and this computer's folders, so a folder change relinks. */
+export function linkedSkillKeys(
+  ids: readonly string[] | null | undefined,
+  folders?: () => readonly string[]
+): readonly string[] | null {
+  const roots = (folders?.() ?? []).map((root) => `folder:${root}`)
+  return ids || roots.length > 0 ? [...(ids ?? []), ...roots] : null
+}
+
 async function scanSkillRoots(
   roots: readonly string[]
-): Promise<{ name: string; path: string; skills: ScannedSkill[] }[]> {
+): Promise<{ name: string; path: string; skills: ScannedSkill[]; kind: 'folder' }[]> {
   const scanned = await Promise.all(
-    roots.map(async (root): Promise<{ name: string; path: string; skills: ScannedSkill[] }[]> => {
-      const skills = await scanSkillsFolder(root)
-      return skills.length > 0 ? [{ name: basename(root), path: root, skills }] : []
-    })
+    roots.map(
+      async (
+        root
+      ): Promise<{ name: string; path: string; skills: ScannedSkill[]; kind: 'folder' }[]> => {
+        const path = resolveSkillRoot(root)
+        if (path === null) {
+          return []
+        }
+        const skills = await scanSkillsFolder(path)
+        return skills.length > 0 ? [{ name: path, path, skills, kind: 'folder' as const }] : []
+      }
+    )
   )
   return scanned.flat()
 }
@@ -238,7 +269,8 @@ export async function linkedSkillProjects(
       ...(await scanLinkedProjects(bot.skillProjects ?? [], repos)).map(({ repo, skills }) => ({
         name: repo.displayName,
         path: repo.path,
-        skills
+        skills,
+        kind: 'project' as const
       })),
       ...(await scanSkillRoots(roots))
     ]
@@ -249,8 +281,9 @@ export async function linkedSkillProjects(
   })
   return {
     root: { skillsRoot: join(folder, 'skills'), pluginDir: folder, linksOut: true },
-    projects: scanned.map(({ name, path, skills }) => ({
+    projects: scanned.map(({ name, path, skills, kind }) => ({
       name,
+      kind,
       repoPath: path,
       skills: skills.map(({ folder: _folder, ...skill }) => skill)
     }))
@@ -261,9 +294,10 @@ export async function linkedSkillProjects(
  *  chats' `/` menus reread them. */
 export function relinkBotSkills(
   bot: Pick<Bot, 'id' | 'skillProjects' | 'folderWorkspaceId'>,
-  repos: readonly Repo[]
+  repos: readonly Repo[],
+  roots: readonly string[] = []
 ): void {
-  void linkedSkillProjects(bot, repos, botLinkedSkillsFolder(bot.id))
+  void linkedSkillProjects(bot, repos, botLinkedSkillsFolder(bot.id), roots)
     .catch(() => {})
     .finally(() => retireAtRestCommandContext(folderWorkspaceKey(bot.folderWorkspaceId)))
 }

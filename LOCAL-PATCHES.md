@@ -5728,11 +5728,19 @@ rather than transport. Each is small; together they were the difference between 
 "a person can use it".
 
 **iMessage had no way in.** Every Photon RPC existed and nothing called it, so the channel was merged and
-unreachable. `components/bots/photon/PhotonChannelSettings.tsx` is the card: connect with an organization
-id and account key (stored only if the owner says so), then per bot a number, the people who may text it,
-Repair, and Release. It mounts in the computer's group beside the GitHub App, and renders nothing on a host
-that answers `method_not_found`. `src/renderer/src/lib/photon-channel-client.ts` is the RPC client, shaped
-like `github-app-client.ts`.
+unreachable. `components/bots/photon/PhotonChannelSettings.tsx` is the card, with `PhotonConnectForm.tsx`
+and `PhotonBotLine.tsx` beside it: connect with an organization id and account key (stored only if the
+owner says so), then per bot a number, the people who may text it — each removable — Repair (its notes
+shown), and Release behind a confirmation, because releasing is a dead end Settings cannot undo. It mounts
+in the computer's group beside the GitHub App and renders nothing on a host that answers
+`method_not_found`. `src/renderer/src/lib/photon-channel-client.ts` is the RPC client, shaped like
+`github-app-client.ts`, and both now sit on the shared `host-rpc-view.ts` hook.
+
+**Keeping a key needs a keyring, and the card says so.** `photon-secrets.ts` falls back to `plain:`
+base64 when the host cannot seal, and `PhotonService.connect` refused to be quiet about that: it will not
+write a key it cannot seal (`assertPhotonKeyCanBeStored`), and the checkbox is disabled with a sentence
+that names the session-only consequence. Before this, "kept, sealed by its keyring" and "not kept" could
+both be wrong on the same host.
 
 **A working webhook was called paused.** `BotWebhooksCard` replaced its whole face with "paused while
 signed out" whenever Orca Cloud was signed out, while a local hook went on firing. `WebhookSummary` now
@@ -5753,9 +5761,17 @@ or `<repo>/.claude/skills`, linked per bot. A tree kept outside Orca — `~/.age
 setup keeps its skills — could only be linked by registering its parent as a folder project. The setting
 `botSkillFolders` (`GlobalSettings`, disposition `hostLocal`) is a list of folders whose children are skills;
 `scanSkillRoots` in `bot-skill-projects.ts` scans them and `linkedSkillProjects` / `linkedSkillListing` link
-them beside the projects, so every bot on the computer loads them. Settings › Bots › this computer edits the
-list, and a change reaches a bot with its next message. One per computer, not per bot, because the tools
-they document are installed once on that computer.
+them beside the projects, so every bot on the computer loads them.
+
+Four things make it work rather than nearly work. A path is read by `resolveSkillRoot`, which expands `~/`
+and refuses anything not absolute — Settings suggests `~/.agents/skills`, and main's cwd is nobody's home, so
+without that the headline case loaded nothing silently. `linkedSkillKeys` puts the folders in the key a
+running chat compares, so adding one reaches an open chat at its next message instead of its next launch.
+`relinkBotSkills` is handed the folders too, because `syncLinks` deletes every link it was not given and a
+project change would otherwise strip them. And `skillLinks` de-duplicates by folder, so a root that overlaps
+a linked project's `.agents/skills` links one skill once. One list per computer, not per bot, because the
+tools they document are installed once on that computer; the section says plainly that every bot here loads
+the folder, including bots other people can message.
 
 **Not rebuilt, on purpose.** `src/main/bots/bot-pr-events.ts` is inert in upstream and no fork commit
 touched it: a bot is no longer woken by its workers' pull requests. The account-free way to react to GitHub

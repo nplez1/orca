@@ -147,16 +147,19 @@ function connectorSummary(
 }
 
 /** Where people can reach one computer's bots, and why not when its server isn't signed in. */
-function ComputerConnectors({ computer }: { computer: BotSettingsComputer }): React.JSX.Element {
+function ComputerConnectors({
+  computer,
+  appLogin
+}: {
+  computer: BotSettingsComputer
+  /** The connected App's login. The group reads it once and hands it to the App's panel too. */
+  appLogin: string | null
+}): React.JSX.Element {
   const t = useTranslate()
   const bots = useHostBots(computer.hostId)
   const available = useBotConnectorAvailable(computer.hostId)
   const google = useGoogleHost(botHostTarget(computer.hostId))
   const googleConnected = google.status === 'ready' && google.google.accounts.length > 0
-  // A connected App is a GitHub identity that needs no cloud, so the row must not read "Coming soon".
-  const githubApp = useGithubApp(computer.hostId).view
-  const appLogin =
-    githubApp.status === 'ready' && githubApp.app.connected ? githubApp.app.login : null
   return (
     <section className="space-y-3">
       <SettingsSubsectionHeader
@@ -295,12 +298,15 @@ function ServerGroup({ computer }: { computer: BotSettingsComputer }): React.JSX
 function LiveServerGroup({ computer }: { computer: BotSettingsComputer }): React.JSX.Element {
   const t = useTranslate()
   const host = computer.name
+  const app = useGithubApp(computer.hostId)
+  const appLogin =
+    app.view.status === 'ready' && app.view.value.connected ? app.view.value.login : null
   return (
     <SettingsGroup icon={Server} title={host} detail={useServerAccountLine(computer)}>
       <ServerEnableRow hostId={computer.hostId} host={host} />
       <ComputerBots computer={computer} />
-      <ComputerConnectors computer={computer} />
-      <GitHubAppSettings hostId={computer.hostId} hostName={host} />
+      <ComputerConnectors computer={computer} appLogin={appLogin} />
+      <GitHubAppSettings hostId={computer.hostId} hostName={host} appRead={app} />
       <PhotonChannelSettings hostId={computer.hostId} hostName={host} />
       <GoogleAccountSettings target={botHostTarget(computer.hostId)} />
       <ComposioKeySection
@@ -355,11 +361,14 @@ function ComposioKeySection({
 function LocalGroup({ computer }: { computer: BotSettingsComputer }): React.JSX.Element {
   const t = useTranslate()
   const email = useAppStore((state) => state.orcaProfileAuthStatus?.cloud?.email ?? null)
+  const app = useGithubApp(computer.hostId)
+  const appLogin =
+    app.view.status === 'ready' && app.view.value.connected ? app.view.value.login : null
   return (
     <SettingsGroup icon={Laptop} title={computer.name} detail={email}>
       <ComputerBots computer={computer} />
-      <ComputerConnectors computer={computer} />
-      <GitHubAppSettings hostId={computer.hostId} hostName={null} />
+      <ComputerConnectors computer={computer} appLogin={appLogin} />
+      <GitHubAppSettings hostId={computer.hostId} hostName={null} appRead={app} />
       <PhotonChannelSettings hostId={computer.hostId} hostName={null} />
       <BotSkillFoldersSection />
       <GoogleAccountSettings target={botHostTarget(computer.hostId)} />

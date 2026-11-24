@@ -1,8 +1,8 @@
-// A host's iMessage channel, as Photon holds it: read here, changed on the host that holds the keys. The
-// account key and a bot's project key never leave that host, so this side only ever learns status.
-import { useCallback, useEffect, useState } from 'react'
+// A host's iMessage channel, as Photon holds it: read here, changed on the host that holds the keys. An
+// account key is typed here and sent to that host once; nothing reads one back, so this side only ever
+// learns status.
 import { callRuntimeRpc } from '@/runtime/rpc/calls/runtime-rpc-call'
-import { RuntimeRpcCallError } from '@/runtime/rpc/calls/runtime-rpc-result'
+import { hostRefusalMessage, useHostRpcView, type HostRpcView } from './host-rpc-view'
 import type {
   PhotonAddMemberInput,
   PhotonChannelStatus,
@@ -31,50 +31,20 @@ export function photonCalls(hostId: ExecutionHostId) {
       callRuntimeRpc(target, 'bots.photon.bot.release', params),
     deleteProject: (params: PhotonDeleteProjectInput): Promise<unknown> =>
       callRuntimeRpc(target, 'bots.photon.project.delete', params),
-    reconcile: (botId: string): Promise<unknown> =>
+    reconcile: (botId: string): Promise<{ repaired: boolean; notes: string[] }> =>
       callRuntimeRpc(target, 'bots.photon.reconcile', { botId })
   }
 }
 
-export type PhotonChannelView =
-  | { status: 'loading' }
-  | { status: 'ready'; channel: PhotonChannelStatus }
-  /** The host predates the channel, so Settings offers nothing rather than an error to fix. */
-  | { status: 'unavailable' }
-  | { status: 'failed'; error: unknown }
+export type PhotonChannelView = HostRpcView<PhotonChannelStatus>
 
 /** A host's own refusal, which names the fix; null when the call never reached it. */
-export function photonErrorMessage(error: unknown): string | null {
-  return error instanceof RuntimeRpcCallError && error.code === 'runtime_error'
-    ? error.message
-    : null
-}
+export const photonErrorMessage = hostRefusalMessage
 
 /** The channel as this host has it, re-read whenever `reload` is called or the host changes. */
 export function usePhotonChannel(hostId: ExecutionHostId): {
   view: PhotonChannelView
   reload: () => void
 } {
-  const [view, setView] = useState<PhotonChannelView>({ status: 'loading' })
-  const [reads, setReads] = useState(0)
-  const reload = useCallback(() => setReads((count) => count + 1), [])
-  useEffect(() => {
-    let live = true
-    void photonCalls(hostId)
-      .status()
-      .then(
-        (channel) => live && setView({ status: 'ready', channel }),
-        (error: unknown) =>
-          live &&
-          setView(
-            error instanceof RuntimeRpcCallError && error.code === 'method_not_found'
-              ? { status: 'unavailable' }
-              : { status: 'failed', error }
-          )
-      )
-    return () => {
-      live = false
-    }
-  }, [hostId, reads])
-  return { view, reload }
+  return useHostRpcView(hostId, () => photonCalls(hostId).status())
 }

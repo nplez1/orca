@@ -6,7 +6,7 @@ import { SettingsSubsectionHeader } from '@/components/settings/form-controls/Se
 import { useIntlLocale, useTranslate } from '@/i18n/use-translate'
 import { uiDateTimeFormat } from '@/i18n/ui-intl-formatters'
 import { openAppHttpLink } from '@/lib/browser/navigation/app-http-link-open'
-import { githubAppCalls, githubAppErrorMessage, useGithubApp } from '@/lib/github-app-client'
+import { githubAppCalls, githubAppErrorMessage, type GithubAppView } from '@/lib/github-app-client'
 import { GITHUB_APP_BOT_SUFFIX } from '../../../../../shared/github/app/github-app-identity'
 import type {
   GithubAppInstallationView,
@@ -175,6 +175,14 @@ function ConnectedApp({
           )}
         </p>
       ) : null}
+      {inUse && inUse.canPushWorkflows === false ? (
+        <p role="alert" className="text-xs text-destructive">
+          {t(
+            'bots.github.app.workflowsMissing',
+            'This installation has no Workflows: write, so a push that changes .github/workflows is refused. Grant it on GitHub, then Refresh.'
+          )}
+        </p>
+      ) : null}
       {expiresAt ? (
         <p className="text-xs text-muted-foreground">
           {t(
@@ -203,14 +211,17 @@ function ConnectedApp({
  */
 export function GitHubAppSettings({
   hostId,
-  hostName
+  hostName,
+  appRead
 }: {
   hostId: ExecutionHostId
   hostName: string | null
+  /** The read its group already made, so the row above and this panel never disagree. */
+  appRead: { view: GithubAppView; reload: () => void }
 }): React.JSX.Element | null {
   const t = useTranslate()
-  const { view, reload } = useGithubApp(hostId)
-  const connected = view.status === 'ready' && view.app.connected ? view.app : null
+  const { view, reload } = appRead
+  const connected = view.status === 'ready' && view.value.connected ? view.value : null
   const header = (
     <SettingsSubsectionHeader
       title={t('bots.github.app.title', 'GitHub App')}
@@ -273,7 +284,7 @@ export function GitHubAppSettings({
       </section>
     )
   }
-  const app = view.app
+  const app = view.value
   return (
     <section className="space-y-3">
       {header}

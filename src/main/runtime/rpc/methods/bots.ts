@@ -54,7 +54,11 @@ async function updateBot(params: BotUpdateParams, context: RpcContext) {
   }
   const bot = await context.runtime.bots.update(params.botId, params.updates)
   if (params.updates.skillProjects !== undefined) {
-    relinkBotSkills(bot, context.runtime.listRepos())
+    relinkBotSkills(
+      bot,
+      context.runtime.listRepos(),
+      context.runtime.requireStore().getSettings().botSkillFolders ?? []
+    )
   }
   if (params.updates.paused === true) {
     await dropUnreadBotRequests(context.runtime, bot.id, 'paused')
