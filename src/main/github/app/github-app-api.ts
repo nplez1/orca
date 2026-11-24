@@ -133,30 +133,31 @@ export async function listGithubAppInstallations(input: {
     if (typeof record.id !== 'number' || typeof account !== 'string') {
       return []
     }
-    const contentsWrite = readContentsWrite(record)
+    const contentsWrite = readWritePermission(record, 'contents')
+    const workflowsWrite = readWritePermission(record, 'workflows')
     return [
       {
         id: record.id,
         account,
         repositorySelection: selection,
         repositories: [],
-        ...(contentsWrite === null ? {} : { contentsWrite })
+        ...(contentsWrite === null ? {} : { contentsWrite }),
+        ...(workflowsWrite === null ? {} : { workflowsWrite })
       }
     ]
   })
 }
 
 /**
- * Whether the installation may push. `permissions` is in GitHub's installation object; when it is absent the
- * answer is null (not verified) rather than a guess, so nothing claims a push will work without having read it.
+ * One permission the installation holds, from GitHub's own installation object. Absent means null (not
+ * verified) rather than false, so nothing claims a push will be rejected without having read it.
  */
-function readContentsWrite(installation: Record<string, unknown>): boolean | null {
-  const permissions = fields(installation.permissions)
-  const contents = permissions.contents
-  if (contents === 'write') {
+function readWritePermission(installation: Record<string, unknown>, key: string): boolean | null {
+  const value = fields(installation.permissions)[key]
+  if (value === 'write') {
     return true
   }
-  return contents === undefined ? null : false
+  return value === undefined ? null : false
 }
 
 export async function mintInstallationToken(input: {

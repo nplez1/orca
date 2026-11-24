@@ -39,6 +39,8 @@ export type GithubAppInstallationView = {
   repositories: string[]
   /** False when the installation cannot push; null when GitHub did not report its permissions. */
   canPush?: boolean | null
+  /** False when a push touching `.github/workflows` is refused; null when not reported. */
+  canPushWorkflows?: boolean | null
 }
 
 /**

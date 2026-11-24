@@ -1506,6 +1506,23 @@
           "origin": "origin"
         }
       }
+    },
+    "bots": {
+      "githubActsAs": "Bots act as {{login}}",
+      "skillFolders": "Skill folders",
+      "skillFoldersDescription": "Folders on this computer whose children are skills. Every bot here loads them beside the projects it links, so a skill can carry its tools with it.",
+      "skillFoldersRemove": "Remove",
+      "skillFoldersAddLabel": "Folder of skills",
+      "skillFoldersPlaceholder": "~/.agents/skills",
+      "skillFoldersAdd": "Add folder",
+      "skillFoldersWhen": "A change reaches a bot with its next message. Each child must hold a SKILL.md that names the skill; a folder with none loads nothing and is dropped silently.",
+      "skillFoldersRemoveOne": "Stop loading {{folder}}",
+      "skillFoldersDuplicate": "That folder is already listed.",
+      "skillFoldersMustBeAbsolute": "Give a full path, or one that starts with ~/. A relative path means a different folder per chat.",
+      "skillFoldersShared": "Whatever is in these folders is loaded by every bot on this computer, including bots other people can message. Keep a shared folder to tools you would hand them anyway.",
+      "skills": {
+        "itsOwn": "{{bot}} also has its own skills folder, {{folder}}, inside its home — the one it can write a skill into itself. What is in it loads for this bot alone, before any project’s, and a new one is known from its next message."
+      }
     }
   },
   "terminal": {
@@ -1588,7 +1605,7 @@
           "installScopeValue": "“Only on this account” for your own repositories, “Any account” when an organization’s repositories are the ones the bots work in. GitHub offers only those two.",
           "issues": "Issues: Read and write",
           "issuesWhy": "Comment on issues.",
-          "optionalPermissions": "Leave Workflows: Read and write off. Orca does not request it, so a push that touches .github/workflows is rejected by GitHub until the App is given it on GitHub — grant it there if the bots push workflows.",
+          "optionalPermissions": "Leave Workflows: Read and write off unless the bots change files under .github/workflows: GitHub refuses such a push without it. Orca reads what the installation actually holds, and says so under the connected App.",
           "permissions": "Repository permissions",
           "permissionsValue": "These five, and nothing else. Metadata: Read is added for you.",
           "pullRequests": "Pull requests: Read and write",
@@ -1597,8 +1614,66 @@
           "webhookValue": "Inactive. Nothing needs to reach Orca."
         },
         "title": "GitHub App",
-        "tokenExpires": "A token it minted expires at {{time}}. Bots mint a new one when it does."
+        "tokenExpires": "A token it minted expires at {{time}}. Bots mint a new one when it does.",
+        "workflowsWrite": "This installation also has Workflows: write, so a push as the App can change .github/workflows.",
+        "workflowsMissing": "This installation has no Workflows: write, so a push that changes .github/workflows is refused. Grant it on GitHub, then Refresh."
       }
+    },
+    "photon": {
+      "connectFailed": "Could not connect Photon on this computer.",
+      "organizationId": "Photon organization ID",
+      "organizationIdHint": "From your Photon dashboard. Photon assigns the numbers; Orca asks it for one when a bot needs a line.",
+      "accountKey": "Account key",
+      "storesKey": "Keep the key on this computer, sealed by its keyring. Otherwise it lasts this session.",
+      "connect": "Connect Photon",
+      "changeFailed": "Photon refused that change.",
+      "noLine": "Not connected to Photon.",
+      "released": "Released",
+      "numberPending": "a number Photon is assigning",
+      "handlePlaceholder": "+15551234567",
+      "addMember": "Let them text it",
+      "giveNumber": "Connect and give it a number",
+      "repair": "Repair",
+      "releaseBot": "Release the number",
+      "title": "iMessage",
+      "descriptionOnHost": "Optional. The Photon account the bots on {{host}} get their iMessage numbers from.",
+      "description": "Optional. The Photon account your bots’ iMessage numbers come from. Orca needs no account for it.",
+      "readFailed": "Could not read the channel on this computer.",
+      "retry": "Try again",
+      "connectedSession": "Connected for this session only.",
+      "refresh": "Refresh",
+      "cannotStoreKey": "This computer has no keyring to seal a key with, so it is not written: the key lasts this session.",
+      "releasedWhatLeft": "Its number and key are gone, and only the Photon project is left. Deleting that project in Photon does not clear the record here: giving this bot a number again needs `bots.photon.project.delete`, which Settings does not offer because it burns the slug for good.",
+      "removeMemberFor": "Stop {{handle}} texting it",
+      "removeMember": "Remove",
+      "unknownSenders": "{{count}} messages from numbers it has no assignment for. Repair re-reads the assignment list from Photon.",
+      "parked": "{{count}} messages could not be delivered. Last reason: {{reason}}",
+      "parkedUnknown": "not recorded",
+      "undelivered": "{{count}} answers never arrived within its retry window. Last reason: {{reason}}",
+      "releaseConfirmTitle": "Release {{bot}}’s number?",
+      "releaseConfirmBody": "Its numbers are released and its key is revoked. Settings has no way back: giving it a number again means deleting its Photon project with `bots.photon.project.delete`, which burns the slug for good, so the record stays with only a project left.",
+      "cancel": "Cancel",
+      "connectedSealed": "Connected, and the key is sealed on this computer.",
+      "connectedUnsealed": "Connected, and a key is kept here, but this host cannot seal one now: it may need pasting again after a restart.",
+      "memberAlreadyGone": "{{handle}} was not on its list any more.",
+      "whoCanText": "Who can text it",
+      "addHandle": "Phone number or Apple ID to let text it",
+      "createFailed": "Photon could not give {{bot}} a number.",
+      "ownerHandle": "Your phone number or Apple ID",
+      "ownerHandleHint": "Required: you are the first person on {{bot}}’s list, and the only one who can text it until you add others. Photon assigns the number, so nobody buys one.",
+      "needsYou": "Needs you",
+      "notConnected": "Not set up yet: Photon provides the number.",
+      "answersOn": "Answers on {{number}}.",
+      "connected": "Connected",
+      "setupNote": "Texting a bot needs an iMessage number, and Photon assigns it. Connect your own Photon account once on this computer; no Orca account is involved.",
+      "readFailedAccount": "Could not read the iMessage account on this computer.",
+      "giveNumbersInBot": "A number and who may text it belong to one bot: open the bot and use its Connectors › iMessage.",
+      "itsOwnAgent": "Its own Photon agent, “{{slug}}”, with its own key and its own list of people. Photon gives one project per bot.",
+      "notYetAnywhere": "{{bot}} has nothing in Photon yet. Connecting makes it its own Photon agent, with its own key and its own number; Orca makes none of that until you ask.",
+      "connectBot": "Connect {{bot}} to Photon",
+      "notNow": "Not now",
+      "unfinished": "Set up only as far as {{step}}, so it has no number yet. Repair finishes it.",
+      "notReceiving": "Not receiving"
     }
   }
 }

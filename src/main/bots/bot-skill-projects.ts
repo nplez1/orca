@@ -1,7 +1,7 @@
 // The projects a bot links for skills: which skills each has, read on this host, and the bot's one
 // skill-only folder its chats load them from.
-import { lstat, mkdir, open, readdir, realpath, rm, symlink } from 'node:fs/promises'
-import { basename, dirname, join } from 'node:path'
+import { mkdir, readdir, realpath, rm, symlink } from 'node:fs/promises'
+import { basename, join } from 'node:path'
 import type { Bot } from '../../shared/bot-types'
 import type { BotSkillProjectView } from '../../shared/bots/bot-skill-projects'
 import type { Repo } from '../../shared/repository/repo-types'
@@ -9,76 +9,19 @@ import {
   getRepoExecutionHostId,
   LOCAL_EXECUTION_HOST_ID
 } from '../../shared/execution-host/execution-host'
-import { skillDirectoryMaxDepth } from '../../shared/skills/discovery/skill-discovery-depth'
-import { declaredSkillMetadata } from '../../shared/skills/discovery/skill-metadata'
-import { findSkillFiles } from '../skills/discovery/skill-root-file-walk'
-import type {
-  LinkedProjectSkill,
-  LinkedSkillListing,
-  LinkedSkills
-} from '../native-chat/native-chat-skill-roots'
+import {
+  SKILL_FOLDERS,
+  scanSkillsFolder,
+  type ScannedProject,
+  type ScannedSkill
+} from './bot-skill-folder-scan'
+import { scanOwnSkills, scanSkillRoots } from './bot-skill-roots'
+import type { LinkedSkillListing, LinkedSkills } from '../native-chat/native-chat-skill-roots'
 import { getProfileUserDataPath } from '../orca-profiles/profile-storage-paths'
 import { retireAtRestCommandContext } from '../native-chat/agent-session-wire/options/at-rest-command-context'
 import { folderWorkspaceKey } from '../../shared/workspace/identity/workspace-scope'
 
-/** Where a project keeps skills for every agent, then Claude's own folder. */
-const SKILL_FOLDERS = ['.agents', '.claude'] as const
-const MAX_SKILL_FILE_BYTES = 256 * 1024
-
-/** An admitted skill, with the real folder its link in Orca's folder points to. */
-type ScannedSkill = LinkedProjectSkill & { folder: string }
-
-type ScannedProject = { skillsDir: string; skills: ScannedSkill[] }
-
-/** A file's text, up to the cap; null when it can't be read. */
-async function readCapped(path: string): Promise<string | null> {
-  try {
-    const file = await open(path, 'r')
-    try {
-      const buffer = Buffer.alloc(Math.min((await file.stat()).size, MAX_SKILL_FILE_BYTES))
-      const { bytesRead } = await file.read(buffer, 0, buffer.length, 0)
-      return buffer.toString('utf8', 0, bytesRead)
-    } finally {
-      await file.close()
-    }
-  } catch {
-    return null
-  }
-}
-
-/** A skill folder (team setup scripts link them in) holding a real SKILL.md that declares its name
- *  and description. A SKILL.md that is itself a link could be any file, so it never counts. */
-async function admittedSkill(skillFile: string): Promise<ScannedSkill | null> {
-  const entry = await lstat(skillFile).catch(() => null)
-  if (!entry?.isFile()) {
-    return null
-  }
-  const folder = await realpath(dirname(skillFile)).catch(() => null)
-  const text = folder ? await readCapped(join(folder, 'SKILL.md')) : null
-  const declared = text === null ? null : declaredSkillMetadata(text)
-  if (!folder || !declared) {
-    return null
-  }
-  const oneLine = (value: string): string => value.replace(/\s+/g, ' ').trim()
-  return {
-    name: oneLine(declared.name),
-    description: oneLine(declared.description),
-    skillFile: join(folder, 'SKILL.md'),
-    folder
-  }
-}
-
-async function scanSkillsFolder(skillsDir: string): Promise<ScannedSkill[]> {
-  const files = await findSkillFiles(skillsDir, skillDirectoryMaxDepth('repo'))
-  const admitted = await Promise.all(files.map(admittedSkill))
-  const byFolder = new Map<string, ScannedSkill>()
-  for (const skill of admitted) {
-    if (skill && !byFolder.has(skill.folder)) {
-      byFolder.set(skill.folder, skill)
-    }
-  }
-  return [...byFolder.values()].sort((a, b) => a.name.localeCompare(b.name))
-}
+export { linkedSkillKeys, resolveSkillRoot } from './bot-skill-roots'
 
 /** The project's skills from .agents/skills, else .claude/skills; null when it has none. */
 export async function scanSkillProject(repoPath: string): Promise<ScannedProject | null> {
@@ -104,7 +47,12 @@ export function botLinkedSkillsFolder(botId: string): string {
 function skillLinks(skills: readonly ScannedSkill[]): Map<string, string> {
   const links = new Map<string, string>()
   const taken = new Set<string>()
+  const linked = new Set<string>()
   for (const skill of skills) {
+    if (linked.has(skill.folder)) {
+      continue
+    }
+    linked.add(skill.folder)
     const base = safeName(basename(skill.folder))
     let link = base
     for (let n = 2; taken.has(link.toLowerCase()); n += 1) {
@@ -164,6 +112,22 @@ function serialized<T>(folder: string, run: () => Promise<T>): Promise<T> {
   })
 }
 
+function withoutRepeatedSkills<
+  T extends { name: string; skills: readonly ScannedSkill[]; kind?: 'project' | 'folder' | 'own' }
+>(entries: readonly T[]): T[] {
+  const seen = new Set<string>()
+  const named = new Set<string>()
+  return entries.map((entry) => {
+    const skills = entry.skills.filter((skill) => {
+      const fresh = !seen.has(skill.folder) && !named.has(skill.name)
+      seen.add(skill.folder)
+      named.add(skill.name)
+      return fresh
+    })
+    return { ...entry, skills }
+  })
+}
+
 function isLocalRepo(repo: Repo): boolean {
   return getRepoExecutionHostId(repo) === LOCAL_EXECUTION_HOST_ID
 }
@@ -189,10 +153,23 @@ async function scanLinkedProjects(
 /** These linked projects' skills, read in place for a running chat's list; no folder is touched. */
 export async function linkedSkillListing(
   ids: readonly string[],
-  repos: readonly Repo[]
+  repos: readonly Repo[],
+  roots: readonly string[] = [],
+  bot?: Pick<Bot, 'folder'>,
+  botsRoot?: string
 ): Promise<LinkedSkillListing[]> {
-  return (await scanLinkedProjects(ids, repos)).map(({ repo, skills }) => ({
-    name: repo.displayName,
+  const scanned = [
+    ...(bot ? await scanOwnSkills(bot, botsRoot) : []),
+    ...(await scanLinkedProjects(ids, repos)).map(({ repo, skills }) => ({
+      name: repo.displayName,
+      skills,
+      kind: 'project' as const
+    })),
+    ...(await scanSkillRoots(roots))
+  ]
+  return withoutRepeatedSkills(scanned).map(({ name, skills, kind }) => ({
+    name,
+    kind,
     skills: skills.map(({ folder: _folder, ...skill }) => skill)
   }))
 }
@@ -205,23 +182,36 @@ export async function linkedSkillListing(
  * drops an unlinked one's, without a restart.
  */
 export async function linkedSkillProjects(
-  bot: Pick<Bot, 'skillProjects'>,
+  bot: Pick<Bot, 'folder' | 'skillProjects'>,
   repos: readonly Repo[],
-  folder: string
+  folder: string,
+  roots: readonly string[] = [],
+  botsRoot?: string
 ): Promise<LinkedSkills> {
   // Rejects when the folder can't be brought up to date, so no caller takes a partial list.
   const scanned = await serialized(folder, async () => {
-    const projects = await scanLinkedProjects(bot.skillProjects ?? [], repos)
-    const links = skillLinks(projects.flatMap((project) => project.skills))
+    const scanned = [
+      ...(await scanOwnSkills(bot, botsRoot)),
+      ...(await scanLinkedProjects(bot.skillProjects ?? [], repos)).map(({ repo, skills }) => ({
+        name: repo.displayName,
+        path: repo.path,
+        skills,
+        kind: 'project' as const
+      })),
+      ...(await scanSkillRoots(roots))
+    ]
+    const unique = withoutRepeatedSkills(scanned)
+    const links = skillLinks(unique.flatMap((project) => project.skills))
     await syncLinks(join(folder, 'skills'), links)
     await syncLinks(join(folder, '.claude', 'skills'), links)
-    return projects
+    return unique
   })
   return {
     root: { skillsRoot: join(folder, 'skills'), pluginDir: folder, linksOut: true },
-    projects: scanned.map(({ repo, skills }) => ({
-      name: repo.displayName,
-      repoPath: repo.path,
+    projects: scanned.map(({ name, path, skills, kind }) => ({
+      name,
+      kind,
+      repoPath: path,
       skills: skills.map(({ folder: _folder, ...skill }) => skill)
     }))
   }
@@ -230,10 +220,11 @@ export async function linkedSkillProjects(
 /** The bot's links changed: its open chats load the skills before their next turn, and its resting
  *  chats' `/` menus reread them. */
 export function relinkBotSkills(
-  bot: Pick<Bot, 'id' | 'skillProjects' | 'folderWorkspaceId'>,
-  repos: readonly Repo[]
+  bot: Pick<Bot, 'id' | 'folder' | 'skillProjects' | 'folderWorkspaceId'>,
+  repos: readonly Repo[],
+  roots: readonly string[] = []
 ): void {
-  void linkedSkillProjects(bot, repos, botLinkedSkillsFolder(bot.id))
+  void linkedSkillProjects(bot, repos, botLinkedSkillsFolder(bot.id), roots)
     .catch(() => {})
     .finally(() => retireAtRestCommandContext(folderWorkspaceKey(bot.folderWorkspaceId)))
 }

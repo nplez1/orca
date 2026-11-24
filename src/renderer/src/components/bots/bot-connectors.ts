@@ -48,7 +48,6 @@ export const BOT_CONNECTORS: readonly BotConnector[] = [
 /** The connectors that link an account, for lists of linked accounts across bots. */
 export const ACCOUNT_CONNECTORS = BOT_CONNECTORS.filter((connector) => connector.add === 'link')
 
-/** Whether an account connector can be added now on the host: Linear and GitHub also wait for its cloud. */
 export function useBotConnectorAvailable(
   hostId: ExecutionHostId = LOCAL_EXECUTION_HOST_ID
 ): (connector: BotConnector) => boolean {

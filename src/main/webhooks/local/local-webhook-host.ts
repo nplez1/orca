@@ -50,6 +50,14 @@ export class LocalWebhookHostService extends WebhookHostService {
     return this.local.holdsLocally(hookId)
   }
 
+  /** Every hook says whether this computer answers it, so a signed-out card does not call a working one paused. */
+  override async list(botId: string): Promise<WebhookSummary[]> {
+    const hooks = await super.list(botId)
+    return hooks.map((hook) =>
+      this.local.holdsLocally(hook.hookId) ? { ...hook, servedHere: true } : hook
+    )
+  }
+
   /** A local hook's card is this computer's, and reading it must not write a row into Orca Cloud's ledger. */
   override async card(hookId: string): Promise<WebhookSummary> {
     if (!this.local.holdsLocally(hookId)) {
@@ -60,8 +68,9 @@ export class LocalWebhookHostService extends WebhookHostService {
       throw new Error('webhooks_unavailable')
     }
     const summary = webhookSummary(hook.value, this.automationOf(hookId))
+    const here = { ...summary, servedHere: true as const }
     // Its port was taken, so the URL a forwarder was given stops working at the next restart.
-    return this.local.portIsStable() ? summary : { ...summary, urlChangesOnRestart: true }
+    return this.local.portIsStable() ? here : { ...here, urlChangesOnRestart: true }
   }
 
   override settle(input: LocalWebhookSettleInput): Promise<LocalWebhookSettleResult> {

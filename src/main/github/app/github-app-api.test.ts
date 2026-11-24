@@ -1,6 +1,11 @@
 import { generateKeyPairSync } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import { mintInstallationToken, readGithubApp, type GithubAppFetch } from './github-app-api'
+import {
+  listGithubAppInstallations,
+  mintInstallationToken,
+  readGithubApp,
+  type GithubAppFetch
+} from './github-app-api'
 import { forgetInstallationTokens, installationToken } from './github-app-installation-token'
 import type { GithubAppCredentials } from './github-app-credentials'
 
@@ -143,5 +148,37 @@ describe('forgetInstallationTokens', () => {
     await installationToken(input)
 
     expect(calls).toHaveLength(2)
+  })
+})
+
+describe('listGithubAppInstallations', () => {
+  it('reads Contents and Workflows write, because a push needs the first and a workflow edit the second', async () => {
+    const { fetch } = responder([
+      {
+        body: [
+          {
+            id: 181472560,
+            account: { login: 'nplez1' },
+            repository_selection: 'selected',
+            permissions: { contents: 'write', workflows: 'write', metadata: 'read' }
+          },
+          {
+            id: 181472561,
+            account: { login: 'nplez1' },
+            repository_selection: 'all',
+            permissions: { contents: 'read', workflows: 'read' }
+          }
+        ]
+      }
+    ])
+
+    const [granted, readOnly] = await listGithubAppInstallations({
+      ...keyPair,
+      fetch,
+      nowMs: 1_700_000_000_000
+    })
+
+    expect(granted).toMatchObject({ contentsWrite: true, workflowsWrite: true })
+    expect(readOnly).toMatchObject({ contentsWrite: false, workflowsWrite: false })
   })
 })

@@ -3,10 +3,8 @@
 import { botTurnFingerprint as fingerprint } from './bot-turn-memory-update'
 
 const COPY = {
-  skills:
-    '[The skills from your linked projects, as they are now; this replaces any earlier list.]',
-  noSkills:
-    '[You have no skills from linked projects now; any earlier list of them no longer applies.]'
+  skills: '[Your skills, as they are now; this replaces any earlier list.]',
+  noSkills: '[You have no skills now; any earlier list of them no longer applies.]'
 }
 
 /** A bot's linked projects now (null: none ever), those its session's launch scanned, and the
@@ -49,20 +47,14 @@ export function linkedSkillsUpdate(entry: BotTurnSkills): { text: string; skills
   }
 }
 
-/** The list for projects linked or unlinked since `entry` was set; null when none changed or a
- *  listing failed, which keeps the last good list and tries again next turn. */
 export async function relinkedSkills(
   linkedSkills: BotTurnLinkedSkills,
   sessionId: string,
   entry: BotTurnSkills
 ): Promise<Pick<BotTurnSkills, 'skillProjects' | 'skillsNow'> | null> {
   const ids = linkedSkills.projects(entry.botId)
-  const skillProjects = linkedProjectsKey(ids)
-  if (skillProjects === entry.skillProjects) {
-    return null
-  }
   const skillsNow = await linkedSkills
     .listed(entry.botId, ids ?? [], sessionId)
     .catch(() => undefined)
-  return skillsNow === undefined ? null : { skillProjects, skillsNow }
+  return skillsNow === undefined ? null : { skillProjects: linkedProjectsKey(ids), skillsNow }
 }

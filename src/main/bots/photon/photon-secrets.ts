@@ -13,6 +13,16 @@ export function photonCanSealSecrets(): boolean {
   }
 }
 
+/** Refuses a key asked to be kept where it could only be written base64. The owner is told why, so
+ *  session-only is a choice rather than a surprise. */
+export function assertPhotonKeyCanBeStored(storesKey: boolean): void {
+  if (storesKey && !photonCanSealSecrets()) {
+    throw new Error(
+      'This computer cannot seal a key, so Orca will not write one to disk. Connect without keeping it, and paste it again after a restart.'
+    )
+  }
+}
+
 /** A secret as it is written: sealed where this host can, plain base64 where it cannot. */
 export function sealPhotonSecret(value: string): string {
   if (photonCanSealSecrets()) {

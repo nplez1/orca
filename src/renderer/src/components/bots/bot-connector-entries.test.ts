@@ -109,6 +109,7 @@ describe('botConnectorEntries', () => {
       'slack:T1',
       'linear:org-1',
       'google',
+      'photon',
       'webhooks',
       'composio:ca-slack'
     ])
@@ -165,6 +166,7 @@ describe('botConnectorEntries', () => {
       })
     )
     expect(unread.map((entry) => [entry.key, entry.needsOwner])).toEqual([
+      ['photon', false],
       ['webhooks', false],
       ['composio', true]
     ])

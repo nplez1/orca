@@ -159,7 +159,7 @@ export function GitHubAppSetupSteps({
         <p className="text-xs text-muted-foreground">
           {t(
             'bots.github.app.step.optionalPermissions',
-            'Leave Workflows: Read and write off. Orca does not request it, so a push that touches .github/workflows is rejected by GitHub until the App is given it on GitHub — grant it there if the bots push workflows.'
+            'Leave Workflows: Read and write off unless the bots change files under .github/workflows: GitHub refuses such a push without it. Orca reads what the installation actually holds, and says so under the connected App.'
           )}
         </p>
       </Step>

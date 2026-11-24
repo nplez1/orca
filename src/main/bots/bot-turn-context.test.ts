@@ -6,6 +6,7 @@ import type {
   AgentJournalRenderItem
 } from '../../shared/agent-session/journal/agent-session-journal-types'
 import { type BotFirstRun, createBotTurnContext } from './bot-turn-context'
+import type { BotTurnLinkedSkills } from './bot-turn-linked-skills'
 import type { BotRecentChatsSection } from './bot-recent-chats'
 import { botSessionInstructions } from './bot-session-instructions'
 import { botRulesBlock } from './bot-preamble'
@@ -14,11 +15,20 @@ import { codexItemBody } from '../codex/structured/items/codex-structured-item-t
 
 const FOLDER = '/home/me/.orca/bots/scout'
 
+function listing(section: string | null): BotTurnLinkedSkills {
+  return {
+    projects: () => (section === null ? [] : ['orca']),
+    launchScanned: () => null,
+    listed: async () => section
+  }
+}
+
 function home(
   soul: string,
   memory: string,
   firstRun?: BotFirstRun,
-  topics: Record<string, string> = {}
+  topics: Record<string, string> = {},
+  linkedSkills?: BotTurnLinkedSkills
 ) {
   const files = new Map([
     [join(FOLDER, 'SOUL.md'), soul],
@@ -34,7 +44,7 @@ function home(
     replaceText: async () => false,
     writeText: async () => false
   }
-  const context = createBotTurnContext(fs, firstRun)
+  const context = createBotTurnContext(fs, firstRun, undefined, undefined, undefined, linkedSkills)
   context.launched('s1', 'bot-1', FOLDER, { soul, memory }, true, HELD_BOT_RULES)
   // Each turn end reads the journal as it stands; a turn adds its rows.
   const journal: AgentJournalRenderItem[] = []
@@ -571,7 +581,7 @@ describe("a bot chat's linked-project skills", () => {
   const textOf = async (h: ReturnType<typeof home>): Promise<string> => (await h.plan())?.text ?? ''
 
   it('sends the current list on the first turn of a resumed chat, whose instructions stay its first ones', async () => {
-    const h = home('Be brief.', '- a fact')
+    const h = home('Be brief.', '- a fact', undefined, {}, listing(SECTION))
     h.context.linkedSkillsLaunched('s1', SECTION, false)
     const first = await h.plan()
     expect(first?.text).toContain(SECTION)
@@ -585,8 +595,25 @@ describe("a bot chat's linked-project skills", () => {
     expect(await textOf(h)).not.toContain(SECTION)
   })
 
+  it('sends a list a bot wrote a skill into, whose links did not change', async () => {
+    let current = SECTION
+    const linked = { ...listing(SECTION), listed: async () => current }
+    const h = home('Be brief.', '- a fact', undefined, {}, linked)
+    h.context.linkedSkillsLaunched('s1', SECTION, true)
+    expect(await textOf(h)).not.toContain('own')
+    current = '## Skills\n\nYour own skills (scout): read these first.'
+    expect(await textOf(h)).toContain('Your own skills')
+  })
+
+  it('says nothing when the listing is the text the launch already gave', async () => {
+    const h = home('Be brief.', '- a fact', undefined, {}, listing(SECTION))
+    h.context.linkedSkillsLaunched('s1', SECTION, true)
+    expect((await h.plan())?.text).toBeUndefined()
+    expect((await h.plan())?.text).toBeUndefined()
+  })
+
   it('sends the list once the agent turns down the folders it was told it loaded', async () => {
-    const h = home('Be brief.', '- a fact')
+    const h = home('Be brief.', '- a fact', undefined, {}, listing(SECTION))
     h.context.linkedSkillsLaunched('s1', 'loaded natively', true)
     h.context.linkedSkillsLaunched('s1', SECTION, false)
     expect(await textOf(h)).toContain(SECTION)
@@ -595,13 +622,13 @@ describe("a bot chat's linked-project skills", () => {
     const h = home('Be brief.', '- a fact')
     h.context.linkedSkillsLaunched('s1', null, false)
     const first = await h.plan()
-    expect(first?.text).toContain('no skills from linked projects now')
+    expect(first?.text).toContain('You have no skills now')
     first?.given(TAKEN)
     expect(await textOf(h)).not.toContain('linked projects')
   })
 
   it("rides a worker's report through the launch update, given once", async () => {
-    const h = home('Be brief.', '- a fact')
+    const h = home('Be brief.', '- a fact', undefined, {}, listing(SECTION))
     h.context.linkedSkillsLaunched('s1', SECTION, false)
     const update = await h.context.launchUpdate?.('s1')
     expect(update?.text).toContain(SECTION)
@@ -618,7 +645,7 @@ describe("a bot chat's linked-project skills", () => {
 
 describe('a project linked while a bot chat runs', () => {
   const NEW_LIST =
-    '[The skills from your linked projects, as they are now; this replaces any earlier list.]\n\norca: review -> /orca/.agents/skills/review/SKILL.md'
+    '[Your skills, as they are now; this replaces any earlier list.]\n\norca: review -> /orca/.agents/skills/review/SKILL.md'
 
   function running(launchScanned: string[] = [], linkedAtLaunch: string[] = []) {
     const state = { linked: linkedAtLaunch }
@@ -702,8 +729,6 @@ describe('the empty linked-skills replacement on a resumed chat', () => {
       null,
       h.fs
     )
-    expect((await h.context.launchUpdate?.('s1'))?.text).toContain(
-      'no skills from linked projects now'
-    )
+    expect((await h.context.launchUpdate?.('s1'))?.text).toContain('You have no skills now')
   })
 })

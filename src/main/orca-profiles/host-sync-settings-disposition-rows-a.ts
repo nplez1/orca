@@ -7,6 +7,7 @@
 export const HOST_SYNC_DISPOSITION_ROWS_A = {
   // ---- hostLocal: names something only this machine has ------------------------------
   workspaceDir: 'hostLocal',
+  botSkillFolders: 'hostLocal',
   hostSettingOverrides: 'hostLocal',
   terminalGpuAcceleration: 'hostLocal',
   terminalWindowsShell: 'hostLocal',
@@ -202,5 +203,5 @@ export const HOST_SYNC_DISPOSITION_ROWS_A = {
   showMobileButton: 'replicated',
   showPinnedWorktreesInGroups: 'replicated',
   ctrlTabOrderMode: 'replicated',
-  terminalShortcutPolicy: 'replicated',
+  terminalShortcutPolicy: 'replicated'
 } as const

@@ -439,6 +439,18 @@ describe('a host with both kinds of hook', () => {
     return { service, localWebhooks }
   }
 
+  it('marks the hooks this computer answers, so a signed-out card never calls one paused', async () => {
+    const { service, localWebhooks } = host()
+    const hookId = await minted(localWebhooks)
+    await localWebhooks.start()
+    try {
+      const hooks = await service.list(BOT)
+      expect(hooks.map((hook) => [hook.hookId, hook.servedHere])).toEqual([[hookId, true]])
+    } finally {
+      localWebhooks.stop()
+    }
+  })
+
   it('refuses a Slack rule while signed out, and hears its own webhook rule', () => {
     const { service, localWebhooks } = host({ cloud: signedOutCloud })
     const saves = new AutomationWebhookSaves()

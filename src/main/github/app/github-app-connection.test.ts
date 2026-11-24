@@ -41,11 +41,19 @@ vi.mock('./github-app-credentials', async (importOriginal) => {
 
 vi.mock('./github-app-installation-token', async (importOriginal) => {
   const actual = await importOriginal<typeof InstallationTokenModule>()
-  return { ...actual, forgetInstallationTokens: forgotten }
+  return {
+    ...actual,
+    // Recorded, and still real: the cache outlives a test, so a status read must not see another's token.
+    forgetInstallationTokens: (installationId?: number) => {
+      forgotten(installationId)
+      actual.forgetInstallationTokens(installationId)
+    }
+  }
 })
 
 const { connectGithubApp, disconnectGithubApp, githubAppStatus, refreshGithubApp } =
   await import('./github-app-connection')
+const { forgetInstallationTokens } = await import('./github-app-installation-token')
 
 type Reply = { status?: number; body: unknown }
 
@@ -70,6 +78,8 @@ function reset(): void {
   store.stored = null
   store.writes = []
   store.readFailure = null
+  // A token minted by any earlier case would otherwise show up in a status read as `tokenExpiresAt`.
+  forgetInstallationTokens()
   forgotten.mockReset()
 }
 
@@ -180,7 +190,8 @@ describe('githubAppStatus', () => {
           repositorySelection: 'selected',
           repositories: [],
           // Nothing on disk says whether this install can push, and a view never invents an answer.
-          canPush: null
+          canPush: null,
+          canPushWorkflows: null
         }
       ],
       activeInstallationId: 181472560

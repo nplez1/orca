@@ -18,6 +18,7 @@ import { BotGitHubCard } from '@/components/bots/github/BotGitHubCard'
 import { BotGoogleCard } from '@/components/bots/google/BotGoogleCard'
 import { BotLinearCard } from '@/components/bots/linear/BotLinearCard'
 import { BotSlackCard } from '@/components/bots/slack/BotSlackCard'
+import { BotPhotonCard } from '@/components/bots/photon/BotPhotonCard'
 import { BotWebhooksCard } from '@/components/bots/webhooks/BotWebhooksCard'
 import { BotCloudSignInNotice } from '@/components/bots/BotCloudSignInNotice'
 import { BotConnectorsHostNotice } from '@/components/bots/BotConnectorsHostNotice'
@@ -71,6 +72,8 @@ function BotConnectorEntryCard({
       )
     case 'google':
       return <BotGoogleCard bot={bot} title={title} defaultOpen={defaultOpen} />
+    case 'photon':
+      return <BotPhotonCard bot={bot} title={title} />
     case 'webhooks':
       return <BotWebhooksCard bot={bot} title={title} />
     case 'composio':
@@ -141,8 +144,9 @@ export function BotConnectorsSection({ bot }: { bot: Bot }): React.JSX.Element {
   const rows = entries.map((entry) => (
     <BotConnectorEntryRow key={`${botRefKey(bot)}\u0000${entry.key}`} bot={bot} entry={entry} />
   ))
-  // The Webhooks row is always listed but shows only once a hook exists.
-  const empty = entries.every((entry) => entry.kind === 'webhooks') && webhooks !== 'added'
+  const empty =
+    entries.every((entry) => entry.kind === 'webhooks' || entry.kind === 'photon') &&
+    webhooks !== 'added'
   return (
     <AddConnectorButton
       bot={bot}
@@ -150,6 +154,7 @@ export function BotConnectorsSection({ bot }: { bot: Bot }): React.JSX.Element {
         empty ? (
           <section className="flex flex-col gap-0.5">
             <BotConnectorsHostNotice bot={bot} />
+            {rows}
             <NoConnectors bot={bot} onAdd={open} />
           </section>
         ) : (

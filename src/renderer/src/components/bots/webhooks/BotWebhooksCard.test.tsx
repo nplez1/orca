@@ -10,7 +10,11 @@ import { ORCA_SIGNED_OUT } from '../orca-sign-in.test-fixture'
 import { BotWebhooksCard } from './BotWebhooksCard'
 import { notifyWebhooksChanged } from './use-webhook-data'
 import { setWebhookHostTransportForTests } from './webhook-host-client'
-import { webhookCallsFixture, webhookSummaryFixture } from './webhook-summary.test-fixture'
+import {
+  FIXTURE_HOOK_ID,
+  webhookCallsFixture,
+  webhookSummaryFixture
+} from './webhook-summary.test-fixture'
 
 const bot: Bot = {
   id: 'bot-1',
@@ -266,6 +270,34 @@ describe('BotWebhooksCard', () => {
       expect(screen.getByText('Investigate Sentry alert · paused while signed out')).toBeTruthy()
       expect(screen.getByText('Needs sign-in')).toBeTruthy()
       expect(screen.queryByText('Webhooks aren’t available right now.')).toBeNull()
+    } finally {
+      useAppStore.setState(initial, true)
+    }
+  })
+
+  it('never calls a hook this computer answers paused, even while Orca is signed out', async () => {
+    const initial = useAppStore.getState()
+    renderRow((method) =>
+      method === 'webhooks.list'
+        ? {
+            hooks: [
+              webhookSummaryFixture({
+                url: `http://127.0.0.1:49731/hook/${FIXTURE_HOOK_ID}`,
+                servedHere: true
+              })
+            ]
+          }
+        : { calls: [] }
+    )
+    try {
+      await openRow()
+      await screen.findByText('Investigate Sentry alert')
+      act(() => {
+        useAppStore.setState({ orcaProfileAuthStatus: ORCA_SIGNED_OUT })
+        notifyWebhooksChanged()
+      })
+      expect(await screen.findByText('1 hook · no calls yet')).toBeTruthy()
+      expect(screen.queryByText('Investigate Sentry alert · paused while signed out')).toBeNull()
     } finally {
       useAppStore.setState(initial, true)
     }

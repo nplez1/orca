@@ -22,7 +22,7 @@ import {
 import type { PhotonStreamStatus } from './photon-stream'
 import type { PhotonStreams } from './photon-streams'
 import { photonConnectorRow } from './photon-runtime'
-import { photonCanSealSecrets as photonSeals } from './photon-secrets'
+import { assertPhotonKeyCanBeStored, photonCanSealSecrets as photonSeals } from './photon-secrets'
 import type { PhotonStore } from './photon-store'
 import type {
   PhotonTeardown,
@@ -74,6 +74,7 @@ export class PhotonService {
     accountKey: string
     storesKey: boolean
   }): Promise<PhotonConnectResult> {
+    assertPhotonKeyCanBeStored(input.storesKey)
     await this.deps.store.saveAccount(
       { organizationId: input.organizationId, storesKey: input.storesKey },
       input.accountKey

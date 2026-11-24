@@ -32,14 +32,11 @@ import type { BotController } from './bot-controller'
 import type { BotWorkRecord } from './bot-work-record'
 import {
   botLinkedSkillsFolder,
+  linkedSkillKeys,
   linkedSkillListing,
   linkedSkillProjects
 } from './bot-skill-projects'
-import {
-  linkedSkillsSection,
-  NO_LINKED_SKILLS,
-  type LinkedSkills
-} from '../native-chat/native-chat-skill-roots'
+import { linkedSkillsSection, NO_LINKED_SKILLS } from '../native-chat/native-chat-skill-roots'
 
 /** The agents that reload a watched skills folder mid-chat (checked on Claude 2.1.319, Codex 0.163). */
 const LIVE_SKILLS_PROVIDERS = new Set(['claude', 'codex'])
@@ -52,6 +49,7 @@ export type WiredBot = Bot
 export function botStructuredSessionWiring(deps: {
   /** The host's bots, and its projects, which bots link for skills. */
   store: () => { getBots?: () => readonly Bot[]; getRepos: () => readonly Repo[] } & LaunchRepoStore
+  botSkillFolders?: () => readonly string[]
   /** First-run setup's end, and each bot's MEMORY.md as Orca last recorded it. */
   bots: Pick<BotController, 'endFirstRun' | 'memory'>
   /** The bot's chats as a turn end reads them. */
@@ -99,9 +97,6 @@ export function botStructuredSessionWiring(deps: {
   >
 > {
   const bots = (): readonly Bot[] => deps.store().getBots?.() ?? []
-  /** The paired servers' bots a message names, as each server last listed them, so a send never
-   *  waits on another computer; one on a server this host isn't paired to, or one its server no longer
-   *  lists, adds nothing. */
   const serverBotLines = async (words: string) => {
     const picks = mentionedServerBots(words)
     if (picks.length === 0 || !deps.pairedBotRosters) {
@@ -156,21 +151,24 @@ export function botStructuredSessionWiring(deps: {
     (sessionId, message) => deps.work.turnNote(sessionId, message),
     deps.bots.memory,
     {
-      projects: (botId) => botById(botId)?.skillProjects ?? null,
+      projects: (botId) => linkedSkillKeys(botById(botId)?.skillProjects, deps.botSkillFolders),
       launchScanned: (sessionId) => launchScans.get(sessionId) ?? null,
       listed: async (botId, projects, sessionId) => {
         const repos = deps.store().getRepos()
+        const bot = botById(botId)
+        const roots = deps.botSkillFolders?.() ?? []
         if (!liveSkills.has(sessionId)) {
-          const linked = await linkedSkillListing(projects, repos)
+          const linked = await linkedSkillListing(projects, repos, roots, bot)
           return linkedSkillsSection(linked, linked)
         }
         // The running agent rereads the folder, so it is brought up to date before the names go.
         const linked = await linkedSkillProjects(
-          { skillProjects: [...projects] },
+          { folder: bot?.folder ?? '', skillProjects: [...projects] },
           repos,
-          botLinkedSkillsFolder(botId)
+          botLinkedSkillsFolder(botId),
+          roots
         )
-        return linkedSkillsSection(linked.projects, [], true)
+        return linkedSkillsSection(linked.projects, [])
       }
     },
     deps.recentChats,
@@ -193,8 +191,8 @@ export function botStructuredSessionWiring(deps: {
   const botOfRecord = (record: AgentSessionRecord): Bot | null =>
     botOfHomeWorkspace(bots(), record.location.workspaceId)
   /** The bot's linked-skills folder brought up to date; rejects when it can't be. */
-  const syncLinkedSkills = (bot: Bot): Promise<LinkedSkills> =>
-    linkedSkillProjects(bot, deps.store().getRepos(), botLinkedSkillsFolder(bot.id))
+  const syncLinkedSkills = (bot: Bot, roots = deps.botSkillFolders?.() ?? []) =>
+    linkedSkillProjects(bot, deps.store().getRepos(), botLinkedSkillsFolder(bot.id), roots)
   return {
     resolveSessionInstructions: (record, launchDirectory, linkedSkills) =>
       botSessionInstructions(turnContext, bots(), record, launchDirectory, linkedSkills),
@@ -244,7 +242,7 @@ export function botStructuredSessionWiring(deps: {
       }
       try {
         const linked = await syncLinkedSkills(bot)
-        launchScans.set(record.sessionId, bot.skillProjects ?? null)
+        launchScans.set(record.sessionId, linkedSkillKeys(bot.skillProjects, deps.botSkillFolders))
         if (LIVE_SKILLS_PROVIDERS.has(record.provider)) {
           liveSkills.add(record.sessionId)
         } else {
@@ -321,18 +319,14 @@ export function botStructuredSessionWiring(deps: {
   }
 }
 
-/** A picked chat as the host's own list has it: `--chat` only for one of the bot's chats that takes
- *  mail; any doubt (an unread list included) says it can't, and never falls back to the Home Chat. */
 function checkedChat(rows: readonly BotChatRow[] | null, chatId: string): BotMentionChat {
-  if (!rows) {
-    return { refused: 'unverifiable' }
-  }
-  const row = rows.find((entry) => entry.id === chatId)
+  const row = rows?.find((entry) => entry.id === chatId)
   if (!row) {
-    return { refused: 'not-its-chat' }
+    return { refused: rows ? 'not-its-chat' : 'unverifiable' }
   }
-  if (row.self) {
-    return { refused: 'self' }
-  }
-  return row.closed ? { refused: row.reason ?? 'unverifiable' } : { id: row.id, title: row.title }
+  return row.self
+    ? { refused: 'self' }
+    : row.closed
+      ? { refused: row.reason ?? 'unverifiable' }
+      : { id: row.id, title: row.title }
 }

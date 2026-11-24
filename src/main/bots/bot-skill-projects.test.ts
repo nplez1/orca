@@ -7,12 +7,12 @@ import {
   symlinkSync,
   writeFileSync
 } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { Repo } from '../../shared/repository/repo-types'
 import { linkedSkillsSection } from '../native-chat/native-chat-skill-roots'
-import { botSkillProjectViews, linkedSkillProjects } from './bot-skill-projects'
+import { botSkillProjectViews, linkedSkillProjects, resolveSkillRoot } from './bot-skill-projects'
 
 const dirs: string[] = []
 afterEach(() => {
@@ -64,7 +64,7 @@ describe('linked projects for bot skills', () => {
     writeFileSync(join(project, '.claude', 'settings.json'), '{"enabledPlugins":{"x@y":true}}')
 
     const { root, projects } = await linkedSkillProjects(
-      { skillProjects: ['orca'] },
+      { folder: 'scout', skillProjects: ['orca'] },
       [repo('orca', project)],
       join(base, 'bot')
     )
@@ -104,7 +104,7 @@ describe('linked projects for bot skills', () => {
     writeSkill(skills, 'deploy')
 
     const { projects } = await linkedSkillProjects(
-      { skillProjects: ['p'] },
+      { folder: 'scout', skillProjects: ['p'] },
       [repo('p', join(base, 'project'))],
       join(base, 'bot')
     )
@@ -122,7 +122,7 @@ describe('linked projects for bot skills', () => {
     symlinkSync(join(base, 'shared'), join(project, '.agents', 'skills'))
 
     const { projects } = await linkedSkillProjects(
-      { skillProjects: ['p'] },
+      { folder: 'scout', skillProjects: ['p'] },
       [repo('p', project)],
       join(base, 'bot')
     )
@@ -141,7 +141,7 @@ describe('linked projects for bot skills', () => {
     const {
       projects: [first, second]
     } = await linkedSkillProjects(
-      { skillProjects: ['both', 'claude-only'] },
+      { folder: 'scout', skillProjects: ['both', 'claude-only'] },
       [repo('both', both), repo('claude-only', claudeOnly)],
       join(base, 'bot')
     )
@@ -161,7 +161,7 @@ describe('linked projects for bot skills', () => {
       { repoId: 'website', name: 'website', status: 'local', skillsDir: null, skills: [] }
     ])
     await expect(
-      linkedSkillProjects({ skillProjects: ['website'] }, repos, join(base, 'bot'))
+      linkedSkillProjects({ folder: 'scout', skillProjects: ['website'] }, repos, join(base, 'bot'))
     ).resolves.toMatchObject({ projects: [] })
   })
 
@@ -176,7 +176,7 @@ describe('linked projects for bot skills', () => {
       { repoId: 'gone', name: 'gone', status: 'missing', skillsDir: null, skills: [] }
     ])
     await expect(
-      linkedSkillProjects({ skillProjects: ['api'] }, repos, join(base, 'bot'))
+      linkedSkillProjects({ folder: 'scout', skillProjects: ['api'] }, repos, join(base, 'bot'))
     ).resolves.toMatchObject({ projects: [] })
   })
 
@@ -189,16 +189,20 @@ describe('linked projects for bot skills', () => {
     const repos = [repo('orca', orca), repo('website', website)]
     const folder = join(base, 'bot')
 
-    await linkedSkillProjects({}, repos, folder)
+    await linkedSkillProjects({ folder: 'scout' }, repos, folder)
     expect(contentsOf(folder)).toEqual({
       top: ['.claude', 'skills'],
       skills: [],
       claude: ['skills'],
       claudeSkills: []
     })
-    await linkedSkillProjects({ skillProjects: ['orca', 'website'] }, repos, folder)
+    await linkedSkillProjects(
+      { folder: 'scout', skillProjects: ['orca', 'website'] },
+      repos,
+      folder
+    )
     expect(contentsOf(folder).claudeSkills).toEqual(['deploy', 'review'])
-    await linkedSkillProjects({ skillProjects: ['website'] }, repos, folder)
+    await linkedSkillProjects({ folder: 'scout', skillProjects: ['website'] }, repos, folder)
     expect(contentsOf(folder).skills).toEqual(['review'])
     expect(contentsOf(folder).claudeSkills).toEqual(['review'])
     expect(realpathSync(join(folder, 'skills', 'review'))).toBe(review)
@@ -214,8 +218,16 @@ describe('linked projects for bot skills', () => {
     const folder = join(base, 'bot')
 
     // The older request scans 40 skills; the newer one, after an unlink, scans none.
-    const older = linkedSkillProjects({ skillProjects: ['big'] }, [repo('big', big)], folder)
-    const newer = linkedSkillProjects({ skillProjects: [] }, [repo('big', big)], folder)
+    const older = linkedSkillProjects(
+      { folder: 'scout', skillProjects: ['big'] },
+      [repo('big', big)],
+      folder
+    )
+    const newer = linkedSkillProjects(
+      { folder: 'scout', skillProjects: [] },
+      [repo('big', big)],
+      folder
+    )
     await Promise.all([older, newer])
 
     expect(contentsOf(folder).skills).toEqual([])
@@ -230,7 +242,7 @@ describe('linked projects for bot skills', () => {
     const folder = join(base, 'bot')
 
     await linkedSkillProjects(
-      { skillProjects: ['one', 'two'] },
+      { folder: 'scout', skillProjects: ['one', 'two'] },
       [repo('one', join(base, 'one')), repo('two', join(base, 'two'))],
       folder
     )
@@ -247,7 +259,79 @@ describe('linked projects for bot skills', () => {
     mkdirSync(join(folder, 'skills', 'alpha'), { recursive: true })
 
     await expect(
-      linkedSkillProjects({ skillProjects: ['orca'] }, [repo('orca', join(base, 'orca'))], folder)
+      linkedSkillProjects(
+        { folder: 'scout', skillProjects: ['orca'] },
+        [repo('orca', join(base, 'orca'))],
+        folder
+      )
     ).rejects.toThrow(/EEXIST/)
+  })
+})
+
+describe("a computer's skill folders", () => {
+  it('links a skills tree kept outside Orca, so its skills reach a bot with no linked project', async () => {
+    const base = scratch()
+    const mailbox = writeSkill(join(base, 'agents', 'skills'), 'outlook-mail')
+    const folder = join(base, 'bot')
+
+    const linked = await linkedSkillProjects({ folder: 'scout', skillProjects: [] }, [], folder, [
+      join(base, 'agents', 'skills')
+    ])
+
+    expect(contentsOf(folder).skills).toEqual(['outlook-mail'])
+    expect(realpathSync(join(folder, 'skills', 'outlook-mail'))).toBe(mailbox)
+    expect(linked.projects).toMatchObject([
+      { name: join(base, 'agents', 'skills'), kind: 'folder' }
+    ])
+  })
+
+  it('links one skill once when a project and a folder name the same folder', async () => {
+    const base = scratch()
+    const shared = writeSkill(join(base, 'agents', 'skills'), 'outlook-mail')
+    const project = join(base, 'orca')
+    mkdirSync(join(project, '.agents', 'skills'), { recursive: true })
+    symlinkSync(shared, join(project, '.agents', 'skills', 'mail'))
+    const folder = join(base, 'bot')
+
+    await linkedSkillProjects(
+      { folder: 'scout', skillProjects: ['orca'] },
+      [repo('orca', project)],
+      folder,
+      [join(base, 'agents', 'skills')]
+    )
+
+    expect(contentsOf(folder).skills).toEqual(['outlook-mail'])
+  })
+})
+
+describe('a settings folder as main reads it', () => {
+  it('expands ~ against the real home and refuses anything that is not a path', () => {
+    expect(resolveSkillRoot('~/agents/skills')).toBe(join(homedir(), 'agents', 'skills'))
+    expect(resolveSkillRoot('/opt/orca/skills')).toBe('/opt/orca/skills')
+    expect(resolveSkillRoot('agents/skills')).toBeNull()
+    expect(resolveSkillRoot('~/')).toBeNull()
+    expect(resolveSkillRoot('/')).toBeNull()
+    expect(resolveSkillRoot(homedir())).toBeNull()
+  })
+})
+
+describe("a bot's own skills", () => {
+  it('loads the skills a bot wrote into its own home, before any linked project', async () => {
+    const base = scratch()
+    const botsRoot = join(base, 'bots')
+    const own = writeSkill(join(botsRoot, 'scout', '.agents', 'skills'), 'outlook-mail')
+    writeSkill(join(base, 'orca', '.agents', 'skills'), 'electron')
+    const folder = join(base, 'bot')
+
+    const linked = await linkedSkillProjects(
+      { folder: 'scout', skillProjects: ['orca'] },
+      [repo('orca', join(base, 'orca'))],
+      folder,
+      [],
+      botsRoot
+    )
+
+    expect(realpathSync(join(folder, 'skills', 'outlook-mail'))).toBe(own)
+    expect(linked.projects.map((project) => project.kind)).toEqual(['own', 'project'])
   })
 })
