@@ -39,8 +39,6 @@ export const REQUIRED = [
   // for dispatch and call, so a manual dispatch lands on `blacksmith-*` labels this fork lacks; PR and
   // schedule events pass no input and stay on hosted runners.
   '.github/workflows/node-server-tests.yml',
-  // Why: auto-update correctness, ~7 min of macOS across six observed PR runs.
-  '.github/workflows/macos-updater-tests.yml',
   // Why: perf regression contract on PRs, and every other day through `fork-performance-contracts.yml`
   // — the contracts config is separate from the nightly unit suite, so nothing else covers it.
   '.github/workflows/performance-contracts.yml',
@@ -84,7 +82,6 @@ export const EXPECTED_TRIGGERS = {
   ],
   '.github/workflows/mobile.yml': ['pull_request', 'push'],
   '.github/workflows/node-server-tests.yml': ['pull_request', 'workflow_dispatch', 'workflow_call'],
-  '.github/workflows/macos-updater-tests.yml': ['pull_request', 'workflow_dispatch'],
   '.github/workflows/performance-contracts.yml': [
     'workflow_dispatch',
     'pull_request',
