@@ -8,7 +8,10 @@ import { Input } from '../../ui/input'
 import { Label } from '../../ui/label'
 import { SettingsSwitchRow } from '../form-controls/SettingsFormControls'
 import { getChatBehaviorEntriesByKey } from './chat-behavior-search'
-import type { SettingsHostScope } from '../host-scope/settings-host-scope'
+import {
+  LOCAL_SETTINGS_HOST_SCOPE,
+  type SettingsHostScope
+} from '../host-scope/settings-host-scope'
 import {
   getHostSettingUnsupportedNote,
   getHostSettingUpdateFailedMessage,
@@ -138,12 +141,13 @@ export function NativeChatShellEnvironmentSetting({
   settings,
   updateSettings,
   hostScope
-}: NativeChatShellEnvironmentSettingProps): React.JSX.Element {
+}: NativeChatShellEnvironmentSettingProps): React.JSX.Element | null {
   const t = useTranslate()
   const entry = getChatBehaviorEntriesByKey().shellEnvironment
-  const hostLabel = useSettingsHostLabel(hostScope.target)
+  const target = hostScope.target
+  const hostLabel = useSettingsHostLabel(target ?? LOCAL_SETTINGS_HOST_SCOPE.target)
   const hostArgs = {
-    owner: hostScope.target,
+    owner: target ?? LOCAL_SETTINGS_HOST_SCOPE.target,
     localSettings: settings,
     updateLocalSettings: updateSettings,
     updateFailedMessage: getHostSettingUpdateFailedMessage(hostLabel, t)
@@ -156,6 +160,10 @@ export function NativeChatShellEnvironmentSetting({
     inherit.setting.state === 'unsupported' || names.setting.state === 'unsupported'
   const inheritAll = inherit.setting.state !== 'ready' || inherit.setting.value
   const savedNames = names.setting.state === 'ready' ? names.setting.value : []
+  // A machine-only scope has no server endpoint, so there is no host to read.
+  if (target === null) {
+    return null
+  }
 
   return (
     <div className="space-y-3 pb-3">

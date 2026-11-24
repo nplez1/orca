@@ -25,3 +25,7 @@ export function releaseGitAdmissionAfter(
     grant.release()
   }
 }
+
+export function _resetGitAdmissionForTests(replacement = new GitAdmissionScheduler()): void {
+  scheduler = replacement
+}

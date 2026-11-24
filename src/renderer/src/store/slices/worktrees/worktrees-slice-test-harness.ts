@@ -1,4 +1,4 @@
-import { withAgentStatusOwnership } from '../agent-status/status-ownership/agent-status-ownership-boundary'
+import { withStatusTransaction } from '../../status-transaction/status-transaction-boundary'
 import { createAgentStatusSlice } from '../agent-status/agent-status'
 import { createPaneForegroundAgentSlice } from '../agent-status/pane-authority/pane-foreground-agent'
 import { vi, type Mock } from 'vitest'
@@ -23,12 +23,19 @@ import type {
 } from '../../../../../shared/worktree/catalog/detected-worktree-provider-contract'
 import { createWorktreeSlice } from './create-worktree-slice'
 import { resetAuthoritativelyRemovedWorktreeMemoryForTests } from './listing/authoritative-worktree-removal-memory'
-import { resetHostedReviewLinkMutationGenerationForTests } from './metadata/hosted-review-link-mutation'
+import {
+  hostedReviewLinkClearTombstonesByCopy,
+  hostedReviewLinkMutationGenerationByWorktreeId,
+  hostedReviewLinkWorktreeIdAliases
+} from './metadata/hosted-review-link-mutation'
+import { deleteDetachedOwners } from './metadata/detached-hosted-review-owners'
 import {
   makeDetectedResult,
   qualifyDetectedResult,
   TEST_SSH_AUTHORITY
-} from './listing/worktrees-detected-listing-fixtures'
+} from './listing/worktrees-detected-listing.test-fixture'
+
+export { makeDetectedResult } from './listing/worktrees-detected-listing.test-fixture'
 import { makeWorktree } from './worktree.test-fixture'
 import { createWorkspaceAttentionSlice } from '../workspace-attention/workspace-attention-slice'
 import { createEphemeralVmLifecycleSlice } from '../ephemeral-vm/ephemeral-vm-lifecycle'
@@ -122,7 +129,11 @@ globalThis.window = { api: mockApi }
 
 export function resetRemoteRuntimeMocks() {
   clearRuntimeCompatibilityCacheForTests()
-  resetHostedReviewLinkMutationGenerationForTests()
+  // Upstream dropped the module's test-only reset; its state is exported, so clear it here.
+  hostedReviewLinkMutationGenerationByWorktreeId.clear()
+  hostedReviewLinkClearTombstonesByCopy.clear()
+  hostedReviewLinkWorktreeIdAliases.clear()
+  deleteDetachedOwners()
   runtimeEnvironmentCall.mockReset()
   runtimeEnvironmentTransportCall.mockReset()
   runtimeEnvironmentTransportCall.mockImplementation((args: RuntimeEnvironmentCallRequest) => {
@@ -133,7 +144,7 @@ export function resetRemoteRuntimeMocks() {
 /** Supplies the worktree slice with the minimal UI and runtime state needed to exercise creation and teardown. */
 export function createTestStore() {
   return create<AppState>()(
-    withAgentStatusOwnership(
+    withStatusTransaction(
       (...a) =>
         // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: This slice fixture supplies the state read by worktree actions; unrelated slices are intentionally omitted.
         ({

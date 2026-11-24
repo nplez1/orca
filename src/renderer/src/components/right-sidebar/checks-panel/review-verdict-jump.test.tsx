@@ -95,6 +95,8 @@ function renderList(comments: PRComment[]): void {
         <PRCommentsList
           comments={comments}
           commentsLoading={false}
+          // This suite pins verdict navigation, not the cold-start skeleton.
+          loadingSkeleton={false}
           selectionContextKey="review:42"
           reviewVerdictsEnabled
         />

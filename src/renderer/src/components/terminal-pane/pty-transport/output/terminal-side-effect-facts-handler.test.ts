@@ -1,8 +1,37 @@
 import { describe, expect, it, vi } from 'vitest'
+import type { TerminalSideEffectBatch } from '../../../../../../shared/terminal/output/terminal-side-effect-facts'
 import {
   dispatchTerminalSideEffectBatch,
-  registerTerminalSideEffectFactConsumer
+  registerTerminalSideEffectFactConsumer,
+  type TerminalSideEffectFactConsumerCallbacks
 } from './terminal-side-effect-facts-handler'
+
+const PTY_ID = 'wt-1#1'
+
+function createCallbackRecorder(): {
+  callbacks: TerminalSideEffectFactConsumerCallbacks
+  events: unknown[][]
+} {
+  const events: unknown[][] = []
+  return {
+    events,
+    callbacks: {
+      onTitleChange: (normalizedTitle, rawTitle) =>
+        events.push(['title', normalizedTitle, rawTitle]),
+      onBell: () => events.push(['bell']),
+      onAgentBecameIdle: (title) => events.push(['idle', title]),
+      onAgentBecameWorking: () => events.push(['working']),
+      onAgentExited: () => events.push(['exited'])
+    }
+  }
+}
+
+function batch(
+  facts: TerminalSideEffectBatch['facts'],
+  options: Partial<TerminalSideEffectBatch> = {}
+): TerminalSideEffectBatch {
+  return { ptyId: PTY_ID, seq: 0, facts, ...options }
+}
 
 describe('foreground-changed facts', () => {
   it('routes runtime input to the input path and a host notice to the foreground path', () => {
@@ -42,7 +71,7 @@ describe('restoredUnconfirmed title facts', () => {
     const { callbacks, events } = createCallbackRecorder()
     registerTerminalSideEffectFactConsumer({ ptyId: PTY_ID, callbacks })
 
-    _dispatchTerminalSideEffectBatchForTest(
+    dispatchTerminalSideEffectBatch(
       batch(
         [
           {
@@ -63,7 +92,7 @@ describe('restoredUnconfirmed title facts', () => {
     const { callbacks, events } = createCallbackRecorder()
     registerTerminalSideEffectFactConsumer({ ptyId: PTY_ID, callbacks })
 
-    _dispatchTerminalSideEffectBatchForTest(
+    dispatchTerminalSideEffectBatch(
       batch([
         {
           kind: 'title',
@@ -81,7 +110,7 @@ describe('restoredUnconfirmed title facts', () => {
     const { callbacks, events } = createCallbackRecorder()
     registerTerminalSideEffectFactConsumer({ ptyId: PTY_ID, callbacks })
 
-    _dispatchTerminalSideEffectBatchForTest(
+    dispatchTerminalSideEffectBatch(
       batch(
         [
           {
@@ -101,7 +130,7 @@ describe('restoredUnconfirmed title facts', () => {
     const { callbacks, events } = createCallbackRecorder()
     registerTerminalSideEffectFactConsumer({ ptyId: PTY_ID, callbacks })
 
-    _dispatchTerminalSideEffectBatchForTest(
+    dispatchTerminalSideEffectBatch(
       batch([
         {
           kind: 'title',
@@ -119,7 +148,7 @@ describe('restoredUnconfirmed title facts', () => {
     const { callbacks, events } = createCallbackRecorder()
     registerTerminalSideEffectFactConsumer({ ptyId: PTY_ID, callbacks })
 
-    _dispatchTerminalSideEffectBatchForTest(
+    dispatchTerminalSideEffectBatch(
       batch([
         {
           kind: 'title',

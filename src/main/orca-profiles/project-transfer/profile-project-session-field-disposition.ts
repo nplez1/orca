@@ -338,6 +338,10 @@ export const WORKSPACE_SESSION_HOST_SYNC_DISPOSITION = {
   activeGroupIdByWorktree: 'hostLocal',
   activeConnectionIdsAtShutdown: 'hostLocal',
   remoteSessionIdsByTabId: 'hostLocal',
+  // Why hostLocal, like `remoteSessionIdsByTabId`: main-owned bookkeeping about this desktop window's
+  // relay writes, which says nothing about the host it replicates to.
+  desktopRelayOwnerByTabId: 'hostLocal',
+  desktopRelayAdoptionVersion: 'hostLocal',
   lastVisitedAtByWorktreeId: 'hostLocal',
   defaultTerminalTabsAppliedByWorktreeId: 'hostLocal',
   sleepingAgentSessionsByPaneKey: 'hostLocal',
@@ -358,8 +362,8 @@ type SessionFieldHostSyncKeysMatchDispositionKeys = [
     ? true
     : never
   : never
-const hostSyncKeysMatch: SessionFieldHostSyncKeysMatchDispositionKeys = true
-void hostSyncKeysMatch
+// Exported rather than `void`ed so the assertion costs one line under this file's max-lines cap.
+export const hostSyncKeysMatch: SessionFieldHostSyncKeysMatchDispositionKeys = true
 
 // Why `SESSION_FIELDS` rather than a second `Object.keys` list: the two tables are pinned to the same
 // key set by the assertion above and by test, so walking either one walks both.

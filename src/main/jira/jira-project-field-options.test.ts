@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { JiraClientForSite } from './authenticated-request'
 import type { JiraCreateField } from '../../shared/jira/jira-types'
-import { _resetTracerForTests, setActiveSink, type TracerSink } from '../observability/tracer'
+import { setActiveSink, type TracerSink } from '../observability/tracer'
 
 function captureSpans(): unknown[] {
   const records: unknown[] = []
@@ -16,7 +16,7 @@ function captureSpans(): unknown[] {
 
 // Why afterEach: a failing assertion must not leave this suite's capturing sink installed.
 afterEach(() => {
-  _resetTracerForTests()
+  setActiveSink(null)
 })
 
 const { clearTokenMock, isAuthErrorMock, jiraRequestMock } = vi.hoisted(() => ({

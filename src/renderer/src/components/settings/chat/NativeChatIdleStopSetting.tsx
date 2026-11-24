@@ -10,7 +10,10 @@ import { useIntlLocale, useTranslate, type Translate } from '@/i18n/use-translat
 import { formatMinutesDuration } from '@/i18n/ui-intl-formatters'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select'
 import { SettingsRow } from '../form-controls/SettingsFormControls'
-import type { SettingsHostScope } from '../host-scope/settings-host-scope'
+import {
+  LOCAL_SETTINGS_HOST_SCOPE,
+  type SettingsHostScope
+} from '../host-scope/settings-host-scope'
 import {
   getHostSettingUnsupportedNote,
   getHostSettingUpdateFailedMessage,
@@ -44,19 +47,24 @@ export function NativeChatIdleStopSetting({
   hostScope,
   title,
   description
-}: NativeChatIdleStopSettingProps): React.JSX.Element {
+}: NativeChatIdleStopSettingProps): React.JSX.Element | null {
   const t = useTranslate()
   const intlLocale = useIntlLocale()
   const labelId = useId()
-  const hostLabel = useSettingsHostLabel(hostScope.target)
+  const target = hostScope.target
+  const hostLabel = useSettingsHostLabel(target ?? LOCAL_SETTINGS_HOST_SCOPE.target)
   const { setting, update } = useHostSetting({
-    owner: hostScope.target,
+    owner: target ?? LOCAL_SETTINGS_HOST_SCOPE.target,
     settingKey: 'nativeChatIdleStopMinutes',
     localSettings: settings,
     updateLocalSettings: updateSettings,
     updateFailedMessage: getHostSettingUpdateFailedMessage(hostLabel, t)
   })
   const minutes = setting.state === 'ready' ? setting.value : null
+  // A machine-only scope has no server endpoint, so there is no host to read.
+  if (target === null) {
+    return null
+  }
   // Keep a hand-edited value selectable rather than showing a blank trigger.
   const options =
     minutes === null || NATIVE_CHAT_IDLE_STOP_MINUTE_CHOICES.includes(minutes)

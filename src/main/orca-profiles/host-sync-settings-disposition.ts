@@ -62,5 +62,26 @@ import { HOST_SYNC_DISPOSITION_ROWS_B } from './host-sync-settings-disposition-r
 
 export const GLOBAL_SETTINGS_HOST_SYNC_DISPOSITION = {
   ...HOST_SYNC_DISPOSITION_ROWS_A,
-  ...HOST_SYNC_DISPOSITION_ROWS_B
+  ...HOST_SYNC_DISPOSITION_ROWS_B,
+  // 2026-11-24 sync: upstream added these eight keys, classified here so the resolution stays in the
+  // file the typecheck named; the two halves above are unchanged.
+  // Why replicated, like `pluginSystemDefaultedOn`: a one-shot marker of a choice the user made, which
+  // a host that has not seen it should follow rather than re-decide.
+  agentDefaultSurfaceChosen: 'replicated',
+  nativeChatAutoContinueAfterUsageLimitDefaultedOn: 'replicated',
+  // Why replicated: a feature flag, like `experimentalAppRail`; the shared-servers cap is a preference.
+  experimentalSharedCodexServers: 'replicated',
+  // Why replicated: a skip-confirmation choice, like every other `skip…Confirm` key.
+  skipDeleteChatConfirm: 'replicated',
+  // Why replicated: which sign-in a chat on the Google account method uses is a preference; the
+  // project it signs in against (`antigravityChatAuth`) stays host-local.
+  antigravityGoogleSignIn: 'replicated',
+  // Why replicated: a kill switch on Orca's own copy of agy, not a fact about what this machine has.
+  antigravityManagedAgyEnabled: 'replicated',
+  // Why hostLocal: upstream calls it host-owned — each host updates the server it installed, so the
+  // main's answer would overwrite a host's own.
+  antigravityServerAutoUpdateEnabled: 'hostLocal',
+  // Why hostLocal: a caption cache keyed by `host|bot|avatar`, so every entry describes a picture this
+  // machine made.
+  generatedAvatarDescriptions: 'hostLocal'
 } as const satisfies Record<keyof GlobalSettings, SettingsFieldHostSyncDisposition>

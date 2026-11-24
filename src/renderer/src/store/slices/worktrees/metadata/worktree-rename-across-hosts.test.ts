@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeWorktree } from '../worktree.test-fixture'
-import { makeDetectedResult } from '../listing/worktrees-detected-listing-fixtures'
 import {
   createTestStore,
+  makeDetectedResult,
   mockApi,
   resetRemoteRuntimeMocks,
   resetWorktreeSliceModuleMemory,

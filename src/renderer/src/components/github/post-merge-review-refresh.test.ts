@@ -7,7 +7,7 @@ import {
   createTestStore,
   makePR,
   makePRRefreshWorktree
-} from '../../store/github/github-slice-test-harness'
+} from '../../store/github/github-slice.test-fixture'
 import {
   __clearPostMergeRefreshesForTests,
   POST_MERGE_REFRESH_DEADLINE_MS,

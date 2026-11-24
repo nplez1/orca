@@ -180,7 +180,7 @@ export function createMainWindow(
   installWindowsPathRegistryChangeListener(mainWindow)
   // Native paste fallback is privileged; trust only the top-level renderer.
   setTrustedUIRendererWebContentsId(rendererWebContentsId)
-  installUiHangWindowObserver({ window: mainWindow, store, surface: 'main' })
+  installUiHangWindowObserver({ window: mainWindow, store: nativeSettings, surface: 'main' })
 
   // Unlike query-session-end, session-end cannot be canceled before this signal is recorded.
   if (process.platform === 'win32') {
@@ -203,7 +203,7 @@ export function createMainWindow(
     mainWindow.webContents.setBackgroundThrottling(true)
     installMacosVisibilityRepaint(
       mainWindow,
-      () => store?.getSettings().uiHangDiagnosticsEnabled === true
+      () => nativeSettings?.getSettings().uiHangDiagnosticsEnabled === true
     )
   }
 

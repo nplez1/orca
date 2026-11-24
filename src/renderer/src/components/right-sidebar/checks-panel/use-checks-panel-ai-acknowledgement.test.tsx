@@ -116,8 +116,9 @@ function hookInput(overrides: Partial<AcknowledgementInput> = {}) {
     commentsSelectionClearTokenRef: { current: 0 },
     pendingCommentResolutionRef: { current: null },
     setCommentResolutionAckBusyNow: vi.fn(),
-    setComments: (next: SetStateAction<PRComment[]>) => {
-      renderedComments = typeof next === 'function' ? next(renderedComments) : next
+    setComments: (next: SetStateAction<PRComment[]> | null | undefined) => {
+      // The real setter clears its read state on null/undefined; the ref this suite inspects holds a list.
+      renderedComments = typeof next === 'function' ? next(renderedComments) : (next ?? [])
     },
     setCommentsSelectionClearRequest: vi.fn(),
     commentResolutionLaunchAcceptedRef: { current: false },

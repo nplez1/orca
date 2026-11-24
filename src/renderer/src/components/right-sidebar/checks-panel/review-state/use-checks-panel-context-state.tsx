@@ -41,8 +41,10 @@ type ChecksPanelContextStateInput = Pick<
   | 'repo'
   | 'settings'
   | 'setAgentComposerState'
+  | 'setChecks'
   | 'setChecksLoading'
   | 'setCommentResolutionAckBusyNow'
+  | 'setComments'
   | 'setCommentsLoading'
   | 'setConflictDetailsRefreshing'
   | 'setCreatePrError'
@@ -83,8 +85,10 @@ export function useChecksPanelContextState(model: ChecksPanelContextStateInput) 
     repo,
     settings,
     setAgentComposerState,
+    setChecks,
     setChecksLoading,
     setCommentResolutionAckBusyNow,
+    setComments,
     setCommentsLoading,
     setConflictDetailsRefreshing,
     setCreatePrError,

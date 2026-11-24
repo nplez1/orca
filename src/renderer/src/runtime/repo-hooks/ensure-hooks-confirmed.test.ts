@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppState } from '@/store/types'
 import type { PersistedTrustedOrcaHooks } from '../../../../shared/workspace-setup/orca-yaml-hook-types'
-import { __resetTrustPromptChainForTests, ensureHooksConfirmed } from './ensure-hooks-confirmed'
+import { ensureHooksConfirmed } from './ensure-hooks-confirmed'
 import { hashOrcaHookScript } from './orca-hook-trust'
 import {
   createCompatibleRuntimeStatusResponseIfNeeded,
@@ -64,7 +64,6 @@ describe('ensureHooksConfirmed', () => {
     )
     clearRuntimeCompatibilityCacheForTests()
     installHooksApiMock()
-    __resetTrustPromptChainForTests()
   })
 
   it('shows the recipe extend hook and its lifetimes in the trust prompt', async () => {

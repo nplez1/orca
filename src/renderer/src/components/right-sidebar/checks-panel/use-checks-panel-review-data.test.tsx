@@ -8,7 +8,7 @@ import {
   flush,
   mountProbe,
   unmountProbes
-} from '../source-control/panel/source-control-hook-test-harness'
+} from '../source-control/panel/source-control-hook-probe.test-fixture'
 import { useChecksPanelReviewData } from './review-data/use-checks-panel-review-data'
 import type { PRComment } from '../../../../../shared/github/comments/comment-types'
 import type { PRInfo } from '../../../../../shared/github/pull-requests/pull-request-types'

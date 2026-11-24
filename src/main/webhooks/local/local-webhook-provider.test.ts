@@ -24,7 +24,7 @@ import {
   LocalWebhooks,
   type LocalWebhooksDeps
 } from './local-webhook-provider'
-import type { ConnectorCloudStatus } from '../../connector-cloud/connector-cloud'
+import type { ConnectorCloudStatus } from '../../../shared/bots/connector-cloud-status'
 import { localWebhookPort } from './local-webhook-listener'
 import { LOCAL_MINT_GRACE_MS, LOCAL_WEBHOOK_DIR, LocalWebhookStore } from './local-webhook-store'
 
@@ -431,6 +431,7 @@ describe('a host with both kinds of hook', () => {
       botFolder: () => botFolder,
       botFolders: () => [botFolder],
       botExists: () => true,
+      newerAgentBotIds: () => new Set<string>(),
       bot: () => undefined,
       notifyOwner: () => {},
       runForEvent: () => Promise.resolve(null),

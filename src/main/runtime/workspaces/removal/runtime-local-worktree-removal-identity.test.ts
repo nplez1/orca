@@ -84,6 +84,7 @@ it('keeps another repo checkout recreated at the path instead of recovering into
         localOptions: {},
         force: true,
         deleteBranch: false,
+        deleteRemoteBranch: false,
         closeWatchers: async () => {},
         preserveBranchHead: (value) => value ?? {},
         finishRemoval: async () => {}

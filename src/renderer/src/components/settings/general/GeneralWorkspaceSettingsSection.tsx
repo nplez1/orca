@@ -12,7 +12,10 @@ import { SearchableSetting } from '../section-layout/SearchableSetting'
 import { SettingsSegmentedControl } from '../form-controls/SettingsFormControls'
 import { WorkspaceDirectorySetting } from './WorkspaceDirectorySetting'
 import { RepoRootSetting } from './RepoRootSetting'
-import type { SettingsHostScope } from '../host-scope/settings-host-scope'
+import {
+  LOCAL_SETTINGS_HOST_SCOPE,
+  type SettingsHostScope
+} from '../host-scope/settings-host-scope'
 import { useTranslate } from '@/i18n/use-translate'
 import { GlobalWorktreeVisibilitySourcesSetting } from './GlobalWorktreeVisibilitySourcesSetting'
 import { GLOBAL_WORKTREE_VISIBILITY_SETTINGS_TARGET_ID } from '@/components/settings/navigation/settings-navigation-types'
@@ -45,14 +48,17 @@ export function useNestWorkspacesSetting(
   updateSettings: (updates: Partial<GlobalSettings>) => void | Promise<void>
 ): ReturnType<typeof useHostSetting<'nestWorkspaces'>> {
   const t = useTranslate()
-  const hostLabel = useSettingsHostLabel(hostScope.target)
-  return useHostSetting({
-    owner: hostScope.target,
+  const target = hostScope.target
+  const hostLabel = useSettingsHostLabel(target ?? LOCAL_SETTINGS_HOST_SCOPE.target)
+  const host = useHostSetting({
+    owner: target ?? LOCAL_SETTINGS_HOST_SCOPE.target,
     settingKey: 'nestWorkspaces',
     localSettings: settings,
     updateLocalSettings: updateSettings,
     updateFailedMessage: getHostSettingUpdateFailedMessage(hostLabel, t)
   })
+  // A machine-only scope has no endpoint, so the switch has nothing to read or write.
+  return target === null ? { setting: { state: 'loading' }, update: async () => {} } : host
 }
 
 export function GeneralWorkspaceSettingsSection({

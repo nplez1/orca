@@ -3,7 +3,7 @@ import type { HostedReviewInfo } from '../../../../shared/source-control/hosted-
 import type { PRInfo } from '../../../../shared/github/pull-requests/pull-request-types'
 import { getHostedReviewCacheKey } from '../../store/slices/hosted-review/hosted-review-cache-identity'
 import { setGitHubPRResultCaches } from '../../store/github/pull-requests/pr-result-cache'
-import { createTestStore, makePR } from '../../store/github/github-slice-test-harness'
+import { createTestStore, makePR } from '../../store/github/github-slice.test-fixture'
 import { selectWorkspaceReviewState } from './checks-panel/review-state/checks-panel-review'
 
 const HEAD = 'head-oid'

@@ -77,7 +77,7 @@ export function resolveClaudePaneStatus(
   // LOCAL(nplez1): only a plain running shell is reclassified as agent work, and upstream would have
   // called that hold monitoring (see LOCAL-PATCHES.md § local(agents)).
   const shellHeldAsAgentWork =
-    state.claudeRunningNonAgentTaskPaneKeys.has(paneKey) && !held.runningAgent && !held.owedAgent
+    state.claudeRunningNonAgentTasksByPaneKey.has(paneKey) && !held.runningAgent && !held.owedAgent
   return {
     ...foldAgentLeadStatus({
       leadState: lead.state,
@@ -92,7 +92,7 @@ export function resolveClaudePaneStatus(
         hasLiveAgentWork:
           held.runningAgent ||
           held.owedAgent ||
-          state.claudeRunningNonAgentTaskPaneKeys.has(paneKey),
+          state.claudeRunningNonAgentTasksByPaneKey.has(paneKey),
         hasLiveNonAgentWork: state.claudeActiveSessionCronPaneKeys.has(paneKey) || held.owedShell
       })
     }),

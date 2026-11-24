@@ -34,6 +34,8 @@ import {
   NO_LINKED_SKILLS,
   type LinkedSkills
 } from '../native-chat/native-chat-skill-roots'
+import type { Repo } from '../../shared/repository/repo-types'
+import type { AgentSessionRecord } from '../../shared/agent-session/lifecycle/agent-session-record'
 
 /** The agents that reload a watched skills folder mid-chat (checked on Claude 2.1.319, Codex 0.163). */
 const LIVE_SKILLS_PROVIDERS = new Set(['claude', 'codex'])

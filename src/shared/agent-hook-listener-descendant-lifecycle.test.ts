@@ -6,11 +6,11 @@ import {
   movePaneCacheState,
   type HookListenerState
 } from './agent-hook-listener/listener-state'
-import { seedLegacyAgentStatusForTests } from './agent-hook-listener/legacy-agent-status-test-seed'
 import { paneHasStateClaims } from './agent-hook-listener/pane-state-claims'
 import {
   normalizeAndAccept,
-  PANE_KEY
+  PANE_KEY,
+  seedLegacyAgentStatusForTests
 } from './agent-hook-listener/normalization/agent-hook-listener-test-harness'
 import type { AgentHookSource } from './agent-hook-listener/transport/agent-hook-relay'
 import { AGENT_DESCENDANT_QUIET_REAP_MS } from './agent-descendant-roster'

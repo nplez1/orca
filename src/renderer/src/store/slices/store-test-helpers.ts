@@ -60,7 +60,7 @@ import { createWorkspaceAttentionSlice } from './workspace-attention/workspace-a
 import { createForkUiSlice } from './fork-ui'
 import '@/i18n/i18n'
 import { withEditorBufferRecords } from './editor/buffers/editor-buffer-record-lifecycle'
-import { withAgentStatusOwnership } from './agent-status/status-ownership/agent-status-ownership-boundary'
+import { withStatusTransaction } from '../status-transaction/status-transaction-boundary'
 import { withAgentConversationRetention } from './agent-status/conversation/agent-conversation-retention'
 import { makeWorktree } from './worktrees/worktree.test-fixture'
 import { TEST_REPO } from '../repos/repo.test-fixture'
@@ -71,9 +71,9 @@ export { makeOpenFile } from './editor/types/open-file.test-fixture'
 export { makeUnifiedTab, makeTabGroup } from './tabs/tab-group.test-fixture'
 
 const withTestStorePolicies = (creator: StateCreator<AppState, [], []>, check: boolean) =>
-  // Why the ownership boundary: agent-status reads come from the projection it publishes, so a
+  // Why the status transaction: agent-status reads come from the projection it publishes, so a
   // store without it reports every pane idle. The app store and the other fixture both wrap it.
-  withAgentStatusOwnership(withEditorBufferRecords(withAgentConversationRetention(creator), check))
+  withStatusTransaction(withEditorBufferRecords(withAgentConversationRetention(creator), check))
 
 export function createTestStore() {
   // Why the record middleware: views of one file share a record only through it, as in the app.

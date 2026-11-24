@@ -27,7 +27,7 @@ export function renderOrcaAccountSettingsSection(
   const { model, navigation, view } = context
   const { target } = model.settingsHostScope
   const serverName =
-    target.kind === 'environment'
+    target?.kind === 'environment'
       ? (model.runtimeEnvironments.find((entry) => entry.id === target.environmentId)?.name ??
         t('components.settings.notifications.server.fallbackHost', 'this server'))
       : null
@@ -53,7 +53,9 @@ export function renderOrcaAccountSettingsSection(
         <SettingsHostScopeUnavailableNotice />
       ) : (
         <SettingsGroup bodyClassName="py-4">
-          {target.kind === 'environment' ? (
+          {target === null ? (
+            <SettingsHostScopeUnavailableNotice />
+          ) : target.kind === 'environment' ? (
             <ServerOrcaAccountPane environmentId={target.environmentId} />
           ) : (
             <OrcaAccountSettingsPane />

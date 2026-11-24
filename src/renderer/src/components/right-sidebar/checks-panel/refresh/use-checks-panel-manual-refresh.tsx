@@ -345,7 +345,13 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
             branch,
             refreshedPR.headSha,
             refreshedPR.prRepo,
-            { force: true, ...repoOptions, throwOnError: true, wakeWslDistro: true, userRefresh: true }
+            {
+              force: true,
+              ...repoOptions,
+              throwOnError: true,
+              wakeWslDistro: true,
+              userRefresh: true
+            }
           ).then(
             (result) => {
               if (!isCurrentRequest() || !isCurrentAsyncResult(prRequestKey)) {

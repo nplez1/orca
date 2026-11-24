@@ -13,7 +13,61 @@ import type { KnownRuntimeEnvironment } from '../../../../shared/remote-runtime/
 import { createCompatibleRuntimeStatusResponseIfNeeded } from '../../runtime/rpc/testing/runtime-compatibility-test-fixture'
 import { clearRuntimeCompatibilityCacheForTests } from '../../runtime/runtime-rpc-client'
 import { createTestStore, makeLayout, makeTab, makeWorktree, seedStore } from './store-test-helpers'
-import { createStoreCascadesMockApi } from '../testing/app-store-cascade-api.test-fixture'
+/** window.api double for the store cascades this suite drives; installs itself on globalThis. */
+function createStoreCascadesMockApi() {
+  const mockApi = {
+    worktrees: {
+      create: vi.fn().mockResolvedValue({}),
+      remove: vi.fn().mockResolvedValue(undefined),
+      forceDeletePreservedBranch: vi.fn().mockResolvedValue({ deleted: true }),
+      updateMeta: vi.fn().mockResolvedValue({})
+    },
+    repos: {
+      list: vi.fn().mockResolvedValue([]),
+      add: vi.fn().mockResolvedValue({}),
+      remove: vi.fn().mockResolvedValue(undefined),
+      update: vi.fn().mockResolvedValue({}),
+      pickFolder: vi.fn().mockResolvedValue(null)
+    },
+    pty: {
+      kill: vi.fn().mockResolvedValue(undefined),
+      inspectProcess: vi.fn(async (ptyId: string) => ({
+        foregroundProcess: 'codex',
+        hasChildProcesses: true,
+        foregroundObservation: {
+          verdict: 'observed',
+          source: 'pty-master',
+          foregroundKind: 'non-shell',
+          processName: 'codex',
+          ptyId,
+          ptyIncarnationId: `inc-${ptyId}`,
+          authorityGeneration: 'test-authority',
+          observationEpoch: 1,
+          capturedAgeMs: 0
+        }
+      }))
+    },
+    runtime: { call: vi.fn() },
+    gh: {
+      prForBranch: vi.fn().mockResolvedValue(null),
+      issue: vi.fn().mockResolvedValue(null)
+    },
+    settings: {
+      get: vi.fn().mockResolvedValue({}),
+      set: vi.fn().mockResolvedValue(undefined)
+    },
+    runtimeEnvironments: { call: vi.fn() },
+    cache: {
+      getGitHub: vi.fn().mockResolvedValue(null),
+      setGitHub: vi.fn().mockResolvedValue(undefined)
+    }
+  }
+
+  // @ts-expect-error -- minimal window.api stub for the store under test
+  globalThis.window = { api: mockApi }
+  return mockApi
+}
+
 import { resolveUnreachableVmRemovalFallback } from './worktrees/teardown/unreachable-vm-workspace-release'
 import type * as AgentStatusModule from '@/lib/agent-status/aggregation/worktree-agent-status'
 

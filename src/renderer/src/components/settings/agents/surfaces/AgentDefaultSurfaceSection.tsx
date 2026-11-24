@@ -128,21 +128,26 @@ export function AgentDefaultSurfaceSection({
   /** A server's value only decides the agents that server starts itself. */
   hostScope?: SettingsHostScope
   presentation?: 'tiles' | 'switch'
-}): JSX.Element {
+}): JSX.Element | null {
   const t = useTranslate()
   const name = useId()
   const notify = useKeptSurfaceNotice()
   const updateSettings = useAppStore((s) => s.updateSettingsOrThrow)
   const mutation = useImmediateMutation()
-  const hostLabel = useSettingsHostLabel(hostScope.target)
+  const target = hostScope.target
+  const hostLabel = useSettingsHostLabel(target ?? LOCAL_SETTINGS_HOST_SCOPE.target)
   const hostSurface = useHostSetting({
-    owner: hostScope.target,
+    owner: target ?? LOCAL_SETTINGS_HOST_SCOPE.target,
     settingKey: 'agentDefaultSurface',
     localSettings: settings,
     updateLocalSettings: updateSettings,
     updateFailedMessage: getHostSettingUpdateFailedMessage(hostLabel, t)
   })
-  const onServer = hostScope.target.kind === 'environment'
+  // A machine-only scope has no server endpoint, so there is no host to read.
+  if (target === null) {
+    return null
+  }
+  const onServer = target.kind === 'environment'
   const serverReady = hostScope.available && hostSurface.setting.state === 'ready'
   const pending = mutation.isPending('default-surface') || (onServer && !serverReady)
   const surface = onServer

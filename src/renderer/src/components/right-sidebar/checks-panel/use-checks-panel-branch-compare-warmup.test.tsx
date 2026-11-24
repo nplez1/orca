@@ -43,7 +43,7 @@ import {
   flush,
   mountProbe,
   unmountProbes
-} from '../source-control/panel/source-control-hook-test-harness'
+} from '../source-control/panel/source-control-hook-probe.test-fixture'
 
 const WORKTREE_ID = 'worktree-A'
 const REPO_ID = 'repo-A'

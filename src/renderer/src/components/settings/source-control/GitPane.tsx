@@ -7,7 +7,7 @@ import { useAppStore } from '../../../store/index'
 import { SearchableSetting } from '../section-layout/SearchableSetting'
 import { SettingsGroup } from '../section-layout/SettingsGroup'
 import { BranchPrefixSetting } from './BranchPrefixSetting'
-import type { SettingsHostScope } from '../host-scope/settings-host-scope'
+import { isServerScope, type SettingsHostScope } from '../host-scope/settings-host-scope'
 import { runtimeTargetEnvironmentId } from '@/runtime/rpc/targets/runtime-client-target'
 import { matchesSettingsSearch } from '../search/settings-search'
 import { AutoRenameBranchFromWorkSetting } from './AutoRenameBranchFromWorkSetting'
@@ -131,6 +131,8 @@ export function GitPane({
   const storeSearchQuery = useAppStore((s) => s.settingsSearchQuery)
   const searchQuery = settingsSearchQuery ?? storeSearchQuery
   const keepLocalMainUpToDateTitle = getKeepLocalMainUpToDateTitle(t)
+  // A machine-only scope has no server endpoint, so the branch rows have no host to read.
+  const serverScope = isServerScope(hostScope) ? hostScope : null
 
   const visibleSections = [
     matchesSettingsSearch(searchQuery, {
@@ -144,11 +146,11 @@ export function GitPane({
         t('auto.components.settings.GitPane.2351aa5a31', 'git username'),
         t('auto.components.settings.GitPane.813e15b346', 'custom')
       ]
-    }) ? (
+    }) && serverScope ? (
       <BranchPrefixSetting
         // A fresh row per host, so one host's unsaved draft never shows on another.
-        key={`branch-prefix:${runtimeTargetEnvironmentId(hostScope.target) ?? 'local'}`}
-        hostScope={hostScope}
+        key={`branch-prefix:${runtimeTargetEnvironmentId(serverScope.target) ?? 'local'}`}
+        hostScope={serverScope}
         settings={settings}
         updateSettings={updateSettings}
         displayedGitUsername={displayedGitUsername}
@@ -169,10 +171,10 @@ export function GitPane({
       title: keepLocalMainUpToDateTitle,
       description: KEEP_LOCAL_MAIN_UP_TO_DATE_DESCRIPTION,
       keywords: KEEP_LOCAL_MAIN_UP_TO_DATE_KEYWORDS
-    }) ? (
+    }) && serverScope ? (
       <KeepLocalMainUpToDateSetting
-        key={`refresh-base-ref:${runtimeTargetEnvironmentId(hostScope.target) ?? 'local'}`}
-        hostScope={hostScope}
+        key={`refresh-base-ref:${runtimeTargetEnvironmentId(serverScope.target) ?? 'local'}`}
+        hostScope={serverScope}
         settings={settings}
         updateSettings={updateSettings}
       />

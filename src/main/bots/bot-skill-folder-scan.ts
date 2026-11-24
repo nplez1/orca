@@ -34,7 +34,7 @@ async function readCapped(path: string): Promise<string | null> {
 
 /** A skill folder (team setup scripts link them in) holding a real SKILL.md that declares its name
  *  and description. A SKILL.md that is itself a link could be any file, so it never counts. */
-async function admittedSkill(skillFile: string): Promise<ScannedSkill | null> {
+export async function admittedSkill(skillFile: string): Promise<ScannedSkill | null> {
   const entry = await lstat(skillFile).catch(() => null)
   if (!entry?.isFile()) {
     return null

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createLocalFileSink } from './local-file-sink'
 import { recordSwallowedFailure } from './swallowed-failure'
-import { _resetTracerForTests, setActiveSink, type TracerSink } from './tracer'
+import { setActiveSink, type TracerSink } from './tracer'
 
 function makeCapturingSink(): TracerSink & { records: unknown[] } {
   const records: unknown[] = []
@@ -25,7 +25,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  _resetTracerForTests()
+  setActiveSink(null)
   vi.restoreAllMocks()
 })
 
@@ -94,7 +94,7 @@ describe('recordSwallowedFailure', () => {
         exit: { _tag: 'Failure' }
       })
     } finally {
-      _resetTracerForTests()
+      setActiveSink(null)
       rmSync(directory, { recursive: true, force: true })
     }
   })

@@ -58,3 +58,7 @@ export async function starOrca(): Promise<boolean> {
     release()
   }
 }
+
+export function __resetOrcaStarCheckForTests(): void {
+  inFlightStarCheck = null
+}

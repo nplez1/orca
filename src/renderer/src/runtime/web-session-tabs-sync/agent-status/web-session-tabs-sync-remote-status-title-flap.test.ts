@@ -12,7 +12,6 @@ import { makeWorktree } from '../../../store/slices/worktrees/worktree.test-fixt
 import {
   markRendererOwnedAgentStatusWrite,
   registerRendererOwnedAgentStatusPane,
-  resetRendererOwnedAgentStatusPanesForTests,
   resolveRendererOwnedAgentStatusTiming
 } from '../../../components/terminal-pane/agent-status/renderer-owned-agent-status-registry'
 import { applyWebSessionTabsSnapshot } from '../snapshots/snapshot-api'
@@ -110,11 +109,21 @@ function applyHostSnapshot(
   store.setState(patch as Partial<AppState>)
 }
 
+// The registry has no reset hook; the release each claim returns is its only teardown.
+const paneReleases: (() => void)[] = []
+
+function releaseRendererOwnedAgentStatusPanes(): void {
+  for (const release of paneReleases.splice(0)) {
+    release()
+  }
+}
+
 /** Replay paired pty-connection OSC handling with client Date.now(); returns the release pty-connection holds for dispose(). */
 function replayClientOscWorking(store: TestStore, clientNow: number): () => void {
   vi.setSystemTime(clientNow)
   // Claim on transport creation, then verify ownership on each byte-derived status.
   const release = registerRendererOwnedAgentStatusPane(MIRROR_PANE_KEY, ENV)
+  paneReleases.push(release)
   markRendererOwnedAgentStatusWrite(MIRROR_PANE_KEY)
   store
     .getState()
@@ -159,13 +168,12 @@ describe('remote-paired pane: host snapshot mirror vs client byte-derived status
     vi.useFakeTimers()
     vi.setSystemTime(T0)
     resetWebSessionTabsSnapshotFreshnessForTests()
-    resetRendererOwnedAgentStatusPanesForTests()
     resetHostDialogObservationsForTests()
   })
 
   afterEach(() => {
     vi.useRealTimers()
-    resetRendererOwnedAgentStatusPanesForTests()
+    releaseRendererOwnedAgentStatusPanes()
   })
 
   // Fence only proven client writers and never host-only state classes.

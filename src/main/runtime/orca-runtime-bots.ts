@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget (286/300); the fork's +32-line own-PR guard rides inside it, and splitting costs a permanent sync hunk. */
 import type { BotSessionHooks } from '../bots/bot-turn-ended'
 import { UNSET_BOT_SESSION_HOOKS } from '../bots/bot-session-hooks-unset'
 import { sessionRepliesInSlack } from '../external-conversations/external-conversation-links'
@@ -25,6 +26,14 @@ import type { BotShareDownloadPolicy } from '../bots/sharing/bot-share-receive'
 import { BotShareService } from '../bots/sharing/bot-share-service'
 import { readBotShareable } from '../bots/sharing/bot-share-sources'
 import { runtimeBotWork, type BotWorkRuntime } from '../bots/bot-work-runtime'
+import { botWorkStoreFile, type BotWorkRemote } from '../bots/bot-work-ops'
+import {
+  botHomeWorktreeOnBranch,
+  botWorkHasPrBranch,
+  workerGitHubRepo,
+  type BotHomeLineage
+} from '../bots/bot-work-pr-branch'
+import type { OwnPullRequest } from '../connector-cloud/own-pr-trigger-guard'
 import type { WorkspaceKey } from '../../shared/workspace/identity/workspace-scope'
 import { createBotLookupIndex } from '../../shared/bots/bot-lookup-index'
 import type { WorkspaceLineage } from '../../shared/worktree/lineage-types'
@@ -191,7 +200,7 @@ export abstract class OrcaRuntimeWithBots extends OrcaRuntimeWithLinearCommands 
   readonly pairedBotRosters = pairedBotRosterCache(this)
 
   /** What the work record reads: orchestration, worktrees and the conversation store. */
-  private readonly botWorkRuntime: BotWorkRuntime = {
+  private readonly botWorkRuntime: BotWorkRuntime & BotHomeLineage = {
     getOrchestrationDb: () => this.getOrchestrationDb(),
     resolveOrchestrationWorkerServer: (selector) => this.resolveOrchestrationWorkerServer(selector),
     callOrchestrationWorkerServer: (...args) => this.callOrchestrationWorkerServer(...args),
@@ -201,7 +210,9 @@ export abstract class OrcaRuntimeWithBots extends OrcaRuntimeWithLinearCommands 
     // Read per call: the host binds it after this field initializes.
     getAgentStatusSnapshotFn: () => this.getAgentStatusSnapshotFn?.() ?? [],
     showManagedTerminalWorkspace: (...args) => this.showManagedTerminalWorkspace(...args),
-    linkStore: () => this.store
+    linkStore: () => this.store,
+    bots: this.bots,
+    listWorkspaceLineage: () => this.listWorkspaceLineage()
   }
 
   /** The runtime's one bots DB worker: every bot store's SQL runs in it, off this thread. */
@@ -226,6 +237,37 @@ export abstract class OrcaRuntimeWithBots extends OrcaRuntimeWithLinearCommands 
   })
 
   protected override structuredMailReportItem = botItemOfReport(this.botItems)
+
+  /** This profile's work rows, read in the bots DB worker that holds them. */
+  private botWorkStore(): BotWorkRemote {
+    return this.botsDb.work(botWorkStoreFile(getProfileUserDataPath()))
+  }
+
+  /** Whether a bot's work on this host opened this pull request as its owner: a live worker's, or a
+   *  workspace under a bot's home with its head branch checked out. */
+  async isBotWorkPullRequest(pr: OwnPullRequest): Promise<boolean> {
+    return (
+      (await botWorkHasPrBranch(
+        {
+          rows: async () => {
+            const bots = this.bots.list()
+            return (await this.botWorkStore().liveRows()).filter((row) =>
+              bots.some((bot) => bot.id === row.botId)
+            )
+          },
+          workspace: async (row) => {
+            const checked = await this.botWork.check(row)
+            const worker = checked?.worker
+            const branch = checked?.workspace?.branch
+            return worker && branch
+              ? { branch, githubRepo: () => workerGitHubRepo(this.botWorkRuntime, worker, branch) }
+              : null
+          }
+        },
+        pr
+      )) || (await botHomeWorktreeOnBranch(this.botWorkRuntime, pr.head, pr.headRef))
+    )
+  }
 
   abstract deleteAutomation(id: string): Promise<{ removed: boolean; id: string }>
   abstract updateAutomation(id: string, updates: { agentId: Bot['agent'] }): Promise<unknown>

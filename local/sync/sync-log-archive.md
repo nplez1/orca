@@ -6,6 +6,75 @@ three most recent inline so that section stays readable. Same text and same orde
 Entries dated before the 2026-11-09 rename have been rewritten to say `main`; where one reads oddly
 for the topology it was written in (a `main` that mirrored upstream), its date is the explanation.
 
+- **2026-11-10 — merge of upstream `86ee16da9ea` (426 commits) into the release line, from
+  `24dceda182f`** (merge base `51c77320bc`, merge commit `266cd398f34`). **281 conflicted paths** —
+  `both-rewrote 155, union 64, modify/delete 27, rename-replay 23, duplicate-tail 9, no-markers 2,
+  duplicate-members 1`. Upstream advanced from `69e10786752` to `86ee16da9ea` while the sync was
+  fetching, so the newer tip was merged (runbook trap 11). Decisions are in
+  [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md); the ones a reviewer will
+  want first:
+
+  - **The clone was shallow and the graft hid the ancestry.** `pre-sync.mjs` refused with "no merge
+    base" and reported 12 upstream commits; `git fetch upstream --deepen=3000` restored merge base
+    `51c77320bc` and the true size — **426 commits, not 12**. A sync that starts from a shallow clone
+    measures the wrong thing before it resolves anything.
+  - **Resolved in four tiers.** `conflicts.mjs --apply-proven` proved **73 of 281 paths** outright
+    (import-only three-way unions, fork-unchanged, upstream-unchanged). **21 deletions** were settled
+    against the ledger: 16 upstream-retired test suites — including five the rename record called
+    "re-homed" that upstream had renamed _then deleted again_, verified against `upstream/main`
+    rather than the rename record — and the 5 dashboard-popout hosts per the owner's 2026-10-26
+    decision that delivery is a content-area view. `expected-deletions.json` pruned 6 entries both
+    sides deleted and re-bound 12 to their current upstream blobs. **5 re-homes** re-applied the
+    fork's delta at upstream's new path. The rest were resolved in 13 disjoint area batches.
+  - **~230 import specifiers across 60 files pointed at modules this merge moved or deleted, with no
+    conflict marker and no conflict entry.** The merge is clean at the syntax level and broken at the
+    module level: the `rate-limits` `providers/`/`service/` reorganisation alone moved 35 mappings
+    across 24 files, and the renderer `lib/` regrouping, the agent-hooks `installation/` move and a
+    clipboard sender-trust extraction did the same. `pnpm tc` is the backstop for this class, and the
+    first `tc:web` run after the markers were gone still held **84** errors.
+  - **Upstream's new `orca.yaml` recipe timeout was silently ignored.** `parseEphemeralVmRecipeTimeoutSeconds`
+    landed inside a function the fork had moved to `orca-yaml-vm-recipes.ts`, so the key parsed
+    nowhere and no test failed. Re-homed onto the fork's split module.
+  - **Two settings upstream added were unclassified in the host-sync disposition map**
+    (`nativeChatMarkNewMessages` → `replicated`, `voiceDictationModeDefaultedToAuto` → `hostLocal`).
+  - **`WorktreeStatus` exists twice and the merge repointed a consumer at the wrong one.** The fork's
+    `lib/worktree-status.ts` union carries `'setup'`; upstream's `shared/worktree-status-rollup.ts`
+    does not. `CrewAgentIcons` was moved onto the narrow type and lost its `'setup'` case.
+  - **Two store slices upstream added were missing from the test store**, so every suite that builds
+    the test store failed to typecheck (`applyStructuredChatCompanionWrites`,
+    `createEphemeralVmLifecycleSlice`).
+  - **A fork identity string regressed to upstream's.** `OpenAiCompatibleProviderDialog` shipped
+    `~/.orca` where the catalog and the sibling dialog say `~/.orca-np`; the localization gate caught
+    it as an English/catalog mismatch, which is the only reason it was noticed.
+  - **Ephemeral VM provisioning convergence (owner's call).** Both sides had independently built
+    "record the VM create before the spawn": upstream a write-ahead record, the fork a bounded
+    attempts store. One create function now does both — upstream's — and it also writes the fork's
+    attempt row so the fork's startup reconcile keeps working. Recorded in
+    [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) § "Ephemeral VM".
+  - **Five files were split rather than suppressed.** The `max-lines` ratchet fails on any newly added
+    `eslint-disable`, so `runtime-service.test.ts`, `session-search-engine.ts`, `ephemeral-vm.ts`,
+    `use-section-rows.ts` and `EphemeralVmRuntimesSection.tsx` each gave up a cohesive piece to a
+    sibling module. `TabGroupPanel.tsx` and `native-chat/wsl-transcript-fs-access.ts` followed.
+  - **`import/no-cycle` keeps the fork's depth bound.** Upstream replaced `{ maxDepth: 3 }` with
+    `{ ignoreTypes: true }`; removing the bound surfaced 18 pre-existing cycles in 13 fork-owned files
+    and reddened `audit:code-quality:native`. The fork keeps both options, and the deviation is
+    recorded in the ledger with the 13 files named. Silencing it was not available: that step prints
+    only the `[ELIFECYCLE]` fallback line, which gate-lint can cover only with `wholeStep: true` —
+    masking every future failure of the step.
+  - **Three ratchets this sync introduced had never seen the fork's own files.**
+    `check:main-sync-fs-ratchet` (new from upstream) and `check:recurring-timer-ratchet` reported 22
+    fork-owned or fork-modified files at "baseline allows 0"; each was adopted at its current count
+    with a reason, then pruned to 2230 and 99. `check:workspace-path-sync-fs-ratchet`'s single row
+    was re-bound from `rate-limits/hidden-probe-cwd.ts` to `lib/hidden-probe-cwd.ts` after the move.
+    `check:focus-read-ratchet` was pruned 642 → 641.
+  - **Fork-comment ratchet re-baselined to 7267** (`--init --accept`, reason recorded): the fork's
+    pre-existing comments on upstream-owned files plus the comment lines this sync's own repairs
+    added.
+  - **Localization**: the orphan-key pass and the catalog regeneration are one operation, not two.
+    Deleting the reported orphan keys by hand removed keys the source still generates (the hashes had
+    moved, not the keys), so the extraction gate flipped to "extracted keys missing from en.json".
+    `pnpm sync:localization-catalog` is what reconciles both directions.
+
 - **2026-11-08 — merge of upstream `51c77320bc` (1537 commits) into the release line, from
   `3f8bbfb269`** (merge base `0fa5dae2f9`, rollback tag `archive/pre-sync-3f8bbfb269`, merge commit
   `5a02a4c8406`). **1110 conflicted paths, 1239 hunks** —

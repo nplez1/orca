@@ -12,7 +12,7 @@ import {
   flush,
   mountProbe,
   unmountProbes
-} from '../right-sidebar/source-control/panel/source-control-hook-test-harness'
+} from '../right-sidebar/source-control/panel/source-control-hook-probe.test-fixture'
 
 const WORKTREE_ID = 'repo-A::/repo/wt'
 const WORKTREE_PATH = '/repo/wt'

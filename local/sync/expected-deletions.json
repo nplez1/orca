@@ -15,28 +15,148 @@
       "reason": "Upstream hardcodes com.stablyai.orca as the app it trusts; this fork's helper trusts com.nplez1.orca.computer-use from its own OrcaBundleIdentity.swift, so taking it back would make the helper trust the wrong app. evidence: convergence-ledger.md Identity Do-not, config/scripts/computer-use-bundle-identity.test.mjs"
     },
     {
-      "path": "src/renderer/src/components/dashboard/agent-dashboard-open-mode.ts",
-      "commit": "ab57bb7bbb",
-      "upstreamBlob": "69606c8725925aea3d472ffc72de79e40489db56",
-      "class": "dashboard-delivery",
-      "status": "expected-deletion",
-      "reason": "The fork delivers the dashboard as a full-page view (#44), which is the only delivery it exposes. Upstream's drawer and sidebar host need AppState.agentDashboardDrawerOpen, which the fork removed, and upstream's newer AgentKanbanBoard props. Restoring them re-adds a second live implementation of the same surface."
-    },
-    {
-      "path": "src/renderer/src/components/dashboard/agent-dashboard-open-mode.test.ts",
-      "commit": "ab57bb7bbb",
-      "upstreamBlob": "2c16cf7fe3e2c5a665438ddbd93bf8e0fb28627e",
-      "class": "dashboard-delivery",
-      "status": "expected-deletion",
-      "reason": "The fork delivers the dashboard as a full-page view (#44), which is the only delivery it exposes. Upstream's drawer and sidebar host need AppState.agentDashboardDrawerOpen, which the fork removed, and upstream's newer AgentKanbanBoard props. Restoring them re-adds a second live implementation of the same surface."
-    },
-    {
-      "path": "src/main/ipc/dashboard-popout.ts",
-      "commit": "ab57bb7bbb",
-      "upstreamBlob": "715b6abf7fb057c0ffd058b422f58b6e2bd78c25",
-      "class": "dashboard-delivery",
+      "path": "src/cli/runtime/fixtures/runtime-rpc-fixtures.ts",
+      "commit": "a8c508f5fb7",
+      "upstreamBlob": "60b700999570defafe4345cd205369c8300fae27",
+      "class": "fork-test-support",
       "status": "restore",
-      "reason": "Held, not used: the dashboard delivery is the fork’s content-area view, so upstream’s pop-out is rejected — but this main-process pair costs nothing to hold. It imports nothing of the fork’s, nothing imports it, and its two suites pass, so keeping upstream’s bytes removes the modify/delete conflict at no cost. The preload half of the same subsystem was NOT kept: it exists only to publish window.api.dashboard, which has no caller."
+      "reason": "Test support a surviving CLI suite imports; upstream retired the fixture without retiring every consumer."
+    },
+    {
+      "path": "src/main/bots/bot-work-pr-branch.ts",
+      "commit": "a8c508f5fb7",
+      "upstreamBlob": "98dce54195c7683e6068904c711ac5edea6bab2e",
+      "class": "fork-test-support",
+      "status": "restore",
+      "reason": "Fork module: tells a pull request its owner opened from one a bot's worker opened as them (own-pr-trigger-guard.ts). Upstream deleted it; the fork keeps it and the own-PR guard's detection lives here."
+    },
+    {
+      "path": "src/main/connector-cloud/own-pr-trigger-guard.test.ts",
+      "commit": "a8c508f5fb7",
+      "upstreamBlob": "2f9913015977fccdf6bc967013f8c9a92943084a",
+      "class": "fork-test-support",
+      "status": "restore",
+      "reason": "The guard module’s own suite, kept with the module it covers."
+    },
+    {
+      "path": "src/main/connector-cloud/own-pr-trigger-guard.ts",
+      "commit": "a8c508f5fb7",
+      "upstreamBlob": "134d203c45f8ee296aef7cc2c20b8201df11c89d",
+      "class": "fork-test-support",
+      "status": "restore",
+      "reason": "Fork-owned module: the fork wraps a trigger delivery in its own-PR guard (bot_work via the gh marker, burst cap, from=me). Upstream deleted it, so the fork keeps the file and re-points the caller at upstream’s runTriggerDelivery."
+    },
+    {
+      "path": "src/main/github/client/client-test-harness.ts",
+      "commit": "a8c508f5fb7",
+      "upstreamBlob": "01fa7484827c348631419c1b42fc4ad58494ce4a",
+      "class": "fork-test-support",
+      "status": "restore",
+      "reason": "Test support a surviving fork test imports; upstream retired it in the 2026-11-24 sync and nothing upstream replaces it."
+    },
+    {
+      "path": "src/main/github/client/client-test-mocks.ts",
+      "commit": "a8c508f5fb7",
+      "upstreamBlob": "34913b2564d67ac171a84ba0b8eea820ed901bfb",
+      "class": "fork-test-support",
+      "status": "restore",
+      "reason": "Test support a surviving fork test imports; upstream retired it in the 2026-11-24 sync and nothing upstream replaces it."
+    },
+    {
+      "path": "src/main/github/pull-requests/refresh/pr-refresh-coordinator-test-harness.ts",
+      "commit": "a8c508f5fb7",
+      "upstreamBlob": "61206270714ccaaa5d85b97481b38979a6519732",
+      "class": "fork-test-support",
+      "status": "restore",
+      "reason": "Test support a surviving fork test imports; upstream retired it in the 2026-11-24 sync and nothing upstream replaces it."
+    },
+    {
+      "path": "src/main/github/pull-requests/refresh/pr-refresh-coordinator-test-mocks.ts",
+      "commit": "a8c508f5fb7",
+      "upstreamBlob": "7251cc5f1091e601f0db21742c75fe3d6d3cff4b",
+      "class": "fork-test-support",
+      "status": "restore",
+      "reason": "Test support a surviving fork test imports; upstream retired it in the 2026-11-24 sync and nothing upstream replaces it."
+    },
+    {
+      "path": "src/main/ipc/filesystem/testing/filesystem-test-harness.ts",
+      "commit": "a8c508f5fb7",
+      "upstreamBlob": "a0d7b8265c29777833abe6c1eeda83c2e18bee63",
+      "class": "fork-test-support",
+      "status": "restore",
+      "reason": "Test support a surviving test still imports (filesystem quick-open path index wiring). Upstream retired the harness without retiring every consumer."
+    },
+    {
+      "path": "src/main/ipc/filesystem/watchers/filesystem-watcher-test-sender.ts",
+      "commit": "a8c508f5fb7",
+      "upstreamBlob": "5ab08a8c2c3a40ad518370ea62fb20e6f1b60b88",
+      "class": "fork-test-support",
+      "status": "restore",
+      "reason": "Test support a surviving fork test imports; upstream retired it in the 2026-11-24 sync and nothing upstream replaces it."
+    },
+    {
+      "path": "src/main/rate-limits/service/rate-limit-service-test-harness.ts",
+      "commit": "a8c508f5fb7",
+      "upstreamBlob": "0b106f167438d6be009e014dcdd25686d96f583c",
+      "class": "fork-test-support",
+      "status": "restore",
+      "reason": "Test support many surviving rate-limit suites import (fork provider cycles, usage probes, account switch)."
+    },
+    {
+      "path": "src/main/runtime/agent-session/environment/structured-session-child-env.test-support.ts",
+      "commit": "a8c508f5fb7",
+      "upstreamBlob": "217acf17aebd1b39a0ecbfad7beebb093e5a5fed",
+      "class": "fork-test-support",
+      "status": "restore",
+      "reason": "Test support a surviving fork test imports; upstream retired it in the 2026-11-24 sync and nothing upstream replaces it."
+    },
+    {
+      "path": "src/main/runtime/agent-session/environment/structured-session-login-shell-test-harness.ts",
+      "commit": "a8c508f5fb7",
+      "upstreamBlob": "276292b5ed514e9e297e74ad6f50fe8577572fa8",
+      "class": "fork-test-support",
+      "status": "restore",
+      "reason": "Test support the two surviving structured-session login-shell suites import."
+    },
+    {
+      "path": "src/main/runtime/construction/test-context/runtime-store-partial-fixture.ts",
+      "commit": "a8c508f5fb7",
+      "upstreamBlob": "1cd4c9fb4c245c281a7c7e70cbf1c7cac12edc5c",
+      "class": "fork-test-support",
+      "status": "restore",
+      "reason": "Test support a surviving fork test imports; upstream retired it in the 2026-11-24 sync and nothing upstream replaces it."
+    },
+    {
+      "path": "src/main/runtime/terminal/launch/spawned-pty-env-fixtures.ts",
+      "commit": "a8c508f5fb7",
+      "upstreamBlob": "2dfff16f70e623a638420a9574ca49cb63f662c0",
+      "class": "fork-test-support",
+      "status": "restore",
+      "reason": "Test support a surviving fork test imports; upstream retired it in the 2026-11-24 sync and nothing upstream replaces it."
+    },
+    {
+      "path": "src/main/runtime/terminal/wait/agent-transcript-replay-test-harness.ts",
+      "commit": "a8c508f5fb7",
+      "upstreamBlob": "5a88b6c86c78ccdbdde8f2b65ffe00222ed18267",
+      "class": "fork-test-support",
+      "status": "restore",
+      "reason": "Test support a surviving fork test imports; upstream retired it in the 2026-11-24 sync and nothing upstream replaces it."
+    },
+    {
+      "path": "src/main/text-generation/execution/commit-message-text-generation-test-harness.ts",
+      "commit": "a8c508f5fb7",
+      "upstreamBlob": "e9e923fa3aebf3d50ae23fb40551d8646831300e",
+      "class": "fork-test-support",
+      "status": "restore",
+      "reason": "Test support a surviving fork test imports; upstream retired it in the 2026-11-24 sync and nothing upstream replaces it."
+    },
+    {
+      "path": "src/main/updater/testing/updater-net-request.fixture.ts",
+      "commit": "a8c508f5fb7",
+      "upstreamBlob": "966e05387e5da58d9589e8a8ebae45d106db1354",
+      "class": "fork-test-support",
+      "status": "restore",
+      "reason": "Test support a surviving fork test imports; upstream retired it in the 2026-11-24 sync and nothing upstream replaces it."
     },
     {
       "path": "src/main/window/dashboard-popout-window.ts",
@@ -47,41 +167,9 @@
       "reason": "Held, not used: the dashboard delivery is the fork’s content-area view, so upstream’s pop-out is rejected — but this main-process pair costs nothing to hold. It imports nothing of the fork’s, nothing imports it, and its two suites pass, so keeping upstream’s bytes removes the modify/delete conflict at no cost. The preload half of the same subsystem was NOT kept: it exists only to publish window.api.dashboard, which has no caller."
     },
     {
-      "path": "src/main/window/clipboard-dashboard-popout-access.test.ts",
-      "commit": "ab57bb7bbb",
-      "upstreamBlob": "889afa780e073b5f5a99d55fac81a0da91070e52",
-      "class": "dashboard-delivery",
-      "status": "expected-deletion",
-      "reason": "Deleted: it asserts the fork admits upstream’s pop-out renderer in assertTrustedClipboardTextSender. The fork deliberately does not — dead code has no business adding an admission to a clipboard trust check."
-    },
-    {
-      "path": "src/preload/api/dashboard-api.ts",
-      "commit": "ab57bb7bbb",
-      "upstreamBlob": "36a7747c819c2743186650cda4150949c616dd0a",
-      "class": "dashboard-delivery",
-      "status": "expected-deletion",
-      "reason": "Deleted: the fork’s board removed the relay these bridges served, so window.api.dashboard has no caller. Keeping them needs a `dashboard` member on PreloadApi for a runtime API nothing registers, and dashboard-bridge.ts type-checks itself against that member — the lie would be load-bearing."
-    },
-    {
-      "path": "src/preload/api/dashboard-bridge.ts",
-      "commit": "ab57bb7bbb",
-      "upstreamBlob": "4663b87459efd6b9cbc5528cd5a2bd25a80c5389",
-      "class": "dashboard-delivery",
-      "status": "expected-deletion",
-      "reason": "Deleted: the fork’s board removed the relay these bridges served, so window.api.dashboard has no caller. Keeping them needs a `dashboard` member on PreloadApi for a runtime API nothing registers, and dashboard-bridge.ts type-checks itself against that member — the lie would be load-bearing."
-    },
-    {
       "path": "src/renderer/popout.html",
       "commit": "ab57bb7bbb",
       "upstreamBlob": "a67accd3fc32c3062d5325eeaaa8af9bc818f779",
-      "class": "dashboard-delivery",
-      "status": "expected-deletion",
-      "reason": "The popout window is never opened, and popout.tsx mounts DashboardPopoutRoot, which requires the onAckAgent/onRevealAgent props upstream added to AgentKanbanBoard. The fork's live page view is built on that same board, so restoring this means either two live dashboard implementations or changing the shipped view."
-    },
-    {
-      "path": "src/renderer/src/popout.tsx",
-      "commit": "ab57bb7bbb",
-      "upstreamBlob": "71e9e6d55f3ab9fa4409c4585cd6567d615e25b2",
       "class": "dashboard-delivery",
       "status": "expected-deletion",
       "reason": "The popout window is never opened, and popout.tsx mounts DashboardPopoutRoot, which requires the onAckAgent/onRevealAgent props upstream added to AgentKanbanBoard. The fork's live page view is built on that same board, so restoring this means either two live dashboard implementations or changing the shipped view."
@@ -95,67 +183,20 @@
       "reason": "The popout window is never opened, and popout.tsx mounts DashboardPopoutRoot, which requires the onAckAgent/onRevealAgent props upstream added to AgentKanbanBoard. The fork's live page view is built on that same board, so restoring this means either two live dashboard implementations or changing the shipped view."
     },
     {
-      "path": "src/renderer/src/components/dashboard-popout/useDashboardSnapshot.ts",
-      "commit": "ab57bb7bbb",
-      "upstreamBlob": "d5332c4d99b28d688e47818d01376b02662bbccc",
-      "class": "dashboard-delivery",
-      "status": "expected-deletion",
-      "reason": "The popout window is never opened, and popout.tsx mounts DashboardPopoutRoot, which requires the onAckAgent/onRevealAgent props upstream added to AgentKanbanBoard. The fork's live page view is built on that same board, so restoring this means either two live dashboard implementations or changing the shipped view."
-    },
-    {
-      "path": "src/renderer/src/components/dashboard-popout/useDashboardSnapshot.test.tsx",
-      "commit": "ab57bb7bbb",
-      "upstreamBlob": "07f3e61d19eed733b5eca48cc6722b2d9ae7c18a",
-      "class": "dashboard-delivery",
-      "status": "expected-deletion",
-      "reason": "The popout window is never opened, and popout.tsx mounts DashboardPopoutRoot, which requires the onAckAgent/onRevealAgent props upstream added to AgentKanbanBoard. The fork's live page view is built on that same board, so restoring this means either two live dashboard implementations or changing the shipped view."
-    },
-    {
       "path": "src/renderer/src/components/dashboard/AgentDashboardDrawer.tsx",
       "commit": "ab57bb7bbb",
-      "upstreamBlob": "157d9b99e8a6487757da19c8629925be1ce854bf",
+      "upstreamBlob": "4424becf8093fa81f973dbb23e2e41fe84bd7c2c",
       "class": "dashboard-delivery",
       "status": "expected-deletion",
-      "reason": "The fork delivers the dashboard as a full-page view (#44), which is the only delivery it exposes. Upstream's drawer and sidebar host need AppState.agentDashboardDrawerOpen, which the fork removed, and upstream's newer AgentKanbanBoard props. Restoring them re-adds a second live implementation of the same surface."
+      "reason": "The fork delivers the dashboard as a full-page view (#44), which is the only delivery it exposes. Upstream's drawer and sidebar host need AppState.agentDashboardDrawerOpen, which the fork removed, and upstream's newer AgentKanbanBoard props. Restoring them re-adds a second live implementation of the same surface. Settled again at the 2026-11-24 sync: upstream edited the drawer and the fork still ships the dashboard as a content-area view only, so the deletion stands."
     },
     {
-      "path": "src/renderer/src/components/dashboard/AgentDashboardDrawer.test.tsx",
-      "commit": "ab57bb7bbb",
-      "upstreamBlob": "1094ff92a0f6da67afb574155ac94d1a9491a326",
-      "class": "dashboard-delivery",
-      "status": "expected-deletion",
-      "reason": "The fork delivers the dashboard as a full-page view (#44), which is the only delivery it exposes. Upstream's drawer and sidebar host need AppState.agentDashboardDrawerOpen, which the fork removed, and upstream's newer AgentKanbanBoard props. Restoring them re-adds a second live implementation of the same surface."
-    },
-    {
-      "path": "src/renderer/src/components/dashboard/DashboardPopoutBridge.tsx",
-      "commit": "ab57bb7bbb",
-      "upstreamBlob": "79399b310c04f244581fd6887861381792cbea3d",
-      "class": "dashboard-delivery",
-      "status": "expected-deletion",
-      "reason": "The fork delivers the dashboard as a full-page view (#44), which is the only delivery it exposes. Upstream's drawer and sidebar host need AppState.agentDashboardDrawerOpen, which the fork removed, and upstream's newer AgentKanbanBoard props. Restoring them re-adds a second live implementation of the same surface."
-    },
-    {
-      "path": "src/renderer/src/components/dashboard/useDashboardPopoutBridge.ts",
-      "commit": "ab57bb7bbb",
-      "upstreamBlob": "17247a60c28e025388411e5057f10c80325513f1",
-      "class": "dashboard-delivery",
-      "status": "expected-deletion",
-      "reason": "The fork delivers the dashboard as a full-page view (#44), which is the only delivery it exposes. Upstream's drawer and sidebar host need AppState.agentDashboardDrawerOpen, which the fork removed, and upstream's newer AgentKanbanBoard props. Restoring them re-adds a second live implementation of the same surface."
-    },
-    {
-      "path": "src/renderer/src/components/sidebar/AgentDashboardSidebarHost.tsx",
-      "commit": "ab57bb7bbb",
-      "upstreamBlob": "041fac4b9c9b449b0eeed58fb2c03fb141a1ae64",
-      "class": "dashboard-delivery",
-      "status": "expected-deletion",
-      "reason": "The fork delivers the dashboard as a full-page view (#44), which is the only delivery it exposes. Upstream's drawer and sidebar host need AppState.agentDashboardDrawerOpen, which the fork removed, and upstream's newer AgentKanbanBoard props. Restoring them re-adds a second live implementation of the same surface."
-    },
-    {
-      "path": "src/renderer/src/components/dashboard-popout/dashboard-preview-link-composition.test.tsx",
-      "class": "dashboard-popout",
-      "status": "expected-deletion",
-      "reason": "New upstream renderer fixture for the pop-out/drawer delivery this fork rejected (convergence-ledger.md Dashboard delivery: a content-area view, not a drawer or a pop-out). It imports the deleted DashboardPopoutRoot and reads window.api.dashboard, which the deleted preload pair used to publish; nothing in the fork imports either fixture.",
-      "upstreamBlob": "bf688a8de9d39bade69d3790a15bc0d9e094d502"
+      "path": "src/renderer/src/components/diff-comments/diff-comment-editor-test-fixture.ts",
+      "commit": "a8c508f5fb7",
+      "upstreamBlob": "e66557854e3d836653062fa20659cae6acc5ff70",
+      "class": "fork-test-support",
+      "status": "restore",
+      "reason": "Test support the surviving monaco-markdown-annotation and PR-comment decorator suites import."
     },
     {
       "path": "src/renderer/src/components/feature-wall/commit-pr-settings/AiCommitPrSettingsFields.tsx",
@@ -177,6 +218,62 @@
       "class": "fork-refactor",
       "status": "expected-deletion",
       "reason": "The fork replaced the directory host-scope helper with the shared settings host-scope module; no module at HEAD references this path. Deleted in an earlier merge resolution with no commit of its own, so it was never asserted here."
+    },
+    {
+      "path": "src/renderer/src/components/task-page/linear/issue-refresh/task-page-linear-refresh-test-fixtures.tsx",
+      "commit": "a8c508f5fb7",
+      "upstreamBlob": "e49d377f3f49f976b98dd12f242ec428b773a687",
+      "class": "fork-test-support",
+      "status": "restore",
+      "reason": "Test support the surviving task-page linear refresh lifecycle suite imports."
+    },
+    {
+      "path": "src/renderer/src/popout.tsx",
+      "commit": "ab57bb7bbb",
+      "upstreamBlob": "71e9e6d55f3ab9fa4409c4585cd6567d615e25b2",
+      "class": "dashboard-delivery",
+      "status": "expected-deletion",
+      "reason": "The popout window is never opened, and popout.tsx mounts DashboardPopoutRoot, which requires the onAckAgent/onRevealAgent props upstream added to AgentKanbanBoard. The fork's live page view is built on that same board, so restoring this means either two live dashboard implementations or changing the shipped view."
+    },
+    {
+      "path": "src/renderer/src/store/slices/worktrees/worktrees-slice-test-harness.ts",
+      "commit": "a8c508f5fb7",
+      "upstreamBlob": "f3a13eac6b3f01e9b9177631a1978619f34861c1",
+      "class": "fork-test-support",
+      "status": "restore",
+      "reason": "Test support the surviving worktree store suites import (create-exact-branch, rename-across-hosts, remote-branch cleanup)."
+    },
+    {
+      "path": "src/shared/agent-hook-listener/legacy-agent-status-test-seed.ts",
+      "commit": "a8c508f5fb7",
+      "upstreamBlob": "56f3a32424a3758fe2e118274cebe9c67387101d",
+      "class": "fork-test-support",
+      "status": "restore",
+      "reason": "Test support a surviving fork test imports; upstream retired it in the 2026-11-24 sync and nothing upstream replaces it."
+    },
+    {
+      "path": "src/shared/agent-hook-listener/normalization/agent-hook-listener-test-harness.ts",
+      "commit": "a8c508f5fb7",
+      "upstreamBlob": "1d34ef4a795b4cac4068c7448a88c3b7b00d15b6",
+      "class": "fork-test-support",
+      "status": "restore",
+      "reason": "Test support the surviving agent-hook listener suites import (grok completion, pi claude child events, nested pi session guard)."
+    },
+    {
+      "path": "src/shared/github/checks/complete-pr-check-test-fixture.ts",
+      "commit": "a8c508f5fb7",
+      "upstreamBlob": "7c873ca47dcfabd38de6459a4488e27a4f2fdb3f",
+      "class": "fork-test-support",
+      "status": "restore",
+      "reason": "Test support a surviving fork test imports; upstream retired it in the 2026-11-24 sync and nothing upstream replaces it."
+    },
+    {
+      "path": "tests/e2e/source-control/pr-comments-sidebar-fixture.ts",
+      "commit": "a8c508f5fb7",
+      "upstreamBlob": "efbe603a29a764fa3e21998051b8a211805bad84",
+      "class": "fork-test-support",
+      "status": "restore",
+      "reason": "E2E fixture the surviving pr-review-verdicts spec imports."
     }
   ],
   "symbols": [

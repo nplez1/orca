@@ -113,6 +113,8 @@ const ctx: WorktreeItemRowContext = {
   onImmediateActivate: noop,
   onRowClickCapture: noop,
   onRowPointerDown: noop,
+  branchGroupSelection: {},
+  onSelectBranchGroupHost: noop,
   onCardDragStart: noop,
   onCardDragEnd: noop
 }

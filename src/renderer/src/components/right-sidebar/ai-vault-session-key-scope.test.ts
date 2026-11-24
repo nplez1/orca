@@ -1,14 +1,11 @@
-import { beforeEach, expect, it } from 'vitest'
+import { expect, it } from 'vitest'
 import type { AiVaultSession } from '../../../../shared/ai-vault/contracts/ai-vault-types'
 import { aiVaultSessionKeyScopePaths } from './ai-vault/session-list/ai-vault-session-limit'
 import {
   cacheAiVaultSessionList,
   readCachedAiVaultSessionList
 } from './ai-vault/scanning/ai-vault-session-list-request'
-import {
-  aiVaultSessionResultCacheKey,
-  resetAiVaultSessionResultCacheForTest
-} from './ai-vault/scanning/ai-vault-session-result-cache'
+import { aiVaultSessionResultCacheKey } from './ai-vault/scanning/ai-vault-session-result-cache'
 
 function session(sessionId: string): AiVaultSession {
   return {
@@ -39,10 +36,7 @@ function request(scopePath: string, sessionLimit: 'unlimited' | number) {
   return { executionHostScope: 'local' as const, scopePaths: [scopePath], sessionLimit }
 }
 
-beforeEach(() => {
-  resetAiVaultSessionResultCacheForTest()
-})
-
+// The result cache is module state with no reset hook, so each case claims its own project paths.
 // Why: at Unlimited every scope's rows are already in the answer, so a key that still
 // names one splits an identical list per project — and refetches it on every switch.
 it('drops the scope at Unlimited and keeps it at a finite depth', () => {
@@ -52,13 +46,15 @@ it('drops the scope at Unlimited and keeps it at a finite depth', () => {
 
 it('serves a second project from the Unlimited listing already cached', () => {
   const loaded = { sessions: [session('a')], issues: [], scannedAt: '2026-07-04T01:00:00.000Z' }
-  cacheAiVaultSessionList(request('/repo/app', 'unlimited'), loaded, { replaceHostEntries: false })
+  cacheAiVaultSessionList(request('/repo/unlimited-app', 'unlimited'), loaded, {
+    replaceHostEntries: false
+  })
 
-  expect(readCachedAiVaultSessionList(request('/repo/other', 'unlimited'))).not.toBeNull()
+  expect(readCachedAiVaultSessionList(request('/repo/unlimited-other', 'unlimited'))).not.toBeNull()
   // Why not a preset too: a scoped scan budgets in-scope rows per source, so a deeper (or
   // unbounded) scan holds rows a 250 scan would not have kept. Only an equal depth answers a
   // scoped request; an unscoped preset still rides the unbounded entry.
-  expect(readCachedAiVaultSessionList(request('/repo/app', 250))).toBeNull()
+  expect(readCachedAiVaultSessionList(request('/repo/unlimited-app', 250))).toBeNull()
   expect(
     readCachedAiVaultSessionList({
       executionHostScope: 'local',
@@ -70,29 +66,33 @@ it('serves a second project from the Unlimited listing already cached', () => {
 
 it('still stores a fresher bounded list beside the unbounded entry', () => {
   const loaded = { sessions: [session('old')], issues: [], scannedAt: '2026-08-01T00:00:00.000Z' }
-  cacheAiVaultSessionList(request('/repo/app', 'unlimited'), loaded, { replaceHostEntries: false })
+  cacheAiVaultSessionList(request('/repo/bounded-app', 'unlimited'), loaded, {
+    replaceHostEntries: false
+  })
   // A scoped preset must not be answered (or shadowed) by the unbounded entry, so the bounded
   // write lands on its own key and the unbounded copy is still there for an unbounded read.
-  expect(readCachedAiVaultSessionList(request('/repo/app', 250))).toBeNull()
+  expect(readCachedAiVaultSessionList(request('/repo/bounded-app', 250))).toBeNull()
 
   const fresh = { sessions: [session('new')], issues: [], scannedAt: '2026-08-01T00:00:09.000Z' }
-  cacheAiVaultSessionList(request('/repo/app', 250), fresh, { replaceHostEntries: false })
+  cacheAiVaultSessionList(request('/repo/bounded-app', 250), fresh, {
+    replaceHostEntries: false
+  })
 
-  expect(readCachedAiVaultSessionList(request('/repo/app', 250))?.scannedAt).toBe(
+  expect(readCachedAiVaultSessionList(request('/repo/bounded-app', 250))?.scannedAt).toBe(
     '2026-08-01T00:00:09.000Z'
   )
-  expect(readCachedAiVaultSessionList(request('/repo/app', 'unlimited'))?.scannedAt).toBe(
+  expect(readCachedAiVaultSessionList(request('/repo/bounded-app', 'unlimited'))?.scannedAt).toBe(
     '2026-08-01T00:00:00.000Z'
   )
 })
 
 it('keeps one project apart from another at a finite depth', () => {
   const loaded = { sessions: [session('a')], issues: [], scannedAt: '2026-07-04T01:00:00.000Z' }
-  cacheAiVaultSessionList(request('/repo/app', 250), loaded, { replaceHostEntries: false })
+  cacheAiVaultSessionList(request('/repo/scoped-app', 250), loaded, { replaceHostEntries: false })
 
-  expect(aiVaultSessionResultCacheKey('local', ['/repo/app'], 250)).not.toBe(
-    aiVaultSessionResultCacheKey('local', ['/repo/other'], 250)
+  expect(aiVaultSessionResultCacheKey('local', ['/repo/scoped-app'], 250)).not.toBe(
+    aiVaultSessionResultCacheKey('local', ['/repo/scoped-other'], 250)
   )
   // A bounded listing is its own answer, so another project must not inherit it.
-  expect(readCachedAiVaultSessionList(request('/repo/other', 250))).toBeNull()
+  expect(readCachedAiVaultSessionList(request('/repo/scoped-other', 250))).toBeNull()
 })

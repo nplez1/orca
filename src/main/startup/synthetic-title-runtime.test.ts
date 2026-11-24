@@ -43,11 +43,11 @@ beforeEach(() => {
   mainProcessState.mainWindow = null
   mainProcessState.store = null
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: driveSyntheticTitle only reads these two runtime members.
-  mainProcessState.runtime = {
+  mainProcessState.core.runtime = {
     ingestSyntheticTitleFrame: hooks.ingest,
     getTrackedPtyTitle: (ptyId: string) => titles.get(ptyId) ?? null,
     getTrackedVisiblePtyTitle: (ptyId: string) => titles.get(ptyId) ?? null
-  } as unknown as typeof mainProcessState.runtime
+  } as unknown as typeof mainProcessState.core.runtime
 })
 
 // Why both brands: the renderer rebrands a pi title to its owner label (`Pi ! …`), and a pi build

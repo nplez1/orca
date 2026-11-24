@@ -22,6 +22,62 @@ Rules for using it:
 
 ---
 
+## 2026-11-24 sync (upstream `7daf01d99f3`, 1350 commits)
+
+### A trigger delivery is guarded, then run: `runTriggerDelivery` is upstream's unguarded tail
+
+**Paths:** `src/main/connector-cloud/connector-cloud-install.ts`, `src/main/connector-cloud/connector-triggers.ts`
+
+**Resolution:** manual — upstream's `runTriggerDelivery` with the fork's guard wrapped around it
+
+**Decision:** upstream replaced the fork's inlined trigger-run body with `runTriggerDelivery(deps, delivery)` (`event === null` → false, a webhook → its ledger, else the run), which is exactly the fork's post-guard path. The merged `runTrigger` therefore reads: compute the event, and when it is null or a webhook call `runTriggerDelivery`; otherwise `runOwnPrGuarded(ownPrGuard, …, event, delivery)`. The fork's `servesLocally` third parameter on `connectorTriggers` is NOT optional fork code — it is how this fork keeps a locally-served webhook out of the cloud's rule list — so it is re-applied to upstream's signature (`.filter((trigger) => !servesLocally(trigger))`) on every sync that touches that function.
+
+**Do not:** resolve this file as a pick-one. Taking upstream's side drops the own-PR guard; taking the fork's side drops `runTriggerDelivery` and the trigger-batch behaviour behind it.
+
+### The own-PR guard stays a fork-owned module
+
+**Paths:** `src/main/connector-cloud/own-pr-trigger-guard.ts`, `src/main/connector-cloud/own-pr-trigger-guard.test.ts`
+
+**Resolution:** keep-ours (both files are listed `restore` in `expected-deletions.json`)
+
+**Decision:** upstream deleted the module and its suite; the fork keeps them because the bot-work guard (`bot_work` from the gh marker in the event text, the burst cap, the rule's `from=me`) exists only here. The caller is wired through `connector-cloud-install.ts` as above.
+
+### The photon connector row lives in upstream's shared builder now
+
+**Paths:** `src/shared/bots/bot-connector-entries.ts`, `src/renderer/src/components/bots/bot-connector-entries.ts`, `src/renderer/src/components/settings/bots/BotConnectorsSection.tsx`
+
+**Resolution:** manual — re-home the fork's row onto upstream's builder
+
+**Decision:** upstream moved the connector-row list into `src/shared/bots/bot-connector-entries.ts`, so the fork's `photon` (iMessage) entry belongs there as `add({ kind: 'photon', key: 'photon', needsOwner: false }, { service: words.photon })` after the google block, with the renderer's `photon: t('bots.photon.title', 'iMessage')` word and the `case 'photon'` → `BotPhotonCard` restored. Deleting the renderer's copy without this loses the row from Settings and the bot page while leaving `BotPhotonCard` orphaned.
+
+**Do not:** drop a fork connector kind because upstream's builder has no case for it — add the case.
+
+### `SettingsHostScope.target` is nullable in this fork
+
+**Paths:** `src/renderer/src/components/settings/**`
+
+**Resolution:** manual — guard the null, on neither side's terms
+
+**Decision:** the fork made the settings host scope's `target` nullable; upstream's newer surfaces dereference it. A guard (`?`/`if (target)`) keeps both. Reverting either side costs a hunk on every sync.
+
+### `max-lines`: upstream-owned files are exempted, not split
+
+**Paths:** `config/max-lines-baseline.txt`
+
+**Resolution:** manual — add the `inline` row plus the file's `eslint-disable max-lines -- Why:` line
+
+**Decision:** the `local(lint)` rule re-applied. Upstream keeps several files exactly at their budget (300 for `.ts`, 400 for `.tsx`), so any fork line pushes them over; a split costs a permanent sync hunk, and `local/max-lines-exemption.test.mjs` only allows a file that exists at the recorded sync base. Fourteen rows were added by the 2026-11-24 sync, including three `eslint-disable` headers a resolver dropped that the baseline still claimed (the baseline silences the ratchet, not oxlint — both are needed).
+
+**Do not:** split an upstream-owned file to get under the cap, and do not add a row for a fork-owned file (split that one).
+
+### The workspace card's `surface/worktree-card-*` pair was already dead
+
+**Paths:** `src/renderer/src/components/sidebar/workspace-card/surface/worktree-card-header.tsx`, `src/renderer/src/components/sidebar/workspace-card/surface/worktree-card-presentation.tsx`
+
+**Resolution:** delete (upstream deleted both)
+
+**Decision:** both files were dead at the fork's own tip — their only importers (`worktree-card-parent-content.tsx`, `worktree-card-meta-row.tsx`, `worktree-card-secondary-rows.tsx`) were themselves unreferenced. The live renderings of the two features they held are the card-template parts: `template/card-identity-parts.tsx` (same-branch host switcher, from `card.branchGroup`/`selectedBranchHostId`/`branchGroupKey`) and `template/card-activity-parts.tsx` (ephemeral-VM lease badge via `resolveEphemeralVmLeaseIndicator(card.ephemeralLease)`). A future sync must keep those two parts and must not resurrect the deleted pair.
+
 ## Review follow-ups from the 2026-11-15 sync
 
 The release review (Opus 5.5, high) read the remerge diff in six slices and returned 0 BLOCKER and
@@ -552,11 +608,18 @@ pure additions after them. Credential sections are split per provider; a pane th
 `OpenCodeGoCredentials` or a GLMT plan section needs those `window.api` doubles in its test.
 
 **Why:** this was `accounts-search-extra-providers.ts` from 2026-10-15 until 2026-10-26, and the reason
-then was the 300-line cap. The cap is now off (`max-lines` is `"off"` in every `.oxlintrc.json`), so a
-split is no longer a reason to move upstream's code — and leaving upstream's entries where upstream has
-them turns this file's next sync into an addition rather than a rival copy.
+then was the 300-line cap (which the 2026-11-24 correction below puts back), so a split is no longer a
+reason to move upstream's code — and leaving upstream's entries where upstream has them turns this
+file's next sync into an addition rather than a rival copy.
 
 **Do not:** add a `max-lines` disable, or inline a credential section back into `AccountsPane.tsx`.
+
+**2026-11-24 correction.** The cap is enforced again: `.oxlintrc.json` carries `max-lines` at 300
+(`.ts`), 400 (`.tsx`), 600 (`.mjs`) and 800 (test files), with upstream-owned files exempted through
+`config/max-lines-baseline.txt` plus the file's own `eslint-disable max-lines -- Why:` line
+(`LOCAL-PATCHES.md` § `local(lint)`). The 2026-11-24 sync added fourteen rows on that rule; a split of
+an upstream-owned file still costs a permanent sync hunk, so a disable is the answer only for a file
+that exists at the recorded sync base.
 
 **2026-10-16 addendum.** Upstream's "trim redundant tests" pass (#29156) deleted
 `accounts-pane-claude-section.test.tsx` and moved both of its cases into `AccountsPane.test.tsx`,
@@ -922,6 +985,14 @@ now describe guards upstream retired.
 
 **Do not:** re-add a deleted inventory to carry one fork entry; add the assertion to a surviving test
 instead.
+
+**2026-11-24 addendum — the same rule at 3× the scale.** The 2026-11-24 sync of upstream `7daf01d99f3`
+(1,350 commits) took **169 fork-modified test files and 215 fork-added cases** as deletions: upstream
+retired 6,116 files, 5,217 of them suites, harnesses and fixtures. The baseline carries them with this
+section as the evidence. Ten fork-owned test-support files that surviving tests still import were
+`restore`d instead (`expected-deletions.json`), and the retired-harness imports those restores did not
+cover were re-pointed at the harness upstream kept — never resurrected wholesale. Do not read the 169
+as one decision to re-litigate: it is this rule, applied to whatever that sync retired.
 
 **2026-10-16 addendum.** Two more of upstream's consolidations were taken with the fork's content
 re-homed rather than restored: `accounts-pane-claude-section.test.tsx` (deleted; both cases live in

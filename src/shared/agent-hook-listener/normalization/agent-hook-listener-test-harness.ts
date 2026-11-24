@@ -1,7 +1,25 @@
 import { normalizeHookPayload } from './normalize-hook-payload'
-import type { HookListenerState } from '../listener-state'
-import { seedLegacyAgentStatusForTests } from '../legacy-agent-status-test-seed'
+import { admitLegacyAgentStatus, type HookListenerState } from '../listener-state'
+import type { AgentHookEventPayload } from '../listener-event'
+import { AGENT_STATUS_2A_CURRENT_PRODUCER_MODE } from '../../agent-status/transport/agent-status-legacy-adapter'
 import { makePaneKey } from '../../workspace-layout/stable-pane-id'
+
+/** Test harnesses seed the same compatibility region without exposing a mutable Map. */
+export function seedLegacyAgentStatusForTests(
+  state: HookListenerState,
+  entry: AgentHookEventPayload
+): void {
+  if (
+    !admitLegacyAgentStatus(
+      state,
+      'main-status-update',
+      entry,
+      AGENT_STATUS_2A_CURRENT_PRODUCER_MODE
+    )
+  ) {
+    throw new Error('Test legacy agent-status seed was refused')
+  }
+}
 
 const LEAF_ID = '11111111-1111-4111-8111-111111111111'
 export const PANE_KEY = makePaneKey('tab-1', LEAF_ID)

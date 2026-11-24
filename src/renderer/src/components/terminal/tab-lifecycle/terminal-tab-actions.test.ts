@@ -31,8 +31,65 @@ vi.mock('@/runtime/native-chat/requests/structured-agent-session-close', () => (
   closeStructuredAgentSession: vi.fn(() => Promise.resolve())
 }))
 
-const { createTabsSliceMockApi } = await import('@/store/slices/tabs/tabs-slice-test-harness')
-createTabsSliceMockApi()
+/** window.api double for the full app store this suite drives; the tabs slice reads most of these. */
+function installTabsSliceMockApi(): void {
+  const usageScanner = () => ({
+    getScanState: vi.fn().mockResolvedValue({
+      enabled: false,
+      isScanning: false,
+      lastScanStartedAt: null,
+      lastScanCompletedAt: null,
+      lastScanError: null,
+      hasAnyClaudeData: false
+    }),
+    setEnabled: vi.fn().mockResolvedValue({}),
+    refresh: vi.fn().mockResolvedValue({}),
+    getSummary: vi.fn().mockResolvedValue(null),
+    getDaily: vi.fn().mockResolvedValue([]),
+    getBreakdown: vi.fn().mockResolvedValue([]),
+    getRecentSessions: vi.fn().mockResolvedValue([])
+  })
+
+  const api = {
+    worktrees: {
+      create: vi.fn().mockResolvedValue({}),
+      remove: vi.fn().mockResolvedValue(undefined),
+      updateMeta: vi.fn().mockResolvedValue({})
+    },
+    repos: {
+      list: vi.fn().mockResolvedValue([]),
+      add: vi.fn().mockResolvedValue({}),
+      remove: vi.fn().mockResolvedValue(undefined),
+      update: vi.fn().mockResolvedValue({}),
+      pickFolder: vi.fn().mockResolvedValue(null)
+    },
+    pty: {
+      kill: vi.fn().mockResolvedValue(undefined),
+      spawn: vi.fn().mockResolvedValue({ id: 'pty-1' })
+    },
+    gh: {
+      prForBranch: vi.fn().mockResolvedValue(null),
+      issue: vi.fn().mockResolvedValue(null)
+    },
+    settings: {
+      get: vi.fn().mockResolvedValue({}),
+      set: vi.fn().mockResolvedValue(undefined)
+    },
+    ui: { set: vi.fn().mockResolvedValue(undefined) },
+    cache: {
+      getGitHub: vi.fn().mockResolvedValue(null),
+      setGitHub: vi.fn().mockResolvedValue(undefined)
+    },
+    claudeUsage: usageScanner(),
+    codexUsage: usageScanner(),
+    openCodeUsage: usageScanner()
+  }
+
+  // @ts-expect-error -- minimal window.api stub for the store under test
+  globalThis.window = { api }
+}
+
+installTabsSliceMockApi()
 
 const { createTestStore, seedStore } = await import('@/store/testing/app-store-test-fixture'),
   { makeTab } = await import('@/store/terminals/testing/terminal-tab.test-fixture'),

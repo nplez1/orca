@@ -3,7 +3,7 @@ import type { GlobalSettings } from '../../../../../shared/settings/global-setti
 import { Label } from '../../ui/label'
 import { Switch } from '../../ui/switch'
 import { SearchableSetting } from '../section-layout/SearchableSetting'
-import type { SettingsHostScope } from '../host-scope/settings-host-scope'
+import type { SettingsServerScope } from '../host-scope/settings-host-scope'
 import {
   getHostSettingUnsupportedNote,
   getHostSettingUpdateFailedMessage,
@@ -40,7 +40,7 @@ export function KeepLocalMainUpToDateSetting({
   settings,
   updateSettings
 }: {
-  hostScope: SettingsHostScope
+  hostScope: SettingsServerScope
   settings: GlobalSettings
   updateSettings: (updates: Partial<GlobalSettings>) => void | Promise<void>
 }): React.JSX.Element {

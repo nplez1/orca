@@ -3,6 +3,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from '@/store/index'
 import type { AppState } from '@/store/types'
 import type { WorktreeStatus } from '../../../../../../shared/worktree/row-display/worktree-status-rollup'
+import { asSharedWorktreeStatus } from '@/lib/workspace/activity/worktree-status'
 import { selectWorktreeActivityStatus } from './use-worktree-activity-status'
 
 function selectStatusesForIds(worktreeIds: readonly string[]) {
@@ -10,7 +11,8 @@ function selectStatusesForIds(worktreeIds: readonly string[]) {
   return (state: AppState) => {
     let next = previous
     for (const id of worktreeIds) {
-      const status = selectWorktreeActivityStatus(state, id)
+      // The renderer's status adds `setup`; shared rollups read it as plain live.
+      const status = asSharedWorktreeStatus(selectWorktreeActivityStatus(state, id))
       if (next.get(id) !== status) {
         if (next === previous) {
           next = new Map(previous)

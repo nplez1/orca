@@ -23,7 +23,7 @@ import {
   parseExecutionHostId
 } from '../../../../../shared/execution-host/execution-host'
 import { BOT_MAX_SKILL_PROJECTS, type Bot } from '../../../../../shared/bot-types'
-import { skillsFolderFor } from '../../../../../shared/bots/bot-package'
+import { BOT_OWN_SKILLS_FOLDER } from '../../../../../shared/bots/bot-package'
 import {
   BOT_AGENTS_LISTING_LINKED_SKILLS,
   type BotOwnSkillsView,
@@ -357,7 +357,7 @@ export function BotSkillsSection({
         {t(
           'settings.bots.skills.itsOwn',
           '{{bot}} also has its own skills folder, {{folder}}, inside its home — the one it can write a skill into itself. What is in it loads for this bot alone, before any project’s, and a new one is known from its next message.',
-          { bot: bot.name, folder: skillsFolderFor(bot.agent) }
+          { bot: bot.name, folder: BOT_OWN_SKILLS_FOLDER }
         )}
       </p>
       <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card shadow-xs">

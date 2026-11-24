@@ -3,7 +3,7 @@ import type { RuntimeStatus } from '../../shared/remote-runtime/session-graph/ru
 import type { RuntimeDegradation } from '../../shared/remote-runtime/protocol/runtime-capability-degradation'
 import {
   runtimeBrowserCommandsFactoryIsHeadless,
-  runtimeBrowserCommandsFactorySupportsGoogleCookieClear,
+  runtimeBrowserCommandsFactorySupportsEngineCapability,
   runtimeBrowserCommandsFactorySupportsClientHosting,
   runtimeBrowserUnavailableCause
 } from './browser/installation/runtime-browser-commands-factory'
@@ -91,7 +91,7 @@ export abstract class OrcaRuntimeWithGetStatus extends OrcaRuntimeWithPtyControl
     const capabilities: NonNullable<RuntimeStatus['capabilities']> = RUNTIME_CAPABILITIES.filter(
       (capability) =>
         (capability !== BROWSER_GOOGLE_COOKIE_CLEAR_CAPABILITY ||
-          runtimeBrowserCommandsFactorySupportsGoogleCookieClear()) &&
+          runtimeBrowserCommandsFactorySupportsEngineCapability(capability)) &&
         (capability !== 'browser.screencast.v1' || canBrowse) &&
         (capability !== BROWSER_CLIENT_HOST_RUNTIME_CAPABILITY || canHostClientPages) &&
         (capability !== BROWSER_TAB_CREATE_KNOWN_ID_RUNTIME_CAPABILITY ||

@@ -6,7 +6,7 @@ import {
   mockApi,
   resetRemoteRuntimeMocks,
   runtimeEnvironmentCall
-} from '../github/github-slice-test-harness'
+} from '../github/github-slice.test-fixture'
 import type { AppState } from '../types'
 import type { Repo } from '../../../../shared/repository/repo-types'
 

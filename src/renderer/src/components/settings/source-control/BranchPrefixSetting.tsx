@@ -4,7 +4,7 @@ import { Input } from '../../ui/input'
 import { Label } from '../../ui/label'
 import { SearchableSetting } from '../section-layout/SearchableSetting'
 import { BranchPrefixFeedback } from './BranchPrefixFeedback'
-import type { SettingsHostScope } from '../host-scope/settings-host-scope'
+import type { SettingsServerScope } from '../host-scope/settings-host-scope'
 import {
   getHostSettingUnsupportedNote,
   getHostSettingUpdateFailedMessage,
@@ -20,7 +20,7 @@ export function BranchPrefixSetting({
   updateSettings,
   displayedGitUsername
 }: {
-  hostScope: SettingsHostScope
+  hostScope: SettingsServerScope
   settings: GlobalSettings
   updateSettings: (updates: Partial<GlobalSettings>) => void | Promise<void>
   /** This computer's Git username; a server resolves its own at create time. */

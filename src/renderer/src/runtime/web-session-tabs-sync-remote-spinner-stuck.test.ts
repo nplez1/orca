@@ -37,8 +37,7 @@ import type { AppState } from '../store/types'
 import { createTestStore, makeWorktree, seedStore } from '../store/slices/store-test-helpers'
 import {
   markRendererOwnedAgentStatusWrite,
-  registerRendererOwnedAgentStatusPane,
-  resetRendererOwnedAgentStatusPanesForTests
+  registerRendererOwnedAgentStatusPane
 } from '../components/terminal-pane/agent-status/renderer-owned-agent-status-registry'
 import { applyWebSessionTabsSnapshot } from './web-session-tabs-sync/snapshots/snapshot-api'
 import { resetWebSessionTabsSnapshotFreshnessForTests } from './web-session-tabs-sync/tracking/tracking-lifecycle'
@@ -125,6 +124,15 @@ function applyHostSnapshot(
   store.setState(patch as Partial<AppState>)
 }
 
+// The registry has no reset hook; the release each claim returns is its only teardown.
+const paneReleases: (() => void)[] = []
+
+function releaseRendererOwnedAgentStatusPanes(): void {
+  for (const release of paneReleases.splice(0)) {
+    release()
+  }
+}
+
 /** Replay what pty-connection.handleRendererOwnedAgentStatus does for a remote pane. */
 function replayClientOscWorking(
   store: TestStore,
@@ -133,6 +141,7 @@ function replayClientOscWorking(
 ): () => void {
   vi.setSystemTime(clientNow)
   const release = registerRendererOwnedAgentStatusPane(MIRROR_PANE_KEY, ENV)
+  paneReleases.push(release)
   markRendererOwnedAgentStatusWrite(MIRROR_PANE_KEY)
   store
     .getState()
@@ -173,12 +182,11 @@ describe('remote paired pane: does a client "working" row clear past the stale b
     vi.useFakeTimers()
     vi.setSystemTime(T0)
     resetWebSessionTabsSnapshotFreshnessForTests()
-    resetRendererOwnedAgentStatusPanesForTests()
   })
 
   afterEach(() => {
     vi.useRealTimers()
-    resetRendererOwnedAgentStatusPanesForTests()
+    releaseRendererOwnedAgentStatusPanes()
   })
 
   it('host publishes done: the client row reaches a terminal state and stops painting the yellow dot', () => {
@@ -277,12 +285,11 @@ describe('remote paired pane: structuredHostOwned decay bypass (M1) and unattrib
     vi.useFakeTimers()
     vi.setSystemTime(T0)
     resetWebSessionTabsSnapshotFreshnessForTests()
-    resetRendererOwnedAgentStatusPanesForTests()
   })
 
   afterEach(() => {
     vi.useRealTimers()
-    resetRendererOwnedAgentStatusPanesForTests()
+    releaseRendererOwnedAgentStatusPanes()
   })
 
   // Deliberately NOT pinned: `structuredHostOwned: true` makes a non-done row fresh forever
