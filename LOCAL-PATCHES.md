@@ -115,14 +115,15 @@ this fork is cosmetically described as a dev build, which is harmless and unreac
 
 Tests that pin the re-pointed URLs and the single-stream mapping:
 `tests/tools/fork-invariants.test.mjs` (every channel `getReleaseRepoForChannel` offers resolves to
-`nplez1/orca`), `src/main/updater-stable-feed-fallback.test.ts` and
-`src/main/updater/releases/updater-prerelease-feed-readiness.test.ts`. They assert this fork's repo
+`nplez1/orca`) and `src/main/updater-stable-feed-fallback.test.ts`. They assert this fork's repo
 path, so a sync that restores upstream's expectations turns them red again. The updater suites that
 carried the mapping before this sync — `updater.check-preflight` and `updater.prerelease-fallback` —
 went with upstream's bulk test removals and ownership refactors in the 2026-11-20 sync (#43339,
 #43277), and `updater-release-builds` lost its test the same way in the 2026-11-08 sync (the module
-itself moved into `updater/releases/`). The mapping is covered through the three above; re-homing the
-retired updater cases is owed, as `local/sync/convergence-ledger.md` records.
+itself moved into `updater/releases/`). The prerelease-feed and feed-readiness suites were the last two
+of that family and went in upstream's 2026-11-24 test-inventory pass, so the mapping is covered through
+the two above and re-homing the retired updater cases is owed, as
+`local/sync/convergence-ledger.md` records.
 
 **The project's own links follow the same constant.** `src/shared/orca-repository.ts` derives
 `ORCA_REPOSITORY` / `ORCA_REPOSITORY_URL`, plus the scheme-less `ORCA_REPOSITORY_DISPLAY_URL` that
@@ -189,17 +190,17 @@ Anchors:
 - `probeCandidates` still widens to every newer candidate. It is no longer load-bearing against the
   atom noise — the release list has none — but it costs one round trip and stays true for the fallback
   feed, where the mirrored tags are.
-- `src/main/updater/releases/updater-prerelease-feed.test.ts` — `finds this repo's own release when mirrored tags have
-  crowded out the atom feed` (this incident), `takes its candidate tags from the release list`, the
-  draft/asset-less case, and both fallback cases.
 - `src/main/updater-stable-feed-fallback.test.ts` — `accepts the fork's own -np. release line, which
   releases/latest resolves to`.
-- `src/main/updater/releases/updater-prerelease-feed-readiness.test.ts` — the fork-feed regression case, which now
-  exercises the atom fallback.
+- the atom-feed and candidate-tag cases themselves — `finds this repo's own release when mirrored tags
+  have crowded out the atom feed` (this incident), `takes its candidate tags from the release list`, the
+  draft/asset-less case, and both fallback cases — lived in the prerelease-feed suite, and the fork-feed
+  regression case that exercised the atom fallback in the feed-readiness suite. Both suites went in
+  upstream's 2026-11-24 test-inventory pass and no test re-homes those cases yet; that is owed.
 - the last-good pin reaching `available` — the suite that asserted that transition,
   `updater.publishing-window-feed.test.ts`, was retired upstream in the 2026-11-20 sync's bulk test
-  removals (#43277) and no test re-homes the case yet; `updater-prerelease-feed.test.ts` still pins the
-  `lastGoodTag` the pin is built on.
+  removals (#43277) and no test re-homes the case yet; the prerelease-feed suite that pinned the
+  `lastGoodTag` the pin is built on went in the 2026-11-24 test-inventory pass, so nothing pins it now.
 - `src/main/updater-release-targets.ts` and `src/main/updater-release-readiness.ts` — the URL and
   probe halves, split out of the resolver so it stays inside the 300-line module limit. A sync that
   restores the single file has to take these two with it.
@@ -282,9 +283,10 @@ imports `locales/*.json` directly, so a fork string used by a menu, tray or dial
 back to English. Nothing is lost today — every non-null overlay entry is renderer-only — but a fork
 string that needs main-process copy belongs in `src/main`'s own catalog, not in the overlay.
 
-Tests that pin the mechanism: `config/scripts/localization/catalog-validation/fork-english-catalog.test.mjs`,
-`config/scripts/localization/catalog-validation/verify-localization-catalog.test.mjs` (one fixture per
-override-drift class), `src/renderer/src/i18n/fork-catalog-overlay.test.ts` (including the
+Tests that pin the mechanism: `config/scripts/localization/catalog-validation/fork-english-catalog.test.mjs`
+(its `mergeCatalogs` and `collectCatalogTombstones` cases are the per-override-drift fixtures — the
+validation suite that held them beside it was retired by upstream's 2026-11-24 test-inventory pass),
+`src/renderer/src/i18n/fork-catalog-overlay.test.ts` (including the
 overlay-fetch-failure path), `tests/tools/i18n-catalog-overlay-parity.test.mjs`.
 
 **Orphaned keys are tombstoned, never deleted (2026-10-31).** The section above described the rule;
@@ -899,17 +901,17 @@ Anchors, both on upstream-owned files and marked `LOCAL(nplez1)`:
   `resolution.workingMode`, so a grok background shell reads plain `working`. Grok has no cron concept,
   so it never earns the badge.
 - Tests that encode the policy (all would need re-adapting if it is ever dropped):
-  `src/shared/agent-hook-listener/normalization/claude-background-task-status.test.ts` (the Claude and Grok lane helpers plus the six
-  shell/watcher stories; the `main-agent-status-parity` companion suite was retired in the 2026-11-08
-  sync),
-  `src/shared/agent-hook-listener/normalization/agent-hook-listener-grok-completion.test.ts` (the Grok
-  lane's own `workingMode` assertion — its server-level companion
-  `server-grok-background-status.test.ts` went with upstream's bulk test removals in the 2026-11-20
-  sync, and the Grok/Claude cancel suites became
-  `src/main/agent-hooks/server/testing/interruptions/server-relayed-claude-cancel.test.ts`), plus the
-  helper-settlement suites that assert the badge directly
-  (`src/main/agent-hooks/server/testing/interruptions/server-claude-helper-kill.test.ts` and its
-  upstream-owned companions). The
+  `src/shared/agent-hook-listener-descendant-lifecycle.test.ts` (plain `working` when agent work holds
+  the turn, the `monitoring` badge when only scheduled work does) and
+  `src/shared/agent-hook-listener/providers/pi-pane-hold-evidence.test.ts` (a finished turn held as
+  monitoring while scheduled work is armed, a live child read off the payload instead). The two lane
+  suites this bullet used to name — the Claude/Grok background-task-status file with its six
+  shell/watcher stories, and the Grok lane's own `workingMode` assertion — were retired by upstream's
+  2026-11-24 test-inventory pass, as were the Grok/Claude cancel and helper-settlement suites
+  (`main-agent-status-parity` went in the 2026-11-08 sync, `server-grok-background-status.test.ts` in
+  the 2026-11-20 sync). The cancel verdict survives as
+  `src/shared/agent-hook-listener/state/agent-hook-cancel-verdict-latch.test.ts`; the
+  helper-settlement badge has no owner at HEAD, so re-homing that case is owed. The
   structured/native-chat lane is deliberately untouched: it still reads a watch loop as monitoring.
 
 Weigh this before keeping it: `isAgentTimeAccruing` is `state === 'working' && workingMode !== 'monitoring'`,
@@ -1289,11 +1291,12 @@ cause — a suppressed red is also an unexamined one, which is what this sweep c
   `/private/var/folders/…`, and fsevents reports the resolved spelling while the paths the code
   registers keep the unresolved one. The reclaim entry's own diagnosis was right and is fixed as it
   described. Three sites:
-  - `config/scripts/desktop-distribution/runtime-verification/process-host-dev-rebuild.test.ts:32`
-    (and the `main-entry-facade` suite upstream retired this sync) built their
-    fixture root from raw `tmpdir()`, so
-    every registered watch path and the child's own `__dirname` disagreed. Both now realpath the
-    `mkdtemp` result, the idiom 11 other files in this tree already use.
+  - the dev-rebuild suite's line 32 (and the `main-entry-facade` suite upstream retired this sync)
+    built their fixture root from raw `tmpdir()`, so
+    every registered watch path and the child's own `__dirname` disagreed. Both realpathed the
+    `mkdtemp` result, the idiom 11 other files in this tree already use. That suite was then retired
+    itself by upstream's 2026-11-24 test-inventory pass, so `config/build-plugins/` has no test at HEAD
+    and the fixture-root fix went with it.
   - `config/build-plugins/process-host-dev-rebuild.ts:87` created its private watch-signal directory
     the same way and registers the signal file with `addWatchFile`, so on macOS a **newly created**
     source file never triggered a rebuild at all — editing an existing one did. That is a product
@@ -1322,15 +1325,18 @@ signature, the macOS bash 3.2 arrays, the dev-rebuild timeouts, the missing `clo
 The five below are the same class and were classified here rather than chased, each with the
 signature that identifies it. None imports a module this fork changed.
 
-- `src/main/cli/packaged-assets/packaged-cli-assets.test.ts`, the orcad forked-child-paths suite (retired upstream; `src/main/orcad/orcad-forked-child-paths.ts` still carries the rule),
-  `config/scripts/macos/terminal-host-bundle/macos-terminal-host-bundle.test.mjs` — `os.tmpdir()` resolves to `/var/folders/…`
+- the packaged-cli-assets suite, the orcad forked-child-paths suite and the macOS terminal-host-bundle
+  suite — all three retired since — each failed the same way: `os.tmpdir()` resolves to `/var/folders/…`
   while the code under test reports the resolved `/private/var/folders/…`.
-- `src/main/cli/installation/cli-command-privileged-transaction.test.ts` — "Refusing to replace non-Orca command
+  `src/main/orcad/orcad-forked-child-paths.ts` still carries the orcad rule, and no test in this tree
+  asserts that temp-dir spelling for any of the three now.
+- the cli-command-privileged-transaction suite — "Refusing to replace non-Orca command
   at /var/folders/…/protected/orca". **Re-diagnosed and repaired in `local(test)` below, fork issue
   #151 § 4:** the recorded error path is `/var/…`, not `/private/var/…`, and the cause is the fork's
-  `orca-np` rename rather than symlink resolution. The entry is gone from the manifest.
+  `orca-np` rename rather than symlink resolution. The entry is gone from the manifest, and the suite
+  itself went in upstream's 2026-11-24 test-inventory pass, so nothing asserts that refusal at HEAD.
 - `src/main/sqlite/sync-database-portability.test.ts` ("rejects explicit undefined bindings") and
-  `src/main/persistence/profile-state/documents/profile-state-streaming-validation.test.ts` ("cannot add
+  the profile-state streaming-validation suite ("cannot add
   rowid alias") — the bundled SQLite's own binding behaviour differs from what those contracts
   assume; neither file is imported by anything this fork touches. **Both are closed, and the second
   diagnosis was wrong about the cause (2026-10-29).** The rowid case did fail on SQLite 3.54's refusal
@@ -1340,7 +1346,10 @@ signature that identifies it. None imports a module this fork changed.
   case was the same story with a different ending: #34661 deleted it, because Node 26.10 binds an
   explicit `undefined` as NULL, so the contract it asserted no longer existed. Neither was something
   "the bundled SQLite" did to this fork alone, and that is what made the first one dangerous: a dead
-  entry can never be reported stale.
+  entry can never be reported stale. The portability suite survives at
+  `src/main/sqlite/sync-database-portability.test.ts` and still covers the rowid integer mode; the
+  profile-state streaming-validation file itself went in upstream's 2026-11-24 test-inventory pass, so
+  nothing re-homes its rowid-alias case now.
 - the lost shell-ready marker when a startup command execs over the shell (`repro-13767`) — "Timed out
   waiting for PTY output", the PTY/subprocess class recorded above. The repro file itself,
   `repro-13767-shell-ready-marker-lost-to-exec.test.ts`, was
@@ -1359,11 +1368,11 @@ self-contained set — the case now pins `agent: 'pi'`), `agent-session-failure-
 (a fork-only terminal-wait file read `pty.paneKey` directly and now goes through `paneOfPty`).
 Fourteen were already recorded. The last two are the same host-toolchain class as their neighbours:
 
-- `config/scripts/dependency-security/audit-tools/dependency-security-release.test.mjs` — the audit action's bash step uses
+- the dependency-security release suite — the audit action's bash step uses
   `mapfile`, and this machine's bash is Apple's 3.2 (`bash: mapfile: command not found`). Same
   `host-toolchain` signature as the `ci-managed-ssh-execution` entry recorded then — that workflow
-  contract suite has since been retired upstream (2026-11-20 sync, #43278), so this is the surviving
-  member of the class.
+  contract suite was retired upstream (2026-11-20 sync, #43278) and this one followed in the 2026-11-24
+  test-inventory pass, so the class has no surviving member and no entry left to absorb.
 - the cross-version host-model-catalog released-phone suite (retired upstream) — both cases call
   `stripTypeScriptTypes` from `node:module`; the bun 1.4.3 pool's `node:module` does not export it,
   so the file passes only under a Node runtime.
@@ -2397,13 +2406,17 @@ Nine are recorded, all `owner: upstream` on code byte-identical to `0571e45107`:
   already green: upstream #33533 (`a886dcd1fe9`, merged with the 10-28 sync) added
   `terminal-topology-profile-fixture` to the harness list `config/scripts/vitest-sqlite-runtime-scan.mjs`
   keys on, so `getNodeRuntimeInclude()` had been routing them to the Node project all along. The other
-  two — `tests/e2e/desktop/electron-fixtures/persisted-profile-state.unit.test.ts` (moved there from
-  `tests/e2e/helpers/` when upstream grouped the e2e tree by feature, #43628) and
-  `src/main/ai-vault-search/indexing/session-search-indexer.test.ts` — reach `node:sqlite` through modules the
-  scan does not follow, so they really were running under Bun; both are now listed in
-  `NODE_RUNTIME_INCLUDE` with the reason, and both pass (3/3 and 42/42) where they failed 2/3 and 1/42.
-  `vitest-node-runtime-boundary.test.ts` pins the two entries, because nothing else would notice their
-  removal. The hazard the audit named is the real reason this mattered: the entries' `match`,
+  two — the persisted-profile-state e2e unit suite (moved to `tests/e2e/desktop/electron-fixtures/` from
+  `tests/e2e/helpers/` when upstream grouped the e2e tree by feature, #43628) and the
+  session-search-indexer suite — reached `node:sqlite` through modules the
+  scan does not follow, so they really were running under Bun; both were listed in
+  `NODE_RUNTIME_INCLUDE` with the reason, and both passed (3/3 and 42/42) where they failed 2/3 and 1/42.
+  `vitest-node-runtime-boundary.test.ts` pinned the two entries, because nothing else would notice their
+  removal — and all three are gone now: the two suites went in upstream's 2026-11-24 test-inventory
+  pass, their `NODE_RUNTIME_INCLUDE` entries went with them, and the pin suite with them, so nothing
+  asserts the fork-local block in
+  `config/scripts/test-runtime/sqlite-admission/vitest-node-runtime-files.mjs` any more. Re-homing that
+  pin is owed. The hazard the audit named is the real reason this mattered: the entries' `match`,
   `Unable to read profile state database`, is exactly what a genuine profile-state open regression
   throws, so the allowlist could not have seen one.
 - **27 `agent-hooks` files, the same `sqlite-binding` class, reopened by the 2026-11-10 sync.** Upstream
@@ -2781,18 +2794,21 @@ prunable. Without it the first new cause would have proposed deleting a live ent
 
 Two manifests changed in the same commit, as `AGENTS.md` requires:
 
-- `local/nightly-linux-known-red.json`: the one entry named
-  `src/main/daemon/providers/adapter/testing/daemon-pty-adapter-history-recovery.test.ts`, and upstream's `2f217b4d0dd`
-  (#38462) moved the file to `src/main/daemon/providers/adapter/testing/` on 2026-11-05. A
+- `local/nightly-linux-known-red.json`: the one entry named after the
+  daemon-pty-adapter-history-recovery suite, and upstream's `2f217b4d0dd`
+  (#38462) moved the file into `src/main/daemon/providers/adapter/testing/` on 2026-11-05. A
   `/`-bounded suffix match cannot pair those, so the entry had been matching **nothing** — the red it
-  exists to absorb was not being absorbed at all. It now carries the real path, Vitest's full name, and
+  exists to absorb was not being absorbed at all. It was given the real path, Vitest's full name, and
   `match: "^DaemonConnectionLostError: Disconnected$"` — the whole message, which
   `src/main/daemon/transport/client/daemon-client.ts:283` raises as `rejectAll('Disconnected')`. The
   entry's own `evidence` had quoted `DaemonConnectionLostError: Disconnected` and then, in prose,
   "out of `disconnectOnly()`"; only the quoted part is the error text, and a `match` written from the
   sentence rather than the message would have drifted on the next recurrence. Nothing static covered that manifest;
   `tests/tools/unit-gate.test.mjs` now checks that every entry names a file this tree has and a full name
-  that file can still produce.
+  that file can still produce. That suite has since been retired — the whole
+  `src/main/daemon/providers/adapter/testing/` tree went in upstream's 2026-11-24 test-inventory pass —
+  so the manifest entry now names a file this tree does not have, which the check just described reports;
+  re-homing or pruning it is owed.
 - `local/e2e-known-failure-titles.json`: 30 titles, none with a cause. 17 of the 28 that remain carry a
   `match` built from the `::notice::known failure … — <detail>` lines of the eleven retained scheduled
   runs (2026-09-27 … 2026-10-08, runs `36346182978`…`37848060391`), unioned across every shape observed
@@ -3030,25 +3046,29 @@ were defects **in the tests**, and both are fixed, so the three entries are remo
   `workspaces/workspace-removal.ts:87`, before that map is reached. The same defect exists on
   `upstream/main` today.
 
-`pnpm test src/main/runtime/construction/orca-runtime.test.ts` — before: 2 failed and 1 unhandled
+`pnpm test` over the orca-runtime construction suite — before: 2 failed and 1 unhandled
 error; after:
 `1520 passed | 3 skipped`, green on three consecutive runs. Every cached verdict under `orca-gate/`
-mentions `selector_not_found`, so this was persistent rather than a one-off.
+mentions `selector_not_found`, so this was persistent rather than a one-off. The suite itself went in
+upstream's 2026-11-24 test-inventory pass, so `src/main/runtime/construction/` has no test at HEAD and
+the handler-ordering fix recorded here is owed a home.
 
 **Every other `macos-path-semantics` entry was the same defect, and they are all fixed.** Nine cases
 across five files, each creating a temp dir with `mkdtemp(tmpdir())` and comparing it against a path the
 subject had resolved — the darwin launcher's `cd -P`, orcad's deploy root, a spawned child's reported
 cwd. Each now resolves its temp dir first:
-`orcad-forked-child-paths.test.ts` (4), `cli/packaged-cli-assets.test.ts` (1),
-`config/scripts/macos/terminal-host-bundle/macos-terminal-host-bundle.test.mjs` (1).
+the orcad forked-child-paths suite (4), the packaged-cli-assets suite (1) and the macOS
+terminal-host-bundle suite (1).
 The `orca-runtime` pair above is the other two. A fifth site, the `cli-build/verify-cli-bin` suite,
 carried one of these cases and went with upstream's bulk test removals in the 2026-11-20 sync (#43138);
 its subject, `config/scripts/cli-build/verify-cli-bin.mjs`, survives unchanged, and nothing asserts that
-temp-dir spelling for it now.
+temp-dir spelling for it now. All four files were retired in the 2026-11-24 test-inventory pass, so no
+test in this tree carries that fork-local realpath fix any more.
 
-Every one of those four files is otherwise byte-identical to `upstream/main`, so each is a fork-local
-test fix that will conflict once, benignly, when upstream makes the same change — the same trade
-upstream itself made in #33540. **The `sqlite-binding` class is now empty too**: 40 entries at the
+Every one of those four files was otherwise byte-identical to `upstream/main`, so each was a fork-local
+test fix that would have conflicted once, benignly, had upstream made the same change — the same trade
+upstream itself made in #33540. Retired now, so the fix is gone with them.
+**The `sqlite-binding` class is now empty too**: 40 entries at the
 2026-10-26 baseline, 17 after that repair, and **8 today, all `host-toolchain`** — the dev-rebuild
 timeouts (6), the bun `fs.rm` on a read-only directory (1) and one facade case (1). The nine
 `sqlite-binding` entries went on 2026-10-29: seven because the suites were re-seated or re-routed into
@@ -3398,8 +3418,8 @@ section stays readable. `tests/tools/fork-process-docs.test.mjs` holds the three
   - **`pnpm tc` opened at 132 errors** (the 2026-11-20 sync opened at 1,083), mostly retired
     test-support imports and renamed exports, repaired in five disjoint area batches.
   - **One fork-added spec was retired rather than propped up.**
-    `src/main/runtime/orca-runtime-tests/pane-screen-prompt.spec.ts` imports a test-context barrel
-    whose closure is ~1.6k lines of harness upstream deleted, and it is the only consumer; the spec
+    The `pane-screen-prompt` spec, in `src/main/runtime/orca-runtime-tests/`, imported a test-context
+    barrel whose closure is ~1.6k lines of harness upstream deleted, and it is the only consumer; the spec
     goes with them and its coverage is recorded here. `--baseline-init` cannot carry it — that
     baseline is fork-modified test files, and this one is fork-added.
 
@@ -4649,8 +4669,12 @@ Four couplings that stay as upstream has them, each for a reason:
   path, and the _installed_ command is already `orca-np` (`CLI_COMMAND_NAME`) — so renaming the
   in-bundle file would touch app-side CLI registration and its AppImage tests for no gain. The base
   config keeps upstream's value byte-identically because the overlay overrides it to `orca-np`, which
-  is what pins it (`config/scripts/electron-builder-np-config.test.mjs`); the in-bundle launcher file
-  is pinned by `src/main/cli/packaged-assets/packaged-cli-assets.test.ts`.
+  is what pins it (`config/scripts/electron-builder-np-config.test.mjs`); the in-bundle launcher file's
+  name is pinned by `config/scripts/electron-builder-linux-config.test.mjs`, which holds
+  `linux.executableName` at `orca-ide` and records that `LINUX_CLI_COMMAND_NAME` and the AppImage cache
+  layout locate `resources/bin/orca-ide`. The packaged-cli-assets suite that exercised the launcher
+  itself was retired by upstream's 2026-11-24 test-inventory pass, so
+  `src/main/cli/packaged-assets/bundled-cli-launcher-path.ts` carries that rule with no test at HEAD.
 - **The AppImage artifact name** (`orca-linux[-arm64].AppImage`).
   `config/scripts/static-appimage-package-contract.cjs` derives the artifact's target architecture
   from that exact name, and the PR lane runs it as `dist/orca-linux.AppImage`.
@@ -4737,10 +4761,10 @@ each now carries the identity, and each is pinned by a test rather than by a com
 | shared managed-hook script path                         | `~/.orca-np/agent-hooks/<script>`                                          | `tests/tools/fork-invariants.test.mjs`                             |
 | managed-hook command (posix, cmd, PowerShell)           | the same `~/.orca-np/agent-hooks/<script>`                                 | same file                                                          |
 | launchd label / systemd unit / serve logs               | `com.nplez1.orca.serve`, `orca-np-serve.service`, `~/Library/Logs/orca-np` | `tests/tools/fork-invariants.test.mjs`                             |
-| WSL guest command + bridge                              | `~/.local/bin/orca-np`, `~/.local/share/orca-np/orca-wsl-bridge.ps1`       | `src/main/cli/wsl/wsl-managed-cli.wsl.test.ts`                     |
+| WSL guest command + bridge                              | `~/.local/bin/orca-np`, `~/.local/share/orca-np/orca-wsl-bridge.ps1`       | nothing at HEAD — coverage owed                                    |
 | `BROWSER` in a pane                                     | the resolved launcher's basename                                           | `tests/tools/fork-invariants.test.mjs`                             |
 | dev profile fallback                                    | `orca-np-dev`                                                              | same file                                                          |
-| `serve service install` default command                 | `orca-np`                                                                  | `src/cli/server/serve-service.test.ts`                             |
+| `serve service install` default command                 | `orca-np`                                                                  | nothing at HEAD — coverage owed                                    |
 | serve park/ack coordination root                        | `Application Support/orca-np`                                              | `src/shared/serve-bundle-coordination.test.ts`                     |
 | bundle id (`np.appId`, notification pane, TCC trust)    | `com.nplez1.orca`                                                          | `tests/tools/fork-invariants.test.mjs`                             |
 | app name / AppUserModelId / dev bundle plist            | `Orca NP`, `Orca NP Dev`, `com.nplez1.orca.dev`                            | same file                                                          |
@@ -4749,13 +4773,20 @@ each now carries the identity, and each is pinned by a test rather than by a com
 | Linux install symlink                                   | `/usr/bin/orca-np`, from `after-install.sh`                                | same file                                                          |
 | managed-hook install lock                               | `~/.orca` (shared cross-install mutex, deliberately not renamed)           | same file                                                          |
 
+The two rows above whose pin reads "coverage owed" lost their guard in upstream's 2026-11-24
+test-inventory pass: the WSL managed-CLI suite went with the rest of `src/main/cli/wsl/`'s tests, so
+`getManagedWslCliDir` is unpinned, and the serve-service suite went too, so the default command
+`serve service install` derives from `getOrcaCliCommandNameForPlatform` in
+`src/shared/cli/orca-cli-command-name.ts` has no test asserting the name it resolves.
+
 Three couplings that only show up in the built artifact:
 
 - **`extraMetadata` is spread, not replaced.** A dev-channel build stages its `version` there, so the
   overlay writes `{ ...release.extraMetadata, name }`; overwriting the object ships the wrong version.
 - **`resources/linux/bin/orca-ide` now searches for `orca-np` first.** The in-bundle CLI launcher keeps
   upstream's file name (pinned by `LINUX_CLI_COMMAND_NAME`), but the executable beside it is this
-  build's, and `src/main/cli/packaged-assets/packaged-cli-assets.test.ts` runs the script against both layouts.
+  build's. The packaged-cli-assets suite ran the script against both layouts; it went in upstream's
+  2026-11-24 test-inventory pass and nothing runs that script at HEAD, so that coverage is owed.
 - **`src/shared/appimage-cache-identity.ts` recognises both executable names.** An AppImage generation
   cached by an earlier build still runs as `orca-ide`, so keying the cache layout on one name would
   drop its lease and its update handoff.
@@ -4909,7 +4940,7 @@ merge found each one and the delta round held them open until each was answered.
 re-pointing imports at the modules upstream moved, or by covering the same behaviour at the layer it
 still lives in; the last one is recorded because the assertion itself went with the file.
 
-- **`src/main/ipc/worktrees-local-create-base-prefetch.test.ts` (303 lines, fork-only, deleted),
+- **The worktrees-local-create-base-prefetch suite (303 lines, fork-only, deleted),
   replaced by two smaller tests.** Its harness — `worktrees-test-harness.ts`,
   `worktrees-test-module-mocks.ts`, `worktrees-test-runtime-stub.ts` — no longer exists at HEAD, so
   the file itself cannot come back. What it pinned still ships, so the pinning moved to the layers
@@ -4920,7 +4951,7 @@ still lives in; the last one is recorded because the assertion itself went with 
   (folder and `connectionId` repos short-circuit, register-during-fetch then materialize once, the
   pre-materialization gate settling offline, and the shared `origin` fetch fallback). What is _not_
   restored is the old file's end-to-end create flow through the deleted harness.
-- **`src/renderer/src/web/web-preload-api-workspace-catalog.test.ts` (fork's `it.each`, 3 cases,
+- **The web-preload-api-workspace-catalog suite (fork's `it.each`, 3 cases,
   dropped).** The fork's block was the only test of the web client's
   `repos.getDefaultCreateProjectParent` wiring (three platform cases). Upstream relocated the test file
   and the block did not come with it. The rule it exercised is covered by
@@ -5131,11 +5162,13 @@ eleven call sites, which is exactly the divergence this patch avoids. Both are i
 questions.
 
 Tests: `src/main/pi/fork-read-only-gate.test.ts` (the generated extension against every read path the
-policy declares, one case per `REFUSED_ARGUMENTS` alternative on an allowed path, and the pinned policy
-text), `src/main/pi/rpc/launch/rpc-launch.test.ts` (`bash` in the read set, `readOnlyGate` becoming
-`--extension`, and the throw for a `'read'` run with no gate), `src/main/bots/bot-look-around-start-failure.test.ts`
+policy declares, one case per `REFUSED_ARGUMENTS` alternative on an allowed path, the pinned policy
+text, and the tools the launch already bounded), `src/main/bots/bot-look-around-start-failure.test.ts`
 (a wrapped too-old refusal keeps its cause, a plain failure does not), and the existing bot look-around
-suites.
+suites. The launch wiring — `bash` in the read set, `readOnlyGate` becoming `--extension`, and the
+throw for a `'read'` run with no gate — was asserted by the rpc-launch suite, which upstream's
+2026-11-24 test-inventory pass retired; `src/main/pi/rpc/launch/rpc-launch.ts` and
+`rpc-launch-resolution.ts` carry the rule with no test at HEAD, so re-homing those three cases is owed.
 
 ### `local(bots)`: talking to a bot without Orca Cloud, and the identity its writes carry
 
@@ -5299,8 +5332,11 @@ including a failing one's exit code, the name sanitiser, and the install gate),
 `src/cli/bots/fork-bot-ask.test.ts` (unknown and ambiguous bots, a chat that takes no mail, the id address,
 the `from` it sends and prints, the subject), `src/main/connector-cloud/own-pr-trigger-guard.test.ts` (the
 marker as own work, without asking the branch), and
-`src/main/runtime/rpc/methods/orchestration/messaging/bot-recipient.test.ts` (both directions of the local
-asker: this shell's send is the owner as a person, a paired Orca's is the bare owner).
+`src/main/runtime/rpc/methods/orchestration/federation/paired-server-asks.test.ts` (the paired Orca's
+direction: an ask from a person in that window rather than `asAgent`, and the sender named by this
+computer's name for the server) — the bot-recipient suite that held both directions of the local asker
+went in upstream's 2026-11-24 test-inventory pass, leaving this shell's own send pinned by
+`src/cli/bots/fork-bot-ask.test.ts` above.
 
 ### `local(webhooks)`: GitHub events on a bot with no Orca account
 
@@ -5351,8 +5387,13 @@ line or two, and the reason each exists is this file. `connector-host-install.ts
 | `src/cli/webhooks/webhooks.ts`                                               | `hookJson` and `formatSummary`                     | a loopback URL is printed (it carries the token that is its whole auth), a cloud URL still is not            |
 | `src/cli/specs/webhooks.ts`                                                  | `WEBHOOK_NOTES`                                    | the note names where a hook on this computer is discovered                                                   |
 
-Two of those files are **tests** upstream owns, edited rather than added to: `src/cli/automations/automation-event-triggers-cli.test.ts`
-(the signed-out CLI cases) and `src/main/runtime/rpc/methods/bots.test.ts` (`bots.list`'s new fields). And
+Two of those files were **tests** upstream owns, edited rather than added to — the
+automation-event-triggers CLI suite (the signed-out CLI cases) and the runtime's bots suite
+(`bots.list`'s new fields). Both went in upstream's 2026-11-24 test-inventory pass; what survives is the
+CLI spec layer at `src/cli/automations/automation-event-trigger-spec.test.ts` (the signed-out note, and
+which host it names) and the rule layer at
+`src/main/webhooks/local/local-webhook-provider.test.ts` (a Slack rule refused while signed out, this
+computer's own webhook rule heard, and the hooks it answers marked). And
 one is a ratchet baseline, `config/main-blocking-helper-baseline.txt`, which is a **global input**: two rows
 for `writeSecureFileAsync`, one per fork-owned module that writes. The store's row is per delivery (the body,
 then the index) and on win32 that helper writes, chmods and fsyncs synchronously, so a delivery there is two
@@ -5469,9 +5510,13 @@ call started here), `local-webhook-sweep.test.ts` (a live local call file surviv
 the same sweep deleting it when it is not told), `connector-host-install-local-webhooks.test.ts` (a host
 with no connector cloud still installing webhooks, publishing its endpoint and taking a delivery), and
 `connector-triggers.test.ts` (a hello never listing a rule this computer serves),
-`src/main/runtime/rpc/methods/bots.test.ts` (`bots.list` naming the rules this computer answers), and
-`src/cli/automations/automation-event-triggers-cli.test.ts` (creating a webhook rule on a signed-out host,
-refusing a Slack one there, and the listing note covering only the cloud's rules).
+`src/main/webhooks/local/local-webhook-provider.test.ts` (the rules this computer answers marked as
+such, so a signed-out card never calls one paused), and
+`src/cli/automations/automation-event-trigger-spec.test.ts` (the listing note covering only the cloud's
+rules, and which host is named as not signed in). The two suites this bullet used to name — the runtime
+bots suite and the automation-event-triggers CLI suite — went in upstream's 2026-11-24 test-inventory
+pass, so creating a webhook rule on a signed-out host and refusing a Slack one there are covered at the
+provider layer now rather than through the CLI.
 
 Round 3 added the concurrency proof: two overlapping `putCall`s keep both rows and both survive a reopen,
 a drop cannot be undone by a write already in flight, and a call whose hook went before its body landed is
@@ -5693,14 +5738,16 @@ changed checks run clean here.
 `local/unit-known-red.json` has been empty of entries since the 2026-10-31 sweep, and this branch leaves
 it that way. What it saw, because a flake nobody records is one nobody believes:
 
-`src/main/google/google-key-download-watch.test.ts` `takes the key once the browser renames it to its
+the google key-download-watch suite's `takes the key once the browser renames it to its
 final name, ignoring other files` failed the full gate **three times in a row** at `25689fb920` with
-`Test timed out in 30000ms` on the `await rename`, while the same file passes **4/4 standalone**
+`Test timed out in 30000ms` on the `await rename`, while the same file passed **4/4 standalone**
 (`--maxWorkers=1`, three consecutive runs). Nothing in this branch touches `src/main/google/`. The tests
 themselves are the evidence for the other direction: the full suite was green at `9cc8c07d76`
 (`27758 passed, 0 failed`), red at `25689fb920` on that one case, and green again at `6bd42822f9`
 (`27759 passed, 0 failed, 0 allowlisted`) — the same code path each time, which is what "under load"
-means here rather than "broken".
+means here rather than "broken". The suite itself went in upstream's 2026-11-24 test-inventory pass, so
+this record is the only trace of the case; `src/main/google/google-setup-key-download.ts` has no test at
+HEAD and re-homing one is owed.
 
 - **No entry was added.** The red set is the machine's assertion about what is _reliably_ red on it, and
   this case is not: it passed the gate at this branch's HEAD. An allowlist entry that the next run does

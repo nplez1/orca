@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at 292 of its 300-line budget; the fork's agent-status extension wiring rides inside it, and splitting costs a permanent sync hunk. */
 import { EventEmitter } from 'node:events'
 import { createContext, runInContext } from 'node:vm'
 // TypeScript 7 is a native CLI; transpile tests still need the legacy JavaScript API.

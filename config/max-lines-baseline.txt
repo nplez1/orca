@@ -34,6 +34,7 @@ inline src/main/ipc/shell/shell.ts
 inline src/main/ipc/worktrees/worktree-remote.ts
 inline src/main/jira/client.test.ts
 inline src/main/persistence/tracking-repos/repo-update-operations.ts
+inline src/main/pi/managed-extensions/agent-status/agent-status-extension-test-harness.ts
 inline src/main/pi/rpc/launch/rpc-launch-resolution.ts
 inline src/main/rate-limits/service/service-fetch-targets.ts
 inline src/main/rate-limits/service/service-full-cycle-preparation.ts
