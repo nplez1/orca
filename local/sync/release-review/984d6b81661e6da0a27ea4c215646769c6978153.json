@@ -1,0 +1,2496 @@
+{
+  "revision": "984d6b81661e6da0a27ea4c215646769c6978153",
+  "base": "cc4fefcbaad23d69fd62406099d84551e6280042",
+  "upstream": "7daf01d99f3d3301bf3c867e293ebb9d1f9a324e",
+  "mergeCommit": "a8c508f5fb763662faf5aa3e7efe751fb99c5792",
+  "reviewer": {
+    "provider": "claude",
+    "alias": "opus",
+    "name": "Opus 5.5",
+    "thinking": "high"
+  },
+  "generatedBy": "node local/release-review-packets.mjs --write",
+  "artifact": {
+    "kind": "remerge-diff",
+    "path": "orca-review/sync-a8c508f5fb76/remerge-diff.patch",
+    "bytes": 2074985,
+    "files": 340,
+    "reviewedBytes": 2061557,
+    "excluded": {
+      "files": 5,
+      "bytes": 13428,
+      "rules": [
+        {
+          "id": "ratchet-baselines",
+          "covers": [
+            "gate-lint:check:main-blocking-helper-ratchet",
+            "gate-lint:check:main-sync-fs-ratchet",
+            "gate-lint:check:max-lines-ratchet",
+            "gate-lint:check:recurring-timer-ratchet",
+            "gate-lint:check:workspace-record-read-ratchet"
+          ],
+          "files": 5,
+          "bytes": 13428,
+          "why": "a list of known offenders; its ratchet fails when the tree grows past it",
+          "residual": "an edit that raises an allowance still passes; the +/- counts show whether a list grew"
+        }
+      ]
+    },
+    "uncovered": [
+      {
+        "path": "config/react-compiler-bailout-baseline.txt",
+        "rule": "ratchet-baselines",
+        "reason": "no covering check found"
+      }
+    ]
+  },
+  "note": "6 slice(s) over the remerge diff of a8c508f5fb7, 2061557 of 2074985 bytes reviewed (13428 bytes in 5 files left to their verifying checks). Round 1: 0 BLOCKER, 4 SHOULD-FIX, 8 MINOR, 3 NIT. Sweep: 40 fine slice(s) by Opus 5.5, 71 finding(s): 2 BLOCKER, 5 SHOULD-FIX, 44 MINOR, 20 NIT. Adjudication: 7 packet(s) by Opus 5.5, 83 judgment(s) and 0 BLOCKER, 0 SHOULD-FIX, 0 MINOR, 1 NIT the sweep missed. 9 delta round(s) (delta a8c508f5fb76..d4452477df35; delta d4452477df35..1306d783d0b4; delta 1306d783d0b4..046cfc34ded2; delta 046cfc34ded2..11f1861ebc6a; delta 11f1861ebc6a..3d4721be0c8e; delta 3d4721be0c8e..60a3b76c913a; delta 60a3b76c913a..bc14dc634d01; delta bc14dc634d01..03562253a5f4; delta 03562253a5f4..984d6b81661e): 0 BLOCKER, 2 SHOULD-FIX, 10 MINOR, 10 NIT. 22/22 slices reported; $70.70 total.",
+  "slices": [
+    {
+      "id": "A",
+      "round": "R1",
+      "scope": "{.github,README.md,config}, mobile/src/source-control/review/pull-request/actions/pr-actions-engine.test.ts, pnpm-lock.yaml, src/cli, src/main/{agent-hooks,ai-vault-search,ai-vault,antigravity}, src/main/bitbucket/credential-store.test.ts, src/main/bots",
+      "files": 60,
+      "bytes": 366751,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 1,
+      "nits": 0,
+      "unresolved": 0,
+      "costUsd": 4.0082136,
+      "coverage": "Read all 8500 lines of slice-A.patch (60 files) and skimmed excluded.patch, checking every non-deletion resolution against HEAD (current files, the post-merge repair commit d4452477df3, whether referenced paths exist, and patch blob ids); I could not run the React Compiler, so the bailout counts in react-compiler-bailout-baseline.txt are taken on trust and left to the lint ratchet.",
+      "findings": [
+        {
+          "id": "A-1",
+          "severity": "MINOR",
+          "file": "src/main/bots/bot-skill-projects.ts",
+          "summary": "The resolution drops upstream's abort during the walk: the signal is only checked before and after the fork's scanner runs, and that scanner never passes it to findSkillFiles.",
+          "status": "resolved (delta-2)"
+        }
+      ]
+    },
+    {
+      "id": "B",
+      "round": "R1",
+      "scope": "src/main/browser/cdp/input/guest-text-insertion.electron.test.ts, src/main/claude/hooks/post-compact-hook-command.test.ts, src/main/{cli,codex}, src/main/command-code/hook-service.test.ts, src/main/connector-cloud, src/main/copilot/hook-service.test.ts, src/main/{credentials,cursor,daemon}, src/main/droid/hook-service.ts, src/main/dsh/hook-service.test.ts, src/main/ephemeral-vm, src/main/filesystem/host-tree-removal.ts, src/main/{git,github,ipc}",
+      "files": 58,
+      "bytes": 350120,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 1,
+      "minors": 2,
+      "nits": 1,
+      "unresolved": 0,
+      "costUsd": 4.1704734,
+      "coverage": "Read all 8308 lines of slice-B.patch (58 files) and checked every content resolution and kept-file hunk against the merged tree and both parents; the test-file deletions were read and checked against the upstream-deleted-fork-tests baseline rather than re-reviewed as code.",
+      "findings": [
+        {
+          "id": "B-1",
+          "severity": "SHOULD-FIX",
+          "file": "src/main/ipc/worktrees/removal/remove-registered-local-worktree.ts",
+          "summary": "The resolution kept the fork's orphan-cleanup helper but dropped upstream's guard.markerOptions (and checkoutDeleteSignal) that upstream threads into cleanupLocalOrphanedWorktreeDirectory, leaving upstream's purgeRemoved(false) branch unreachable.",
+          "status": "resolved (delta-2)"
+        },
+        {
+          "id": "B-2",
+          "severity": "MINOR",
+          "file": "src/main/filesystem/host-tree-removal.ts",
+          "summary": "The resolver invented a LeftoverCheckoutFolderError throw for tolerated child failures on the unregistered path, which neither parent had, with a comment about releasing a registration that this path has no caller for.",
+          "status": "resolved (delta-2)"
+        },
+        {
+          "id": "B-3",
+          "severity": "MINOR",
+          "file": "src/main/cli/cli-launcher-session-handoff.test.ts",
+          "summary": "Taking upstream's deletions removed the only tests asserting resources/darwin/bin/orca execs the 'Orca NP' bundle executable.",
+          "status": "resolved (delta-2)"
+        },
+        {
+          "id": "B-4",
+          "severity": "NIT",
+          "file": "src/main/connector-cloud/connector-host-install.ts",
+          "summary": "The comment 'Only a host with Orca Cloud makes webhooks' now follows the unconditional webhooks.start() the fork moved out of the cloud block.",
+          "status": "resolved (delta-2)"
+        }
+      ]
+    },
+    {
+      "id": "C",
+      "round": "R1",
+      "scope": "src/main/{jira,keybindings}, src/main/kimi/hook-service.test.ts, src/main/local-builds/local-build-candidate.test.ts, src/main/macos-permissions/macos-tcc-prompt-watch.test.ts, src/main/network/macos-tailscale-dns-diagnostic.ts, src/main/orcad/host-runtime/orcad-app-paths.test.ts, src/main/{persistence,pi}, src/main/project-groups/nested-repo-discovery.test.ts, src/main/providers/local-pty/local-pty-provider-test-harness.ts, src/main/pty, src/main/qoder/real-cli.test.ts, src/main/rate-limits",
+      "files": 31,
+      "bytes": 235058,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 0,
+      "nits": 1,
+      "unresolved": 0,
+      "costUsd": 1.9996536,
+      "coverage": "Read the whole slice-C patch (31 files: 25 deletions confirmed by header and against the retirement baseline, plus full reading of the 6 source hunks), checked each against the current tree, upstream 7daf01d99f3, upstream-deleted-fork-tests-baseline.json, expected-deletions.json and max-lines-baseline.txt; the excluded ratchet baselines were checked for presence only.",
+      "findings": [
+        {
+          "id": "C-1",
+          "severity": "NIT",
+          "file": "src/main/network/macos-tailscale-dns-diagnostic.ts",
+          "summary": "The resolution kept the fork's __resetMacTailscaleDnsDiagnosticCacheForTests, which upstream deleted, but nothing in the tree imports it any more.",
+          "status": "resolved (delta-2)"
+        }
+      ]
+    },
+    {
+      "id": "D",
+      "round": "R1",
+      "scope": "src/main/runtime, src/main/skills/bundled-skill-install/computer-use-before-rename.skill-md.txt, src/main/{ssh … window} (5), src/main/worker-threads/worker-thread-request-queue.test.ts, src/main/{workspaces,zcode}",
+      "files": 54,
+      "bytes": 379873,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 2,
+      "minors": 3,
+      "nits": 1,
+      "unresolved": 0,
+      "costUsd": 4.704251599999999,
+      "coverage": "Read every source-file conflict hunk in slice-D.patch in full and checked each against the merged tree; read the deleted-test hunks whose fork changes were checked, and scanned the remaining deleted test bodies for fork identity strings rather than reading them line by line (git diff was denied, so fork changes were measured with git log --stat and git show).",
+      "findings": [
+        {
+          "id": "D-1",
+          "severity": "SHOULD-FIX",
+          "file": "src/main/startup/configure-process.test.ts",
+          "summary": "The merge deleted the only test that pins packaged userData to appData/orca-np, along with upstream's test cut.",
+          "status": "resolved (delta-2)"
+        },
+        {
+          "id": "D-2",
+          "severity": "SHOULD-FIX",
+          "file": "src/main/updater/releases/updater-prerelease-feed-readiness.test.ts",
+          "summary": "The fork's feed tests are gone, including 'finds this repo's own release behind the parent repo's entries in a fork feed', so the fork logic still in updater-prerelease-feed.ts is untested.",
+          "status": "resolved (delta-2)"
+        },
+        {
+          "id": "D-3",
+          "severity": "MINOR",
+          "file": "src/main/ssh/targets/ssh-connection-store.test.ts",
+          "summary": "The fork's hide-auto-imported-SSH-hosts feature now has no tests at all.",
+          "status": "open"
+        },
+        {
+          "id": "D-4",
+          "severity": "MINOR",
+          "file": "src/main/runtime/agent-session/environment/structured-session-login-shell-test-harness.ts",
+          "summary": "The harness was kept because 'two surviving suites import it', but this merge deleted both suites, so it is orphaned and the recorded reason is false.",
+          "status": "resolved (delta-2)"
+        },
+        {
+          "id": "D-5",
+          "severity": "MINOR",
+          "file": "src/main/runtime/rpc/methods/bots.test.ts",
+          "summary": "Other fork-authored cases went with upstream's cut: the bots.list local-webhook result fields (#453), the zcode Orca NP home path, and remoteKeys enrichment.",
+          "status": "resolved (delta-1)"
+        },
+        {
+          "id": "D-6",
+          "severity": "NIT",
+          "file": "src/main/startup/quit/main-process-quit.ts",
+          "summary": "Before-quit still calls flushUnsavedCloudSessions, awaitPackedRefsLockRelease and cancelHistoryGc, and will-quit's fenceDesktopCore calls all three again.",
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "id": "E",
+      "round": "R1",
+      "scope": "src/packages/process-host/src/run-process.test.ts, src/renderer/src/app-shell, src/renderer/src/components/artifacts/ArtifactsPage.test.tsx, src/renderer/src/components/{bots,browser-pane}, src/renderer/src/components/dashboard-popout/snapshot/useDashboardSnapshot.ts, src/renderer/src/components/dashboard, src/renderer/src/components/diff-comments/diff-comment-editor-test-fixture.ts, src/renderer/src/components/editor, src/renderer/src/components/feature-tips/feature-tip-startup-gate-bots.test.ts, src/renderer/src/components/github-item-dialog/inspect-pull-request/checks-tab-check-row.tsx, src/renderer/src/components/github/github-checks-tab-state.ts, src/renderer/src/components/maintenance/update-card/UpdateCard.error-card.test.tsx, src/renderer/src/components/native-chat/pane/routing/native-chat-split-flow.test.ts, src/renderer/src/components/pull-request-page/checks/row.tsx, src/renderer/src/components/{right-sidebar,settings,sidebar}",
+      "files": 77,
+      "bytes": 377721,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 1,
+      "minors": 1,
+      "nits": 0,
+      "unresolved": 0,
+      "costUsd": 6.694005799999998,
+      "coverage": "Read all 8,446 lines of slice-E.patch and checked each conflict resolution against the HEAD tree (and upstream/fork parents where needed); the excluded ratchet-baseline files were checked only for presence.",
+      "findings": [
+        {
+          "id": "E-1",
+          "severity": "SHOULD-FIX",
+          "file": "src/renderer/src/app-shell/AppWorkspaceShell.tsx",
+          "summary": "The resolution kept the fork's titlebar exclusion for 'automations' and 'artifacts' while the auto-merged ArtifactsPage.tsx and AutomationsPageFrame.tsx took upstream #47038's removal of their window-controls padding and their deeper pt-5 md:pt-6 top padding, so those pages now have neither the shared top bar nor the padding.",
+          "status": "resolved (delta-2)"
+        },
+        {
+          "id": "E-2",
+          "severity": "MINOR",
+          "file": "src/renderer/src/components/sidebar/worktree-list/listing/create-sidebar-host-options-selector.ts",
+          "summary": "The resolution restored upstream's inline createSidebarHostOptionsSelector in use-section-rows.ts but left the fork's extracted copy, which nothing imports and which still reads state.runtimeStatusByEnvironmentId instead of the statuses owner.",
+          "status": "resolved (delta-2)"
+        }
+      ]
+    },
+    {
+      "id": "F",
+      "round": "R1",
+      "scope": "src/renderer/src/components/{status-bar,tab-bar}, src/renderer/src/components/tab-group/TabGroupPanel.tsx, src/renderer/src/components/{task-page,terminal-pane}, src/renderer/src/components/ui/badge.tsx, src/renderer/src/{hooks,lib,store}, src/{shared,wsl-guest}, tests",
+      "files": 55,
+      "bytes": 352034,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 1,
+      "nits": 0,
+      "unresolved": 0,
+      "costUsd": 3.7611682000000006,
+      "coverage": "Read all 8,336 lines of slice-F.patch and checked the risky hunks against current code (TabBarNewTabButton, use-tab-strip-condense measureTabRoom, portSystemBrowserOpener, PI restatement helpers, SshStatusSegment callers, bridge imports, quick-open imports, the kept or deleted test harnesses and their consumers); I did not read the excluded ratchet baselines' contents, only confirmed they were modified, not added or deleted.",
+      "findings": [
+        {
+          "id": "F-1",
+          "severity": "MINOR",
+          "file": "src/renderer/src/components/task-page/linear/issue-refresh/task-page-linear-refresh-test-fixtures.tsx",
+          "summary": "The merge kept this test fixture that upstream deleted, but deleted its only consumer (task-page-linear-refresh-lifecycle.test.tsx), so the file is now orphaned while expected-deletions.json still marks it 'restore' for a 'surviving' suite.",
+          "status": "resolved (delta-2)"
+        }
+      ]
+    },
+    {
+      "id": "adj-1",
+      "round": "adj-1",
+      "scope": "adjudication 1 of 7",
+      "files": 12,
+      "bytes": 77602,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 0,
+      "nits": 0,
+      "unresolved": 0,
+      "costUsd": 3.272407200000001,
+      "coverage": "Read every hunk in adj-1.patch, the resolved server-state.ts, bot-skill-projects.ts and bot-skill-folder-scan.ts at HEAD, the upstream bot-chat-search-host.ts, the fork's diffs to each deleted test file against base 0c6207e3d71, the surviving tests, the deleted-test baseline, the max-lines baseline, the fork-comment baseline, LOCAL-PATCHES.md and the round-one fix commit 0e5161d5250; I could not git-grep upstream's server-state.ts body, but those lines merged cleanly and the remerge diff shows no hunk there.",
+      "findings": []
+    },
+    {
+      "id": "adj-2",
+      "round": "adj-2",
+      "scope": "adjudication 2 of 7",
+      "files": 12,
+      "bytes": 103268,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 0,
+      "nits": 0,
+      "unresolved": 0,
+      "costUsd": 2.8505613999999992,
+      "coverage": "Read every resolution hunk in adj-2.patch, the HEAD text of all four resolved source files, connector-triggers.ts, own-pr-trigger-guard.ts, the requestTurnEnded caller, the fork deltas of the hook services and macos-daemon-launchd.ts against upstream, the post-merge repairs d4452477df3 and 0e5161d5250, the upstream-deleted-fork-tests baseline, the identity-sweep rules and the surviving fork tests (install-layout-names, structured-session-cli-login-shell); did not run anything and did not trace windows-transient-lock-removal's retry predicate, which is pre-existing fork behaviour and not resolution text.",
+      "findings": []
+    },
+    {
+      "id": "adj-3",
+      "round": "adj-3",
+      "scope": "adjudication 3 of 7",
+      "files": 12,
+      "bytes": 87676,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 0,
+      "nits": 1,
+      "unresolved": 0,
+      "costUsd": 2.7581018000000004,
+      "coverage": "Read every resolution hunk in adj-3.patch and judged each finding against HEAD 3d4721be0c8, including the later fix commit 0e5161d5250 that changed host-tree-removal.ts, remove-registered-local-worktree.ts, macos-tailscale-dns-diagnostic.ts and the login-shell suites; checked the orphan wrapper, the ownership purge helpers, the trust-drop module, removeTree retry semantics, LeftoverCheckoutFolderError, appBoundRepoGitEnv and its surviving test, the deleted-test baseline entries, and upstream-vs-HEAD diffs for nested-repo-discovery and jira-preset-jql; did not run tests, and did not open the seven deleted ssh suites beyond ssh-app-shutdown.",
+      "findings": [
+        {
+          "id": "adj-3-1",
+          "severity": "NIT",
+          "file": "src/main/filesystem/host-tree-removal.ts",
+          "summary": "The new eslint-disable max-lines justification says the fork's process-holder and VM-lease removal guards live in this file, but none are in it.",
+          "status": "resolved (delta-5)"
+        }
+      ]
+    },
+    {
+      "id": "adj-4",
+      "round": "adj-4",
+      "scope": "adjudication 4 of 7",
+      "files": 12,
+      "bytes": 58390,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 0,
+      "nits": 0,
+      "unresolved": 0,
+      "costUsd": 2.5168505999999997,
+      "coverage": "Read all ten resolution hunks in adj-4.patch and checked each claim against HEAD: callers of WebhookHostLedger and the WebhookHostService deps type, upstream and fork versions of first-window-startup-services.ts, terminal-title-observation.ts and windows-update-install-directory.ts, createMainWindow at a8c508f and at HEAD, local/sync/upstream-deleted-fork-tests-baseline.json, local/upstream-file-comments-baseline.json, test greps for every named symbol, and blob ids at cc4fefcbaad and 0c6207e3d71; I could not run the ratchet, typecheck or tests, so the green comment ratchet at HEAD is inferred from the re-measured baseline.",
+      "findings": []
+    },
+    {
+      "id": "adj-5",
+      "round": "adj-5",
+      "scope": "adjudication 5 of 7",
+      "files": 12,
+      "bytes": 87871,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 0,
+      "nits": 0,
+      "unresolved": 0,
+      "costUsd": 3.8731743999999986,
+      "coverage": "Read all 11 resolution hunks in adj-5.patch and checked each claim against HEAD 3d4721be, both parents (cc4fefcbaad, 7daf01d99f3), the base, and the post-merge fix commits, including callers (mobile connector rows, GeneralPane, host-owned settings, the worktree create path, the path-index hold test, and the checks-panel controller state); I could not run oxlint to measure the effective line count behind the max-lines suppression in S-AD-3.",
+      "findings": []
+    },
+    {
+      "id": "adj-6",
+      "round": "adj-6",
+      "scope": "adjudication 6 of 7",
+      "files": 12,
+      "bytes": 77101,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 0,
+      "nits": 0,
+      "unresolved": 0,
+      "costUsd": 3.2610306000000007,
+      "coverage": "Read the whole adj-6 patch, all ten post-merge commits that touch these paths, the current tree for every named file and the consumers that matter (mobile connector-entry-rows and phone-connector-needs, desktop bot-connector-entries, provider-dispatch with pi-family restatement, claude-pane-hold-evidence, ssh-connection-store, the fork ipc-bridge test, upstream-file-comments-baseline, upstream-deleted-fork-tests-baseline, expected-deletions, convergence-ledger); I did not run anything and did not confirm whether use-terminal-context-menu-trigger.test.ts actually exercises the mouse-tracking paste path.",
+      "findings": []
+    },
+    {
+      "id": "adj-7",
+      "round": "adj-7",
+      "scope": "adjudication 7 of 7",
+      "files": 6,
+      "bytes": 22305,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 0,
+      "nits": 0,
+      "unresolved": 0,
+      "costUsd": 3.4642072000000006,
+      "coverage": "Read the adj-7 resolution patch, the fork, upstream and HEAD versions of main-process-quit.ts, desktop-core-shutdown.ts and desktop-core.ts, the fork async-subagent lane against upstream's roster and handler (postAgentEndOnce, agent_start clearing waiting) and the fork test, the deleted-fork-tests baseline, nightly-linux-known-red.json, the LOCAL-PATCHES updater anchors, the convergence ledger and updater-fork-feed.test.ts; I could not check pi-subagents' real ordering of runner exit, wake turn and async-complete beyond what upstream's own grace comment and fixtures state.",
+      "findings": []
+    },
+    {
+      "id": "delta-1",
+      "round": "delta-1",
+      "scope": "delta a8c508f5fb76..d4452477df35",
+      "files": 78,
+      "bytes": 464850,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 1,
+      "minors": 3,
+      "nits": 2,
+      "unresolved": 0,
+      "costUsd": 5.878476,
+      "coverage": "Read the full delta patch and checked every round-one BLOCKER/SHOULD-FIX against d4452 itself (the working tree is at a later HEAD, 0e5161d5250, so every file was read via git show d4452:<path>), plus the source, manifest, ledger and baseline hunks the delta touched.",
+      "findings": [
+        {
+          "id": "delta-1-1",
+          "severity": "SHOULD-FIX",
+          "file": "src/main/runtime/orca-runtime-bots.ts",
+          "summary": "The delta completes and re-enables the own-PR guard that upstream deliberately removed in #47879 ('a from=me pull request rule starts for every pull request opened under the owner's account'), while the shipped CLI help (src/cli/automations/automation-event-words.ts SOURCE_NOTES: 'your agents' workers' included') and src/shared/automation-event-triggers.ts still describe upstream's behaviour.",
+          "status": "resolved (delta-2)"
+        },
+        {
+          "id": "delta-1-2",
+          "severity": "MINOR",
+          "file": "src/main/bots/bot-work-pr-branch.ts",
+          "summary": "The re-homed bot-work detection (botWorkHasPrBranch, botHomeWorktreeOnBranch, workerGitHubRepo, getGitHubTrackedRepository, readRemoteGitHubRepo) has no test; upstream's bot-work-pr-branch.test.ts and own-pr-trigger-runs.test.ts were not restored, and own-pr-trigger-guard.test.ts mocks isBotWork.",
+          "status": "resolved (delta-2)"
+        },
+        {
+          "id": "delta-1-3",
+          "severity": "MINOR",
+          "file": "local/sync/expected-deletions.json",
+          "summary": "Six dashboard-delivery expected-deletion entries were pruned because upstream moved the files, but not re-bound at their new paths (dashboard/popout-bridge/DashboardPopoutBridge.tsx and useDashboardPopoutBridge.ts, dashboard/sidebar/AgentDashboardSidebarHost.tsx, dashboard-popout/snapshot/useDashboardSnapshot.ts, preload/api/window-ui/dashboard-api.ts and dashboard-bridge.ts); the dashboard-popout.ts restore entry was also dropped while the file now lives at src/main/ipc/dashboard/dashboard-popout.ts.",
+          "status": "resolved (delta-2)"
+        },
+        {
+          "id": "delta-1-4",
+          "severity": "MINOR",
+          "file": "src/main/runtime/terminal/launch/spawned-pty-env-fixtures.ts",
+          "summary": "The delta restores spawned-pty-env-fixtures.ts (no importer; spawnedPtyEnv is referenced nowhere else) and structured-session-child-env.test-support.ts (whose only importer is the already-orphaned login-shell harness from D-4), with manifest reasons claiming surviving tests import them.",
+          "status": "resolved (delta-2)"
+        },
+        {
+          "id": "delta-1-5",
+          "severity": "NIT",
+          "file": "src/main/git/command-runner/admission/git-subprocess-admission.ts",
+          "summary": "Test-only reset exports (_resetGitAdmissionForTests, resetGhLoginCacheForTests, __resetOrcaStarCheckForTests) are re-added to upstream-owned production modules.",
+          "status": "open"
+        },
+        {
+          "id": "delta-1-6",
+          "severity": "NIT",
+          "file": "local/sync/upstream-deleted-fork-tests-baseline.json",
+          "summary": "The accepted reason says 170 fork-modified test files while total is 169 (LOCAL-PATCHES also says 169), and every case carries the same generic reason although the file's note requires each case to have its own.",
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "id": "delta-2",
+      "round": "delta-2",
+      "scope": "delta d4452477df35..1306d783d0b4",
+      "files": 57,
+      "bytes": 582098,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 1,
+      "nits": 2,
+      "unresolved": 0,
+      "costUsd": 6.0509258,
+      "coverage": "Read the whole delta (all 57 files): every source, test and mobile hunk against the current tree and upstream 7daf01d99f3, plus the ledger, LOCAL-PATCHES, ratchet, expected-deletions and deleted-tests-baseline hunks.",
+      "findings": [
+        {
+          "id": "delta-2-1",
+          "severity": "MINOR",
+          "file": "src/main/pi/agent-status-async-subagent-source.ts",
+          "summary": "A runner exit is handed to upstream's roster as onEvent(payload, 'completed'), although the roster already binds that channel to onRunnerExit with a 2 s grace, so a held turn settles at runner exit and native chat (where the roster also binds subagent:async-*) gets every start and completion twice.",
+          "status": "resolved (delta-8)"
+        },
+        {
+          "id": "delta-2-2",
+          "severity": "NIT",
+          "file": "LOCAL-PATCHES.md",
+          "summary": "The updater anchors still say the prerelease-feed and fork-feed cases are owed with no re-home and that the nightly manifest names a missing file, while this delta re-homed those cases in updater-fork-feed.test.ts and emptied the manifest; the nightly-linux-known-red.json note also says the two delay cases are not in the baseline, which this delta added.",
+          "status": "resolved (delta-4)"
+        },
+        {
+          "id": "delta-2-3",
+          "severity": "NIT",
+          "file": "local/sync/upstream-deleted-fork-tests-baseline.json",
+          "summary": "The four cases restored in runtime-client-ipc-bridge-ownership-fork.test.ts still carry the generic 'retired' reason, and that reason still says 170 files while total is 167.",
+          "status": "resolved (delta-7)"
+        }
+      ]
+    },
+    {
+      "id": "delta-3",
+      "round": "delta-3",
+      "scope": "delta 1306d783d0b4..046cfc34ded2",
+      "files": 4,
+      "bytes": 13308,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 3,
+      "nits": 1,
+      "unresolved": 0,
+      "costUsd": 1.8906232000000003,
+      "coverage": "Read the whole delta (4 files) and checked every new claim against the tree: the async-subagent source against the roster's runner-exit and postAgentEndOnce code and its fork test, the nightly note and LOCAL-PATCHES anchors against updater-fork-feed.test.ts and the baseline, and the four relabelled baseline entries against runtime-client-ipc-bridge-ownership-fork.test.ts.",
+      "findings": [
+        {
+          "id": "delta-3-1",
+          "severity": "MINOR",
+          "file": "local/nightly-linux-known-red.json",
+          "summary": "The note now says both REST-list-first update-delay titles are re-homed in updater-fork-feed.test.ts and 'that coverage survives', but neither title exists anywhere in src/.",
+          "status": "resolved (delta-4)"
+        },
+        {
+          "id": "delta-3-2",
+          "severity": "MINOR",
+          "file": "LOCAL-PATCHES.md",
+          "summary": "The last-good-pin anchor says the transition to `available` is re-homed in updater-fork-feed.test.ts, and line 125 says the retired updater cases are re-homed 'as convergence-ledger.md records'; neither is true.",
+          "status": "open"
+        },
+        {
+          "id": "delta-3-3",
+          "severity": "MINOR",
+          "file": "local/sync/upstream-deleted-fork-tests-baseline.json",
+          "summary": "This case is now labelled 'Re-homed, not lost… They live in runtime-client-ipc-bridge-ownership-fork.test.ts', but that title appears nowhere except the baseline.",
+          "status": "resolved (delta-4)"
+        },
+        {
+          "id": "delta-3-4",
+          "severity": "NIT",
+          "file": "src/main/pi/agent-status-async-subagent-source.ts",
+          "summary": "The new comment says 'The roster's later settle posts done too', but postAgentEndOnce clears `waiting` and only posts once per generation, so the grace timer's onRunnerExitSettled does nothing after the forced settle.",
+          "status": "resolved (delta-8)"
+        }
+      ]
+    },
+    {
+      "id": "delta-4",
+      "round": "delta-4",
+      "scope": "delta 046cfc34ded2..11f1861ebc6a",
+      "files": 4,
+      "bytes": 12303,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 1,
+      "nits": 2,
+      "unresolved": 0,
+      "costUsd": 1.723242,
+      "coverage": "Read all of delta.patch (4 files) and checked each changed claim against the tree and history: the updater-fork-feed test titles, the fork's prerelease-feed suite at a8c508f5fb7^1, the bridge fork-suite titles, the deleted-file list of 2cffdeda72c, the surviving preload dispatcher, convergence-ledger.md, and the agent-status source and test comments.",
+      "findings": [
+        {
+          "id": "delta-4-1",
+          "severity": "MINOR",
+          "file": "local/sync/upstream-deleted-fork-tests-baseline.json",
+          "summary": "The new reason says the case guarded upstream's preload dispatcher 'which #46786 deleted deliberately', but #46786 deleted only test files and subscribeRuntimeEnvironmentFromPreload is still live in src/preload/runtime/runtime-environment-subscriptions.ts, used by runtime-environments-bridge.ts.",
+          "status": "resolved (delta-7)"
+        },
+        {
+          "id": "delta-4-2",
+          "severity": "NIT",
+          "file": "local/nightly-linux-known-red.json",
+          "summary": "'the suite's other eleven cases are re-homed' is wrong: the fork suite had 14 cases, 10 are in updater-fork-feed.test.ts (its eleventh came from feed-readiness), and the two other delay cases ('offers the newest release past the delay…', 'fails closed for releases without a feed timestamp') are also absent from src/.",
+          "status": "resolved (delta-7)"
+        },
+        {
+          "id": "delta-4-3",
+          "severity": "NIT",
+          "file": "src/main/pi/agent-status-async-subagent-source.ts",
+          "summary": "'A real completion (the other two channels)' calls subagent:async-started a completion; in this loop only subagent:async-complete is one.",
+          "status": "resolved (delta-7)"
+        }
+      ]
+    },
+    {
+      "id": "delta-5",
+      "round": "delta-5",
+      "scope": "delta 11f1861ebc6a..3d4721be0c8e",
+      "files": 5,
+      "bytes": 9708,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 0,
+      "nits": 1,
+      "unresolved": 0,
+      "costUsd": 1.7204408,
+      "coverage": "Read the whole delta patch, checked every touched file against its current tree text, compared the re-homed test with upstream's original body, checked the updater delay-case counts against the deleted suite and the baseline, and confirmed that adj-3-1's fix is present at both 11f1861 and 3d4721.",
+      "findings": [
+        {
+          "id": "delta-5-1",
+          "severity": "NIT",
+          "file": "src/main/pi/agent-status-async-subagent-source.ts",
+          "summary": "The rewritten comment says 'the other is a start' inside a loop over three channels, so the reader has to work out that 'the other' means async-started and that process-terminal is the 'this channel' of the line above.",
+          "status": "resolved (delta-8)"
+        }
+      ]
+    },
+    {
+      "id": "delta-6",
+      "round": "delta-6",
+      "scope": "delta 3d4721be0c8e..60a3b76c913a",
+      "files": 1,
+      "bytes": 1470,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 1,
+      "nits": 0,
+      "unresolved": 0,
+      "costUsd": 1.1478508,
+      "coverage": "Read the full delta and the current text of orphaned-local-worktree-cleanup.ts, the orphan branch of remove-registered-local-worktree.ts, the two purge functions in worktree-removal-ownership.ts and the agent-trust drop helpers, and searched the test tree for coverage of the orphan path and the trust drop.",
+      "findings": [
+        {
+          "id": "delta-6-1",
+          "severity": "MINOR",
+          "file": "src/main/ipc/worktrees/removal/orphaned-local-worktree-cleanup.ts",
+          "summary": "No test pins that the orphaned-worktree cleanup drops Orca-created agent trust; no test file references the orphan path or dropOrcaCreatedAgentTrustForRemovedWorktree.",
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "id": "delta-7",
+      "round": "delta-7",
+      "scope": "delta 60a3b76c913a..bc14dc634d01",
+      "files": 6,
+      "bytes": 136842,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 1,
+      "minors": 0,
+      "nits": 2,
+      "unresolved": 0,
+      "costUsd": 2.2117658000000002,
+      "coverage": "Read the whole delta patch (LOCAL-PATCHES, focus and blocking-helper overlays, the new release-review record, the upstream-file-comments baseline, ko.json) and the excluded workspace-path hunk; checked the overlay rows against the upstream base file, the ko.json tombstones against ja/zh/en, the AppWorkspaceShell comment against upstream 7daf01d99f3, release-review-gate.mjs's pass logic, and the current text of agent-status-async-subagent-source.ts for the open delta-2-1 chain.",
+      "findings": [
+        {
+          "id": "delta-7-1",
+          "severity": "SHOULD-FIX",
+          "file": "local/sync/release-review/60a3b76c913af3ed8d561b4c3abab9787b387ea0.json",
+          "summary": "The record and its commit say '0 should-fix outstanding; every blocking finding resolved', but the record's own adj-7 judges delta-2-1 a real SHOULD-FIX, the finding is still open, and the source is unchanged.",
+          "status": "resolved (delta-8)"
+        },
+        {
+          "id": "delta-7-2",
+          "severity": "NIT",
+          "file": "LOCAL-PATCHES.md",
+          "summary": "The text says nine rows were raised and seven belong to session search, but the diff raises eight rows (five session-search files plus cursor, droid-hook-config-files and perf-notice-signals), and the same paragraph also says eight files were above their allowance.",
+          "status": "resolved (delta-8)"
+        },
+        {
+          "id": "delta-7-3",
+          "severity": "NIT",
+          "file": "config/workspace-path-sync-fs-baseline.txt",
+          "summary": "The row was pruned from 2 to 1, but its reason still says hasUnrecognizedOrcaYamlKeys reads orca.yaml in this file, and that function now lives in workspace-hook-inspection.ts.",
+          "status": "resolved (delta-8)"
+        }
+      ]
+    },
+    {
+      "id": "delta-8",
+      "round": "delta-8",
+      "scope": "delta bc14dc634d01..03562253a5f4",
+      "files": 3,
+      "bytes": 4025,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 1,
+      "nits": 0,
+      "unresolved": 0,
+      "costUsd": 1.4779090000000001,
+      "coverage": "Read the full delta and excluded patch, the current async-subagent source, the roster's binding and onRunnerExit/grace code, the affected fork test, and the LOCAL-PATCHES paragraph; grepped all test files for runner-exit coverage.",
+      "findings": [
+        {
+          "id": "delta-8-1",
+          "severity": "MINOR",
+          "file": "src/main/pi/agent-status-async-subagent.test.ts",
+          "summary": "The new comment (and the commit message) says the settle after RUNNER_EXIT_GRACE_MS is pinned by the roster's suite, but no test emits subagent:process-terminal into the roster or advances timers past the grace, and the exitRunner fixture is still unused.",
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "id": "delta-9",
+      "round": "delta-9",
+      "scope": "delta 03562253a5f4..984d6b81661e",
+      "files": 2,
+      "bytes": 126988,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 0,
+      "nits": 0,
+      "unresolved": 0,
+      "costUsd": 1.2605684,
+      "coverage": "Read the whole delta (the one comment hunk in agent-status-async-subagent.test.ts and the new 2480-line release-review record), checked every finding status in the record and that no BLOCKER/SHOULD-FIX is open, and grepped the fork tree and upstream 7daf01d99f3 tests for subagent:process-terminal / RUNNER_EXIT_GRACE_MS to verify the new comment's claim.",
+      "findings": []
+    }
+  ],
+  "sweep": {
+    "reviewer": {
+      "name": "cheap-tier"
+    },
+    "budgetBytes": 65536,
+    "slices": [
+      {
+        "id": "A",
+        "scope": "{.github,README.md}, config/{localization-coverage-allowlist.json,react-compiler-bailout-baseline.txt}, config/scripts/build/mobile-web-app/mobile-web-bundle-manifest.mjs, config/scripts/ci/unit-selection/check-test-file-runners.mjs, config/scripts/desktop-distribution, config/scripts/development/launch/orca-dev-bin.test.mjs, config/scripts/locale-catalog/locale-brand-prefilter-benchmark.mjs, config/scripts/localization, config/scripts/macos/terminal-host-bundle/macos-terminal-host-bundle.test.mjs, config/scripts/native-build/macos/build-computer-macos.mjs",
+        "files": 15,
+        "bytes": 62800,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 1,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-A-1",
+            "severity": "MINOR",
+            "file": "config/scripts/localization/catalog-validation/verify-localization-catalog.test.mjs",
+            "summary": "Taking upstream's deletion of this test drops the fork's 88 added lines covering collectOverlayOverrideDrift, which now has no test anywhere in the tree.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "B",
+        "scope": "config/scripts/runtime-verification/daemon-lifecycle/run-headless-serve-shutdown-docker.mjs, config/scripts/static-analysis/ratchets/runtime-lifecycle/check-main-blocking-api-ratchet.test.mjs, config/scripts/test-runtime/sqlite-admission/vitest-node-runtime-files.mjs, config/vitest.performance.config.ts, mobile/src/source-control/review/pull-request/actions/pr-actions-engine.test.ts, pnpm-lock.yaml",
+        "files": 6,
+        "bytes": 29021,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 2,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-B-1",
+            "severity": "MINOR",
+            "file": "config/scripts/static-analysis/ratchets/runtime-lifecycle/check-main-blocking-api-ratchet.test.mjs",
+            "summary": "The ratchet's only test is gone while the ratchet it guards survives and still runs in the gate.",
+            "status": "open"
+          },
+          {
+            "id": "S-B-2",
+            "severity": "MINOR",
+            "file": "mobile/src/source-control/review/pull-request/actions/pr-actions-engine.test.ts",
+            "summary": "Mobile's PrActionsEngine is left with no test while the engine and its fork-relevant merge/host-change behaviour survive.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "C",
+        "scope": "src/cli",
+        "files": 7,
+        "bytes": 38254,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 1,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-C-1",
+            "severity": "MINOR",
+            "file": "src/cli/server/serve-service.test.ts",
+            "summary": "The merge accepted upstream's deletion of the only test that exercised the fork's orca-np service launcher resolution, so the Orca NP CLI-name invariant is now untested anywhere.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "D",
+        "scope": "src/main/agent-hooks",
+        "files": 9,
+        "bytes": 59707,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 2,
+        "nits": 1,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-D-1",
+            "severity": "MINOR",
+            "file": "src/main/agent-hooks/server/testing/interruptions/server-claude-helper-kill.test.ts",
+            "summary": "Taking upstream's deletion removes the fork's only assertion that a shell-held Claude turn reads plain working rather than workingMode monitoring.",
+            "status": "open"
+          },
+          {
+            "id": "S-D-2",
+            "severity": "MINOR",
+            "file": "src/main/agent-hooks/installation/scripts/managed-hook-timeout.test.ts",
+            "summary": "Deleting this suite leaves the shipped hook POST fail-open budget and its C-locale scoping with no test at HEAD.",
+            "status": "open"
+          },
+          {
+            "id": "S-D-3",
+            "severity": "NIT",
+            "file": "src/main/agent-hooks/server/server-state.ts",
+            "summary": "The new file-level max-lines suppression adds a fresh ratchet bypass for a file that is one effective line over budget, and puts a fork hunk on line 1 of an upstream-owned file.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "E",
+        "scope": "src/main/{ai-vault-search,ai-vault}",
+        "files": 11,
+        "bytes": 63331,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 3,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-E-1",
+            "severity": "MINOR",
+            "file": "src/main/ai-vault-search/session-search-instance.test.ts",
+            "summary": "Taking upstream's deletion of this suite leaves the fork's consent and clear transition — including the live `searchClear` path — with no test at all, and neither the ledger nor LOCAL-PATCHES.md records that coverage as owed.",
+            "status": "open"
+          },
+          {
+            "id": "S-E-2",
+            "severity": "MINOR",
+            "file": "src/main/ai-vault/transcripts/session-transcript-message-content.test.ts",
+            "summary": "The retired suite was the only test of the fork's tool-result bound, so `textOriginalLength`, `toolKind` call/result and the 256 KiB read stop are now unpinned.",
+            "status": "open"
+          },
+          {
+            "id": "S-E-3",
+            "severity": "MINOR",
+            "file": "local/upstream-file-comments-baseline.json",
+            "summary": "The sync did not re-measure the fork-comment baseline, so gate-lint's check-upstream-file-comments reports a moved total and three of its rows now name files this merge deleted.",
+            "status": "dismissed (adj-1)"
+          }
+        ]
+      },
+      {
+        "id": "F",
+        "scope": "src/main/antigravity, src/main/bitbucket/credential-store.test.ts, src/main/bots/{bot-chat-search-host.test.ts … bot-skill-projects.ts} (6)",
+        "files": 9,
+        "bytes": 61766,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 1,
+        "nits": 1,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-F-1",
+            "severity": "MINOR",
+            "file": "src/main/bots/bot-chat-search-host.test.ts",
+            "summary": "The resolution takes upstream's deletion of the fork-modified test, so the fork's 'never start the AI-vault session index while content search is off' gate in indexedChatMatches is now untested; the same hunk group also drops the fork's only tests for bot-launch-tools token/gh-shim routing, bot-skill-projects linking (case collisions, serialized relink, EEXIST), the antigravity/posix hook scripts under ~/.orca-np, and bitbucket credential-store atomicity.",
+            "status": "open"
+          },
+          {
+            "id": "S-F-2",
+            "severity": "NIT",
+            "file": "src/main/bots/bot-skill-projects.ts",
+            "summary": "The wrapper keeps upstream's signal parameter but only checks it before and after the fork's scanSkillsFolderInPlace, so the signal no longer reaches findSkillFiles and an aborted request still walks and reads every SKILL.md under the folder.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "G",
+        "scope": "src/main/bots/{bot-structured-session-wiring.test.ts,bot-structured-session-wiring.ts,bot-turn-context.test.ts}",
+        "files": 3,
+        "bytes": 51872,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 1,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-G-1",
+            "severity": "NIT",
+            "file": "src/main/bots/bot-structured-session-wiring.ts",
+            "summary": "The resolution kept the base-shaped native-chat-skill-roots import block and dropped the two type imports Repo and AgentSessionRecord that the file still uses, so the merge revision a8c508f does not typecheck.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "H",
+        "scope": "src/main/browser/cdp/input/guest-text-insertion.electron.test.ts, src/main/claude/hooks/post-compact-hook-command.test.ts, src/main/cli",
+        "files": 6,
+        "bytes": 35740,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": []
+      },
+      {
+        "id": "I",
+        "scope": "src/main/codex, src/main/command-code/hook-service.test.ts",
+        "files": 7,
+        "bytes": 51192,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 3,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-I-1",
+            "severity": "MINOR",
+            "file": "src/main/codex/hooks/definitions/codex-real-home-hook-key-spellings.test.ts",
+            "summary": "The resolution deleted the fork's only test for the fork-only macOS automounter guard, so isMacHomeAutomounterMountPoint now has no coverage at HEAD.",
+            "status": "open"
+          },
+          {
+            "id": "S-I-2",
+            "severity": "MINOR",
+            "file": "src/main/codex/structured/launch/codex-structured-child-environment.test.ts",
+            "summary": "Deletion drops the fork's only assertion that a spawned structured Codex child gets this build's orca-np-dev launcher first on PATH, and no test at HEAD references orca-np-dev for that path.",
+            "status": "open"
+          },
+          {
+            "id": "S-I-3",
+            "severity": "MINOR",
+            "file": "src/main/command-code/hook-service.test.ts",
+            "summary": "CommandCodeHookService install/identity-recovery coverage is now zero, although this deletion was not forced and the sibling fork-modified test in the same directory was kept.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "J",
+        "scope": "src/main/connector-cloud, src/main/copilot/hook-service.test.ts, src/main/{credentials,cursor}",
+        "files": 10,
+        "bytes": 56043,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 2,
+        "nits": 2,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-J-1",
+            "severity": "MINOR",
+            "file": "src/main/connector-cloud/connector-triggers.test.ts",
+            "summary": "The resolution took upstream's deletion, discarding the fork's only test of connectorTriggers/triggerRunEvent, including its fork-added servesLocally case.",
+            "status": "open"
+          },
+          {
+            "id": "S-J-2",
+            "severity": "MINOR",
+            "file": "src/main/copilot/hook-service.test.ts",
+            "summary": "CursorHookService and CopilotHookService now have no test at all, so the fork's .orca-np/agent-hooks install path is unguarded.",
+            "status": "open"
+          },
+          {
+            "id": "S-J-3",
+            "severity": "NIT",
+            "file": "src/main/connector-cloud/connector-host-install.ts",
+            "summary": "The retained comment now sits above a block that no longer starts the webhooks, while setWebhooks/webhooks.start() are unconditional.",
+            "status": "open"
+          },
+          {
+            "id": "S-J-4",
+            "severity": "NIT",
+            "file": "src/main/connector-cloud/connector-cloud-install.ts",
+            "summary": "The fallback path computes triggerRunEvent twice per delivery: once to choose the branch, again inside runTriggerDelivery.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "K",
+        "scope": "src/main/daemon, src/main/droid/hook-service.ts, src/main/dsh/hook-service.test.ts",
+        "files": 5,
+        "bytes": 46117,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 1,
+        "nits": 2,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-K-1",
+            "severity": "MINOR",
+            "file": "src/main/daemon/executable-host/macos/testing/macos-daemon-launchd.test.ts",
+            "summary": "Deleting this file leaves the fork's macOS launchd identity paths with no test at all.",
+            "status": "open"
+          },
+          {
+            "id": "S-K-2",
+            "severity": "NIT",
+            "file": "src/main/dsh/hook-service.test.ts",
+            "summary": "DshHookService stays wired and live while its only test, which pinned the fork's ~/.orca-np managed-hooks path, is retired.",
+            "status": "open"
+          },
+          {
+            "id": "S-K-3",
+            "severity": "NIT",
+            "file": "src/main/daemon/shell-readiness/testing/shell-ready-bash-wrapper.test.ts",
+            "summary": "The daemon bash rcfile's CLI-first PATH assertion against the fork's DEV_COMMAND_NAME is gone, and no surviving test replaces it.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "L",
+        "scope": "src/main/ephemeral-vm, src/main/filesystem/host-tree-removal.ts, src/main/{git,github}, src/main/ipc/ephemeral-vm/ephemeral-vm.test.ts",
+        "files": 12,
+        "bytes": 64718,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 2,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-L-1",
+            "severity": "NIT",
+            "file": "src/main/filesystem/host-tree-removal.ts",
+            "summary": "The two new `eslint-disable max-lines -- Why:` rationales name fork deltas that are not in either file.",
+            "status": "open"
+          },
+          {
+            "id": "S-L-2",
+            "severity": "NIT",
+            "file": "src/main/filesystem/host-tree-removal.ts",
+            "summary": "Returning one rejected result from deleteHostChildren defeats blockingFileOf's deliberate EBUSY preference.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "M",
+        "scope": "src/main/ipc/filesystem, src/main/ipc/pty/host-env/opencode-hook-installation.test.ts, src/main/ipc/settings/testing/settings-ipc-test-fixture.ts, src/main/ipc/shell/shell.test.ts, src/main/ipc/ssh",
+        "files": 10,
+        "bytes": 52369,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 1,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-M-1",
+            "severity": "MINOR",
+            "file": "src/main/ipc/ssh/ssh-app-shutdown.test.ts",
+            "summary": "Accepting upstream's deletion of these seven fork-modified suites leaves src/main/ipc/ssh with no test file at all and drops the fork's only coverage of the SSH shutdown drain, credential-decline and user-disconnect holds, connect-decision cancellation, fs:search cancellation, the shell external-editor launch guards and the OpenCode startup-prompt installer.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "N",
+        "scope": "src/main/ipc/worktrees",
+        "files": 8,
+        "bytes": 43941,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 3,
+        "nits": 1,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-N-1",
+            "severity": "MINOR",
+            "file": "src/main/ipc/worktrees/removal/remove-registered-local-worktree.ts",
+            "summary": "The resolution correctly adopts upstream's `guard.verify()` and preflight shape but routes the orphan purge through the fork's wrapper, which purges with `removeWorktreeMetadataAndTransientState` (dropAgentTrust false) where the merge base and upstream use `removeDeletedCheckoutMetadataAndTransientState`.",
+            "status": "resolved (delta-6)"
+          },
+          {
+            "id": "S-N-2",
+            "severity": "MINOR",
+            "file": "src/main/ipc/worktrees/floating-workspace-directory.test.ts",
+            "summary": "Accepting upstream's deletion drops the fork's ~160 lines of additions, which were the only coverage of the fork's `~/.orca-np/floating-workspace` trusted-cwd authorization and legacy notes migration.",
+            "status": "open"
+          },
+          {
+            "id": "S-N-3",
+            "severity": "MINOR",
+            "file": "src/main/ipc/worktrees/local-worktree-runtime-options.test.ts",
+            "summary": "The deletion removes the only test of the fork-only `getLocalRemoteSyncGitOptions`, including its GitHub-App-bound repo refusal (gh_bound_account_unavailable), which six live call sites depend on.",
+            "status": "open"
+          },
+          {
+            "id": "S-N-4",
+            "severity": "NIT",
+            "file": "src/main/ipc/worktrees/listing/detected-worktree-scan-listing-distro.test.ts",
+            "summary": "These three upstream-owned listing tests were fork-touched only to add `getProfileStorageDirectory` to their doubles, but their removal also leaves the E9 invariant untested: a stopped WSL distro must fail the scan as unavailable instead of being booted.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "O",
+        "scope": "src/main/jira",
+        "files": 4,
+        "bytes": 59693,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 1,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-O-1",
+            "severity": "MINOR",
+            "file": "src/main/jira/jira-issue-search-status-category.test.ts",
+            "summary": "Taking upstream's deletion removes the only test of the server statusCategory-to-resolution preset retry, a behaviour the fork still ships in src/shared/jira/jira-preset-jql.ts.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "P",
+        "scope": "src/main/keybindings, src/main/kimi/hook-service.test.ts, src/main/local-builds/local-build-candidate.test.ts, src/main/macos-permissions/macos-tcc-prompt-watch.test.ts, src/main/network/macos-tailscale-dns-diagnostic.ts, src/main/orcad/host-runtime/orcad-app-paths.test.ts, src/main/persistence",
+        "files": 10,
+        "bytes": 65517,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 1,
+        "nits": 1,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-P-1",
+            "severity": "MINOR",
+            "file": "src/main/persistence/tracking-repos/repo-update-host-guard.test.ts",
+            "summary": "Taking upstream's deletion of all nine files also drops the fork-authored cases inside them, leaving four fork-only shipped behaviours with no test at all.",
+            "status": "open"
+          },
+          {
+            "id": "S-P-2",
+            "severity": "NIT",
+            "file": "src/main/network/macos-tailscale-dns-diagnostic.ts",
+            "summary": "The resolution kept the fork's __resetMacTailscaleDnsDiagnosticCacheForTests (with inFlightProbe = null) where upstream deleted the function outright.",
+            "status": "dismissed (adj-3)"
+          }
+        ]
+      },
+      {
+        "id": "Q",
+        "scope": "src/main/pi, src/main/project-groups/nested-repo-discovery.test.ts, src/main/providers/local-pty/local-pty-provider-test-harness.ts, src/main/pty, src/main/qoder/real-cli.test.ts",
+        "files": 9,
+        "bytes": 63283,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 1,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-Q-1",
+            "severity": "MINOR",
+            "file": "src/main/project-groups/nested-repo-discovery.test.ts",
+            "summary": "Deleting the fork-adapted test leaves the fork's marker-first probe in scanNestedRepos with no test at HEAD.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "R",
+        "scope": "src/main/rate-limits, src/main/runtime/agent-session, src/main/runtime/agent-state-rules/agent-state-rules-live-update.test.ts",
+        "files": 12,
+        "bytes": 58099,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 1,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-R-1",
+            "severity": "MINOR",
+            "file": "src/main/runtime/agent-session/environment/structured-session-login-shell-test-harness.ts",
+            "summary": "The resolution deleted both structured-session login-shell suites but kept the harness that was their only consumer, leaving two dead test-support files and a restore reason that names importers which no longer exist.",
+            "status": "dismissed (adj-3)"
+          }
+        ]
+      },
+      {
+        "id": "S",
+        "scope": "src/main/runtime/{construction,orca-runtime-bots.ts}, src/main/runtime/orca-runtime-test-mocks/setup.spec.ts, src/main/runtime/push/push-dispatcher.ts, src/main/runtime/repositories, src/main/runtime/rpc/methods/bots-connectors.ts",
+        "files": 8,
+        "bytes": 49023,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": []
+      },
+      {
+        "id": "T",
+        "scope": "src/main/runtime/rpc/methods/{bots.test.ts,bots.ts}",
+        "files": 2,
+        "bytes": 30027,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 1,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-T-1",
+            "severity": "MINOR",
+            "file": "src/main/runtime/rpc/methods/bots.test.ts",
+            "summary": "The deletion is correct and baseline-recorded, but the fork's only guard on bots.list's localWebhooks/localWebhookHooks projection is gone with no re-home, leaving the fork patch at LOCAL-PATCHES.md:5393 and its CLI consumer unguarded.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "U",
+        "scope": "src/main/runtime/rpc/methods/orchestration/messaging/bot-recipient.test.ts, src/main/runtime/rpc/methods/projects/repo.ts, src/main/runtime/rpc/methods/ssh/ssh.test.ts, src/main/runtime/runtime-automation-webhook.test.ts",
+        "files": 4,
+        "bytes": 50543,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 1,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-U-1",
+            "severity": "MINOR",
+            "file": "src/main/runtime/rpc/methods/ssh/ssh.test.ts",
+            "summary": "Deleting the file takes the fork's only test of the ssh summary `hidden` wire-compat rule with it, and no surviving test dispatches ssh.listTargetSummaries.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "V",
+        "scope": "src/main/runtime/{terminal,workspaces}",
+        "files": 7,
+        "bytes": 63760,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 1,
+        "nits": 1,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-V-1",
+            "severity": "MINOR",
+            "file": "src/main/runtime/terminal/output/trust-dialog-status-observer.test.ts",
+            "summary": "Taking upstream's deletion of this suite also deletes the fork's only coverage of the pi dialog title-gain path (#228/#230), with no replacement anywhere in the tree.",
+            "status": "open"
+          },
+          {
+            "id": "S-V-2",
+            "severity": "NIT",
+            "file": "src/main/runtime/terminal/output/terminal-title-observation.ts",
+            "summary": "The new eslint-disable max-lines reason misdescribes both the budget and the fork's delta in this file.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "W",
+        "scope": "src/main/skills/bundled-skill-install/computer-use-before-rename.skill-md.txt, src/main/ssh",
+        "files": 3,
+        "bytes": 20099,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 1,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-W-1",
+            "severity": "MINOR",
+            "file": "src/main/ssh/targets/ssh-connection-store.test.ts",
+            "summary": "Accepting upstream's deletion drops the fork's only test coverage for the fork-only setTargetHidden behavior.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "X",
+        "scope": "src/main/startup",
+        "files": 7,
+        "bytes": 51585,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 2,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-X-1",
+            "severity": "MINOR",
+            "file": "src/main/startup/configure-process.test.ts",
+            "summary": "The fork's only assertion that a packaged run pins userData to appData/orca-np was deleted with upstream's prune, leaving configureDevUserDataPath with no test at all.",
+            "status": "dismissed (adj-4)"
+          },
+          {
+            "id": "S-X-2",
+            "severity": "MINOR",
+            "file": "src/main/startup/pty-startup/first-window-startup-services.test.ts",
+            "summary": "Deleting this file (and the matching fixture line in windows-desktop-shell-path-startup.test.ts) removed the only coverage of the fork-only agentHookStatusCacheHydrationReady fail-open, which gates the agent-hooks IPC.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "Y",
+        "scope": "src/main/{updater,webhooks,window}",
+        "files": 13,
+        "bytes": 53056,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 2,
+        "nits": 2,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-Y-1",
+            "severity": "MINOR",
+            "file": "src/main/webhooks/webhook-host-ledger.ts",
+            "summary": "The resolution gave upstream's required newerAgentBotIds parameter a silent `= () => new Set()` default, dropping the compile-time guarantee that every host declares it.",
+            "status": "open"
+          },
+          {
+            "id": "S-Y-2",
+            "severity": "MINOR",
+            "file": "src/main/updater/lifecycle/windows-update-install-directory.test.ts",
+            "summary": "The fork's only test for windows-update-install-directory.ts went with upstream's 2cffdeda72c cull, and unlike its siblings the baseline entry records no case or coverage-owed note.",
+            "status": "open"
+          },
+          {
+            "id": "S-Y-3",
+            "severity": "NIT",
+            "file": "src/main/window/createMainWindow.ts",
+            "summary": "The resolution kept upstream's NativeSettingsProjection import and dropped the fork's `Store`, but left two body references to the now-undefined `store`, so the merge commit did not typecheck.",
+            "status": "open"
+          },
+          {
+            "id": "S-Y-4",
+            "severity": "NIT",
+            "file": "local/sync/upstream-deleted-fork-tests-baseline.json",
+            "summary": "src/main/local-builds/local-build-switch.test.ts was deleted by the same upstream cull as its recorded sibling local-build-candidate.test.ts but is absent from the accepted baseline, so no gate reports the loss.",
+            "status": "dismissed (adj-4)"
+          }
+        ]
+      },
+      {
+        "id": "Z",
+        "scope": "src/main/worker-threads/worker-thread-request-queue.test.ts, src/main/{workspaces,zcode}, src/packages/process-host/src/run-process.test.ts",
+        "files": 7,
+        "bytes": 61212,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 1,
+        "minors": 2,
+        "nits": 1,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-Z-1",
+            "severity": "SHOULD-FIX",
+            "file": "local/upstream-file-comments-baseline.json",
+            "summary": "The merge re-took the five config ratchets but not this fork-comment ratchet, so deleting run-process.test.ts (one of 196 baseline entries whose file is now gone) leaves `check-upstream-file-comments` failing against a frozen total it can no longer match.",
+            "status": "resolved (delta-2)"
+          },
+          {
+            "id": "S-Z-2",
+            "severity": "MINOR",
+            "file": "src/main/workspaces/catalog/repo-git-remote-identity-enrichment.test.ts",
+            "summary": "Deleting this suite leaves the fork's `fork-comment-ok`-marked multi-remote identity logic with no test at all, recorded only under the baseline's generic retirement reason.",
+            "status": "open"
+          },
+          {
+            "id": "S-Z-3",
+            "severity": "MINOR",
+            "file": "src/main/worker-threads/worker-thread-request-queue.test.ts",
+            "summary": "The only test of the fork's #301 `keepAlive` hold is gone, leaving a fork-patched queue used by eleven worker clients with no suite at all.",
+            "status": "dismissed (adj-5)"
+          },
+          {
+            "id": "S-Z-4",
+            "severity": "NIT",
+            "file": "src/main/workspaces/removal/worktree-removal-lifetime.test-fixtures.ts",
+            "summary": "A fork-modified 81-line harness disappears with no baseline record because the deleted-fork-tests matcher only tracks `.test.`/`.spec.` paths.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "AA",
+        "scope": "src/renderer/src/app-shell, src/renderer/src/components/artifacts/ArtifactsPage.test.tsx, src/renderer/src/components/bots",
+        "files": 8,
+        "bytes": 64391,
+        "verdict": "reported",
+        "blockers": 1,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-AA-1",
+            "severity": "BLOCKER",
+            "file": "src/renderer/src/components/bots/bot-connector-entries.ts",
+            "summary": "The fork's photon word is now a required field of the shared BotConnectorFacts.words, but the phone's only caller never supplies it, so the phone's connector list throws on undefined.",
+            "status": "resolved (delta-2)"
+          }
+        ]
+      },
+      {
+        "id": "AB",
+        "scope": "src/renderer/src/components/browser-pane, src/renderer/src/components/dashboard-popout/snapshot/useDashboardSnapshot.ts, src/renderer/src/components/dashboard, src/renderer/src/components/diff-comments/diff-comment-editor-test-fixture.ts, src/renderer/src/components/editor, src/renderer/src/components/feature-tips/feature-tip-startup-gate-bots.test.ts, src/renderer/src/components/github-item-dialog/inspect-pull-request/checks-tab-check-row.tsx, src/renderer/src/components/github/github-checks-tab-state.ts, src/renderer/src/components/maintenance/update-card/UpdateCard.error-card.test.tsx",
+        "files": 14,
+        "bytes": 61325,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 1,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-AB-1",
+            "severity": "NIT",
+            "file": "local/sync/expected-deletions.json",
+            "summary": "The two renderer files this slice deletes, dashboard-popout/snapshot/useDashboardSnapshot.ts and dashboard/popout-bridge/useDashboardPopoutBridge.ts, are absent at HEAD and still present upstream, yet the deletion manifest no longer asserts them (dashboard-delivery entries fell from 17 at the pre-sync tip to 5).",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "AC",
+        "scope": "src/renderer/src/components/native-chat/pane/routing/native-chat-split-flow.test.ts, src/renderer/src/components/pull-request-page/checks/row.tsx, src/renderer/src/components/right-sidebar/{RightSidebar.tsx,activity-bar,ai-vault}",
+        "files": 12,
+        "bytes": 53487,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 1,
+        "minors": 0,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-AC-1",
+            "severity": "SHOULD-FIX",
+            "file": "src/renderer/src/components/right-sidebar/ai-vault/scanning/ai-vault-session-refresh.ts",
+            "summary": "The resolution re-added the unmount-time `void window.api.aiVault.cancelListSessions({ requestToken })` that upstream deliberately deleted, silently reverting upstream #46089's \"no longer cancels a scan when the panel closes\".",
+            "status": "resolved (delta-2)"
+          }
+        ]
+      },
+      {
+        "id": "AD",
+        "scope": "src/renderer/src/components/right-sidebar/{checks-panel,right-sidebar-activity-visibility.test.ts,right-sidebar-panel-content.tsx,right-sidebar-top-activity-bar.fixture.tsx}",
+        "files": 9,
+        "bytes": 35154,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 2,
+        "nits": 1,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-AD-1",
+            "severity": "MINOR",
+            "file": "src/renderer/src/components/right-sidebar/checks-panel/review-data/use-checks-panel-review-data.tsx",
+            "summary": "The resolution added a setCommentsError(...) call inside the comments read effect but did not add setCommentsError to that effect's dependency array.",
+            "status": "open"
+          },
+          {
+            "id": "S-AD-2",
+            "severity": "MINOR",
+            "file": "src/renderer/src/components/right-sidebar/right-sidebar-activity-visibility.test.ts",
+            "summary": "Deleting this file with upstream also drops the fork's only coverage of the hasLinkedIssue / linkedIssueOnly visibility gate.",
+            "status": "dismissed (adj-5)"
+          },
+          {
+            "id": "S-AD-3",
+            "severity": "NIT",
+            "file": "src/renderer/src/components/right-sidebar/checks-panel/panel/use-checks-panel-controller-state.tsx",
+            "summary": "The resolution adds a new max-lines suppression here plus the matching config/max-lines-baseline.txt entry, growing a ratchet whose own header says the list may only shrink.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "AE",
+        "scope": "src/renderer/src/components/settings, src/renderer/src/components/sidebar/index.tsx, src/renderer/src/components/sidebar/project-admission/create/runtime-create-project-parent.test.ts, src/renderer/src/components/sidebar/sidebar-feedback/SidebarFeedbackDialog.tsx",
+        "files": 16,
+        "bytes": 55013,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 1,
+        "minors": 0,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-AE-1",
+            "severity": "SHOULD-FIX",
+            "file": "src/renderer/src/components/settings/general/GeneralWorkspaceSettingsSection.tsx",
+            "summary": "The layout mode is written to this computer's settings while the legacy nestWorkspaces boolean is written to the host picked in Settings, so the two placement keys can land on different machines and disagree.",
+            "status": "resolved (delta-2)"
+          }
+        ]
+      },
+      {
+        "id": "AF",
+        "scope": "src/renderer/src/components/sidebar/workspace-actions, src/renderer/src/components/sidebar/workspace-board/projection/workspace-board-task-status-sync.test.ts",
+        "files": 4,
+        "bytes": 28533,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 1,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-AF-1",
+            "severity": "NIT",
+            "file": "src/renderer/src/components/sidebar/workspace-actions/deletion/DeleteWorktreeDialog.tsx",
+            "summary": "The rewritten eslint-disable comment claims \"the fork's delete-remote-branch choice and lineage review ride inside it\", but the lineage review is upstream's, not a fork delta.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "AG",
+        "scope": "src/renderer/src/components/sidebar/workspace-card",
+        "files": 10,
+        "bytes": 59459,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 2,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-AG-1",
+            "severity": "MINOR",
+            "file": "src/renderer/src/components/sidebar/workspace-card/activity/use-worktree-activity-statuses.ts",
+            "summary": "The resolution typed the status map with the shared WorktreeStatus but kept upstream's selectWorktreeActivityStatus, which returns the renderer union containing 'setup', so the fork's setup handling was dropped.",
+            "status": "open"
+          },
+          {
+            "id": "S-AG-2",
+            "severity": "MINOR",
+            "file": "src/renderer/src/components/sidebar/workspace-card/identity/AutoRenameFailedDialog.test.tsx",
+            "summary": "Taking upstream's deletion leaves the still-live auto-rename retry/focus flow in AutoRenameFailedDialog.tsx with no test coverage anywhere in the tree.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "AH",
+        "scope": "src/renderer/src/components/sidebar/worktree-list, src/renderer/src/components/{status-bar,tab-bar}, src/renderer/src/components/tab-group/TabGroupPanel.tsx, src/renderer/src/components/task-page",
+        "files": 12,
+        "bytes": 47664,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 2,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-AH-1",
+            "severity": "MINOR",
+            "file": "src/renderer/src/components/sidebar/worktree-list/listing/use-section-rows.ts",
+            "summary": "The resolution re-inlined upstream's createSidebarHostOptionsSelector and dropped the import of the fork's ./create-sidebar-host-options-selector module, leaving that fork file with no importer anywhere in the tree.",
+            "status": "dismissed (adj-6)"
+          },
+          {
+            "id": "S-AH-2",
+            "severity": "MINOR",
+            "file": "src/renderer/src/components/task-page/linear/issue-refresh/task-page-linear-refresh-test-fixtures.tsx",
+            "summary": "The resolution accepted upstream's deletion of task-page-linear-refresh-lifecycle.test.tsx but left this modify/delete conflict unresolved, so the fixture survives with no importer while local/sync/expected-deletions.json records it as restore because 'the surviving task-page linear refresh lifecycle suite' imports it.",
+            "status": "dismissed (adj-6)"
+          }
+        ]
+      },
+      {
+        "id": "AI",
+        "scope": "src/renderer/src/components/terminal-pane, src/renderer/src/components/ui/badge.tsx, src/renderer/src/hooks",
+        "files": 9,
+        "bytes": 45471,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 1,
+        "minors": 0,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-AI-1",
+            "severity": "SHOULD-FIX",
+            "file": "src/renderer/src/hooks/ipc-events/runtime-events/runtime-client-ipc-bridge-ownership.test.ts",
+            "summary": "Taking upstream's deletion silently dropped the fork's own 99 lines / 4 added tests in this file, including the only test for the fork's onSubscriptionLive catch-up that is still live in runtime-client-events-sync.ts and runtime-client-ipc-bridge.ts.",
+            "status": "resolved (delta-2)"
+          }
+        ]
+      },
+      {
+        "id": "AJ",
+        "scope": "src/renderer/src/{lib,store}",
+        "files": 7,
+        "bytes": 31136,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": []
+      },
+      {
+        "id": "AK",
+        "scope": "src/shared/agent-hook-listener, src/shared/agent-session/options/catalog-providers/agent-session-option-catalog.test.ts, src/shared/bots, src/shared/execution-host/managed-orcad-execution-host.test.ts, src/shared/git/remotes/git-remote-identity.test.ts, src/shared/jira/jira-issue-url.test.ts, src/shared/quick-open/quick-open-path-search.ts",
+        "files": 12,
+        "bytes": 63442,
+        "verdict": "reported",
+        "blockers": 1,
+        "shouldFix": 0,
+        "minors": 2,
+        "nits": 1,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-AK-1",
+            "severity": "BLOCKER",
+            "file": "src/shared/bots/bot-connector-entries.ts",
+            "summary": "The fork's iMessage row was ported into upstream's new shared entries module, but the phone's consumer of that module was not updated, so the row's title crashes on undefined.",
+            "status": "resolved (delta-2)"
+          },
+          {
+            "id": "S-AK-2",
+            "severity": "MINOR",
+            "file": "src/shared/agent-session/options/catalog-providers/agent-session-option-catalog.test.ts",
+            "summary": "Deleting this file removes the fork's only coverage of Pi launch-time model and thinking pinning, which a standing fork decision had re-homed into it.",
+            "status": "open"
+          },
+          {
+            "id": "S-AK-3",
+            "severity": "MINOR",
+            "file": "src/shared/agent-hook-listener/normalization/claude-background-task-status.test.ts",
+            "summary": "The only coverage of the fork's LOCAL(agents) invariant that a background shell keeps a row working with no monitoring badge is gone.",
+            "status": "open"
+          },
+          {
+            "id": "S-AK-4",
+            "severity": "NIT",
+            "file": "src/shared/agent-hook-listener/provider-dispatch.ts",
+            "summary": "The kept eventName doc comment still says the restatement is about Codex ended turns only, although this function now restates Pi subagent starts too.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "AL",
+        "scope": "src/shared/remote-runtime, src/shared/source-control/checks/pr-checks-fix-prompt.test.ts, src/shared/terminal/output/terminal-output-side-effects.test.ts, src/shared/worktree",
+        "files": 8,
+        "bytes": 50331,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": []
+      },
+      {
+        "id": "AM",
+        "scope": "src/wsl-guest, tests/e2e/cross-version-wire/release-checkouts/release-checkout-tree.unit.test.ts, tests/e2e/integrations/linear/linear-url-workspace-entry.spec.ts",
+        "files": 4,
+        "bytes": 57903,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 2,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-AM-1",
+            "severity": "MINOR",
+            "file": "src/wsl-guest/plugins/overlays/plugin-overlay.test.ts",
+            "summary": "Taking upstream's deletion removes the only tests of PluginOverlayManager, including the fork's four added cases whose behavior still exists at HEAD.",
+            "status": "open"
+          },
+          {
+            "id": "S-AM-2",
+            "severity": "MINOR",
+            "file": "tests/e2e/integrations/linear/linear-url-workspace-entry.spec.ts",
+            "summary": "The deletion leaves the fork-only implied-source composer modules with zero coverage anywhere in the tree.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "AN",
+        "scope": "tests/e2e/layout/window-tabs/tabs.spec.ts, tests/e2e/source-control/pr-comments-sidebar-fixture.ts, tests/e2e/terminal, tests/e2e/workspaces/project-admission/new-workspace-linked-item-project-switch.spec.ts",
+        "files": 6,
+        "bytes": 65480,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 1,
+        "minors": 0,
+        "nits": 1,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-AN-1",
+            "severity": "SHOULD-FIX",
+            "file": "local/upstream-file-comments-baseline.json",
+            "summary": "This sync deletes three of the files this fork-comment ratchet records per-file maxima for, and the baseline was not re-measured in the sync's own commit.",
+            "status": "resolved (delta-2)"
+          },
+          {
+            "id": "S-AN-2",
+            "severity": "NIT",
+            "file": "local/sync/upstream-deleted-fork-tests-baseline.json",
+            "summary": "The three fork-added E2E cases these deletions retire are recorded with the boilerplate 'upstream retired 6,116 files' reason, which does not say what coverage is now owed.",
+            "status": "open"
+          }
+        ]
+      }
+    ],
+    "costUsd": 0
+  },
+  "adjudication": {
+    "reviewer": {
+      "provider": "claude",
+      "alias": "opus",
+      "name": "Opus 5.5",
+      "thinking": "high"
+    },
+    "slices": [
+      {
+        "id": "adj-1",
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "costUsd": 3.272407200000001,
+        "judged": 12,
+        "missing": 0
+      },
+      {
+        "id": "adj-2",
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "costUsd": 2.8505613999999992,
+        "judged": 12,
+        "missing": 0
+      },
+      {
+        "id": "adj-3",
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 1,
+        "costUsd": 2.7581018000000004,
+        "judged": 12,
+        "missing": 0
+      },
+      {
+        "id": "adj-4",
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "costUsd": 2.5168505999999997,
+        "judged": 12,
+        "missing": 0
+      },
+      {
+        "id": "adj-5",
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "costUsd": 3.8731743999999986,
+        "judged": 12,
+        "missing": 0
+      },
+      {
+        "id": "adj-6",
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "costUsd": 3.2610306000000007,
+        "judged": 12,
+        "missing": 0
+      },
+      {
+        "id": "adj-7",
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "costUsd": 3.4642072000000006,
+        "judged": 11,
+        "missing": 0
+      }
+    ],
+    "judged": [
+      {
+        "id": "S-A-1",
+        "real": true,
+        "severity": "MINOR",
+        "why": "collectOverlayOverrideDrift is fork-owned (fork-english-catalog.mjs:74, called at verify-localization-catalog.mjs:623), and no test file in the tree references it or its unrecorded/reworded/stale/no-op/structural messages; the baseline lists only the 'accepts an override' title, not the it.each drift cases. Fix: re-home the drift cases in the fork-owned fork-english-catalog.test.mjs, calling collectOverlayOverrideDrift directly; that is more than one hunk, so record it.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-B-1",
+        "real": true,
+        "severity": "NIT",
+        "why": "No test imports check-main-blocking-api-ratchet.mjs now, but the fork's whole delta to the deleted test was a 2-line import-path change; the typed-receiver and namespace cases are upstream's, and upstream retired its own test of its own ratchet. No fix: record only.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-B-2",
+        "real": true,
+        "severity": "MINOR",
+        "why": "The fork added the only two mobile cases pinning expectedHeadSha alongside bypassBranchProtection, a fork-only feature that upstream 7daf01d99f3 does not have; callers pass the arguments in the right order today (use-mobile-source-control-next-step.ts:301, MobilePrTabSheets.tsx:124), and the desktop side keeps client-pr-admin-merge-bypass.test.ts. Fix: re-home the two merge-argument cases in a fork-owned mobile test file; record it if not done this release.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-C-1",
+        "real": true,
+        "severity": "MINOR",
+        "why": "The resolveServiceCommand PATH walk and its refusal of a bare Linux orca are unpinned, but the finding overstates the loss: LOCAL-PATCHES.md:4780/4791 already records the serve-service suite as coverage owed, and tui-agent-config.test.ts:28-29 still pins getOrcaCliCommandNameForPlatform to orca-np on darwin and linux. No fix beyond the existing record.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-D-1",
+        "real": true,
+        "severity": "MINOR",
+        "why": "The fork's LOCAL(nplez1) assertion (state working, workingMode undefined after a helper kill) was its only delta and is gone; agent-hook-listener-descendant-lifecycle.test.ts:653/666 covers child and scheduled-work holds but not a shell-held Claude turn, and LOCAL-PATCHES.md:917 already records the helper-settlement case as owed. No fix: record only.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-D-2",
+        "real": true,
+        "severity": "NIT",
+        "why": "hook-post-command.ts is upstream code that neither side changed between base and tip, so upstream retired its own coverage of its own timeout budget; the fork's delta to the test was one line, the remote ~/.orca-np/agent-hooks path, which only kimi-hook-config-toml.test.ts still touches. No fix: record only.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-D-3",
+        "real": true,
+        "severity": "NIT",
+        "why": "The file-level max-lines disable follows the fork's established pattern (server-status-update.ts:1, server-ingest-normalization.ts:1), has its baseline entry (config/max-lines-baseline.txt:12), and the ledger records this sync's ratchet growth for review; joining the fork's agent-exit-evidence import onto one line would exceed print width, so the one-line trim is not free. No fix: record only.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-E-1",
+        "real": true,
+        "severity": "MINOR",
+        "why": "SessionSearchInstance.clear and queue() (writeSessionSearchContentConsent at session-search-instance.ts:92) have no test at HEAD, and the baseline reasons are boilerplate with no coverage-owed note; session-search-metadata-retrieval.test.ts still covers the content-off query side ('returns nothing for text that exists only in message bodies'). Fix: add a coverage-owed note for the clear/consent transition in LOCAL-PATCHES.md, or re-home the cases in a fork-owned suite.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-E-2",
+        "real": true,
+        "severity": "MINOR",
+        "why": "The fork-added case was the only one asserting that transcriptMessagesFromDecodedMessage stops at 256 KiB and reports textOriginalLength as that bound, and it stamps toolKind; session-summary-event-digest.test.ts covers only consumers of those fields. Fix: re-home the case in a fork-owned test beside the module; record it if not done.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-E-3",
+        "real": false,
+        "severity": "NIT",
+        "why": "False at HEAD: local/upstream-file-comments-baseline.json has base 7daf01d99f3d3301bf3c867e293ebb9d1f9a324e and total 4756, re-taken in 8cb675eb450, and no rows name the deleted files. No fix needed.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-F-1",
+        "real": true,
+        "severity": "MINOR",
+        "why": "The bot-chat-search-host test is gone, but the gate itself is upstream's (7daf01d99f3 has the same 'if (!sessionSearchPolicy().enabled) return []'); the fork's delta is the contentEnabled rename, which tc enforces because sessionSearchPolicy() returns AiVaultSearchSettings. The other files it bundles are listed in upstream-deleted-fork-tests-baseline.json under the accepted retirement rule. No fix: record only.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-F-2",
+        "real": true,
+        "severity": "NIT",
+        "why": "Real against the merge revision, but already fixed at HEAD by 0e5161d5250: bot-skill-projects.ts:33 passes the signal to scanSkillsFolderInPlace, and bot-skill-folder-scan.ts:61 forwards it to findSkillFiles. No fix needed.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-G-1",
+        "real": true,
+        "severity": "NIT",
+        "why": "At a8c508f the base-shaped import block leaves Repo (deps.store type) and AgentSessionRecord (botOfRecord) unbound; d4452477df3 adds both imports and HEAD has them at lines 37-38, so nothing remains to fix. requestTurnEnded took upstream's turnId signature and its only caller (orca-runtime-bots.ts:298) passes it.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-I-1",
+        "real": true,
+        "severity": "MINOR",
+        "why": "isMacHomeAutomounterMountPoint (codex-trust-identity.ts:104,122) is fork-only and nothing at HEAD tests it; the loss is recorded in upstream-deleted-fork-tests-baseline.json under the accepted policy of not restoring upstream-deleted files. Fix: add a fork-owned test of the darwin /home short-circuit rather than restoring the upstream file.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-I-2",
+        "real": true,
+        "severity": "NIT",
+        "why": "Overstated: structured-session-cli-login-shell.test.ts (restored in 0e5161d5250) runs the sealed structured-session env with the harness stub at cli/bin/orca-np-dev and requires ORCA_CLI_COMMAND to resolve to it, so a regression to orca-dev fails there. Only the Codex-resolver-specific PATH-first ordering assertion is lost, and the baseline records that.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-I-3",
+        "real": true,
+        "severity": "NIT",
+        "why": "No test exercises CommandCodeHookService, but its only fork delta (installRemote's HOME_DIRECTORY_NAME path) is a literal the identity sweep's .orca home-segment rule would flag if reverted. Keeping the upstream-deleted file would cost a modify/delete conflict on every sync, which is exactly what the recorded baseline policy rejects; command-code-managed-script.test.ts survived because upstream kept it.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-J-1",
+        "real": true,
+        "severity": "MINOR",
+        "why": "No test calls connectorTriggers or triggerRunEvent; only the servesLocally predicate itself is tested (local-webhook-provider.test.ts). The baseline marks this entry 'Fork feature, coverage owed'. I checked the rewritten runTrigger branch by hand and it matches the fork parent. Fix: one fork-owned test that connectorTriggers drops a rule servesLocally claims.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-J-2",
+        "real": true,
+        "severity": "NIT",
+        "why": "The claim that a regression 'would pass every gate' is wrong: the identity sweep's home-segment rule catches a reintroduced `${home}/.orca/agent-hooks` literal in cursor/hook-service.ts. copilot/hook-service.ts has no fork delta against upstream at all.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-J-3",
+        "real": true,
+        "severity": "NIT",
+        "why": "Real at a8c508f; 0e5161d5250 already rewrote the comment to 'Connector upkeep exists only on a host with Orca Cloud'. The unconditional setWebhooks/start/stop matches the fork parent, and webhooks.stop is registered once in the initial stops array. No fix needed.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-J-4",
+        "real": true,
+        "severity": "NIT",
+        "why": "triggerRunEvent runs twice on the null/webhook path, but store.listAutomations() and getBots() are synchronous with no await between the calls, so the two derivations cannot differ. Behaviour is identical to the fork parent; optional fix: call webhooks.receive and return false directly instead of calling runTriggerDelivery.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-K-1",
+        "real": true,
+        "severity": "MINOR",
+        "why": "Partly overstated: the AssociatedBundleIdentifiers line is upstream code that reads LOCAL_BUILD_COMPATIBILITY_CONTRACT.appId (it is not in the fork's diff of the file), and both label prefixes are pinned in install-layout-names.test.ts. What is genuinely untested is the fork's releaseMacDaemonJob(legacyService) bootout at line 186. Fix: a fork-owned test of that call, recorded until it lands.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-K-2",
+        "real": true,
+        "severity": "NIT",
+        "why": "DshHookService's only fork delta is installRemote's HOME_DIRECTORY_NAME path, which the identity sweep guards as a literal; upstream retired the test while still wiring the service. Inherited, recorded in the baseline.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-K-3",
+        "real": true,
+        "severity": "NIT",
+        "why": "The assertion is gone, but DEV_COMMAND_NAME is the single constant 'orca-np-dev' in cli-install-constants.ts. The identity sweep's cli-dev-name rule flags an orca-dev literal, and the login-shell test covers the app launcher name. Recorded in the baseline.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-L-1",
+        "real": true,
+        "severity": "NIT",
+        "why": "The resolution wrote a Why naming process-holder and VM-lease guards, but the fork's delta on host-tree-removal.ts is LeftoverCheckoutFolderError/checkClean, and on windows-worktree-removal.ts it is releaseLeftoverCheckoutRegistration, not lock-retry or reparse-point handling. The disables themselves are needed (374 and 343 raw lines). Fix: reword both Why texts to name those deltas.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-L-2",
+        "real": true,
+        "severity": "MINOR",
+        "why": "deleteHostChildren returns failures.find(tolerated), so blockingFileOf only ever sees a one-element array and its EBUSY preference is dead; the pre-sync fork passed all failures. The Windows leftover-folder message can name a directory instead of the held file. One-hunk fix: prefer the EBUSY failure inside deleteHostChildren.",
+        "by": "adj-3"
+      },
+      {
+        "id": "S-M-1",
+        "real": true,
+        "severity": "MINOR",
+        "why": "git ls-files confirms src/main/ipc/ssh has no test file left; the deletions are forced (upstream retired the ssh-ipc harness and mocks) and are recorded in upstream-deleted-fork-tests-baseline.json, so this is recorded coverage debt with no runtime defect.",
+        "by": "adj-3"
+      },
+      {
+        "id": "S-N-1",
+        "real": true,
+        "severity": "SHOULD-FIX",
+        "why": "The fork's orphaned-local-worktree-cleanup.ts purges with removeWorktreeMetadataAndTransientState and no dropAgentTrust, where the base and upstream used removeDeletedCheckoutMetadataAndTransientState, so Orca-written Codex/Antigravity trust survives a deleted checkout and pre-trusts the next occupant of the path (#24697); purgeRemoved(false) is now dead. Fix: have the wrapper await removeDeletedCheckoutMetadataAndTransientState (its only caller) and delete the dead branch.",
+        "by": "adj-3"
+      },
+      {
+        "id": "S-N-2",
+        "real": true,
+        "severity": "MINOR",
+        "why": "No test references the floating-workspace functions; the fork-only ~/.orca-np path, symlink-grant and notes-migration cases are recorded per case in the baseline (lines 263-273), so this is coverage debt, not a build defect.",
+        "by": "adj-3"
+      },
+      {
+        "id": "S-N-3",
+        "real": true,
+        "severity": "MINOR",
+        "why": "Overstated: the WSL gh_bound_account_unavailable refusal is still tested through isAppBoundGitRepo in github-app-bound-repo-git.test.ts:33-43. What is unguarded is the no-App-connected refusal and getLocalRemoteSyncGitOptions threading wslDistro through; both are recorded per case in the baseline.",
+        "by": "adj-3"
+      },
+      {
+        "id": "S-N-4",
+        "real": true,
+        "severity": "NIT",
+        "why": "The fork's delta on these listing tests was 8-9 lines of test-double plumbing; the fork's persisted scan cache keeps its own suite, so this is record only.",
+        "by": "adj-3"
+      },
+      {
+        "id": "S-O-1",
+        "real": true,
+        "severity": "NIT",
+        "why": "jira-preset-jql.ts is byte-identical to upstream and the fork's delta to the deleted test was only an importOriginal mock fix (6 lines), so this is upstream retiring coverage of upstream code, not a fork loss.",
+        "by": "adj-3"
+      },
+      {
+        "id": "S-P-1",
+        "real": true,
+        "severity": "MINOR",
+        "why": "The fork-authored cases (host-scoped relocate, folder-upgrade locator, keybindings ~/.orca-np, Kimi .cmd, zip bundle name) are gone and recorded per case in the baseline as owed coverage; no runtime change in the resolution.",
+        "by": "adj-3"
+      },
+      {
+        "id": "S-P-2",
+        "real": false,
+        "severity": "NIT",
+        "why": "Already fixed: 0e5161d5250 deleted __resetMacTailscaleDnsDiagnosticCacheForTests, so the file at HEAD matches upstream's removal.",
+        "by": "adj-3"
+      },
+      {
+        "id": "S-Q-1",
+        "real": true,
+        "severity": "NIT",
+        "why": "The only fork delta in scanNestedRepos reorders an OR (hasGitMarker before isGitRepoAsync), which only saves time and returns the same answer; losing its test is record only.",
+        "by": "adj-3"
+      },
+      {
+        "id": "S-R-1",
+        "real": false,
+        "severity": "NIT",
+        "why": "Already fixed: 0e5161d5250 restored structured-session-cli-login-shell.test.ts and its live-shell twin, and both import createLoginShellHarness, so the harness has consumers and the restore reason is accurate at HEAD.",
+        "by": "adj-3"
+      },
+      {
+        "id": "S-T-1",
+        "real": true,
+        "severity": "MINOR",
+        "why": "bots.ts:107-115 localWebhookListFacts has no surviving assertion (the local-webhook-provider tests cover only localWebhookFacts), but the loss is recorded per case at baseline:360-361, and re-homing it needs a new bots.list harness, not one hunk.",
+        "by": "adj-3"
+      },
+      {
+        "id": "S-U-1",
+        "real": true,
+        "severity": "MINOR",
+        "why": "ssh.ts:36-48 still emits hidden only when true, no surviving test dispatches ssh.listTargetSummaries or mentions hidden, and ssh-target-management.test.ts:55 already builds a dispatcher over SSH_METHODS, so re-homing the case is one hunk; the baseline carries only the generic retirement reason.",
+        "by": "adj-4"
+      },
+      {
+        "id": "S-V-1",
+        "real": true,
+        "severity": "MINOR",
+        "why": "No test file references notePiDialogTitleGained, pi-dialog-title-gain, or pi's 'Trust project folder' prompt; baseline lines 370-371 give only the generic reason, so a fork-path test or a coverage-owed note is needed.",
+        "by": "adj-4"
+      },
+      {
+        "id": "S-V-2",
+        "real": true,
+        "severity": "NIT",
+        "why": "The fork's only delta against upstream in that file is the notePiDialogTitleGained import and call; the 'turn-end and working-start stamps' the comment names (lastAgentStatusEndedTurn, WorkingStartedAt) are upstream's own code, so the Why text is stale, though the max-lines disable itself is harmless.",
+        "by": "adj-4"
+      },
+      {
+        "id": "S-W-1",
+        "real": true,
+        "severity": "NIT",
+        "why": "The coverage loss is real, but the sweep's claim that it is unrecorded is wrong: baseline lines 377-382 mark all six setTargetHidden cases 'Fork feature, coverage owed', so the debt is already recorded.",
+        "by": "adj-4"
+      },
+      {
+        "id": "S-X-1",
+        "real": false,
+        "severity": "NIT",
+        "why": "src/main/startup/packaged-user-data-path.test.ts:37-55 (added in 0e5161d5250) pins appData/orca-np for packaged runs and orca-np-dev for dev runs, and baseline line 385 records the case as re-homed, so configureDevUserDataPath is not untested.",
+        "by": "adj-4"
+      },
+      {
+        "id": "S-X-2",
+        "real": true,
+        "severity": "MINOR",
+        "why": "Upstream's first-window-startup-services.ts has no agentHookStatusCacheHydrationReady or earlyReady, agent-hooks.ts:46 awaits it, and no test references it; baseline lines 388-389 carry only the generic reason, so a fork-owned test or a coverage-owed note is needed.",
+        "by": "adj-4"
+      },
+      {
+        "id": "S-Y-1",
+        "real": true,
+        "severity": "NIT",
+        "why": "The default exists, but the only cloud host, WebhookHostService, keeps newerAgentBotIds required in its deps type (webhook-host-service.ts:67) and connector-host-install.ts:100 supplies it; the callers relying on the default are the fork-only local provider, which never passed it at the fork tip, and tests, so no runtime path changes.",
+        "by": "adj-4"
+      },
+      {
+        "id": "S-Y-2",
+        "real": true,
+        "severity": "MINOR",
+        "why": "The module is fork-modified (it reads names from fork/install-layout-names) and no test calls resolveWindowsUpdateInstallDirectory; the names themselves are pinned by install-layout-names.test.ts, but the RMDir-safety folder classification is not, and the baseline has a file entry (line 120) with no case or coverage-owed note.",
+        "by": "adj-4"
+      },
+      {
+        "id": "S-Y-3",
+        "real": true,
+        "severity": "NIT",
+        "why": "At a8c508f, lines 183 and 206 read store against a nativeSettings parameter; at HEAD both read nativeSettings (fixed in 0ddf948), and the resolution correctly dropped closeDashboardPopout per the no-pop-out invariant.",
+        "by": "adj-4"
+      },
+      {
+        "id": "S-Y-4",
+        "real": false,
+        "severity": "NIT",
+        "why": "local-build-switch.test.ts is the same blob (955e32e) at cc4fefcbaad and at 0c6207e3d71, so the fork never modified it and it does not belong in a baseline of fork-modified tests; local-build-switch.ts also exists at the old upstream base, so it is not fork-only.",
+        "by": "adj-4"
+      },
+      {
+        "id": "S-Z-1",
+        "real": true,
+        "severity": "NIT",
+        "why": "The stale ratchet was real at the merge, but 8cb675eb450 re-measured local/upstream-file-comments-baseline.json (base 7daf01d99f, total 4756, no run-process.test.ts entry), so HEAD carries no release-gate red from it.",
+        "by": "adj-4"
+      },
+      {
+        "id": "S-Z-2",
+        "real": true,
+        "severity": "MINOR",
+        "why": "The fork adds 35 lines to repo-git-remote-identity-enrichment.ts, no surviving test references enrichMissingRepoGitRemoteIdentities, and baseline lines 415-418 give only the generic reason, so a fork-path test or a coverage-owed note is owed.",
+        "by": "adj-4"
+      },
+      {
+        "id": "S-Z-3",
+        "real": false,
+        "severity": "NIT",
+        "why": "The keepAlive hold is still tested: workspace-path-index-service-worker-hold.test.ts drives the real WorkspacePathIndexWorkerClient, WorkerThreadRequestQueue and LazyWorkerThreadHost with fake timers. It checks that the worker survives IDLE_TEARDOWN_MS while a generation is resident, and that it terminates once revoke() clears the hold. Only upstream's generic queue suite is gone, by upstream's choice.",
+        "by": "adj-5"
+      },
+      {
+        "id": "S-Z-4",
+        "real": true,
+        "severity": "NIT",
+        "why": "TEST_FILE in deleted-fork-tests.mjs only matches .test./.spec. files, so the fixture file left no baseline record. Nothing imports holdRemovalMetadata or the fixture path at HEAD, so no import is left dangling. Record only.",
+        "by": "adj-5"
+      },
+      {
+        "id": "S-AA-1",
+        "real": true,
+        "severity": "BLOCKER",
+        "why": "At a8c508f, shared BotConnectorFacts.words.photon was required and its row was added unconditionally, while phoneConnectorEntries passes no photon word, so the phone's connector titles crashed. Already fixed at HEAD by 36ae037ce68 (photon optional, row only drawn when supplied), with the matching mobile needPage case added in 0e5161d5250. Nothing outstanding.",
+        "by": "adj-5"
+      },
+      {
+        "id": "S-AB-1",
+        "real": true,
+        "severity": "NIT",
+        "why": "The manifest at the merge still listed the pre-move paths (dashboard-popout/useDashboardSnapshot.ts, dashboard/useDashboardPopoutBridge.ts). At HEAD both re-bound paths (snapshot/useDashboardSnapshot.ts, popout-bridge/useDashboardPopoutBridge.ts) are asserted with dashboard-delivery entries. No fix needed.",
+        "by": "adj-5"
+      },
+      {
+        "id": "S-AC-1",
+        "real": true,
+        "severity": "SHOULD-FIX",
+        "why": "The resolution replaced upstream's 'the next visit joins it' comment with an unmount-time cancelListSessions call that neither parent's merged text had, which would have brought back the rescan on every panel exit. Already fixed at HEAD by 8cb675eb450: the unmount effect is back to upstream's comment, and only a scope change cancels an in-flight scan.",
+        "by": "adj-5"
+      },
+      {
+        "id": "S-AD-1",
+        "real": true,
+        "severity": "MINOR",
+        "why": "The comments read effect now calls setCommentsError but its dependency array ends at setComments/setCommentsLoading. setCommentsError is a []-dependency useCallback, so this is only a react-hooks/exhaustive-deps warning (set to warn in .oxlintrc.json). Fix: add setCommentsError to that array.",
+        "by": "adj-5"
+      },
+      {
+        "id": "S-AD-2",
+        "real": false,
+        "severity": "NIT",
+        "why": "The deleted test never covered this gate: every case passed hasLinkedIssue: false, and the items list had no linkedIssueOnly entry. The linkedIssueOnly gate was untested before the deletion as well, so following upstream's deletion lost no coverage of it.",
+        "by": "adj-5"
+      },
+      {
+        "id": "S-AD-3",
+        "real": true,
+        "severity": "NIT",
+        "why": "The suppression and baseline entry are new, but the fork's delta on this upstream file is two code lines (retractStalePRRefreshError) on top of a file upstream ships without a suppression, so the 'at its budget' rationale is plausible. Whether it is actually over 400 effective lines needs oxlint. Record only.",
+        "by": "adj-5"
+      },
+      {
+        "id": "S-AE-1",
+        "real": true,
+        "severity": "MINOR",
+        "why": "At HEAD the mode is written only locally while the boolean goes to this computer and to a remote target (useNestWorkspacesSetting). worktreeLayoutMode is not host-owned, and resolveWorktreeLayoutMode prefers the remote's stored mode over the request's boolean, so a remote pick flips the remote's legacy key without changing its placement, and the General summary row reads the remote boolean while the control shows the local mode. Local-only placement writes predate the sync, and the machine-only half of the claim no longer holds. Fix: make worktreeLayoutMode host-owned and write it to the same owner as the boolean, or record it.",
+        "by": "adj-5"
+      },
+      {
+        "id": "S-AF-1",
+        "real": true,
+        "severity": "NIT",
+        "why": "DeleteWorktreeLineageReview.tsx, workspace-delete-lineage.ts and delete-worktree-lineage-delete-all.ts all exist at 7daf01d99f3, so the only fork delta in this file is the delete-remote-branch option and its plumbing. Fix: reword the comment.",
+        "by": "adj-5"
+      },
+      {
+        "id": "S-AG-1",
+        "real": true,
+        "severity": "MINOR",
+        "why": "At the merge, the renderer status (which can be 'setup') was stored in a Map of the shared WorktreeStatus type. The fork's setup handling was not dropped, though: setupRunning still feeds selectWorktreeActivityStatus in use-worktree-activity-status.ts. The type gap is closed at HEAD by asSharedWorktreeStatus (d4452477df3). Nothing outstanding.",
+        "by": "adj-5"
+      },
+      {
+        "id": "S-AG-2",
+        "real": true,
+        "severity": "MINOR",
+        "why": "The fork-only retry flow (use-branch-auto-rename-retry.ts, register-branch-auto-rename-retry-handlers.ts, and the preload API) has no test left: no *.test.* file references AutoRenameFailedDialog, useBranchAutoRenameRetry or the retry IPC. The fork's old test asserted pre-refactor markup, so re-covering it is new test work. Record.",
+        "by": "adj-5"
+      },
+      {
+        "id": "S-AH-1",
+        "real": false,
+        "severity": "NIT",
+        "why": "Real at the merge, fixed at HEAD: 0e5161d5250 deleted create-sidebar-host-options-selector.ts and its focus-setting-read-baseline.fork.txt line, and nothing references it now; the inlined selector is the same apart from the statuses argument.",
+        "by": "adj-6"
+      },
+      {
+        "id": "S-AH-2",
+        "real": false,
+        "severity": "NIT",
+        "why": "Real at the merge, fixed at HEAD: 0e5161d5250 deleted both task-page-linear-refresh-test-fixtures.tsx and the drawer fixture, and expected-deletions.json:279-284 now records them as expected deletions with an accurate reason.",
+        "by": "adj-6"
+      },
+      {
+        "id": "S-AI-1",
+        "real": false,
+        "severity": "NIT",
+        "why": "Real at the merge, fixed at HEAD: 8cb675eb450 and 3d4721be0c8 added runtime-client-ipc-bridge-ownership-fork.test.ts with all four fork cases, including 're-reads the host catalog when the client-event subscription goes live' (the onSubscriptionLive catch-up), and the baseline records them as re-homed.",
+        "by": "adj-6"
+      },
+      {
+        "id": "S-AK-1",
+        "real": false,
+        "severity": "NIT",
+        "why": "Was a BLOCKER at the merge (the phone passes no photon word, so botConnectorTitles got an undefined service); 36ae037ce68 made words.photon optional and gated the add on it (bot-connector-entries.ts:103,215), so the phone draws no photon row and the desktop keeps its unconditional pre-sync row.",
+        "by": "adj-6"
+      },
+      {
+        "id": "S-AK-2",
+        "real": true,
+        "severity": "MINOR",
+        "why": "No surviving test references resolveAgentSessionOptionLaunch or checkAgentLaunchModelPreferences, and index-agent-launch.test.ts, the ledger's other named pin, was deleted too, so convergence-ledger.md:1007-1016 is now false; fix: add a small fork-owned test for the three Pi cases and rewrite that addendum.",
+        "by": "adj-6"
+      },
+      {
+        "id": "S-AK-3",
+        "real": true,
+        "severity": "MINOR",
+        "why": "The policy is still in claude-pane-hold-evidence.ts:92-96, but neither test pinning it in convergence-ledger.md:476-489 survives and no test touches claudeRunningNonAgentTasksByPaneKey; fix: add a fork-owned test of the running-shell-plus-cron and cron-only cases and update the ledger.",
+        "by": "adj-6"
+      },
+      {
+        "id": "S-AK-4",
+        "real": true,
+        "severity": "NIT",
+        "why": "provider-dispatch.ts:64 still says '(Codex ended turns)' while line 222 restates Pi subagent starts via restatePiFamilyEventName; fix: use upstream's wording.",
+        "by": "adj-6"
+      },
+      {
+        "id": "S-AM-1",
+        "real": true,
+        "severity": "MINOR",
+        "why": "No test imports PluginOverlayManager, while plugin-overlay.ts still implements the logged write failures and the mtime-preserving install; the baseline entries at lines 524-527 carry only the generic retirement reason; fix: change them to 'Coverage owed:' wording, or add a small fork-owned test.",
+        "by": "adj-6"
+      },
+      {
+        "id": "S-AM-2",
+        "real": true,
+        "severity": "MINOR",
+        "why": "TaskImpliedSourceNameField.tsx does not exist upstream at 7daf01d99f3, and no test or spec in src/ or tests/ references data-workspace-implied-source; the fork's only edit to this spec was that selector swap, and the baseline lists the file (line 169) with no per-case reason; fix: record it as coverage owed or add a small renderer test.",
+        "by": "adj-6"
+      },
+      {
+        "id": "S-AN-1",
+        "real": false,
+        "severity": "NIT",
+        "why": "Real at the merge, fixed at HEAD: 8cb675eb450 re-measured local/upstream-file-comments-baseline.json against base 7daf01d99f3 (total 4756, 0 stale) and removed the tabs.spec, terminal-paste-ownership and linked-item-project-switch entries.",
+        "by": "adj-6"
+      },
+      {
+        "id": "S-AN-2",
+        "real": true,
+        "severity": "NIT",
+        "why": "upstream-deleted-fork-tests-baseline.json:530-534 still gives these fork-added e2e cases only the generic '6,116 files' reason; fix: add 'Coverage owed:' lines like the pane-screen-prompt entries.",
+        "by": "adj-6"
+      },
+      {
+        "id": "D-3",
+        "real": true,
+        "severity": "MINOR",
+        "why": "No test calls setTargetHidden or checks ssh_target_not_hideable, and the old test's mock store fixture (testing/ssh-connection-store-test-fixture) is gone too; the baseline (lines 376-383) already says coverage owed; fix: add a fork-owned ssh-connection-store test with its own mock store, including the case that a config sync keeps a host hidden.",
+        "by": "adj-6"
+      },
+      {
+        "id": "D-6",
+        "real": true,
+        "severity": "NIT",
+        "why": "Before-quit and will-quit's fenceDesktopCore both call flushUnsavedCloudSessions, awaitPackedRefsLockRelease and cancelHistoryGc; all three are idempotent and starting the ref-lock wait early is deliberate. No fix.",
+        "by": "adj-7"
+      },
+      {
+        "id": "delta-1-5",
+        "real": true,
+        "severity": "NIT",
+        "why": "1306d783d0b removed _resetGitAdmissionForTests and __resetOrcaStarCheckForTests; resetGhLoginCacheForTests stays in upstream-owned src/main/git/repositories/git-username.ts because the fork-owned git-username-gh-account.test.ts needs the module-private cache reset. Record it as a permanent sync hunk.",
+        "by": "adj-7"
+      },
+      {
+        "id": "delta-1-6",
+        "real": true,
+        "severity": "NIT",
+        "why": "total and the accepted line now say 167 and the fork-identity cases (orca-np userData pin and others) have their own reasons, but 183 per-case reasons still read '170 fork-modified test files'. Regenerate that reason with 167.",
+        "by": "adj-7"
+      },
+      {
+        "id": "delta-2-1",
+        "real": true,
+        "severity": "SHOULD-FIX",
+        "why": "The lane hands subagent:process-terminal to lifecycleState.onEvent(payload,'completed'), so forgetSubagent plus postAgentEndOnce post agent_end at runner exit and bypass upstream's 2 s RUNNER_EXIT_GRACE_MS, which exists so a wake turn's agent_start (which clears waiting) lands first: the pane goes done, working, done, and native chat records a failed child as completed. The 046cfc34ded rebuttal is wrong because the later grace settle finds waiting=false and posts nothing. Fix: drop process-terminal from handToRoster, so the exit only retires the fork's live set, and make the test at agent-status-async-subagent.test.ts:386-400 wait past the grace.",
+        "by": "adj-7"
+      },
+      {
+        "id": "delta-2-3",
+        "real": false,
+        "severity": "NIT",
+        "why": "Already fixed: all four runtime-client-ipc-bridge-ownership cases now carry 'Re-homed, not lost' reasons, and the titles exist in runtime-client-ipc-bridge-ownership-fork.test.ts.",
+        "by": "adj-7"
+      },
+      {
+        "id": "delta-3-2",
+        "real": true,
+        "severity": "NIT",
+        "why": "The last-good anchor (LOCAL-PATCHES.md:202-206) now correctly says the step to available has no test. Line 127 still says the uncovered REST-list-first delay block is recorded 'as local/sync/convergence-ledger.md records', but the ledger has no such entry; the coverage gap itself is stated, so it is only a dead citation. Drop the citation or add the ledger line.",
+        "by": "adj-7"
+      },
+      {
+        "id": "delta-3-4",
+        "real": true,
+        "severity": "NIT",
+        "why": "The quoted 'later settle posts done too' sentence was removed in 11f1861ebc6, but the forced completed still contradicts the comment at agent-status-async-subagent-source.ts:169-172 and the test comment at :398. The delta-2-1 fix resolves it.",
+        "by": "adj-7"
+      },
+      {
+        "id": "delta-4-1",
+        "real": false,
+        "severity": "NIT",
+        "why": "Already fixed: the case reason now says it was dropped on the false premise that #46786 retired the preload dispatcher, and that subscribeRuntimeEnvironmentFromPreload is still live.",
+        "by": "adj-7"
+      },
+      {
+        "id": "delta-4-2",
+        "real": false,
+        "severity": "NIT",
+        "why": "Already fixed: the nightly note now says ten cases are re-homed and that the whole REST-list-first delay describe block, all four cases, is absent.",
+        "by": "adj-7"
+      },
+      {
+        "id": "delta-4-3",
+        "real": false,
+        "severity": "NIT",
+        "why": "Already fixed: 3dbcdf6b107 replaced 'A real completion (the other two channels)' with text naming subagent:async-complete as the only completion.",
+        "by": "adj-7"
+      },
+      {
+        "id": "delta-5-1",
+        "real": true,
+        "severity": "NIT",
+        "why": "'the other is a start' sits in a three-channel loop and should name subagent:async-started. The point goes away if the delta-2-1 fix deletes the comment.",
+        "by": "adj-7"
+      }
+    ]
+  },
+  "waiver": null
+}
