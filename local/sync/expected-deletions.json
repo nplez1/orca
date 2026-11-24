@@ -817,6 +817,13 @@
       "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
     },
     {
+      "path": "src/main/providers/local-pty/local-pty-provider-test-harness.ts",
+      "symbol": "LocalPtyProviderMocks.statMock",
+      "status": "expected-deletion",
+      "supersededBy": null,
+      "reason": "The harness was retired by upstream in the 2026-11-24 sync with the local-pty suites that used it; the fork's `statMock` member went with the file."
+    },
+    {
       "path": "src/main/providers/working-directory-validation.ts",
       "symbol": "validateWorkingDirectory.signal",
       "status": "expected-deletion",
@@ -1137,6 +1144,13 @@
       "status": "expected-deletion",
       "supersededBy": null,
       "reason": "Upstream retired the file in the 2026-11-24 sync; the fork's updater suites went with it (deleted-fork-tests baseline) and nothing imports these fakes."
+    },
+    {
+      "path": "src/main/updater/testing/updater-test-main-window.ts",
+      "symbol": "UpdaterMainWindowFake.close",
+      "status": "expected-deletion",
+      "supersededBy": null,
+      "reason": "File retired with the fork's updater test suites (2026-11-24 sync)."
     },
     {
       "path": "src/main/updater/testing/updater-test-main-window.ts",
@@ -1690,6 +1704,13 @@
       "status": "expected-deletion",
       "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
       "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel/refresh/checks-panel-polling-test-model.ts",
+      "symbol": "createModel.checks",
+      "status": "expected-deletion",
+      "supersededBy": null,
+      "reason": "Upstream retired the file and the checks-panel polling suites that used it in the 2026-11-24 sync."
     },
     {
       "path": "src/renderer/src/components/right-sidebar/checks-panel/refresh/checks-panel-polling-test-model.ts",
