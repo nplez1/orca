@@ -49,6 +49,7 @@ type UntitledEntry = { key: string; needsOwner: boolean } & (
       /** None: GitHub as a whole, until it is linked and installed. */ installation?: ConnectorGitHubInstallation
     }
   | { kind: 'google' }
+  | { kind: 'photon' }
   | { kind: 'webhooks' }
   | { kind: 'composio'; connection: ComposioConnection; problem: ComposioProblem }
   /** An app the bot has as a tool: one Add to <bot> lists, or one added by URL. */
@@ -187,6 +188,11 @@ export function botConnectorEntries(
       { service: 'Google', hints: [accounts.map((account) => account.email).join(', ')] }
     )
   }
+  // Its card sets the whole channel up, so the row is listed before Photon is connected too.
+  add(
+    { kind: 'photon', key: 'photon', needsOwner: false },
+    { service: t('bots.photon.title', 'iMessage') }
+  )
   // Shown once the bot has a hook; its row hides itself until then.
   add(
     { kind: 'webhooks', key: 'webhooks', needsOwner: false },

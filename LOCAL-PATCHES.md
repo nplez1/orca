@@ -5728,13 +5728,17 @@ rather than transport. Each is small; together they were the difference between 
 "a person can use it".
 
 **iMessage had no way in.** Every Photon RPC existed and nothing called it, so the channel was merged and
-unreachable. `components/bots/photon/PhotonChannelSettings.tsx` is the card, with `PhotonConnectForm.tsx`
-and `PhotonBotLine.tsx` beside it: connect with an organization id and account key (stored only if the
-owner says so), then per bot a number, the people who may text it — each removable — Repair (its notes
-shown), and Release behind a confirmation, because releasing is a dead end Settings cannot undo. It mounts
-in the computer's group beside the GitHub App and renders nothing on a host that answers
-`method_not_found`. `src/renderer/src/lib/photon-channel-client.ts` is the RPC client, shaped like
-`github-app-client.ts`, and both now sit on the shared `host-rpc-view.ts` hook.
+unreachable. It is now a connector on the bot, where every other connector is set up:
+`components/bots/photon/BotPhotonCard.tsx` on the bot's Connectors tab, with `PhotonConnectForm.tsx`
+beside it. The card does the whole job in one place — connect the owner's own Photon account (organization
+id and account key, stored only if they say so), give the bot a number with the owner's own handle as the
+first person who may text it, then add or remove the others, Repair (its notes shown), and Release behind
+a confirmation, because releasing is a dead end Settings cannot undo. The computer's own group keeps only
+the account: `PhotonChannelSettings.tsx` connects and reports it, and says that numbers and people belong
+to a bot. Both render nothing on a host that answers `method_not_found`.
+`src/renderer/src/lib/photon-channel-client.ts` is the RPC client, shaped like `github-app-client.ts`, and
+both now sit on the shared `host-rpc-view.ts` hook. The row is listed before Photon is connected, so the
+empty Connectors state still offers Add a connector and still carries the iMessage row that sets it up.
 
 **Keeping a key needs a keyring, and the card says so.** `photon-secrets.ts` falls back to `plain:`
 base64 when the host cannot seal, and `PhotonService.connect` refused to be quiet about that: it will not

@@ -4,10 +4,8 @@ import React from 'react'
 import { Button } from '@/components/ui/button'
 import { SettingsSubsectionHeader } from '@/components/settings/form-controls/SettingsFormControls'
 import { useTranslate } from '@/i18n/use-translate'
-import { useHostBots } from '@/lib/bot-catalog'
 import { photonErrorMessage, usePhotonChannel } from '@/lib/photon-channel-client'
 import type { ExecutionHostId } from '../../../../../shared/execution-host/execution-host'
-import { PhotonBotLine } from './PhotonBotLine'
 import { PhotonConnectForm } from './PhotonConnectForm'
 
 /**
@@ -23,7 +21,6 @@ export function PhotonChannelSettings({
 }): React.JSX.Element | null {
   const t = useTranslate()
   const { view, reload } = usePhotonChannel(hostId)
-  const bots = useHostBots(hostId)
   if (view.status === 'loading' || view.status === 'unavailable') {
     return null
   }
@@ -35,12 +32,12 @@ export function PhotonChannelSettings({
         hostName
           ? t(
               'bots.photon.descriptionOnHost',
-              'Optional. Text the bots on {{host}}, through your own Photon account.',
+              'Optional. The Photon account the bots on {{host}} get their iMessage numbers from.',
               { host: hostName }
             )
           : t(
               'bots.photon.description',
-              'Optional. Text your bots, through your own Photon account. Orca needs no account for it.'
+              'Optional. The Photon account your bots’ iMessage numbers come from. Orca needs no account for it.'
             )
       }
     />
@@ -52,7 +49,10 @@ export function PhotonChannelSettings({
         <div className="flex items-center gap-3">
           <p role="alert" className="min-w-0 flex-1 text-xs text-destructive">
             {photonErrorMessage(view.error) ??
-              t('bots.photon.readFailed', 'Could not read the iMessage channel on this computer.')}
+              t(
+                'bots.photon.readFailedAccount',
+                'Could not read the iMessage account on this computer.'
+              )}
           </p>
           <Button size="xs" variant="outline" onClick={reload}>
             {t('bots.photon.retry', 'Try again')}
@@ -94,17 +94,12 @@ export function PhotonChannelSettings({
           {t('bots.photon.refresh', 'Refresh')}
         </Button>
       </div>
-      <ul className="divide-y divide-border rounded-md border border-border">
-        {bots.map((bot) => (
-          <PhotonBotLine
-            key={bot.id}
-            hostId={hostId}
-            bot={bot}
-            line={channel.bots.find((entry) => entry.botId === bot.id)}
-            onChanged={reload}
-          />
-        ))}
-      </ul>
+      <p className="text-xs text-muted-foreground">
+        {t(
+          'bots.photon.giveNumbersInBot',
+          'A number and who may text it belong to one bot: open the bot and use its Connectors › iMessage.'
+        )}
+      </p>
     </section>
   )
 }
