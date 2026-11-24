@@ -251,3 +251,32 @@ describe('linked projects for bot skills', () => {
     ).rejects.toThrow(/EEXIST/)
   })
 })
+
+describe("a computer's skill folders", () => {
+  it('links a skills tree kept outside Orca, so its skills reach a bot with no linked project', async () => {
+    const base = scratch()
+    const mailbox = writeSkill(join(base, 'agents', 'skills'), 'outlook-mail')
+    const folder = join(base, 'bot')
+
+    const linked = await linkedSkillProjects({ skillProjects: [] }, [], folder, [
+      join(base, 'agents', 'skills')
+    ])
+
+    expect(contentsOf(folder).skills).toEqual(['outlook-mail'])
+    expect(realpathSync(join(folder, 'skills', 'outlook-mail'))).toBe(mailbox)
+    expect(linked.projects).toMatchObject([
+      { name: 'skills', repoPath: join(base, 'agents', 'skills') }
+    ])
+  })
+
+  it('ignores a folder that holds no skill, rather than reporting an empty project', async () => {
+    const base = scratch()
+    mkdirSync(join(base, 'empty'), { recursive: true })
+
+    const linked = await linkedSkillProjects({ skillProjects: [] }, [], join(base, 'bot'), [
+      join(base, 'empty')
+    ])
+
+    expect(linked.projects).toEqual([])
+  })
+})

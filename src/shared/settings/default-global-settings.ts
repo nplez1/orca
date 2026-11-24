@@ -195,6 +195,7 @@ export function buildDefaultSettings(args: {
     // New profiles only; stored profiles without the key load as false (normalizeLoadedGlobalSettings).
     artifactSharingEnabled: true,
     agentSkillSharingEnabled: false,
+    botSkillFolders: [],
     nestedWorkerMaxDepth: NESTED_WORKER_MAX_DEPTH_DEFAULT,
     nestedWorkerMaxDepthDefaultedToFour: true,
     orchestrationWorkerAutoReleaseEnabled: true,

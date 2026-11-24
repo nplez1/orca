@@ -265,6 +265,7 @@ export abstract class OrcaRuntimeWithBots extends OrcaRuntimeWithLinearCommands 
     return {
       ...botStructuredSessionWiring({
         store,
+        botSkillFolders: () => this.store?.getSettings().botSkillFolders ?? [],
         botsAtInstall: this.store?.getBots?.() ?? [],
         bots: this.bots,
         chats: botChatJournal(),

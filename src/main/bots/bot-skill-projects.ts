@@ -189,12 +189,34 @@ async function scanLinkedProjects(
 /** These linked projects' skills, read in place for a running chat's list; no folder is touched. */
 export async function linkedSkillListing(
   ids: readonly string[],
-  repos: readonly Repo[]
+  repos: readonly Repo[],
+  roots: readonly string[] = []
 ): Promise<LinkedSkillListing[]> {
-  return (await scanLinkedProjects(ids, repos)).map(({ repo, skills }) => ({
-    name: repo.displayName,
+  const scanned = [
+    ...(await scanLinkedProjects(ids, repos)).map(({ repo, skills }) => ({
+      name: repo.displayName,
+      skills
+    })),
+    ...(await scanSkillRoots(roots))
+  ]
+  return scanned.map(({ name, skills }) => ({
+    name,
     skills: skills.map(({ folder: _folder, ...skill }) => skill)
   }))
+}
+
+/** A computer's skill folders, scanned as roots: each child is a skill, so the folder itself is the
+ *  skills directory. This is how a tree kept outside Orca (`~/.agents/skills`) reaches every bot. */
+async function scanSkillRoots(
+  roots: readonly string[]
+): Promise<{ name: string; path: string; skills: ScannedSkill[] }[]> {
+  const scanned = await Promise.all(
+    roots.map(async (root): Promise<{ name: string; path: string; skills: ScannedSkill[] }[]> => {
+      const skills = await scanSkillsFolder(root)
+      return skills.length > 0 ? [{ name: basename(root), path: root, skills }] : []
+    })
+  )
+  return scanned.flat()
 }
 
 /**
@@ -207,21 +229,29 @@ export async function linkedSkillListing(
 export async function linkedSkillProjects(
   bot: Pick<Bot, 'skillProjects'>,
   repos: readonly Repo[],
-  folder: string
+  folder: string,
+  roots: readonly string[] = []
 ): Promise<LinkedSkills> {
   // Rejects when the folder can't be brought up to date, so no caller takes a partial list.
   const scanned = await serialized(folder, async () => {
-    const projects = await scanLinkedProjects(bot.skillProjects ?? [], repos)
-    const links = skillLinks(projects.flatMap((project) => project.skills))
+    const scanned = [
+      ...(await scanLinkedProjects(bot.skillProjects ?? [], repos)).map(({ repo, skills }) => ({
+        name: repo.displayName,
+        path: repo.path,
+        skills
+      })),
+      ...(await scanSkillRoots(roots))
+    ]
+    const links = skillLinks(scanned.flatMap((project) => project.skills))
     await syncLinks(join(folder, 'skills'), links)
     await syncLinks(join(folder, '.claude', 'skills'), links)
-    return projects
+    return scanned
   })
   return {
     root: { skillsRoot: join(folder, 'skills'), pluginDir: folder, linksOut: true },
-    projects: scanned.map(({ repo, skills }) => ({
-      name: repo.displayName,
-      repoPath: repo.path,
+    projects: scanned.map(({ name, path, skills }) => ({
+      name,
+      repoPath: path,
       skills: skills.map(({ folder: _folder, ...skill }) => skill)
     }))
   }

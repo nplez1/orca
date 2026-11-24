@@ -126,6 +126,7 @@ export type RuntimeStore = {
   setMobileClientTabSelections?: Store['setMobileClientTabSelections']
   getSettings(): {
     browserClientHostedRemoteEnabled?: GlobalSettings['browserClientHostedRemoteEnabled']
+    botSkillFolders?: GlobalSettings['botSkillFolders']
     autoRenameBranchFromWork?: GlobalSettings['autoRenameBranchFromWork']
     nativeChatAutoName?: GlobalSettings['nativeChatAutoName']
     nativeChatResumeWorkOnRestart?: GlobalSettings['nativeChatResumeWorkOnRestart']

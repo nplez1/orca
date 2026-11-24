@@ -13,6 +13,9 @@ import { useComposioEventsHolder } from '@/components/bots/composio/composio-key
 import { selectExecutionHostDisplayLabel } from '@/runtime/hosts/display/execution-host-display-label'
 import { GitHubAccountSettings } from '@/components/bots/github/GitHubAccountSettings'
 import { GitHubAppSettings } from '@/components/bots/github/GitHubAppSettings'
+import { PhotonChannelSettings } from '@/components/bots/photon/PhotonChannelSettings'
+import { BotSkillFoldersSection } from './BotSkillFoldersSection'
+import { useGithubApp } from '@/lib/github-app-client'
 import { GoogleAccountSettings } from '@/components/bots/google/GoogleAccountSettings'
 import { useGoogleHost } from '@/components/bots/google/google-connect-client'
 import { LinearAccountSettings } from '@/components/bots/linear/LinearAccountSettings'
@@ -117,7 +120,8 @@ export function BotAccountGroup({ account }: { account: BotSettingsAccount }): R
 function connectorSummary(
   id: BotConnector['id'],
   bots: readonly Bot[],
-  googleConnected: boolean
+  googleConnected: boolean,
+  githubApp: string | null
 ): string {
   const connected =
     id === 'linear'
@@ -129,6 +133,9 @@ function connectorSummary(
           : slackWorkspaces(bots).length > 0
   if (connected) {
     return translate('settings.bots.slackConnected', 'Connected')
+  }
+  if (id === 'github' && githubApp) {
+    return translate('settings.bots.githubActsAs', 'Bots act as {{login}}', { login: githubApp })
   }
   return id === 'linear'
     ? translate('settings.bots.noLinearBots', 'No bots on Linear yet')
@@ -146,6 +153,10 @@ function ComputerConnectors({ computer }: { computer: BotSettingsComputer }): Re
   const available = useBotConnectorAvailable(computer.hostId)
   const google = useGoogleHost(botHostTarget(computer.hostId))
   const googleConnected = google.status === 'ready' && google.google.accounts.length > 0
+  // A connected App is a GitHub identity that needs no cloud, so the row must not read "Coming soon".
+  const githubApp = useGithubApp(computer.hostId).view
+  const appLogin =
+    githubApp.status === 'ready' && githubApp.app.connected ? githubApp.app.login : null
   return (
     <section className="space-y-3">
       <SettingsSubsectionHeader
@@ -162,21 +173,24 @@ function ComputerConnectors({ computer }: { computer: BotSettingsComputer }): Re
         <BotHostSignInNotice hostId={computer.hostId} host={computer.name} />
       )}
       <ul className="divide-y divide-border rounded-md border border-border">
-        {ACCOUNT_CONNECTORS.map((connector) => (
-          <li
-            key={connector.id}
-            aria-disabled={!available(connector)}
-            className="flex items-center gap-3 px-3 py-2.5 text-sm aria-disabled:text-muted-foreground"
-          >
-            <connector.Icon className="size-4 shrink-0" />
-            <span className="min-w-0 flex-1">{connector.label}</span>
-            <span className="text-xs text-muted-foreground">
-              {available(connector)
-                ? connectorSummary(connector.id, bots, googleConnected)
-                : t('settings.bots.comingSoon', 'Coming soon')}
-            </span>
-          </li>
-        ))}
+        {ACCOUNT_CONNECTORS.map((connector) => {
+          const shown = available(connector) || (connector.id === 'github' && appLogin !== null)
+          return (
+            <li
+              key={connector.id}
+              aria-disabled={!shown}
+              className="flex items-center gap-3 px-3 py-2.5 text-sm aria-disabled:text-muted-foreground"
+            >
+              <connector.Icon className="size-4 shrink-0" />
+              <span className="min-w-0 flex-1">{connector.label}</span>
+              <span className="text-xs text-muted-foreground">
+                {shown
+                  ? connectorSummary(connector.id, bots, googleConnected, appLogin)
+                  : t('settings.bots.comingSoon', 'Coming soon')}
+              </span>
+            </li>
+          )
+        })}
       </ul>
     </section>
   )
@@ -287,6 +301,7 @@ function LiveServerGroup({ computer }: { computer: BotSettingsComputer }): React
       <ComputerBots computer={computer} />
       <ComputerConnectors computer={computer} />
       <GitHubAppSettings hostId={computer.hostId} hostName={host} />
+      <PhotonChannelSettings hostId={computer.hostId} hostName={host} />
       <GoogleAccountSettings target={botHostTarget(computer.hostId)} />
       <ComposioKeySection
         computer={computer}
@@ -345,6 +360,8 @@ function LocalGroup({ computer }: { computer: BotSettingsComputer }): React.JSX.
       <ComputerBots computer={computer} />
       <ComputerConnectors computer={computer} />
       <GitHubAppSettings hostId={computer.hostId} hostName={null} />
+      <PhotonChannelSettings hostId={computer.hostId} hostName={null} />
+      <BotSkillFoldersSection />
       <GoogleAccountSettings target={botHostTarget(computer.hostId)} />
       <ComposioKeySection
         computer={computer}
