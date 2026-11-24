@@ -123,7 +123,8 @@ went with upstream's bulk test removals and ownership refactors in the 2026-11-2
 itself moved into `updater/releases/`). The prerelease-feed and feed-readiness suites were the last two
 of that family and went in upstream's 2026-11-24 test-inventory pass, so the mapping is covered through
 the two above and the retired updater cases are re-homed in
-`src/main/updater/releases/updater-fork-feed.test.ts`, as `local/sync/convergence-ledger.md` records.
+`src/main/updater/releases/updater-fork-feed.test.ts` — all but the two REST-list-first update-delay
+cases, which no test covers, as `local/sync/convergence-ledger.md` records.
 
 **The project's own links follow the same constant.** `src/shared/orca-repository.ts` derives
 `ORCA_REPOSITORY` / `ORCA_REPOSITORY_URL`, plus the scheme-less `ORCA_REPOSITORY_DISPLAY_URL` that
@@ -196,13 +197,13 @@ Anchors:
   have crowded out the atom feed` (this incident), `takes its candidate tags from the release list`, the
   draft/asset-less case, and both fallback cases — lived in the prerelease-feed suite, and the fork-feed
   regression case that exercised the atom fallback in the feed-readiness suite. Both suites went in
-  upstream's 2026-11-24 test-inventory pass, and every one of those cases is re-homed in
-  `src/main/updater/releases/updater-fork-feed.test.ts` — the atom-fallback regression among them.
+  upstream's 2026-11-24 test-inventory pass; every case listed here is re-homed in
+  `src/main/updater/releases/updater-fork-feed.test.ts`, the atom-fallback regression included.
 - the last-good pin reaching `available` — the suite that asserted that transition,
   `updater.publishing-window-feed.test.ts`, was retired upstream in the 2026-11-20 sync's bulk test
   removals (#43277); the prerelease-feed suite that pinned the `lastGoodTag` the pin is built on went in
-  the 2026-11-24 test-inventory pass, and the transition itself is re-homed in that same fork-owned
-  suite.
+  the 2026-11-24 test-inventory pass; its not-ready readings of `lastGoodTag` are re-homed in
+  `updater-fork-feed.test.ts`, but the step from last-good to `available` still has no test.
 - `src/main/updater-release-targets.ts` and `src/main/updater-release-readiness.ts` — the URL and
   probe halves, split out of the resolver so it stays inside the 300-line module limit. A sync that
   restores the single file has to take these two with it.
