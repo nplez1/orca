@@ -8,6 +8,8 @@ import { computeVisibleWorktrees } from '../../worktree-list/listing/compute-vis
 import { createLiveAgentWorktreeIdsSelector } from '@/lib/workspace/activity/worktree-activity-state'
 import { getSettingsFocusedExecutionHostId } from '../../../../../../shared/execution-host/execution-host'
 import type { AppState } from '@/store/types'
+import type { RuntimeStatuses } from '@/store/slices/runtime-status/views/runtime-status-owner'
+import { useAppStoreWithHostStatuses } from '@/store/slices/runtime-status/views/use-runtime-status-view'
 import {
   EMPTY_PAIRED_DEVICE_IDS_BY_ENVIRONMENT,
   getPairedDeviceIdsByEnvironment
@@ -26,7 +28,7 @@ type UseVisibleWorkspaceKanbanWorktreeIdsParams = {
 const EMPTY_WORKTREE_ID_SET: ReadonlySet<string> = new Set()
 const EMPTY_HIDDEN_WORKSPACE_STATUS_IDS: readonly string[] = []
 const EMPTY_RUNTIME_ENVIRONMENTS: AppState['runtimeEnvironments'] = []
-const EMPTY_RUNTIME_STATUS_BY_ENVIRONMENT_ID: AppState['runtimeStatusByEnvironmentId'] = new Map()
+const EMPTY_RUNTIME_STATUS_BY_ENVIRONMENT_ID: RuntimeStatuses = new Map()
 
 export function useVisibleWorkspaceKanbanWorktreeIds({
   allWorktrees,
@@ -43,10 +45,8 @@ export function useVisibleWorkspaceKanbanWorktreeIds({
   const runtimeEnvironments = useAppStore((s) =>
     s.hideWorkspacesFromOtherDevices ? s.runtimeEnvironments : EMPTY_RUNTIME_ENVIRONMENTS
   )
-  const runtimeStatusByEnvironmentId = useAppStore((s) =>
-    s.hideWorkspacesFromOtherDevices
-      ? s.runtimeStatusByEnvironmentId
-      : EMPTY_RUNTIME_STATUS_BY_ENVIRONMENT_ID
+  const runtimeStatusByEnvironmentId = useAppStoreWithHostStatuses((s, statuses) =>
+    s.hideWorkspacesFromOtherDevices ? statuses : EMPTY_RUNTIME_STATUS_BY_ENVIRONMENT_ID
   )
   const alwaysShowDefaultBranchWorkspace = useAppStore((s) => s.alwaysShowDefaultBranchWorkspace)
   const workspaceHostScope = useAppStore((s) => s.workspaceHostScope)

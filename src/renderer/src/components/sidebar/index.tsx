@@ -41,7 +41,12 @@ import { PROJECTS_SECTION_GROUP_KEY } from '../../../../shared/sidebar-list/sect
 import { useBotsEnabled } from '@/lib/bot-catalog'
 import { StartupWorktreeRefreshStatus } from './worktree-list/listing/StartupWorktreeRefreshStatus'
 import { WorktreeCardsIntroNotice } from './workspace-card/template/WorktreeCardsIntroNotice'
-import { WORKSPACE_LIST_REGION_ID } from '@/components/app-rail/app-rail-layout'
+import {
+  selectRailPageHidesWorkspaceList,
+  selectWorkspaceListOpen,
+  WORKSPACE_LIST_REGION_ID
+} from '@/components/app-rail/app-rail-layout'
+import { useRailPageListFocusRelease } from '@/components/app-rail/rail-page-list-focus-loss'
 import { setWorkspaceListRegionPresent } from '@/components/app-rail/workspace-list-region-presence'
 import { WorktreeCardsUpdateNotice } from './workspace-card/template/WorktreeCardsUpdateNotice'
 
@@ -66,7 +71,6 @@ const OrcaYamlTrustDialog = lazyWithRetry(
 const ForgetSshWorkspaceDialog = lazyWithRetry(
   () => import('./workspace-actions/deletion/ForgetSshWorkspaceDialog')
 )
-
 const MIN_WIDTH = 220
 const MAX_WIDTH = 500
 const sidebarSectionDragModifiers: Modifier[] = [
@@ -100,7 +104,13 @@ function Sidebar({
   worktreeScrollOffsetRef,
   worktreeScrollAnchorRef
 }: SidebarProps): React.JSX.Element {
-  const sidebarOpen = useAppStore((s) => s.sidebarOpen)
+  // Whether the list shows: collapsed on a rail page (rail on) while the saved choice stays.
+  const sidebarOpen = useAppStore(selectWorkspaceListOpen)
+  // Why the saved choice: a rail page only hides the rows (zero width, inert), so their drafts, open dialogs, sort
+  // session and smart-sort latch survive the visit; only the user's own collapse unmounts them.
+  const rowsMounted = useAppStore((s) => s.sidebarOpen)
+  const hiddenByRailPage = useAppStore(selectRailPageHidesWorkspaceList)
+  useRailPageListFocusRelease(hiddenByRailPage)
   const sidebarWidth = useAppStore((s) => s.sidebarWidth)
   const setSidebarWidth = useAppStore((s) => s.setSidebarWidth)
   const repos = useAppStore((s) => s.repos)
@@ -285,10 +295,13 @@ function Sidebar({
           id={WORKSPACE_LIST_REGION_ID}
           className="relative min-h-0 flex-shrink-0 bg-worktree-sidebar flex flex-col overflow-hidden"
           style={leftSidebarStyle}
+          // Hidden rows stay mounted but out of the tab order, pointer and accessibility tree.
+          inert={hiddenByRailPage || undefined}
+          aria-hidden={hiddenByRailPage || undefined}
           onClickCapture={restoreAgentTabFocusAfterChromeClick}
           {...dropHandlers}
         >
-          {sidebarOpen && (
+          {rowsMounted && (
             <>
               <DndContext
                 sensors={sidebarSectionDragSensors}

@@ -10,6 +10,7 @@ import {
   refreshDetectedAgentInventories
 } from '../../store/slices/agent-enablement-redetection'
 import { useAppStore } from '../../store/index'
+import { showWorkspaceListThen } from '../../components/app-rail/app-rail-navigation'
 import { openPluginInstallLink } from '../../store/plugins/navigation/plugin-preview-request'
 
 function getShortcutPlatform(): NodeJS.Platform {
@@ -167,7 +168,11 @@ export function registerSettingsAndSidebarIpcBridge(unsubs: (() => void)[]): voi
 
   unsubs.push(
     window.api.ui.onToggleLeftSidebar(() => {
-      runBuiltInOrReplacement('sidebar.left.toggle', () => useAppStore.getState().toggleSidebar())
+      runBuiltInOrReplacement('sidebar.left.toggle', () => {
+        if (!showWorkspaceListThen(useAppStore)) {
+          useAppStore.getState().toggleSidebar()
+        }
+      })
     })
   )
 

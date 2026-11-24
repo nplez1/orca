@@ -44,7 +44,8 @@ type SearchPage = {
 export function useAiVaultSearch(
   request: AiVaultSearchRequest | null,
   scope: ExecutionHostScope | null,
-  policyKey: string
+  policyKey: string,
+  debounceMs = 250
 ) {
   const associations = useAiVaultAssociationObservation(request ? scope : null)
   const [page, setPage] = useState<SearchPage | null>(null)
@@ -131,7 +132,7 @@ export function useAiVaultSearch(
         void run()
       }
     })
-    const timer = setTimeout(() => void run(), 250)
+    const timer = setTimeout(() => void run(), debounceMs)
     return () => {
       cancelled = true
       followUp = false
@@ -139,7 +140,7 @@ export function useAiVaultSearch(
       loadPage.current = null
       clearTimeout(timer)
     }
-  }, [identity, associations])
+  }, [identity, associations, debounceMs])
 
   // Leaving search drops its hits so returning cannot revive another request's results or cursor.
   if (page && !(request && scope)) {
@@ -155,6 +156,8 @@ export function useAiVaultSearch(
     /** Changes when hits for a different request land, never while one is pending. */
     resultsKey: JSON.stringify(shown ? [shown.identity.scope, shown.identity.request] : null),
     response: current?.response ?? null,
+    /** The shown reply had no hits; holds while a newer request on this host is pending. */
+    replyEmpty: shown?.response?.kind === 'results' && shown.response.hits.length === 0,
     error: current?.error ?? false,
     loading: Boolean(request && scope && (!current || current.loading)),
     removeHit: (hit: AiVaultSearchHit) =>
@@ -185,7 +188,7 @@ export function useAiVaultPanelSearch(
   /** Which scope the host resolves; undefined searches everything it has. */
   within: AiVaultSearchScopeIdentity | undefined,
   executionHostScope: ExecutionHostScope,
-  sort: AiVaultSearchSort
+  { sort, submitted }: { sort: AiVaultSearchSort; submitted: boolean }
 ) {
   const settings = useAppStore((state) => state.settings?.aiVaultSearch)
   const policy = resolveAiVaultSearchSettings({ aiVaultSearch: settings })
@@ -196,6 +199,17 @@ export function useAiVaultPanelSearch(
   const hasQuery = trimmed.length > 0
   const needsLocalConsent =
     executionHostScope === 'local' && !isWebClientLocation() && !policy.contentEnabled
+  const policyKey = JSON.stringify(policy)
+  const [undebouncedFor, setUndebouncedFor] = useState(() =>
+    submitted && !needsLocalConsent && scope ? { scope, policyKey } : null
+  )
+  // Edits and policy changes (which can reopen the index) keep the normal debounce.
+  if (
+    undebouncedFor &&
+    (!submitted || undebouncedFor.scope !== scope || undebouncedFor.policyKey !== policyKey)
+  ) {
+    setUndebouncedFor(null)
+  }
   // Why: another computer's index is not this client's to turn on (a relay keeps its
   // own off by design), so once a single host says its search is off, the box goes
   // back to the title filter for that host instead of walling the list (#22453).
@@ -215,7 +229,7 @@ export function useAiVaultPanelSearch(
         : null,
     [searching, scope, agents, trimmed, within, sort]
   )
-  const search = useAiVaultSearch(request, scope, JSON.stringify(policy))
+  const search = useAiVaultSearch(request, scope, policyKey, undebouncedFor ? 0 : undefined)
   const hostSearchOff =
     search.response?.kind === 'unavailable' &&
     TITLE_ONLY_UNAVAILABLE_REASONS.has(search.response.reason)

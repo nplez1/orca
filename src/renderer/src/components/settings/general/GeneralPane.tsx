@@ -7,7 +7,12 @@ import { GeneralEditorSettingsSection } from '../editor/GeneralEditorSettingsSec
 import { GeneralAutoSaveSetting } from '../editor/GeneralAutoSaveSetting'
 import { GeneralSupportSection } from './GeneralSupportSection'
 import { GeneralUpdateSettingsSection } from '../updates/GeneralUpdateSettingsSection'
-import { GeneralWorkspaceSettingsSection } from './GeneralWorkspaceSettingsSection'
+import {
+  GeneralWorkspaceSettingsSection,
+  useNestWorkspacesSetting
+} from './GeneralWorkspaceSettingsSection'
+import type { SettingsHostScope } from '../host-scope/settings-host-scope'
+import { LOCAL_SETTINGS_HOST_SCOPE } from '../host-scope/settings-host-scope'
 import {
   getGeneralCliSearchEntries,
   getGeneralNavigationSearchEntries,
@@ -29,7 +34,6 @@ import { GeneralConfirmationsSection } from './GeneralConfirmationsSection'
 import { GeneralSearchResults } from './GeneralSearchResults'
 import { getGeneralSubPageTitle, type GeneralSubPage } from './general-sub-pages'
 import { useOpenInMenuDraft } from './OpenInMenuSetting'
-import type { SettingsHostScope } from '../host-scope/settings-host-scope'
 import type { RuntimeClientTarget } from '../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
 import { getLocalExecutionHostLabel } from '../../../../../shared/execution-host/execution-host'
 
@@ -173,9 +177,11 @@ function GeneralRootSettings({
   wslSupportedPlatform,
   wslAvailable,
   wslCapabilitiesLoading,
-  wslDistros = EMPTY_WSL_DISTROS
+  wslDistros = EMPTY_WSL_DISTROS,
+  hostScope = LOCAL_SETTINGS_HOST_SCOPE
 }: GeneralPaneProps & { query: string; showNavigation: boolean }): React.JSX.Element {
   const t = useTranslate()
+  const nestWorkspaces = useNestWorkspacesSetting(hostScope, settings, updateSettings)
   const tabsEntries = getGeneralNavigationSearchEntries()
   const runtimeEntries = getGeneralProjectRuntimeSearchEntries()
   const showRuntime = shouldShowProjectRuntimeSection(wslSupportedPlatform, query, runtimeEntries)
@@ -248,9 +254,11 @@ function GeneralRootSettings({
                 title={getGeneralSubPageTitle('folder', t)}
                 description={settings.workspaceDir}
                 value={
-                  settings.nestWorkspaces
-                    ? t('settings.general.folder.perProject', 'Folder per project')
-                    : t('settings.general.folder.oneFolder', 'One folder')
+                  nestWorkspaces.setting.state !== 'ready'
+                    ? undefined
+                    : nestWorkspaces.setting.value
+                      ? t('settings.general.folder.perProject', 'Folder per project')
+                      : t('settings.general.folder.oneFolder', 'One folder')
                 }
                 onClick={() => onSelectSubPage('folder')}
               />

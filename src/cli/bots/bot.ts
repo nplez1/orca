@@ -13,6 +13,7 @@ import { printResult } from '../output/command-result-output'
 import { RuntimeClientError } from '../runtime/connection/types'
 import { callerChat } from '../automations/automation-caller-chat'
 import { formatBotChats, type BotChatsResult } from './bot-chats-format'
+import { orcaCloudNeedsSignIn } from '../../shared/bots/host-orca-sign-in'
 
 export function formatBot(bot: Bot): string {
   return `${bot.name} (${bot.agent}${bot.paused ? ', paused' : ''})  id: ${bot.id}`
@@ -28,7 +29,7 @@ export function callBots<TResult>(
 }
 
 /** bots.list; webhooks says whether the host's Orca Cloud takes webhooks, absent without one;
- *  connectorStatus 'signed-out' that the host is signed out of Orca. */
+ *  connectorStatus 'signed-out' or 'needs-sign-in' that the host isn't signed in to Orca Cloud. */
 export type BotsListResult = {
   bots: Bot[]
   webhooks?: boolean
@@ -37,12 +38,23 @@ export type BotsListResult = {
   threadReplies: boolean
   githubEvents2?: boolean
   githubWorkflows?: boolean
+  githubCiFinished?: boolean
   connectorStatus?: string
+  /** The host's name when it is a headless Orca server; null with a window; absent from an older host. */
+  signInServer?: string | null
 }
 
 /** The bot, with what its host's Orca Cloud takes. */
 export type HostBot = Bot &
-  Pick<BotConnectors, 'webhooks' | 'cloudSignedOut' | 'githubEvents2' | 'githubWorkflows'> & {
+  Pick<
+    BotConnectors,
+    | 'webhooks'
+    | 'cloudSignedOut'
+    | 'signInServer'
+    | 'githubEvents2'
+    | 'githubWorkflows'
+    | 'githubCiFinished'
+  > & {
     threadReplies: boolean
     localWebhooks: boolean
     localWebhookHooks: ReadonlySet<string>
@@ -55,7 +67,9 @@ export function withHostFacts(bot: Bot, result: BotsListResult): HostBot {
     threadReplies: result.threadReplies,
     githubEvents2: result.githubEvents2 === true,
     githubWorkflows: result.githubWorkflows === true,
-    cloudSignedOut: result.connectorStatus === 'signed-out',
+    githubCiFinished: result.githubCiFinished === true,
+    cloudSignedOut: orcaCloudNeedsSignIn(result.connectorStatus),
+    ...(result.signInServer !== undefined ? { signInServer: result.signInServer } : {}),
     localWebhooks: result.localWebhooks === true,
     localWebhookHooks: new Set(result.localWebhookHooks ?? [])
   }

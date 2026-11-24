@@ -4,13 +4,20 @@
 // The owner's reply quotes the question line it answers (bot-item-question-answers.ts); the move the
 // first one caused (`cause: 'answer'`) is not shown while the question is loaded. Answers recorded by
 // older hosts are replies like any other.
+import { botItemCommentFiles } from './bot-item-comment-files'
+import { botItemNamedAnswers } from './bot-item-answer-lines'
 import {
+  botItemCommentImages,
   botItemLinksOnePerChain,
   type BotItem,
   type BotItemEvent,
   type BotItemLinkView
 } from './bot-items'
-import { botItemQuestionPairing, type BotItemQuestionPairing } from './bot-item-question-answers'
+import {
+  botItemQuestionPairing,
+  type BotItemAskEnd,
+  type BotItemQuestionPairing
+} from './bot-item-question-answers'
 
 type DispatchLink = Extract<BotItemLinkView, { kind: 'dispatch' }>
 
@@ -25,10 +32,22 @@ export type BotItemActivityEntry =
       waiting: boolean
       /** On an ask: per question line, the owner comment that answered it. */
       answers?: (BotItemEvent | null)[]
+      /** On an ask: per line, answered only by order (a comment naming no line). */
+      byOrder?: boolean[]
+      /** On an ask a later one replaced, or answered with the rest skipped: its open lines take no answer. */
+      ended?: BotItemAskEnd
       /** On the owner's reply to a question: the question it answers, by its first line. */
       replyTo?: { eventId: string; text: string }
+      /** The owner's answer reads in full on its ask's lines ("Question → answer"): no card of its own. */
+      onAsk?: true
     }
   | { kind: 'worker'; key: string; at: number; phase: 'started' | 'finished'; link: DispatchLink }
+
+/** Why a worker stopped without a report, worded as the chat's worker strip words it. */
+export function botItemWorkerStopReason(link: DispatchLink): string | null {
+  const stopped = link.state === 'failed' || link.state === 'stopped'
+  return stopped && !link.report && link.reason?.trim() ? link.reason.trim() : null
+}
 
 /** The question an owner's comment answers (`answers`), or null for any other event. */
 function answeredQuestion(event: BotItemEvent): string | null {
@@ -37,6 +56,33 @@ function answeredQuestion(event: BotItemEvent): string | null {
     typeof event.data.answers === 'string'
     ? event.data.answers
     : null
+}
+
+/** An answer the ask's lines show whole: words only, no recorded picks, images or files, and where it
+ *  names its lines, nothing but those lines. */
+function readsOnAsk(event: BotItemEvent, pairing: BotItemQuestionPairing): boolean {
+  const text = typeof event.data.text === 'string' ? event.data.text : ''
+  const paired = pairing.replies.get(event.id)
+  const ask = paired ? pairing.questions.get(paired.questionId) : undefined
+  if (!ask) {
+    return false
+  }
+  const { shape } = ask
+  // With several questions, a comment that named no line is a comment of its own.
+  if (
+    shape.decisions.length > 1 &&
+    ask.answers.some((answer, index) => answer?.id === event.id && ask.byOrder[index])
+  ) {
+    return false
+  }
+  const lines = text.split('\n').filter((line) => line.trim())
+  const named = botItemNamedAnswers(shape, text).filter((words) => words !== null).length
+  return (
+    (named === 0 || named === lines.length) &&
+    !Array.isArray(event.data.decisions) &&
+    botItemCommentImages(event.data).length === 0 &&
+    botItemCommentFiles(text).files.length === 0
+  )
 }
 
 function linksOnlyWorkers(event: BotItemEvent): boolean {
@@ -92,7 +138,7 @@ function replyQuote(
 }
 
 function eventEntries(
-  item: Pick<BotItem, 'question' | 'status'>,
+  item: Pick<BotItem, 'question' | 'status' | 'waitingAsk'>,
   events: readonly BotItemEvent[]
 ): BotItemActivityEntry[] {
   const entries: BotItemActivityEntry[] = []
@@ -103,6 +149,10 @@ function eventEntries(
     }
   }
   const pairing = botItemQuestionPairing(item, events)
+  // An ask waits, read or still on an earlier page.
+  const askWaiting =
+    [...pairing.questions.values()].some(({ waiting }) => waiting) ||
+    (item.waitingAsk !== undefined && !pairing.questions.has(item.waitingAsk))
   const kept = events.filter((event) => !isSnoozeMark(event))
   const place = new Map(kept.map((event, index) => [event, index]))
   const prev = (event: BotItemEvent): BotItemEvent | undefined => {
@@ -135,19 +185,21 @@ function eventEntries(
       key: event.id,
       at: event.at,
       event,
-      // A question asked in prose waits while it is the item's question.
+      // A question asked in prose waits while it is the item's question and no ask waits before it.
       waiting: asked
         ? asked.waiting
-        : event.id === item.question?.eventId && event.actor.kind !== 'owner',
-      ...(asked ? { answers: asked.answers } : {}),
-      ...(replyTo ? { replyTo } : {})
+        : event.id === item.question?.eventId && event.actor.kind !== 'owner' && !askWaiting,
+      ...(asked ? { answers: asked.answers, byOrder: asked.byOrder } : {}),
+      ...(asked?.ended ? { ended: asked.ended } : {}),
+      ...(replyTo ? { replyTo } : {}),
+      ...(readsOnAsk(event, pairing) ? { onAsk: true as const } : {})
     })
   }
   return entries
 }
 
 export function botItemActivity(
-  item: Pick<BotItem, 'links' | 'question' | 'status'>,
+  item: Pick<BotItem, 'links' | 'question' | 'status' | 'waitingAsk'>,
   events: readonly BotItemEvent[]
 ): BotItemActivityEntry[] {
   const entries = eventEntries(item, events)
@@ -175,4 +227,46 @@ export function botItemActivity(
     }
   }
   return entries.sort((a, b) => a.at - b.at)
+}
+
+/** The move a Waiting item's card, last in Activity, stands in for: its latest status event, while
+ *  that set Waiting. */
+export function botItemWaitEntryKey(
+  item: Pick<BotItem, 'status' | 'wait'>,
+  entries: readonly BotItemActivityEntry[]
+): string | null {
+  if (item.status !== 'waiting' || !item.wait) {
+    return null
+  }
+  const last = entries.findLast((entry) => entry.kind === 'event' && entry.event.kind === 'status')
+  return last?.kind === 'event' && last.event.data.to === 'waiting' ? last.key : null
+}
+
+/** The open question, or the status entry that put the item in Needs you. */
+/** The ask the item waits on now, as its comment entry: where a replaced ask leads. */
+export function botItemLiveAskKey(entries: readonly BotItemActivityEntry[]): string | null {
+  return (
+    entries.find((entry) => entry.kind === 'comment' && entry.waiting && !entry.onAsk)?.key ?? null
+  )
+}
+
+export function botItemNeedsYouEntryKey(
+  item: Pick<BotItem, 'question' | 'waitingAsk'>,
+  entries: readonly BotItemActivityEntry[]
+): string | null {
+  const questionId = item.waitingAsk ?? item.question?.eventId
+  if (questionId !== undefined) {
+    return (
+      entries.find((entry) => entry.key === questionId && entry.kind === 'comment' && !entry.onAsk)
+        ?.key ?? null
+    )
+  }
+  const target = entries.findLast(
+    (entry) =>
+      (entry.kind === 'comment' && entry.waiting && !entry.onAsk) ||
+      (entry.kind === 'event' &&
+        ((entry.event.kind === 'status' && entry.event.data.to === 'needs_you') ||
+          (entry.event.kind === 'made' && entry.event.data.status === 'needs_you')))
+  )
+  return target?.key ?? null
 }

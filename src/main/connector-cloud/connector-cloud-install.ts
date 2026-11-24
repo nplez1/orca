@@ -9,7 +9,7 @@ import type { ConnectorGitHubInstallations } from './connector-github-installati
 import type { ConnectorRuntimeKind } from './connector-machine'
 import { connectorBots, type ConnectorPlacesStore } from './connector-places'
 import { connectorAccount, desktopConnectorTokenMint } from './connector-token-mint'
-import { connectorTriggers, triggerRunEvent } from './connector-triggers'
+import { connectorTriggers, runTriggerDelivery, triggerRunEvent } from './connector-triggers'
 import { hostNeedsConnector } from './connector-connection-need'
 import type { WebhookHostService } from '../webhooks/webhook-host-service'
 import type {
@@ -72,7 +72,6 @@ export function createConnectorCloud({
   )
   const prWaker = new BotPrWaker({
     record: runtime.botWork,
-    store: () => runtime.botWork.store().wakes,
     now: Date.now,
     send: (address, deliveryId, message) => {
       const seam = runtime.getExternalConversationSeam()
@@ -128,7 +127,7 @@ export function createConnectorCloud({
       bots: () =>
         connectorBots(
           store,
-          store.getSettings().botsEnabled !== false,
+          runtime.bots.enabled(),
           // Asks the cloud only for an account with a bot on GitHub.
           (store.getBots?.() ?? []).some((bot) => bot.github) ? gitHubInstallations.ids() : [],
           runtime.getConnectorCloud()?.cloudFeatures() ?? null
@@ -149,12 +148,17 @@ export function createConnectorCloud({
         ),
       runTrigger: async (delivery) => {
         const event = triggerRunEvent(store.listAutomations(), store.getBots?.() ?? [], delivery)
-        if (event?.source === 'webhook') {
-          // Its ledger, not the run, confirms a call.
-          return webhooks.receive(delivery, event)
-        }
-        if (!event) {
-          return false
+        // Nothing to guard when no rule here takes the delivery, or when a hook's own ledger is what confirms it.
+        if (event === null || event.source === 'webhook') {
+          return runTriggerDelivery(
+            {
+              automations: store.listAutomations(),
+              bots: store.getBots?.() ?? [],
+              webhook: (call, callEvent) => webhooks.receive(call, callEvent),
+              run: (id, runEvent) => runtime.runAutomationForEvent(id, runEvent)
+            },
+            delivery
+          )
         }
         // The owner's own pull request starts nothing when the bot's own work opened it as them.
         return runOwnPrGuarded(

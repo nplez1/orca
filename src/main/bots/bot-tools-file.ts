@@ -173,9 +173,10 @@ function writeServers(
       commitBotToolOAuth(folder, id, () => null)
     }
   }
+  // Publishes every value or throws having written none, so a refusal has nothing to roll back.
+  changeBotToolCredentials(folder, added)
   let written: boolean
   try {
-    changeBotToolCredentials(folder, added)
     for (const [id, url] of signIns) {
       const entry = commitBotToolOAuth(folder, id, (current) =>
         current ? undefined : { url, grant: 0, record: { resource: url } }
@@ -189,7 +190,8 @@ function writeServers(
       botToolsPath(folder),
       snapshot.text,
       `${JSON.stringify({ ...snapshot.file, servers: stored }, null, 2)}\n`,
-      { mode: 0o600 }
+      // Older files hold header values inline: an earlier copy is never kept beside it.
+      { mode: 0o600, credential: true }
     )
   } catch (error) {
     rollBack()

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at 296 of its 300-line budget; the fork's turn-end and working-start stamps ride inside it, and splitting costs a permanent sync hunk. */
 import type { AgentStatus } from '../../../../shared/agent-status/title/agent-title-core'
 import type { RuntimePtyWorktreeRecord } from '../records/runtime-terminal-state-records'
 import { OrcaRuntimeWithGetUnpersistedTrackedTitleForPty } from './terminal-title-tracker'
@@ -166,6 +167,13 @@ export abstract class OrcaRuntimeWithApplyTrackedPtyTitle extends OrcaRuntimeWit
       }
       if (prevStatus !== agentStatus) {
         pty.lastAgentStatusStartedAtEpochMs = observedAtEpochMs
+        // Blocked or statusless titles mid-turn keep the turn; only an idle title means at rest.
+        if (prevStatus === 'working' || prevStatus === 'idle') {
+          pty.lastAgentStatusEndedTurn = prevStatus === 'working'
+        }
+        if (agentStatus === 'working') {
+          pty.lastAgentStatusWorkingStartedAtEpochMs = observedAtEpochMs
+        }
       }
       if (prevStatus !== agentStatus || retiresDisplayClear) {
         this.onTitleAgentStatusChanged()
@@ -302,6 +310,8 @@ export abstract class OrcaRuntimeWithApplyTrackedPtyTitle extends OrcaRuntimeWit
       // so the seed a same-id restore applies must not inherit its authority.
       pty.lastAgentStatusObservedLive = false
       pty.lastAgentStatusStartedAtEpochMs = null
+      pty.lastAgentStatusWorkingStartedAtEpochMs = null
+      pty.lastAgentStatusEndedTurn = false
       pty.lastAgentStatusRichInvalidatedAtEpochMs = Date.now()
       pty.providerGenerationResetAtEpochMs = pty.lastAgentStatusRichInvalidatedAtEpochMs
       pty.managementTitle = null

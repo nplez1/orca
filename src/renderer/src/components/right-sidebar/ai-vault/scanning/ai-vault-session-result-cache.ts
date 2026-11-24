@@ -110,10 +110,6 @@ export function cacheAiVaultSessionResult(args: {
   }
 }
 
-export function resetAiVaultSessionResultCacheForTest(): void {
-  cachedSessionResults.clear()
-}
-
 function markAiVaultSessionResultsStale(matches: (host: ExecutionHostScope) => boolean): void {
   for (const entry of cachedSessionResults.values()) {
     if (matches(entry.executionHostScope)) {

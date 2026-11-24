@@ -1,3 +1,4 @@
+import { runtimeTargetEnvironmentId } from '@/runtime/rpc/targets/runtime-client-target'
 import { AccountsPane } from '../accounts/AccountsPane'
 import { getProviderAccountsOwnerKey } from '@/runtime/provider-accounts/observations/runtime-provider-accounts-client'
 import { AgentsPane } from '../agents/AgentsPane'
@@ -22,6 +23,8 @@ export function renderAgentsSettingsSection(
   t: Translate = translate
 ): React.JSX.Element {
   const { model, navigation, terminal, view } = context
+  // A machine-only scope has no server endpoint, so the server's agent surfaces have no host to read.
+  const scopeTarget = model.settingsHostScope.target
   return (
     <SettingsSection
       id="agents"
@@ -34,8 +37,14 @@ export function renderAgentsSettingsSection(
     >
       {view.isSectionMounted('agents') ? (
         <div className="space-y-8">
-          {model.settingsHostScope.target?.kind === 'local' ? (
-            <AgentDefaultSurfaceSection settings={model.settings} />
+          {/* A web page's server is set from a desktop; its caption names "this computer". */}
+          {scopeTarget !== null &&
+          (model.showDesktopOnlySettings || scopeTarget.kind === 'local') ? (
+            <AgentDefaultSurfaceSection
+              key={runtimeTargetEnvironmentId(scopeTarget) ?? 'local'}
+              settings={model.settings}
+              hostScope={model.settingsHostScope}
+            />
           ) : null}
           <AgentsPane
             settings={model.settings}

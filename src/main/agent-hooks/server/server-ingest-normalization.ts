@@ -142,13 +142,13 @@ export abstract class AgentHookServerIngestNormalization extends AgentHookServer
 
   protected setClaudeBackgroundEvidence(
     paneKey: string,
-    hasRunningTask: boolean,
+    runningTasks: readonly string[] | undefined,
     hasActiveCron: boolean
   ): void {
-    if (hasRunningTask) {
-      this.state.claudeRunningNonAgentTaskPaneKeys.add(paneKey)
+    if (runningTasks) {
+      this.state.claudeRunningNonAgentTasksByPaneKey.set(paneKey, runningTasks)
     } else {
-      this.state.claudeRunningNonAgentTaskPaneKeys.delete(paneKey)
+      this.state.claudeRunningNonAgentTasksByPaneKey.delete(paneKey)
     }
     if (hasActiveCron) {
       this.state.claudeActiveSessionCronPaneKeys.add(paneKey)
@@ -222,7 +222,7 @@ export abstract class AgentHookServerIngestNormalization extends AgentHookServer
         })
       }
     }
-    const previousRunningTask = this.state.claudeRunningNonAgentTaskPaneKeys.has(paneKey)
+    const previousRunningTask = this.state.claudeRunningNonAgentTasksByPaneKey.get(paneKey)
     const previousActiveCron = this.state.claudeActiveSessionCronPaneKeys.has(paneKey)
     const event = normalizeHookPayload(this.state, source, body, this.env, {
       ownsHoldRetraction: true,
@@ -233,7 +233,7 @@ export abstract class AgentHookServerIngestNormalization extends AgentHookServer
       // A wrapper's CLAUDE_CONFIG_DIR is only visible here; History scans it too (#23505).
       getClaudeObservedConfigDirs()?.observeTranscriptPath(transcriptPath)
     }
-    const nextRunningTask = this.state.claudeRunningNonAgentTaskPaneKeys.has(paneKey)
+    const nextRunningTask = this.state.claudeRunningNonAgentTasksByPaneKey.get(paneKey)
     const nextActiveCron = this.state.claudeActiveSessionCronPaneKeys.has(paneKey)
     this.setClaudeBackgroundEvidence(paneKey, previousRunningTask, previousActiveCron)
     if (!event || event.paneKey !== paneKey) {

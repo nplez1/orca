@@ -50,6 +50,8 @@ export function RightSidebarPanelContent({
       // Why: a panel is read-only chrome; a pointer click on its background drops focus
       // to the page, so the agent tab takes it back.
       onClick={restoreAgentTabFocusAfterPanelBackgroundClick}
+      // Bot panel rows open their hover cards outside this rect's left edge, covering nothing in it.
+      data-right-sidebar-panel=""
       // `orca plugin shot` captures exactly this rect.
       data-plugin-panel-surface={isPluginPanelTabKey(effectiveTab) ? effectiveTab : undefined}
     >

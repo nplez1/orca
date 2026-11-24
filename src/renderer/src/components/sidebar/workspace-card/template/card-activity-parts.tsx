@@ -44,6 +44,7 @@ function detailsHover(
       card={card}
       branchName={optionalText(props.branchName)}
       workspaceTitle={optionalText(props.workspaceTitle)}
+      closed={props.closed === true}
     >
       {child}
     </WorktreeCardIdentityHover>
@@ -109,5 +110,5 @@ export const CARD_ACTIVITY_PARTS = {
     const indicator = resolveEphemeralVmLeaseIndicator(card.ephemeralLease)
     return indicator ? <EphemeralVmLeaseBadge indicator={indicator} /> : null
   }),
-  DetailsHover: part(['branchName', 'workspaceTitle'], detailsHover)
+  DetailsHover: part(['branchName', 'workspaceTitle', 'closed'], detailsHover)
 }

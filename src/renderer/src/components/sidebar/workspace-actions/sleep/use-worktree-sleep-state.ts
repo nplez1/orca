@@ -213,8 +213,3 @@ export function useWorktreeIdsWithEmptySurface(enabled = true): ReadonlySet<stri
     unifiedTabsByWorktree
   ])
 }
-
-export function resetWorktreeSleepStateCacheForTests(): void {
-  liveAgentGeneration = null
-  closedTabGeneration = null
-}

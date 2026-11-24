@@ -6,13 +6,14 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import type { HelpMenuController } from '@/components/sidebar/chrome/help-menu-controller'
-import { AppRailButton } from './AppRailButton'
+import { APP_RAIL_ICON_SIZE, APP_RAIL_ICON_STROKE_WIDTH, AppRailButton } from './AppRailButton'
 import { appRailSlotCapacity } from './app-rail-overflow'
 
 /** What doesn't fit on a very short rail: Help (as a submenu sharing the rail's one Help controller), then Settings. */
@@ -22,7 +23,8 @@ export function AppRailMoreMenu({
   includeSettings,
   settingsActive,
   onOpenSettings,
-  tabStop
+  tabStop,
+  destinations
 }: {
   help: HelpMenuController
   includeHelp: boolean
@@ -30,13 +32,29 @@ export function AppRailMoreMenu({
   settingsActive: boolean
   onOpenSettings: () => void
   tabStop: boolean
+  /** Folded destinations, in rail order: plain rows that open their page. */
+  destinations: readonly {
+    id: string
+    label: string
+    icon: React.ReactNode
+    current: boolean
+    /** The page moves focus itself when it opens (Automations' title), so the menu must not refocus its trigger. */
+    ownsFocusOnOpen?: boolean
+    onSelect: () => void
+  }[]
 }): React.JSX.Element {
   const t = useTranslate()
+  // Why: Radix refocuses the trigger in a timeout after closing, which would land after (or before, on a cold page
+  // load) the page's own focus; yielding makes the page's focus win every time.
+  const yieldCloseFocusRef = useRef(false)
   const label = t('appRail.more', 'More')
   const settingsLabel = t('auto.components.sidebar.SidebarSettingsHelpMenu.a428c25998', 'Settings')
-  const current = includeSettings && settingsActive ? settingsLabel : undefined
+  const current =
+    destinations.find((destination) => destination.current)?.label ??
+    (includeSettings && settingsActive ? settingsLabel : undefined)
   return (
-    <DropdownMenu modal={false} onOpenChange={help.handleMenuOpenChange}>
+    // Only a More that holds Help warms Help's feedback dialog.
+    <DropdownMenu modal={false} onOpenChange={includeHelp ? help.handleMenuOpenChange : undefined}>
       <Tooltip>
         <TooltipTrigger asChild>
           <DropdownMenuTrigger asChild>
@@ -45,7 +63,13 @@ export function AppRailMoreMenu({
               label={current ? `${label}, ${current}` : label}
               active={current !== undefined}
               tabStop={tabStop}
-              icon={<Ellipsis size={18} aria-hidden />}
+              icon={
+                <Ellipsis
+                  size={APP_RAIL_ICON_SIZE}
+                  strokeWidth={APP_RAIL_ICON_STROKE_WIDTH}
+                  aria-hidden
+                />
+              }
             />
           </DropdownMenuTrigger>
         </TooltipTrigger>
@@ -53,7 +77,34 @@ export function AppRailMoreMenu({
           {current ? `${label} · ${current}` : label}
         </TooltipContent>
       </Tooltip>
-      <DropdownMenuContent side="right" align="start" sideOffset={8} className="w-52">
+      <DropdownMenuContent
+        side="right"
+        align="start"
+        sideOffset={8}
+        className="w-52"
+        onCloseAutoFocus={(event) => {
+          if (yieldCloseFocusRef.current) {
+            yieldCloseFocusRef.current = false
+            event.preventDefault()
+          }
+        }}
+      >
+        {destinations.map((destination) => (
+          <DropdownMenuItem
+            key={destination.id}
+            onSelect={() => {
+              yieldCloseFocusRef.current = destination.ownsFocusOnOpen === true
+              destination.onSelect()
+            }}
+            aria-current={destination.current ? 'page' : undefined}
+          >
+            {destination.icon}
+            {destination.label}
+          </DropdownMenuItem>
+        ))}
+        {destinations.length > 0 && (includeHelp || includeSettings) ? (
+          <DropdownMenuSeparator />
+        ) : null}
         {includeHelp ? (
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>

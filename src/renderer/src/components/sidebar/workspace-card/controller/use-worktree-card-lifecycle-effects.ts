@@ -140,7 +140,8 @@ export function useWorktreeCardLifecycleEffects({
       run: () =>
         void fetchIssue((issueRepo ?? repo).path, issueNumber, {
           repoId: (issueRepo ?? repo).id,
-          ownerRepo: issueRepository
+          ownerRepo: issueRepository,
+          background: true
         }),
       intervalMs: 5 * 60_000
     })

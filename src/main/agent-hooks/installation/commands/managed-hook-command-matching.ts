@@ -11,6 +11,7 @@ import {
 import { hasOfficialOrcaProfile } from '../../official-orca-profile'
 
 import type { HookCommandConfig, HookDefinition } from '../configuration/hook-config-schema'
+import { isPlainObject } from '../configuration/hooks-json-read'
 
 export type ManagedCommandMatcherOptions = {
   /**
@@ -132,6 +133,10 @@ export function removeManagedCommands(
   isManagedCommand: (command: string | undefined) => boolean
 ): HookDefinition[] {
   return definitions.flatMap((definition) => {
+    // hooks.json is user-editable, so an entry may not be an object; keep it untouched.
+    if (!isPlainObject(definition)) {
+      return [definition]
+    }
     const directCommandKeys = ['command', 'bash', 'powershell'] as const
     const directManagedKeys = directCommandKeys.filter((key) => isManagedCommand(definition[key]))
     const hasNestedHooks = Array.isArray(definition.hooks)
@@ -172,6 +177,9 @@ export function removeManagedCommands(
 }
 
 function hookHasManagedCommand(hook: HookCommandConfig, matches: (value?: string) => boolean) {
+  if (!isPlainObject(hook)) {
+    return false
+  }
   const args = Array.isArray(hook.args) ? hook.args : []
   return matches(hook.command) || args.some((arg) => typeof arg === 'string' && matches(arg))
 }
@@ -193,10 +201,11 @@ export function hookDefinitionHasManagedCommand(
   isManagedCommand: (command: string | undefined) => boolean
 ): boolean {
   return (
-    isManagedCommand(definition.command) ||
-    isManagedCommand(definition.bash) ||
-    isManagedCommand(definition.powershell) ||
-    (Array.isArray(definition.hooks) &&
-      definition.hooks.some((hook) => hookHasManagedCommand(hook, isManagedCommand)))
+    isPlainObject(definition) &&
+    (isManagedCommand(definition.command) ||
+      isManagedCommand(definition.bash) ||
+      isManagedCommand(definition.powershell) ||
+      (Array.isArray(definition.hooks) &&
+        definition.hooks.some((hook) => hookHasManagedCommand(hook, isManagedCommand))))
   )
 }

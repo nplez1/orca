@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -129,9 +129,8 @@ try {
     ].join(' && ')
   ])
 
-  const failedSignals = []
   const cliCommandName = readInstalledCliCommandName()
-  for (const { entrypoint, signalTarget, intDelivery } of cases) {
+  const runs = cases.flatMap(({ entrypoint, signalTarget, intDelivery }) => {
     console.log(
       JSON.stringify({
         type: 'appimage_under_test',
@@ -144,40 +143,52 @@ try {
         launcherExecOverlay
       })
     )
-    for (const signal of ['INT', 'TERM']) {
-      const result = docker(
-        [
-          'run',
-          '--rm',
-          '--init',
-          '--platform',
-          platform,
-          '--shm-size',
-          '256m',
-          '--name',
-          `orca-headless-serve-shutdown-${entrypoint}-${signal.toLowerCase()}-${suffix}`,
-          '-e',
-          `ORCA_SIGNAL_TARGET=${signalTarget}`,
-          '-e',
-          `ORCA_TEST_ENTRYPOINT=${entrypoint}`,
-          '-e',
-          `ORCA_INT_DELIVERY=${intDelivery}`,
-          '-e',
-          `ORCA_TEST_CLI_COMMAND_NAME=${cliCommandName}`,
-          '-v',
-          `${appImage}:/input/orca.AppImage:ro`,
-          '-v',
-          `${artifactVolume}:/artifacts:ro`,
-          image,
-          signal
-        ],
-        { allowFailure: true }
+    return ['INT', 'TERM'].map((signal) => ({
+      entrypoint,
+      signal,
+      promise: dockerAsync([
+        'run',
+        '--rm',
+        '--init',
+        '--platform',
+        platform,
+        '--shm-size',
+        '256m',
+        '--name',
+        `orca-headless-serve-shutdown-${entrypoint}-${signal.toLowerCase()}-${suffix}`,
+        '-e',
+        `ORCA_SIGNAL_TARGET=${signalTarget}`,
+        '-e',
+        `ORCA_TEST_ENTRYPOINT=${entrypoint}`,
+        '-e',
+        `ORCA_INT_DELIVERY=${intDelivery}`,
+        '-e',
+        `ORCA_TEST_CLI_COMMAND_NAME=${cliCommandName}`,
+        '-v',
+        `${appImage}:/input/orca.AppImage:ro`,
+        '-v',
+        `${artifactVolume}:/artifacts:ro`,
+        image,
+        signal
+      ])
+    }))
+  })
+  const results = await Promise.allSettled(runs.map((entry) => entry.promise))
+  const failedSignals = []
+  for (const [index, outcome] of results.entries()) {
+    const { entrypoint, signal } = runs[index]
+    if (outcome.status === 'rejected') {
+      process.stderr.write(
+        `${entrypoint}:${signal} launch error: ${outcome.reason?.message ?? String(outcome.reason)}\n`
       )
-      process.stdout.write(result.stdout)
-      process.stderr.write(result.stderr)
-      if (result.status !== 0) {
-        failedSignals.push(`${entrypoint}:${signal}:${result.status}`)
-      }
+      failedSignals.push(`${entrypoint}:${signal}:error`)
+      continue
+    }
+    const result = outcome.value
+    process.stdout.write(result.stdout)
+    process.stderr.write(result.stderr)
+    if (result.status !== 0) {
+      failedSignals.push(`${entrypoint}:${signal}:${result.status}`)
     }
   }
   if (failedSignals.length > 0) {
@@ -275,6 +286,27 @@ function docker(dockerArgs, options = {}) {
     fail(`docker ${dockerArgs[0]} failed with status ${result.status}`)
   }
   return result
+}
+
+function dockerAsync(dockerArgs) {
+  return new Promise((resolveRun, rejectRun) => {
+    const child = spawn('docker', dockerArgs, {
+      cwd: process.cwd(),
+      stdio: ['ignore', 'pipe', 'pipe']
+    })
+    const stdout = []
+    const stderr = []
+    child.stdout.on('data', (chunk) => stdout.push(chunk))
+    child.stderr.on('data', (chunk) => stderr.push(chunk))
+    child.once('error', rejectRun)
+    child.once('close', (code) => {
+      resolveRun({
+        status: code ?? 1,
+        stdout: Buffer.concat(stdout).toString('utf8'),
+        stderr: Buffer.concat(stderr).toString('utf8')
+      })
+    })
+  })
 }
 
 function fail(message) {

@@ -37,6 +37,7 @@ export function getPiAgentStatusHandlerSourceLines(kind: PiAgentKind): string[] 
           // an in-process subagent must not re-point the shared inventory at its own bus.
           ...getPiAgentStatusScheduledWorkSessionStartLines(kind),
           ...(kind === 'pi' ? ['    piUiPromptDepth = 0', '    captureNativeChatUi(ctx)'] : []),
+          '    syncHeldTurnRepostCheck()',
           '    // Reload replaces registration without ending the turn; preserve status and unread state.',
           "    if (event.reason === 'reload') return",
           "    post('session_start')",

@@ -67,6 +67,9 @@ export type TerminalSideEffectFactConsumerCallbacks = {
   /** DECSET 2031 withdrawal observed by main's tracker. Clears the pane's
    *  subscription registry so later theme flips stop pushing CSI 997. */
   onMode2031Unsubscribe?: () => void
+  /** The host saw the tracked foreground agent exit, which may print nothing. */
+  onForegroundChanged?: () => void
+  onRuntimeInput?: () => void
 }
 
 type ConsumerEntry = {
@@ -150,6 +153,14 @@ function applyLiveFact(entry: ConsumerEntry, fact: TerminalSideEffectFact, seq: 
       return
     case '2031-unsubscribe':
       entry.callbacks.onMode2031Unsubscribe?.()
+      return
+    case 'foreground-changed':
+      // Runtime input is input: a command pane paces it on its slow re-check, like typed input.
+      if (fact.input === true && entry.callbacks.onRuntimeInput) {
+        entry.callbacks.onRuntimeInput()
+        return
+      }
+      entry.callbacks.onForegroundChanged?.()
   }
 }
 
@@ -314,18 +325,4 @@ export function registerTerminalSideEffectFactConsumer(
       openHandoffFactBuffer(options.ptyId)
     }
   }
-}
-
-export function _dispatchTerminalSideEffectBatchForTest(batch: TerminalSideEffectBatch): void {
-  dispatchTerminalSideEffectBatch(batch)
-}
-
-export function _resetTerminalSideEffectFactConsumersForTest(): void {
-  consumersByPtyId.clear()
-  for (const ptyId of Array.from(handoffFactBuffersByPtyId.keys())) {
-    deleteHandoffFactBuffer(ptyId)
-  }
-  channelUnsubscribe?.()
-  channelUnsubscribe = null
-  persistedAuthorityFlagCache = undefined
 }

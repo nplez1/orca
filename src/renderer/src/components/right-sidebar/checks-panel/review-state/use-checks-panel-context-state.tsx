@@ -41,10 +41,8 @@ type ChecksPanelContextStateInput = Pick<
   | 'repo'
   | 'settings'
   | 'setAgentComposerState'
-  | 'setChecks'
   | 'setChecksLoading'
   | 'setCommentResolutionAckBusyNow'
-  | 'setComments'
   | 'setCommentsLoading'
   | 'setConflictDetailsRefreshing'
   | 'setCreatePrError'
@@ -85,10 +83,8 @@ export function useChecksPanelContextState(model: ChecksPanelContextStateInput) 
     repo,
     settings,
     setAgentComposerState,
-    setChecks,
     setChecksLoading,
     setCommentResolutionAckBusyNow,
-    setComments,
     setCommentsLoading,
     setConflictDetailsRefreshing,
     setCreatePrError,
@@ -134,9 +130,9 @@ export function useChecksPanelContextState(model: ChecksPanelContextStateInput) 
     setTitleDraft('')
     setTitleSaving(false)
     clearTitleInputFocusTimer()
-    setChecks([])
+    // Each section's own read owner resets its results when its read inputs change (checks timer,
+    // comments effect); a push-target-only change keeps them, since no read would settle a reset.
     setChecksLoading(false)
-    setComments([])
     setCommentsLoading(false)
     setIsRefreshing(false)
     setEmptyRefreshing(false)

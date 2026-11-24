@@ -11,8 +11,20 @@ import {
 } from '../../../../../shared/rpc-contract/accounts/antigravity-accounts-params'
 import { AntigravityChatAuthConfigSchema } from '../../../../../shared/agent-accounts/antigravity/antigravity-chat-auth-config'
 import { getAntigravityAccountService } from '../../../../antigravity/native-account-host'
-import { restartIdleAgyChats, withAntigravityChatBackend } from './antigravity-chat-backend'
-import { readyAntigravityHostAcpVersion } from '../../../../antigravity/antigravity-host-acp'
+import { agentModelCatalogStore } from '../../../../native-chat/agent-model-catalog/agent-model-catalog-store'
+import {
+  restartIdleAgyChats,
+  sharedAgyLaunchHome,
+  withAntigravityChatBackend
+} from './antigravity-chat-backend'
+import {
+  lastAntigravityAgySignedOut,
+  onAntigravityChatApiKeyChanged
+} from '../../../../antigravity/antigravity-chat-route'
+import {
+  antigravityHostCatalogFingerprints,
+  readyAntigravityHostAcpVersion
+} from '../../../../antigravity/antigravity-host-acp'
 import {
   cancelAntigravityChatSignIn,
   completeAntigravityChatSignIn,
@@ -69,7 +81,8 @@ function detectChatAuth(runtime: OrcaRuntimeService) {
     launchEnv,
     apiKeyStatus: () => readAntigravityChatApiKeyStatus(launchEnv),
     liveChats: () => countStructuredAgentChats('antigravity'),
-    agyVersion: readyAntigravityHostAcpVersion
+    agyVersion: readyAntigravityHostAcpVersion,
+    agySignedOut: lastAntigravityAgySignedOut
   })
 }
 
@@ -115,7 +128,26 @@ export const ANTIGRAVITY_ACCOUNT_METHODS = [
     permission: 'accounts-admin',
     params: AntigravityAccountMutationParams,
     handler: async ({ target, accountId }, ctx) => {
-      const state = await (await getAntigravityAccountService(target)).selectAccount(accountId)
+      const service = await getAntigravityAccountService(target)
+      // Chats run only on the host's agy; what they listed belongs to the previous account. The
+      // switch never waits for the HOME chats launch with: its catalog goes once that is known.
+      const host = target.runtime === 'host'
+      const launchHome = host ? sharedAgyLaunchHome(ctx.runtime) : undefined
+      let switched = false
+      const state = await service.selectAccount(accountId, () => (switched = true))
+      if (host && switched) {
+        const own = antigravityHostCatalogFingerprints()
+        agentModelCatalogStore.forgetSeenRows(own)
+        // A listing started after the switch, such as a Refresh, is already the new account's.
+        const before = agentModelCatalogStore.runningListings()
+        void launchHome?.then((home) => {
+          const launch = home ? antigravityHostCatalogFingerprints(home) : []
+          agentModelCatalogStore.forgetSeenRows(
+            launch.filter((key) => !own.includes(key)),
+            before
+          )
+        })
+      }
       restartIdleAgyChats(target)
       return withAntigravityChatBackend(ctx.runtime, target, state)
     }
@@ -206,6 +238,8 @@ export const ANTIGRAVITY_ACCOUNT_METHODS = [
     params: AntigravityChatApiKeySaveParams,
     handler: async ({ apiKey }, ctx) => {
       await storeAntigravityChatApiKey(apiKey)
+      // A key can move key chats onto agy.
+      onAntigravityChatApiKeyChanged()
       await restartLiveChats(ctx.runtime)
       return apiKeyStatus(ctx.runtime)
     }
@@ -216,6 +250,7 @@ export const ANTIGRAVITY_ACCOUNT_METHODS = [
     params: null,
     handler: async (_, ctx) => {
       await clearAntigravityChatApiKey()
+      onAntigravityChatApiKeyChanged()
       await restartLiveChats(ctx.runtime)
       return apiKeyStatus(ctx.runtime)
     }

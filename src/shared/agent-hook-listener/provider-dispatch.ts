@@ -40,6 +40,7 @@ import {
   normalizePiCompatibleEvent,
   PI_RESTATEMENT_EVENTS
 } from './providers/pi-family/pi-family-events'
+import { restatePiFamilyEventName } from './providers/pi-family/pi-subagent-start-event'
 import { normalizeDroidEvent } from './providers/droid/droid-events'
 import { normalizeCommandCodeEvent } from './providers/command-code/command-code-events'
 import { normalizeGrokEvent } from './providers/grok/grok-events'
@@ -89,7 +90,7 @@ export function normalizeProviderEvent(input: {
     source === 'codex'
       ? codexHookEventForEphemeralThread(state, paneKey, input.eventName, hookPayload)
       : undefined
-  const eventName =
+  let eventName =
     source !== 'codex'
       ? input.eventName
       : codexEventName === undefined
@@ -218,6 +219,7 @@ export function normalizeProviderEvent(input: {
         paneKey,
         hookPayload
       )
+      eventName = restatePiFamilyEventName(eventName, hookPayload)
       break
     case 'droid':
       payload = normalizeDroidEvent(state, eventName, promptText, paneKey, hookPayload)

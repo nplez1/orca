@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react'
-import { MonitorSmartphone, Server } from 'lucide-react'
+import { Server } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   DropdownMenu,
@@ -48,13 +48,7 @@ import type { SshConnectionStatus } from '../../../../../shared/remote-runtime/s
 /** Stable empty set: a selector must not mint a new Set on every read. */
 const NO_HIDDEN_SSH_TARGETS: ReadonlySet<string> = new Set()
 
-export function SshStatusSegment({
-  compact,
-  iconOnly
-}: {
-  compact: boolean
-  iconOnly: boolean
-}): React.JSX.Element | null {
+export function SshStatusSegment(): React.JSX.Element | null {
   const t = useTranslate()
   const sshConnectionStates = useAppStore((s) => s.sshConnectionStates)
   const sshTargetLabels = useAppStore((s) => s.sshTargetLabels)
@@ -229,27 +223,19 @@ export function SshStatusSegment({
             'Remote host connection status'
           )}
         >
-          {iconOnly ? (
-            <MonitorSmartphone className="size-3" />
-          ) : (
-            <>
-              <Server className="size-3" />
-              {!compact && (
-                <span className="inline-grid text-2xs tabular-nums">
-                  {/* Reserve both localized forms so count changes don't resize the bar. */}
-                  <span aria-hidden className="invisible col-start-1 row-start-1">
-                    {connectedHostCountLabel(1, t)}
-                  </span>
-                  <span aria-hidden className="invisible col-start-1 row-start-1">
-                    {connectedHostCountLabel(Math.max(99, statuses.length), t)}
-                  </span>
-                  <span className="col-start-1 row-start-1">
-                    {connectedHostCountLabel(connectedHostCount, t)}
-                  </span>
-                </span>
-              )}
-            </>
-          )}
+          <Server className="size-3" />
+          <span className="inline-grid text-2xs tabular-nums">
+            {/* Reserve both localized forms so count changes don't resize the bar. */}
+            <span aria-hidden className="invisible col-start-1 row-start-1">
+              {connectedHostCountLabel(1, t)}
+            </span>
+            <span aria-hidden className="invisible col-start-1 row-start-1">
+              {connectedHostCountLabel(Math.max(99, statuses.length), t)}
+            </span>
+            <span className="col-start-1 row-start-1">
+              {connectedHostCountLabel(connectedHostCount, t)}
+            </span>
+          </span>
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent

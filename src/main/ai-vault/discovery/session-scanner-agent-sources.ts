@@ -83,6 +83,8 @@ export type AiVaultAgentSource = {
   directoryPredicate?: (name: string, depth: number) => boolean
   // Share the per-agent limit across alternate roots for one install.
   mergeRootDiscoveries?: boolean
+  // Skip a root that resolves (symlink or junction) to an earlier one.
+  dedupeRealRootDirs?: boolean
 }
 
 type AiVaultAgentSourceTable = Record<AiVaultDeletableAgent, AiVaultAgentSource> &
@@ -104,7 +106,9 @@ export const AI_VAULT_AGENT_SOURCES: AiVaultAgentSourceTable = {
     // written seconds after its transcript starts. Tracking its stat is what lets
     // a row cached before it existed pick the link up on a later scan; the
     // unchanged transcript key alone would keep serving `subagent: null`.
-    contentDependencyPath: claudePiParentMarkerPath
+    contentDependencyPath: claudePiParentMarkerPath,
+    // Account homes link their projects folder to the user's shared one.
+    dedupeRealRootDirs: true
   },
   qoder: {
     rootDirs: (options, wslHomeDirs) =>

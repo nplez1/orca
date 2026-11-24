@@ -17,6 +17,11 @@ import { useTranslate } from '@/i18n/use-translate'
 import { GlobalWorktreeVisibilitySourcesSetting } from './GlobalWorktreeVisibilitySourcesSetting'
 import { GLOBAL_WORKTREE_VISIBILITY_SETTINGS_TARGET_ID } from '@/components/settings/navigation/settings-navigation-types'
 import { SettingsGroup } from '../section-layout/SettingsGroup'
+import {
+  getHostSettingUpdateFailedMessage,
+  useHostSetting,
+  useSettingsHostLabel
+} from '../host-scope/use-host-setting'
 
 type GeneralWorkspaceSettingsSectionProps = {
   openInDraft: ReturnType<typeof useOpenInMenuDraft>
@@ -33,6 +38,23 @@ type GeneralWorkspaceSettingsSectionProps = {
   defaultsHostLabel?: string
 }
 
+/** The host that creates a workspace decides its folder layout, so this writes the legacy boolean there. */
+export function useNestWorkspacesSetting(
+  hostScope: SettingsHostScope,
+  settings: GlobalSettings,
+  updateSettings: (updates: Partial<GlobalSettings>) => void | Promise<void>
+): ReturnType<typeof useHostSetting<'nestWorkspaces'>> {
+  const t = useTranslate()
+  const hostLabel = useSettingsHostLabel(hostScope.target)
+  return useHostSetting({
+    owner: hostScope.target,
+    settingKey: 'nestWorkspaces',
+    localSettings: settings,
+    updateLocalSettings: updateSettings,
+    updateFailedMessage: getHostSettingUpdateFailedMessage(hostLabel, t)
+  })
+}
+
 export function GeneralWorkspaceSettingsSection({
   page,
   openInDraft,
@@ -46,6 +68,7 @@ export function GeneralWorkspaceSettingsSection({
   hostScope
 }: GeneralWorkspaceSettingsSectionProps): React.JSX.Element {
   const t = useTranslate()
+  const nestWorkspaces = useNestWorkspacesSetting(hostScope, settings, updateSettings)
   return (
     <SettingsGroup title={getGeneralSubPageTitle(page, t)}>
       {page === 'folder' ? (
@@ -106,12 +129,10 @@ export function GeneralWorkspaceSettingsSection({
                 }
               ]}
               onChange={(next) => {
-                // Why the boolean too: an older reader of these settings only understands it, so
-                // leaving it stale would let the same host place worktrees two different ways.
-                updateSettings({
-                  worktreeLayoutMode: next,
-                  nestWorkspaces: layoutModeNestsWorkspaces(next)
-                })
+                // Why the boolean too: an older reader of these settings only understands it, and
+                // the host that creates the workspace is the one that reads it.
+                void updateSettings({ worktreeLayoutMode: next })
+                void nestWorkspaces.update(layoutModeNestsWorkspaces(next))
               }}
             />
           </SearchableSetting>

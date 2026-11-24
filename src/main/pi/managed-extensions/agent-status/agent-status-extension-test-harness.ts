@@ -4,7 +4,10 @@ import { createContext, runInContext } from 'node:vm'
 import ts from 'typescript-api'
 import { vi } from 'vitest'
 
-import { createTrackedPiEventBus, type PiEventBus } from '../../agent-status-extension-test-event-bus'
+import {
+  createTrackedPiEventBus,
+  type PiEventBus
+} from '../../agent-status-extension-test-event-bus'
 import { getPiAgentStatusExtensionSource } from './agent-status-extension-source'
 import { AGENT_STATUS_EXTENSION_BASE_ENV } from '../../agent-status-extension-test-env'
 
@@ -206,11 +209,11 @@ export function createAgentStatusExtensionHarness(args: {
     Buffer,
     URL,
     AbortController,
-    setTimeout,
-    clearTimeout,
     // Why the host's Date: the VM realm has its own, so a faked clock would leave the extension on the
     // real one — and a scheduled hold is entirely a comparison between the two.
-    Date
+    Date,
+    setTimeout,
+    clearTimeout
   }
   context.globalThis = context
 

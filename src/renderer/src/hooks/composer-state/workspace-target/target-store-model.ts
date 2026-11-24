@@ -72,7 +72,7 @@ export type ComposerTargetStoreModel = {
   sshTargetLabels: Map<string, string>
   sshConnectedGeneration: number
   runtimeEnvironments: readonly PublicKnownRuntimeEnvironment[]
-  runtimeStatusByEnvironmentId: Map<string, RuntimeEnvironmentStatus>
+  runtimeStatusByEnvironmentId: ReadonlyMap<string, RuntimeEnvironmentStatus>
   workspaceHostScope: WorkspaceHostScope
   eligibleRepos: Repo[]
   hostOptions: ExecutionHostRegistryEntry[]

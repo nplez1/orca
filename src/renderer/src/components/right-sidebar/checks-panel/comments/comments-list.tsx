@@ -1,5 +1,5 @@
 import React from 'react'
-import { LoaderCircle, MessageSquare, Plus, SendHorizontal, Sparkles, X } from 'lucide-react'
+import { MessageSquare, Plus, SendHorizontal, Sparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { getPRCommentAudienceEmptyLabel } from '@/lib/source-control/review/comments/pr-comment-audience-labels'
@@ -10,13 +10,22 @@ import { CommentsAudienceTabs } from '../comments-audience-tabs'
 import { CommentsDisplayModeMenu } from '../comments-display-mode-menu'
 import { CommentsInlineHeadMismatchNotice, CommentsInlineToggle } from '../comments-inline-controls'
 import { ReviewVerdictsBlock } from '../review-verdicts'
+import { CommentsAudienceLoading, CommentsListLoading } from './comments-list-loading'
 import { type PRCommentsListProps, useCommentsListState } from './use-comments-list-state'
 
-export function PRCommentsList(props: PRCommentsListProps): React.JSX.Element {
+export function PRCommentsList(
+  props: PRCommentsListProps & {
+    loadingSkeleton: boolean
+    /** False until a read settles: an unread list must not claim there are no comments. */
+    commentsRead?: boolean
+  }
+): React.JSX.Element {
   const t = useTranslate()
   const {
     commentsError,
     commentsLoading,
+    loadingSkeleton,
+    commentsRead = true,
     reviewKind = 'PR',
     commentsDisabled,
     commentsDisabledReason,
@@ -68,6 +77,8 @@ export function PRCommentsList(props: PRCommentsListProps): React.JSX.Element {
     renderAddCommentComposer,
     now
   } = useCommentsListState(props)
+  const showLoading = loadingSkeleton && !isAddingComment
+  const emptyReadError = listComments.length === 0 ? commentsError : null
   return (
     <div className="border-t border-border" ref={listRef}>
       {/* Why: the section's own summary, above its header — "who decided what" belongs with the
@@ -264,6 +275,7 @@ export function PRCommentsList(props: PRCommentsListProps): React.JSX.Element {
             onSelect={setCommentFilter}
           />
         )}
+        {showLoading && <CommentsAudienceLoading presentation={presentation} />}
         {listComments.length >= 100 && (
           <div className="mt-1.5 text-[10px] text-muted-foreground">
             {t(
@@ -283,17 +295,18 @@ export function PRCommentsList(props: PRCommentsListProps): React.JSX.Element {
         />
       ) : null}
 
-      {commentsLoading && listComments.length === 0 ? (
-        <div className="flex items-center justify-center py-6">
-          <LoaderCircle className="size-4 animate-spin text-muted-foreground" />
-        </div>
-      ) : listComments.length === 0 && commentsError ? (
+      {emptyReadError && (
         <div role="alert" className="px-3 py-5 text-[11px] break-words text-destructive">
-          {commentsError}
+          {emptyReadError}
         </div>
-      ) : listComments.length === 0 && isAddingComment && onAddComment ? (
+      )}
+      {listComments.length === 0 && isAddingComment && onAddComment ? (
         renderAddCommentComposer(true)
+      ) : showLoading ? (
+        <CommentsListLoading presentation={presentation} />
       ) : listComments.length === 0 ? (
+        !emptyReadError &&
+        commentsRead &&
         !onAddComment && (
           <div className="flex items-center justify-center py-5 text-[11px] text-muted-foreground">
             {t('auto.components.right.sidebar.checks.panel.content.755be805f6', 'No comments')}

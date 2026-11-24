@@ -1,6 +1,7 @@
 import { ORCA_APP_ID } from '../../../shared/remote-runtime/orcad-distribution/local-build-compatibility'
 import { spawn } from 'node:child_process'
 import { runProcess } from '@orca/process-host'
+import { assertTeamAllowsComputerUse } from '../computer-team-policy'
 import { RuntimeClientError } from '../runtime-client-error'
 import {
   COMPUTER_ERROR_CODES,
@@ -135,11 +136,13 @@ async function launchSetupHelper(
   if (isHostShuttingDown()) {
     return 'cancelled'
   }
+  assertTeamAllowsComputerUse()
   // Kill and relaunch so a repeated click always brings the helper back to the front.
   await closeExistingPermissionHelpers()
   if (generation !== setupGeneration || isHostShuttingDown()) {
     return 'cancelled'
   }
+  assertTeamAllowsComputerUse()
   const helper = spawn(
     '/usr/bin/open',
     ['-n', request.helperAppPath, '--args', ...request.helperArgs],
@@ -162,6 +165,7 @@ async function openComputerUsePermissionsAsync(
   seq: number,
   generation: number
 ): Promise<ComputerUsePermissionSetupResult> {
+  assertTeamAllowsComputerUse()
   if (process.platform !== 'darwin') {
     return {
       platform: process.platform,
@@ -185,7 +189,9 @@ async function openComputerUsePermissionsAsync(
   while (resetInProgress) {
     await resetInProgress.catch(() => {})
   }
+  assertTeamAllowsComputerUse()
   const status = await computerUsePermissionStatusGate.peek()
+  assertTeamAllowsComputerUse()
   if (status.helperUnavailableReason) {
     throw new RuntimeClientError('accessibility_error', status.helperUnavailableReason)
   }

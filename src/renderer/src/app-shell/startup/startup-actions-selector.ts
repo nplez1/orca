@@ -109,7 +109,3 @@ export function selectStartupActions(state: StartupActions): StartupActions {
   }
   return cachedStartupActions
 }
-
-export function resetStartupActionsSelectorCacheForTest(): void {
-  cachedStartupActions = null
-}

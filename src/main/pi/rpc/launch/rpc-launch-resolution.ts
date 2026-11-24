@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at 297 of its 300-line budget; the fork's Pi visuals env and skill-dir resolution ride inside it, and splitting costs a permanent sync hunk. */
 import { readPiSessionHeader, samePiDirectory } from './pi-session-header'
 export { readPiSessionHeader, samePiDirectory } from './pi-session-header'
 import { isAbsolute } from 'node:path'
@@ -29,7 +30,7 @@ import type { StructuredAgentLaunchPartResolver } from '../../../runtime/agent-s
 import { isWindowsProcessStartTimeAvailable } from '../../../windows/windows-process-table'
 import { sessionIdFromFileName } from '../../../ai-vault/parsing/session-scanner-accumulator'
 import {
-  PI_RPC_SESSION_ENV_TO_DELETE,
+  withPiVisualsEnv,
   piToolLimit,
   withoutPiCallerEnv,
   type PiRpcLaunchOptions
@@ -199,9 +200,13 @@ export function piRpcLaunchPart(
     if (launchVersion.status === 'tooOld') {
       throw AgentCliInstallationError.tooOld('pi', launchVersion)
     }
+    const visuals = await basis.visuals()
     const linked = await basis.linkedSkills()
     // Only a folder with skills; Pi loads every SKILL.md under it, links included.
     const linkedRoot = linked.projects.length > 0 ? linked.root : null
+    const skillDirs = [visuals?.skill, linkedRoot].flatMap((root) =>
+      root ? [root.skillsRoot] : []
+    )
     const instructions = await basis.instructions(
       linkedSkillsSection(linked.projects, linkedRoot ? [] : linked.projects)
     )
@@ -239,7 +244,7 @@ export function piRpcLaunchPart(
         ...(replacement ? { replacement } : {}),
         ...(backgroundWork ? { backgroundWork } : {}),
         ...(instructionsFile ? { instructionsFile } : {}),
-        ...(linkedRoot ? { skillDirs: [linkedRoot.skillsRoot] } : {}),
+        ...(skillDirs.length > 0 ? { skillDirs } : {}),
         ...(tools ? { tools } : {}),
         ...(botServers
           ? {
@@ -261,8 +266,7 @@ export function piRpcLaunchPart(
           ? { shrinksImages: true as const }
           : {})
       },
-      env: withBotLaunchToolsEnv(withoutPiCallerEnv(env), botTools),
-      inheritedEnvToDelete: PI_RPC_SESSION_ENV_TO_DELETE
+      ...withPiVisualsEnv(withBotLaunchToolsEnv(withoutPiCallerEnv(env), botTools), visuals)
     }
   }
 }

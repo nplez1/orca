@@ -218,7 +218,8 @@ export type FolderWorkspacesApi = {
         | 'lastActivityAt'
         | 'diffComments'
       >
-    >
+    > &
+      DiffCommentBaseMutation
   }) => Promise<FolderWorkspace | null>
   delete: (args: {
     folderWorkspaceId: string

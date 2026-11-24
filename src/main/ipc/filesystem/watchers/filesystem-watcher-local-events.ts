@@ -11,6 +11,7 @@ import type { WatchedRoot } from './filesystem-watcher-wsl'
 import { subscribeViaWatcherProcess } from '../watcher-process/parcel-watcher-process'
 import { coalesceEvents } from './filesystem-watcher-event-coalescing'
 import { watcherLifecycleState } from './filesystem-watcher-lifecycle-state'
+import { isWatcherCrashFuseFailure } from '../watcher-process/parcel-watcher-process-failure'
 import {
   retainLocalWatcherPhysicalFailure,
   trackDetachedLocalUnsubscribe
@@ -225,7 +226,9 @@ export function scheduleLocalBatchFlush(root: WatchedRoot): void {
 export async function createLocalWatcher(
   rootKey: string,
   rootPath: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  /** Receives the listeners of a root the crash fuse dropped, so they can rewatch after the cooldown. */
+  onCrashFuseFailure?: (listeners: WatchedRoot['listeners']) => void
 ): Promise<WatchedRoot> {
   const root: WatchedRoot = {
     subscription: null!,
@@ -242,6 +245,7 @@ export async function createLocalWatcher(
   try {
     // Errors can precede subscribe resolution; retain cleanup evidence to retire the orphan handle.
     let errorCleanedUp = false
+    let cleanedUpError: unknown
 
     const watcherOptions = {
       ...buildParcelWatcherIgnoreOptions(WATCHER_IGNORE_DIRS),
@@ -279,7 +283,13 @@ export async function createLocalWatcher(
             void trackDetachedLocalUnsubscribe(rootKey, root)
           }
           errorCleanedUp = true
+          cleanedUpError = err
+          const wasInstalled = watcherLifecycleState.watchedRoots.get(rootKey) === root
           watcherLifecycleState.watchedRoots.delete(rootKey)
+          // Why installed only: an error during subscribe rejects the install, which owns its retry.
+          if (wasInstalled && isWatcherCrashFuseFailure(err)) {
+            onCrashFuseFailure?.(root.listeners)
+          }
           return
         }
 
@@ -312,7 +322,10 @@ export async function createLocalWatcher(
     // subscribe resolved after error cleanup; retire its orphaned native handle.
     if (errorCleanedUp) {
       void trackDetachedLocalUnsubscribe(rootKey, root)
-      throw new Error(`Watcher for ${rootKey} errored during subscribe`)
+      // Keep a crash-fuse failure recognizable so the install retries instead of giving up on the root.
+      throw isWatcherCrashFuseFailure(cleanedUpError)
+        ? cleanedUpError
+        : new Error(`Watcher for ${rootKey} errored during subscribe`)
     }
   } catch (err) {
     // Surface synchronous subscription failures through the caller rather than crashing main.

@@ -139,7 +139,7 @@ export default function AiVaultPanel({
       activeWorktreePath,
       local: workspace !== undefined
     })
-  const [query, setQuery] = useAiVaultPanelQuery(initialQuery, {
+  const [query, setQuery, querySubmitted] = useAiVaultPanelQuery(initialQuery, {
     preferredScope,
     activeWorktreeId,
     activeProjectKey
@@ -174,7 +174,10 @@ export default function AiVaultPanel({
       }),
     [activeProjectKey, activeWorktree?.id, scope]
   )
-  const search = useAiVaultPanelSearch(query, agents, searchWithin, executionHostScope, searchSort)
+  const search = useAiVaultPanelSearch(query, agents, searchWithin, executionHostScope, {
+    sort: searchSort,
+    submitted: querySubmitted
+  })
   const { searching, searchHits } = search
   const { listMode, stale, sessions, resolverSessions } = useAiVaultPanelSearchSessions(
     search,
@@ -315,7 +318,11 @@ export default function AiVaultPanel({
       ) : null}
 
       {!searching && <AiVaultScanIssueBanners scanResult={scanResult} />}
-      <AiVaultPanelSearch search={search} noAgents={agents.length === 0}>
+      <AiVaultPanelSearch
+        search={search}
+        noAgents={agents.length === 0}
+        listed={filteredSessions.length > 0}
+      >
         {searching
           ? filteredSessions.length > 0 && (
               <AiVaultSessionListBar
@@ -333,10 +340,11 @@ export default function AiVaultPanel({
                 onChange={setSort}
               />
             )}
-        {(!searching || sessions.length > 0 || search.loading) && (
+        {(!searching || filteredSessions.length > 0 || search.loading) && (
           <AiVaultSessionVirtualList
             key={searching ? 'search' : 'history'}
-            resultsKey={searching ? search.resultsKey : undefined}
+            // Title matches stay put when an empty reply lands, so only hits reset scroll and selection.
+            resultsKey={listMode === 'search-hits' ? search.resultsKey : undefined}
             stale={stale}
             searchHits={searching ? searchHits : undefined}
             searchHitHostLabels={searchHitHostLabels}

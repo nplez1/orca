@@ -30,7 +30,12 @@ import { selectIsSleepingWorktree } from '../../workspace-actions/sleep/use-work
 import { getEphemeralVmHostState } from '../../../../../../shared/execution-host/execution-host-health'
 import { getVmStateLabel, VmStateIcon, WorktreeCardVmStateBadge } from './WorktreeCardVmStateBadge'
 import type { WorktreeCardPrDisplay } from '../review/worktree-card-pr-display'
-import { getReviewLabel, ReviewIconWithMergeMarker } from '../review/worktree-review-presentation'
+import {
+  getReviewLabel,
+  ReviewIconWithMergeMarker,
+  STALE_REVIEW_SHIMMER
+} from '../review/worktree-review-presentation'
+import { handleShimmerAnimationStart } from '@/components/ui/shared-animation-clock'
 import type { WorkspaceReviewChecksSummary } from '../../../../../../shared/workspace-attachments/workspace-review-checks'
 import {
   WorkspaceReviewChecksIndicator,
@@ -74,7 +79,7 @@ export const branchStatusIconClassName = `${compactReviewAndBranchStatusIconClas
 const sleepingStatusIconClassName = 'size-[13px] text-muted-foreground'
 // Overlay unread on the glyph's corner without widening the lane; the ring separates it from busy glyphs.
 // Blue, not amber: the lane already spends yellow and orange on working, pending checks and needs-you.
-const newCardUnreadAlertClassName =
+export const unreadAlertDotClassName =
   'pointer-events-none absolute right-0 bottom-0 size-[6px] rounded-full bg-unread ring-2 ring-worktree-sidebar'
 
 export function getUnreadToggleTooltip(isUnread: boolean): string {
@@ -97,13 +102,18 @@ export function overlayNewCardUnreadStatus(
       className="relative inline-flex size-5 shrink-0 items-center justify-center"
     >
       {status}
-      <span
-        data-worktree-unread-alert=""
-        className={newCardUnreadAlertClassName}
-        aria-hidden="true"
-      />
+      <span data-worktree-unread-alert="" className={unreadAlertDotClassName} aria-hidden="true" />
     </span>
   )
+}
+
+function getReviewStatusLabel(review: WorktreeCardPrDisplay, t: Translate = translate): string {
+  const settled = review.state === 'merged' || review.state === 'closed' || review.state === 'draft'
+  const base = settled
+    ? getReviewStateLabel(review, t)
+    : (getReviewChecksLabel(review, t) ?? getReviewStateLabel(review, t))
+  const mergeReason = getReviewMergeReason(review)
+  return mergeReason ? `${base} · ${mergeReason}` : base
 }
 
 /** The review's own state, with no checks verdict — the collection summary owns that half. */
@@ -153,15 +163,6 @@ function getReviewMergeReason(review: WorktreeCardPrDisplay): string | null {
   // text. Null when the checks half of this same label already says it, or when the provider
   // has not reported a merge state to report.
   return hostedReviewMergeVerdictLabel(getHostedReviewMergeReadiness(review))
-}
-
-function getReviewStatusLabel(review: WorktreeCardPrDisplay, t: Translate = translate): string {
-  const settled = review.state === 'merged' || review.state === 'closed' || review.state === 'draft'
-  const base = settled
-    ? getReviewStateLabel(review, t)
-    : (getReviewChecksLabel(review, t) ?? getReviewStateLabel(review, t))
-  const mergeReason = getReviewMergeReason(review)
-  return mergeReason ? `${base} · ${mergeReason}` : base
 }
 
 export function WorktreeCardStatusSlot({
@@ -239,11 +240,13 @@ export function WorktreeCardStatusSlot({
   // The lane holds the card's only unread dot (agent rows and the folded pill draw none), so it
   // stays on over working/permission glyphs; the corner ring keeps it legible against them.
   const showNewCardUnreadAlert = newCardStyle && isUnread && showStatus
-  const reviewStaleRef = isReviewStale ? observeOffscreenAnimation : undefined
+  const reviewStaleProps = isReviewStale
+    ? { ref: observeOffscreenAnimation, onAnimationStart: handleShimmerAnimationStart }
+    : undefined
   const reviewStatusIconClassName = cn(
     compactReviewAndBranchStatusIconClassName,
     // Same last-known treatment as the hover card's reference rows.
-    isReviewStale && 'shimmer shimmer-duration-2400 shimmer-steps-30'
+    isReviewStale && STALE_REVIEW_SHIMMER
   )
   const branchStatusIcon = <GitBranch className={branchStatusIconClassName} aria-hidden="true" />
   const sleepingStatusIcon = <Moon className={sleepingStatusIconClassName} aria-hidden="true" />
@@ -254,7 +257,7 @@ export function WorktreeCardStatusSlot({
     </span>
   ) : canShowReviewStatus && (collectionChecks || prDisplay) ? (
     <span
-      ref={reviewStaleRef}
+      {...reviewStaleProps}
       className={cn('inline-flex size-5 items-center justify-center p-0.5', className)}
     >
       {collectionChecks ? (
@@ -347,7 +350,7 @@ export function WorktreeCardStatusSlot({
             {newCardStyle ? (
               showStatus && canShowReviewStatus && prDisplay ? (
                 <span
-                  ref={reviewStaleRef}
+                  {...reviewStaleProps}
                   className="inline-flex size-5 items-center justify-center p-0.5"
                 >
                   <ReviewIconWithMergeMarker

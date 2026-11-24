@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at 400 of its 400-line budget at the sync base; the fork's edit-file surface controls ride inside it, and splitting costs a permanent sync hunk. */
 import { useTranslate } from '@/i18n/use-translate'
 import type { MarkdownViewMode, OpenFile } from '@/store/slices/editor/types/open-file'
 import type { PendingEditorReveal } from '@/store/slices/editor/types/pending-editor-reveal'
@@ -35,6 +36,8 @@ import type { ActivePluginCustomEditor } from '@/store/plugins/file-editors/plug
 import { PluginEditorSourceFallbackNotice } from '../plugin-editors/PluginEditorNeedsDesktopNotice'
 import PluginCustomEditorFrame from '../plugin-editors/PluginCustomEditorFrame'
 import PluginBytesCustomEditorSurface from '../plugin-editors/PluginBytesCustomEditorSurface'
+import { ExternalFileChangeBanner } from '../external-changes/ExternalFileChangeBanner'
+import { isEditorWritableView } from '../save/queue/editor-save-writer-view'
 
 // Retry is a user act: it may start a stopped WSL distro.
 
@@ -180,15 +183,29 @@ export function EditorEditFileSurface({
     }
     if (fileContent.isImage) {
       return (
-        <ImageViewer
-          content={fileContent.content}
-          src={fileContent.mediaUrl}
-          byteSize={fileContent.size}
-          filePath={activeFile.filePath}
-          mimeType={fileContent.mimeType}
-          preferenceKey={pdfPreferenceKey}
-          scrollCacheKey={pdfViewStateKey}
-        />
+        <div className="flex h-full min-h-0 flex-col">
+          {activeFile.externalMutation === 'changed' ? (
+            <ExternalFileChangeBanner
+              file={activeFile}
+              currentContent=""
+              reloadContent={reloadContent}
+              binary
+            />
+          ) : null}
+          <div className="min-h-0 flex-1">
+            <ImageViewer
+              content={fileContent.content}
+              src={fileContent.mediaUrl}
+              byteSize={fileContent.size}
+              filePath={activeFile.filePath}
+              mimeType={fileContent.mimeType}
+              preferenceKey={pdfPreferenceKey}
+              scrollCacheKey={pdfViewStateKey}
+              focusPane={{ file: activeFile, viewStateId: viewStateScopeId }}
+              editFileId={isEditorWritableView(activeFile) ? activeFile.id : null}
+            />
+          </div>
+        </div>
       )
     }
     return (
@@ -233,10 +250,11 @@ export function EditorEditFileSurface({
     if (!externalChangeBanner) {
       return changesView
     }
+    // ChangesModeView sizes itself with flex-1, which a block parent ignores.
     return (
       <div className="flex flex-1 min-h-0 flex-col">
         {externalChangeBanner}
-        <div className="min-h-0 flex-1">{changesView}</div>
+        <div className="flex min-h-0 flex-1 flex-col">{changesView}</div>
       </div>
     )
   }

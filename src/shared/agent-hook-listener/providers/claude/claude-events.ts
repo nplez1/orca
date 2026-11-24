@@ -89,6 +89,9 @@ export function normalizeClaudeEvent(
       : eventName === 'StopFailure'
         ? ('failure' as const)
         : undefined
+  // StopFailure names why the turn failed (`rate_limit`, `authentication_failed`, ...) and says it.
+  const failureError = outcome === 'failure' ? readString(hookPayload, 'error') : undefined
+  const failureMessage = failureError && readString(hookPayload, 'last_assistant_message')
   const backgroundTasks = readClaudeBackgroundAgentTasks(hookPayload)
   const isTaskWakeup =
     eventAgentId === undefined &&
@@ -151,7 +154,7 @@ export function normalizeClaudeEvent(
     return null
   }
   if (backgroundTasks.present && eventAgentId === undefined) {
-    updateClaudeRunningNonAgentTask(state, paneKey, backgroundTasks.hasRunningNonAgentTask)
+    updateClaudeRunningNonAgentTask(state, paneKey, backgroundTasks)
   }
   if (sessionCronInventoryPresent && eventAgentId === undefined) {
     if (hasActiveSessionCron) {
@@ -252,6 +255,7 @@ export function normalizeClaudeEvent(
               state: previousLead.state,
               // Child waits must retain the lead's verdict and clock.
               ...(previousLead.outcome ? { outcome: previousLead.outcome } : {}),
+              ...(previousLead.failure ? { failure: previousLead.failure } : {}),
               stateStartedAt: previousLead.stateStartedAt,
               ...(previousLead.taskWakeupTurn ? { taskWakeupTurn: true as const } : {}),
               // Keep the displaced lead end time so later child drain belongs to the same turn.
@@ -320,6 +324,9 @@ export function normalizeClaudeEvent(
     state: reportedStateName,
     ...(taskWakeupTurn ? { taskWakeupTurn: true as const } : {}),
     ...(outcome ? { outcome } : {}),
+    ...(failureError
+      ? { failure: { error: failureError, ...(failureMessage ? { message: failureMessage } : {}) } }
+      : {}),
     ...(isWaitingInducing && eventAgentId ? { waitingAgentId: eventAgentId } : {}),
     ...claudeWaitRequest(eventName, isAskUserQuestionWait, eventToolUseId, previousLead),
     ...(stateBeforeWait ? { stateBeforeWait } : {}),

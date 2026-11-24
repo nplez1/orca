@@ -8,10 +8,7 @@ import { AiVaultSessionPublicationGate } from './ai-vault-session-publication-ga
 import { EMPTY_AI_VAULT_SESSIONS } from '../session-list/ai-vault-session-identity'
 import { useAppliedAiVaultScan } from './ai-vault-applied-scan'
 import { useAiVaultSessionHostRefreshEvents } from '../scope/ai-vault-host-scope'
-import {
-  aiVaultSessionResultCacheKey,
-  resetAiVaultSessionResultCacheForTest
-} from './ai-vault-session-result-cache'
+import { aiVaultSessionResultCacheKey } from './ai-vault-session-result-cache'
 import {
   refreshAiVaultSessionList,
   type AiVaultConditionalSnapshot,
@@ -23,25 +20,12 @@ import { useAiVaultNewSessionRescan } from './ai-vault-new-session-rescan'
 import { saveAiVaultSessionList } from './ai-vault-saved-session-lists'
 import { useAiVaultAssociationObservation } from './ai-vault-association-observation'
 import { createNonSecureContextUuid as createBrowserUuid } from '../../../../../../shared/identifiers/non-secure-context-uuid'
-import {
-  markForcedRescanSpent,
-  resetAiVaultForcedRescanBudgetForTest
-} from './ai-vault-forced-rescan-budget'
-import { resetAgentSessionIdsRefreshKeys } from './ai-vault-agent-session-refresh-key'
+import { markForcedRescanSpent } from './ai-vault-forced-rescan-budget'
 import type {
   AiVaultListResult,
   AiVaultSession
 } from '../../../../../../shared/ai-vault/contracts/ai-vault-types'
 import { isAiVaultScanCancelledError } from '../../../../../../shared/ai-vault/contracts/ai-vault-types'
-
-// Why a wrapper: upstream's suites import this name here. There is one budget module now — the mark
-// this hook makes on a manual refresh and the claim every automatic rescan takes read the same state,
-// which is the fork's rule — so a clean lane is that budget plus the caches it guards.
-export function resetAiVaultForcedRescanThrottleForTest(): void {
-  resetAiVaultForcedRescanBudgetForTest()
-  resetAgentSessionIdsRefreshKeys()
-  resetAiVaultSessionResultCacheForTest()
-}
 
 type ConditionalSnapshot = AiVaultConditionalSnapshot & { scopeKey: string }
 
@@ -68,7 +52,18 @@ export function useAiVaultSessionRefresh(
   /** The depth the sessions on screen came from, which trails the selected one during a rescan. */
   loadedSessionLimit: AiVaultSessionLimit | null
 } {
-  const { scan, applyScan } = useAppliedAiVaultScan()
+  const scanScopeKey = `${aiVaultSessionResultCacheKey(executionHostScope, scopePaths, sessionLimit, hostQuery, scopeOnly)}\n${sessionLimit}`
+  // A return to the panel opens on the list this scope already holds instead of a skeleton.
+  const { scan, applyScan } = useAppliedAiVaultScan(() => {
+    const result = readCachedAiVaultSessionList({
+      scopePaths,
+      scopeOnly,
+      executionHostScope,
+      sessionLimit,
+      ...(hostQuery ? { query: hostQuery } : {})
+    })
+    return result && { result, limit: sessionLimit, scopeKey: scanScopeKey, scopeOnly }
+  })
   const associations = useAiVaultAssociationObservation(executionHostScope)
   const associationsRef = useRef(associations)
   const [loading, setLoading] = useState(false)
@@ -83,7 +78,6 @@ export function useAiVaultSessionRefresh(
   const conditionalSnapshotRef = useRef<ConditionalSnapshot | null>(null)
   const mountedRef = useRef(true)
   const [publicationGate] = useState(() => new AiVaultSessionPublicationGate())
-  const scanScopeKey = `${aiVaultSessionResultCacheKey(executionHostScope, scopePaths, sessionLimit, hostQuery, scopeOnly)}\n${sessionLimit}`
   // Workspace or Project rows would pass for All's list while it loads or after it fails; the filter narrows the rest.
   const shown = scan?.scopeOnly && !scopeOnly ? null : scan
   // Kept through rescans so a repeat failure doesn't blink; shown only for the scope that failed.

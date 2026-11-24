@@ -8,6 +8,10 @@ import {
   retainTopResult,
   type QuickOpenRankedResult
 } from '../quick-open-bounded-result-page'
+import {
+  asciiIdentifierBoundaries,
+  unicodeIdentifierBoundaries
+} from './quick-open-identifier-boundaries'
 
 // Why: the query limits, the bounded result page and the name-filter matcher are their own
 // modules; this file stays the single import site the host, relay and renderer already use.
@@ -96,7 +100,10 @@ export function rankQuickOpenFiles(
     const score = scoreQuickOpenTerms(normalizedQuery, file)
     if (score !== null) {
       matches.push(file)
-      retainTopResult(results, { path: file.path, score, inputIndex: file.inputIndex }, limit)
+      // A full heap keeps only better scores; skip building a candidate it would drop.
+      if (results.length < limit || score <= results[0].score) {
+        retainTopResult(results, { path: file.path, score, inputIndex: file.inputIndex }, limit)
+      }
     }
   }
   lastMatches.set(files, { terms: normalizedQuery, matches })
@@ -178,7 +185,7 @@ function scoreQuickOpenTerms(
   for (const { text: term, withoutSeparators } of terms) {
     let termScore = fuzzyMatchIndexedFile(term, file)
     if (termScore === null && withoutSeparators !== undefined) {
-      const filenameStart = file.lowerPath.lastIndexOf('/') + 1
+      const filenameStart = file.lowerPath.lastIndexOf('/', file.lowerPath.length - 2) + 1
       const parentStart = file.lowerPath.lastIndexOf('/', filenameStart - 2) + 1
       const fallback =
         fuzzyMatchIndexedFile(term, file, withoutSeparators) ??
@@ -202,29 +209,26 @@ function scoreQuickOpenTerms(
 }
 
 function prepareQuickOpenFile(path: string, inputIndex: number): QuickOpenIndexedFile {
-  const searchPath = composeQuickOpenText(path.replace(/\\/g, '/'))
-  const lowerPath = composeQuickOpenText(searchPath.toLowerCase())
+  // Listings run this per path on every open; ASCII paths (nearly all) skip Unicode work.
+  const ascii = !NON_ASCII.test(path)
+  const slashed = path.includes('\\') ? path.replace(/\\/g, '/') : path
+  const searchPath = ascii ? slashed : composeQuickOpenText(slashed)
+  const lowerPath = ascii
+    ? searchPath.toLowerCase()
+    : composeQuickOpenText(searchPath.toLowerCase())
+  // A folder ends in `/`; its name is the segment before it.
+  const nameEnd = lowerPath.endsWith('/') ? lowerPath.length - 1 : lowerPath.length
   const file = {
     path,
     lowerPath,
-    lowerFilename: lowerPath.slice(lowerPath.lastIndexOf('/') + 1),
+    lowerFilename: lowerPath.slice(lowerPath.lastIndexOf('/', nameEnd - 1) + 1, nameEnd),
     inputIndex
   }
   if (/[A-Z]/.test(searchPath)) {
-    const boundaries = new Set<number>()
-    let lowerOffset = 0
-    for (let index = 0; index < searchPath.length; index++) {
-      if (
-        index > 0 &&
-        /[A-Z]/.test(searchPath[index]) &&
-        (/[a-z0-9]/.test(searchPath[index - 1]) ||
-          (/[A-Z]/.test(searchPath[index - 1]) && /[a-z]/.test(searchPath[index + 1] ?? '')))
-      ) {
-        boundaries.add(lowerOffset)
-      }
-      lowerOffset += searchPath[index].toLowerCase().length
-    }
-    if (boundaries.size > 0) {
+    const boundaries = ascii
+      ? asciiIdentifierBoundaries(searchPath)
+      : unicodeIdentifierBoundaries(searchPath)
+    if (boundaries) {
       identifierBoundaries.set(file, boundaries)
     }
   }
@@ -238,16 +242,17 @@ function fuzzyMatchIndexedFile(
   searchStart = 0
 ): number | null {
   const equivalentSeparators = queryWithoutSeparators !== undefined
+  const { lowerPath } = file
   let qi = 0
   let score = 0
   let lastMatchIdx = -1
 
   while (qi < query.length) {
     const next = lastMatchIdx === -1 ? searchStart : lastMatchIdx + 1
-    let ti = file.lowerPath[next] === query[qi] ? next : file.lowerPath.indexOf(query[qi], next + 1)
+    let ti = lowerPath.indexOf(query[qi], next)
     if (equivalentSeparators && (query[qi] === '-' || query[qi] === '_')) {
       for (const separator of ['-', '_', ' ']) {
-        const alternate = file.lowerPath.indexOf(separator, next)
+        const alternate = lowerPath.indexOf(separator, next)
         if (alternate !== -1 && (ti === -1 || alternate < ti)) {
           ti = alternate
         }
@@ -263,12 +268,13 @@ function fuzzyMatchIndexedFile(
     }
     const gap = lastMatchIdx === -1 ? 0 : ti - lastMatchIdx - 1
     score += gap
+    // `/`, `.`, `-`, or `_` when separators are equivalent, start a word.
+    const before = ti > 0 ? lowerPath.charCodeAt(ti - 1) : 0
     if (
-      ti > 0 &&
-      (file.lowerPath[ti - 1] === '/' ||
-        file.lowerPath[ti - 1] === '.' ||
-        file.lowerPath[ti - 1] === '-' ||
-        (equivalentSeparators && file.lowerPath[ti - 1] === '_'))
+      before === 47 ||
+      before === 46 ||
+      before === 45 ||
+      (equivalentSeparators && before === 95)
     ) {
       score -= 5
     }

@@ -64,10 +64,6 @@ export function clearKimiSessionIndexCache(): void {
   workDirCacheByIndexPath.clear()
 }
 
-export function hasKimiSessionIndexCacheEntryForTests(indexPath: string): boolean {
-  return workDirCacheByIndexPath.has(indexPath)
-}
-
 export async function readKimiWorkDirBySessionId(
   indexPath: string,
   signal?: AbortSignal

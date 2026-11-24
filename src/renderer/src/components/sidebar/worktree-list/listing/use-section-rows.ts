@@ -1,7 +1,15 @@
+import { selectWslHostsServing } from '../../../../runtime/hosts/wsl/use-wsl-hosts-enabled'
 import { useCallback, useMemo, useState } from 'react'
+import { shallow } from 'zustand/shallow'
+import { persistedUIValuesEqual } from '../../../../../../shared/collections/persisted-ui-equality'
 import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from '@/store/index'
+import { useUiLanguageRevision } from '@/i18n/use-ui-language-revision'
 import { selectSidebarLineageParentIdentities } from '@/store/slices/worktrees/metadata/cross-store-lineage-parents'
+import type { AppState } from '@/store/types'
+import type { RuntimeStatuses } from '@/store/slices/runtime-status/views/runtime-status-owner'
+import { useAppStoreWithHostStatuses } from '@/store/slices/runtime-status/views/use-runtime-status-view'
+import type { Repo } from '../../../../../../shared/repository/repo-types'
 import {
   getLocalExecutionHostLabel,
   type ExecutionHostId
@@ -13,7 +21,6 @@ import { createHostScopedRepoOf } from '../../../../../../shared/sidebar-list/fe
 import { createSidebarPRGroupReader } from '../grouping/pr-group-key'
 import { useEffectiveCollapsedGroups } from './use-collapsed-groups'
 import { useMergedSidebarRows } from './use-merged-sidebar-rows'
-import { useUiLanguageRevision } from '@/i18n/use-ui-language-revision'
 import type { Row } from '../../../../../../shared/sidebar-list/row-types'
 import type { SectionRowsArgs } from './sidebar-list-model'
 import { getLogicalRepoOrderRankById } from '../../../../../../shared/sidebar-list/sections/project-section-order'
@@ -29,13 +36,65 @@ import {
   orderHostSectionOptions
 } from '../../../../../../shared/sidebar-list/hosts/host-section-order'
 import type { ExecutionHostRegistryEntry } from '../../../../../../shared/execution-host/execution-host-registry-entry'
-import { createSidebarHostLabelsSelector } from '../controls/sidebar-host-options'
-import { createSidebarHostOptionsSelector } from './create-sidebar-host-options-selector'
+import {
+  type SidebarHostOption,
+  buildSidebarHostOptions,
+  sidebarHostSemantics,
+  createSidebarHostLabelsSelector
+} from '../controls/sidebar-host-options'
 import { selectPendingWorktreeCreationKeys } from './pending-worktree-creation-keys'
+import { selectEphemeralVmHostLifecycles } from '@/store/slices/ephemeral-vm/ephemeral-vm-lifecycle'
+
+function createSidebarHostOptionsSelector() {
+  let inputs: readonly unknown[] = []
+  let result: SidebarHostOption[] = []
+  return (
+    state: AppState,
+    statuses: RuntimeStatuses,
+    repos: readonly Repo[],
+    settings: AppState['settings'],
+    hostLabelOverrides: Parameters<typeof buildSidebarHostOptions>[0]['hostLabelOverrides']
+  ): SidebarHostOption[] => {
+    const nextInputs = [
+      repos,
+      state.sshTargetLabels,
+      state.sshConnectionStates,
+      settings,
+      statuses,
+      state.runtimeEnvironments,
+      hostLabelOverrides,
+      state.wslHostStatuses,
+      selectWslHostsServing(state),
+      state.wslHostServerFiles === 'missing',
+      selectEphemeralVmHostLifecycles(state)
+    ]
+    if (shallow(inputs, nextInputs)) {
+      return result
+    }
+    inputs = nextInputs
+    const next = buildSidebarHostOptions({
+      repos,
+      sshTargetLabels: state.sshTargetLabels,
+      sshConnectionStates: state.sshConnectionStates,
+      settings,
+      runtimeEnvironments: state.runtimeEnvironments,
+      runtimeStatusByEnvironmentId: statuses,
+      hostLabelOverrides,
+      wslHostStatuses: state.wslHostStatuses,
+      wslHostsEnabled: selectWslHostsServing(state),
+      wslHostServerFilesMissing: state.wslHostServerFiles === 'missing',
+      ephemeralVmHosts: selectEphemeralVmHostLifecycles(state)
+    })
+    if (!persistedUIValuesEqual(result.map(sidebarHostSemantics), next.map(sidebarHostSemantics))) {
+      result = next
+    }
+    return result
+  }
+}
 
 export function useSidebarSectionRows(args: SectionRowsArgs) {
   const { repos, worktrees, repoMap, defaultHostId } = args
-  const lineageParentIdentities = useAppStore(selectSidebarLineageParentIdentities)
+  const lineageParentIdentities = useAppStoreWithHostStatuses(selectSidebarLineageParentIdentities)
   const workspaceHostOrder = useAppStore((s) => s.workspaceHostOrder)
   const setWorkspaceHostOrder = useAppStore((s) => s.setWorkspaceHostOrder)
 
@@ -76,8 +135,8 @@ export function useSidebarSectionRows(args: SectionRowsArgs) {
   const selectHostOptions = useMemo(() => createSidebarHostOptionsSelector(), [])
   const selectHostLabels = useMemo(() => createSidebarHostLabelsSelector(), [])
   useUiLanguageRevision()
-  const hostOptions = useAppStore((state) =>
-    selectHostOptions(state, repos, args.settings, hostLabelOverrides)
+  const hostOptions = useAppStoreWithHostStatuses((state, statuses) =>
+    selectHostOptions(state, statuses, repos, args.settings, hostLabelOverrides)
   )
   const hostLabelById = selectHostLabels(hostOptions)
 

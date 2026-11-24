@@ -285,9 +285,3 @@ export async function resolveLocalGitUsername(
 ): Promise<string> {
   return (await resolveLocalGitUsernameDetailed(repoPath, ghAccount)).username
 }
-
-export function resetGhLoginCacheForTests(): void {
-  cachedGhLogin = null
-  ghLoginTimedOutAt = null
-  ghLoginProbeInFlight = null
-}

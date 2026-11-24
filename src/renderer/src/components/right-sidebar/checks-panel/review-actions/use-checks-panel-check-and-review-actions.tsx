@@ -4,6 +4,7 @@ import React, { useCallback } from 'react'
 import { toast } from 'sonner'
 import { refreshHostedReviewCard } from '@/store/slices/hosted-review/hosted-review-card-refresh'
 import { checksPanelAsyncResultKey } from '../refresh/checks-panel-async-result-key'
+import { checksPanelLoadErrorMessage } from '../review-data/checks-panel-forge-owner'
 import {
   buildFixBrokenChecksPrompt,
   collectFixChecksPromptDetails,
@@ -48,8 +49,10 @@ export function useChecksPanelCheckAndReviewActions(model: ChecksPanelCheckAndRe
     prCacheKey,
     repo,
     setChecks,
+    setChecksError,
     setChecksLoading,
     setComments,
+    setCommentsError,
     setCommentsLoading,
     setIsFixingChecksWithAI,
     sourceControlAiActionsVisible,
@@ -176,8 +179,8 @@ export function useChecksPanelCheckAndReviewActions(model: ChecksPanelCheckAndRe
       if (!isCurrentRequestContext()) {
         return
       }
-      setChecks([])
-      setComments([])
+      // Keep current results: a newly linked PR changes the read identity, and the section owners
+      // reset and re-read; clearing here would strand them if this action is superseded.
       setChecksLoading(true)
       setCommentsLoading(true)
       let requestKey: string | null = null
@@ -209,6 +212,14 @@ export function useChecksPanelCheckAndReviewActions(model: ChecksPanelCheckAndRe
           return
         }
         if (!refreshedPR) {
+          if (isCurrentAsyncResult(stateRequestKey)) {
+            const message = translate(
+              'checksPanel.linkedReviewUnavailable',
+              'Could not load the linked pull request.'
+            )
+            setChecksError(message)
+            setCommentsError(message)
+          }
           return
         }
         const refreshedRequestKey = checksPanelAsyncResultKey(
@@ -234,6 +245,7 @@ export function useChecksPanelCheckAndReviewActions(model: ChecksPanelCheckAndRe
               force: true,
               repoId: repo.id,
               repoOwnerExecutionHostId: getRepoExecutionHostId(repo),
+              throwOnError: true,
               wakeWslDistro: true,
               userRefresh: true
             }
@@ -249,7 +261,7 @@ export function useChecksPanelCheckAndReviewActions(model: ChecksPanelCheckAndRe
                   return
                 }
                 console.warn('Failed to fetch PR checks:', err)
-                setChecks([])
+                setChecksError(checksPanelLoadErrorMessage(err, getRepoExecutionHostId(repo)))
               }
             )
             .finally(() => {
@@ -276,7 +288,7 @@ export function useChecksPanelCheckAndReviewActions(model: ChecksPanelCheckAndRe
                   return
                 }
                 console.warn('Failed to fetch PR comments:', err)
-                setComments([])
+                setComments(null)
               }
             )
             .finally(() => {
@@ -286,13 +298,11 @@ export function useChecksPanelCheckAndReviewActions(model: ChecksPanelCheckAndRe
             })
         ])
       } catch (err) {
-        if (
-          isCurrentRequestContext() &&
-          (requestKey === null || isCurrentAsyncResult(requestKey))
-        ) {
+        if (isCurrentRequestContext() && isCurrentAsyncResult(requestKey ?? stateRequestKey)) {
           console.warn('Failed to refresh linked GitHub PR:', err)
-          setChecks([])
-          setComments([])
+          const message = checksPanelLoadErrorMessage(err, getRepoExecutionHostId(repo))
+          setChecksError(message)
+          setCommentsError(message)
         }
       } finally {
         if (requestKey === null && isCurrentRequestContext()) {
@@ -324,8 +334,11 @@ export function useChecksPanelCheckAndReviewActions(model: ChecksPanelCheckAndRe
       asyncResultKeyRef,
       setCommentsLoading,
       setChecks,
+      setChecksError,
       panelContextKeyRef,
-      setComments
+      setComments,
+      setCommentsError,
+      stateRequestKey
     ]
   )
 

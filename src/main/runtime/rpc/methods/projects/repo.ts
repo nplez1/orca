@@ -52,7 +52,9 @@ export const REPO_METHODS = [
           .map((repo) => projectRepoVisibilityForClient(repo, context)),
         // Why on a listing: a checkout sitting outside its project folder is something the host can
         // see for free, and a client only ever learns about it if the listing says so.
-        relocationRequiredRepoIds: context.runtime.findReposRequiringRelocation?.()
+        relocationRequiredRepoIds: context.runtime.findReposRequiringRelocation?.(),
+        // Image icons' ids for sidebarInputs.repoIcons: a phone draws no https image itself.
+        repoIconIds: context.runtime.repoIconDataUrls.idsByRepo()
       }
       return resolveReplySnapshot(reply, params.afterSnapshotId)
     }

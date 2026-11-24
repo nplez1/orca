@@ -152,7 +152,7 @@ export async function resolvePRForBranchOutcome(input: {
       ghOptions,
       executionScope,
       preferHeadRefName: branchName || null,
-      reads
+      reads: { ...reads, batchSidebar: true }
     })
     data = exactLookup.data
     dataRepo = exactLookup.dataRepo

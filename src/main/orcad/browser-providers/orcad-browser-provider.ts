@@ -4,6 +4,7 @@ import { homedir } from 'node:os'
 import {
   setRuntimeBrowserUnavailableCause,
   type RuntimeBrowserCommandsFactory,
+  type RuntimeBrowserIdentity,
   type RuntimeBrowserUnavailableCause
 } from '../../runtime/browser/installation/runtime-browser-commands-factory'
 import { ExternalChromiumBrowserProcess } from './chromium/external-chromium-browser-process'
@@ -11,6 +12,7 @@ import type { ExternalChromiumLaunch } from './chromium/external-chromium-browse
 import { resolveOrcadAgentBrowserBinary } from './orcad-agent-browser-binary'
 import { installedAppExecutableCandidates } from '../../fork/install-layout-names'
 import { ElectronServeBrowserProcess } from './electron/electron-serve-browser-process'
+import { electronSidecarIdentity } from './electron/electron-sidecar-identity'
 import { watchOrcadBrowserInstallPark } from './orcad-browser-install-park'
 import { openServeBundlePark } from '../../../shared/remote-runtime/serve-supervisor/serve-bundle-park'
 import { ORCAD_BROWSER_PARK_LABEL } from '../../../shared/remote-runtime/serve-supervisor/serve-bundle-coordination'
@@ -20,7 +22,9 @@ export type OrcadBrowserProvider = {
   kind: 'electron' | 'chromium'
   factory: RuntimeBrowserCommandsFactory
   isAvailable(): boolean
-  supportsGoogleCookieClear?(): boolean
+  /** Engine-served capabilities, such as the cookie clears, that an older browser engine lacks. */
+  supportsEngineCapability?(capability: string): boolean
+  identity?(): RuntimeBrowserIdentity | null
   stop(): Promise<void>
 }
 
@@ -157,7 +161,8 @@ async function startElectronServeProvider(
   const installPark = park ? watchOrcadBrowserInstallPark(helper, { park, parked }) : null
   return {
     kind: 'electron',
-    supportsGoogleCookieClear: () => processHandle.supportsGoogleCookieClear(),
+    supportsEngineCapability: (capability) => processHandle.sidecarWith(capability) !== null,
+    identity: () => electronSidecarIdentity(processHandle),
     factory: (host) => processHandle.createCommands(host),
     isAvailable: () => processHandle.isAvailable(),
     stop: async () => {

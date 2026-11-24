@@ -20,7 +20,7 @@ const badgeVariants = cva(
         link: 'text-primary underline-offset-4 [a&]:hover:underline',
         /** Workspace execution-host context, quieter and squarer than status chips. */
         hostContext:
-          'h-4 rounded border-border bg-[var(--host-badge,var(--accent))] px-1.5 text-[10px] leading-none text-[var(--host-badge-foreground,var(--muted-foreground))] dark:border-border/50 dark:bg-[var(--host-badge,color-mix(in_oklab,var(--accent)_80%,transparent))] [button&]:cursor-pointer [button&]:hover:bg-worktree-sidebar-accent [button&]:hover:text-foreground [button&]:data-[state=open]:bg-worktree-sidebar-accent [button&]:data-[state=open]:text-foreground focus-visible:ring-1 focus-visible:ring-worktree-sidebar-ring focus-visible:ring-inset focus-visible:outline-none',
+          'h-4 rounded border-border bg-[var(--host-badge,var(--accent))] px-1.5 py-0 text-[10px] leading-3.5 text-[var(--host-badge-foreground,var(--muted-foreground))] dark:border-border/50 dark:bg-[var(--host-badge,color-mix(in_oklab,var(--accent)_80%,transparent))] [button&]:cursor-pointer [button&]:hover:bg-worktree-sidebar-accent [button&]:hover:text-foreground [button&]:data-[state=open]:bg-worktree-sidebar-accent [button&]:data-[state=open]:text-foreground focus-visible:ring-1 focus-visible:ring-worktree-sidebar-ring focus-visible:ring-inset focus-visible:outline-none',
         /** Status tones for the compact meta pill shown beside a workspace's review details.
          *  Sizing lives in the variant (like `hostContext`) because a state pill may not be
          *  repainted by hand — its colour is the one signal a reader trusts without reading

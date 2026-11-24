@@ -7,6 +7,21 @@ export function unregisteredFolderRefusal(worktreePath: string): Error {
   )
 }
 
+/** The folder at the path is not provably the accepted checkout; refuses further deletion. */
+export class CheckoutIdentityRefusal extends Error {}
+
+export function differentCheckoutAtPathError(worktreePath: string): Error {
+  return new CheckoutIdentityRefusal(
+    `A different checkout is now at ${worktreePath}; Orca left it in place. Delete it again to remove it.`
+  )
+}
+
+export function unconfirmedCheckoutAtPathError(worktreePath: string): Error {
+  return new CheckoutIdentityRefusal(
+    `Orca cannot confirm the checkout at ${worktreePath}, so it left the folder in place. Inspect the folder before removing it.`
+  )
+}
+
 /** A checkout whose folder could not be emptied, so the delete leaves it behind as the user's problem. */
 export type LeftoverCheckoutFolder = {
   path: string
@@ -64,6 +79,10 @@ export const STILL_LIVE_DETAIL_PREFIX = 'still live:'
 
 // Sweep timeouts need their own force matcher even without a per-PTY verdict (#11960).
 export const WORKTREE_TEARDOWN_TIMEOUT_PREFIX = 'Timed out waiting for physical PTY teardown:'
+
+// Removing a folder workspace purges its session, the only copy of its unsaved editor text.
+export const UNSAVED_DRAFTS_REMOVAL_REFUSAL =
+  'Unsaved editor changes. Save or close them in Orca, then delete again.'
 
 // Running agent sessions also block removal; classify this prefix to expose the force waiver (#11960).
 export const RUNNING_AGENT_SESSION_REMOVAL_PREFIX =

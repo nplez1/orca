@@ -15,6 +15,7 @@ import {
 } from './checks-panel-git-status-snapshot'
 
 import { checksPanelAsyncResultKey } from './checks-panel-async-result-key'
+import { checksPanelLoadErrorMessage } from '../review-data/checks-panel-forge-owner'
 import {
   isWorkspaceReviewProvider,
   workspaceReviewSelectionKey
@@ -65,6 +66,7 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
     repo,
     reviewSelection,
     setChecks,
+    setChecksError,
     setChecksLoading,
     setComments,
     setCommentsLoading,
@@ -343,7 +345,7 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
             branch,
             refreshedPR.headSha,
             refreshedPR.prRepo,
-            { force: true, ...repoOptions, wakeWslDistro: true, userRefresh: true }
+            { force: true, ...repoOptions, throwOnError: true, wakeWslDistro: true, userRefresh: true }
           ).then(
             (result) => {
               if (!isCurrentRequest() || !isCurrentAsyncResult(prRequestKey)) {
@@ -364,7 +366,7 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
                 return
               }
               console.warn('Failed to fetch PR checks:', err)
-              setChecks([])
+              setChecksError(checksPanelLoadErrorMessage(err, repoOptions.repoOwnerExecutionHostId))
             }
           )
           setChecksLoading(true)
@@ -386,7 +388,7 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
                 return
               }
               console.warn('Failed to fetch PR comments:', err)
-              setComments([])
+              setComments(null)
             }
           )
           await Promise.all([
@@ -402,8 +404,8 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
             })
           ])
         } else if (isCurrentRequest()) {
-          setChecks([])
-          setComments([])
+          // A superseded or inconclusive lookup must not clear results no read will settle. A PR
+          // that is really gone changes the read identity, and the section owners reset and re-read.
           refreshOutcome = 'no-pr'
         }
       },
@@ -479,6 +481,7 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
     setChecksLoading,
     refreshRequestKeyRef,
     setChecks,
+    setChecksError,
     setComments,
     setGitStatusSnapshot,
     setManualFailure,

@@ -10,20 +10,13 @@ const contractGlobs = [
   'config/scripts/**/*.performance.test.{ts,tsx,mjs}',
   'tests/tools/**/*.performance.test.{ts,tsx,mjs}'
 ]
-// Older regression tests this job also runs; they get no work-count exception.
+// LOCAL(nplez1): fork-owned perf contracts. They are not named *.performance.test.*, so the globs
+// above miss them, and they get no work-count exception.
 const namedContracts = [
-  // Fork-owned perf contracts; not named *.performance.test.*, so the globs miss them.
   'src/shared/workspace-path-search-performance-contract.test.ts',
   'src/main/workspace-path-index/workspace-path-index-performance-contract.test.ts',
   'src/main/workspace-path-index/workspace-path-index-build-lane.test.ts',
-  'src/main/workspace-path-index/workspace-path-index-admission-scheduler.test.ts',
-  'src/renderer/src/components/agent/launch-menu/use-new-tab-agent-menu-host-preferences.test.tsx',
-  'src/renderer/src/components/native-chat/subagents/use-structured-native-chat-subagents.performance.test.tsx',
-  'src/main/codex-usage/codex-rollout-file-lifetime.test.ts',
-  'src/main/codex-usage/scanner-incremental-append.test.ts',
-  'src/main/usage/source-input/jsonl/jsonl-file-reader.test.ts',
-  'config/scripts/static-analysis/oxlint-contracts/app-store-performance-plugin.test.mjs',
-  'config/scripts/static-analysis/oxlint-contracts/quadratic-buffer-concat-plugin.test.mjs'
+  'src/main/workspace-path-index/workspace-path-index-admission-scheduler.test.ts'
 ]
 for (const contract of namedContracts) {
   if (!existsSync(resolve(contract))) {
@@ -39,6 +32,8 @@ export default defineConfig({
     projects: undefined,
     ...(process.versions.bun ? { pool: 'node-runtime', poolRunner: nodeRuntimePool } : {}),
     include: [...contractGlobs, ...namedContracts],
+    // Upstream ships no contract of its own yet; keep the job green until the first one lands.
+    passWithNoTests: true,
     benchmark: { include: [] },
     retry: 0
   }

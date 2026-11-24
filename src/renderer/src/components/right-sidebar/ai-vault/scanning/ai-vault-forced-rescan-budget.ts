@@ -23,7 +23,3 @@ export function aiVaultForcedRescanDelay(): number {
 export function markForcedRescanSpent(): void {
   lastForcedRescanAt = Date.now()
 }
-
-export function resetAiVaultForcedRescanBudgetForTest(): void {
-  lastForcedRescanAt = 0
-}

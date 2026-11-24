@@ -98,3 +98,7 @@ function waitForSlot(
     void granted.then(() => settle(true))
   })
 }
+
+export function _queuedWorktreeDeletesForTests(): number {
+  return waiting.length
+}

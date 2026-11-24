@@ -11,7 +11,7 @@ import {
 } from '../../shared/execution-host/execution-host'
 import {
   SKILL_FOLDERS,
-  scanSkillsFolder,
+  scanSkillsFolder as scanSkillsFolderInPlace,
   type ScannedProject,
   type ScannedSkill
 } from './bot-skill-folder-scan'
@@ -22,12 +22,27 @@ import { retireAtRestCommandContext } from '../native-chat/agent-session-wire/op
 import { folderWorkspaceKey } from '../../shared/workspace/identity/workspace-scope'
 
 export { linkedSkillKeys, resolveSkillRoot } from './bot-skill-roots'
+export { admittedSkill, type ScannedProject, type ScannedSkill } from './bot-skill-folder-scan'
+
+/** The fork's scan, with upstream's abort: a signal is noticed at the split's boundary. */
+export async function scanSkillsFolder(
+  skillsDir: string,
+  signal?: AbortSignal
+): Promise<ScannedSkill[]> {
+  signal?.throwIfAborted()
+  const skills = await scanSkillsFolderInPlace(skillsDir)
+  signal?.throwIfAborted()
+  return skills
+}
 
 /** The project's skills from .agents/skills, else .claude/skills; null when it has none. */
-export async function scanSkillProject(repoPath: string): Promise<ScannedProject | null> {
+export async function scanSkillProject(
+  repoPath: string,
+  signal?: AbortSignal
+): Promise<ScannedProject | null> {
   for (const folder of SKILL_FOLDERS) {
     const skillsDir = join(repoPath, folder, 'skills')
-    const skills = await scanSkillsFolder(skillsDir)
+    const skills = await scanSkillsFolder(skillsDir, signal)
     if (skills.length > 0) {
       return { skillsDir, skills }
     }
@@ -132,17 +147,21 @@ function isLocalRepo(repo: Repo): boolean {
   return getRepoExecutionHostId(repo) === LOCAL_EXECUTION_HOST_ID
 }
 
+/** These linked projects that are on this host, the only ones a bot loads skills from. */
+export function localSkillProjects(ids: readonly string[], repos: readonly Repo[]): Repo[] {
+  return ids.flatMap((id) => {
+    const repo = repos.find((entry) => entry.id === id)
+    return repo && isLocalRepo(repo) ? [repo] : []
+  })
+}
+
 /** These linked projects on this host that have skills, scanned in place. */
 async function scanLinkedProjects(
   ids: readonly string[],
   repos: readonly Repo[]
 ): Promise<{ repo: Repo; skills: ScannedSkill[] }[]> {
-  const linked = ids.flatMap((id) => {
-    const repo = repos.find((entry) => entry.id === id)
-    return repo && isLocalRepo(repo) ? [repo] : []
-  })
   const scanned = await Promise.all(
-    linked.map(async (repo) => {
+    localSkillProjects(ids, repos).map(async (repo) => {
       const project = await scanSkillProject(repo.path)
       return project ? [{ repo, skills: project.skills }] : []
     })

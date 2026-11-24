@@ -43,6 +43,8 @@ export function* getVisibleHostedReviewWorkspaces(
     (state.workspaceHostScope && state.workspaceHostScope !== 'all'
       ? [state.workspaceHostScope]
       : null)
+  // An open item page shows its PRs whatever host the left sidebar is filtered to.
+  const itemPageIds = new Set(state.visibleItemPageReviewWorktreeIds ?? [])
   for (const id of options?.worktreeIds ?? state.visibleReviewWorktreeIds) {
     const lookupIndex = getWorktreeLookupIndex(state)
     const trackedOwners = lookupIndex.byId.get(id)?.owners
@@ -108,7 +110,10 @@ export function* getVisibleHostedReviewWorkspaces(
         getRepoExecutionHostId(selectedOwner.repo) === hostId
       if (
         (options?.selectedOnly && !selected) ||
-        (!selected && visibleHosts && !hostIds.some((hostId) => visibleHosts.includes(hostId)))
+        (!selected &&
+          !itemPageIds.has(id) &&
+          visibleHosts &&
+          !hostIds.some((hostId) => visibleHosts.includes(hostId)))
       ) {
         continue
       }
@@ -212,6 +217,8 @@ export function getVisibleHostedReviewRefreshTargets(
       foregroundIntervalMs:
         reviewRefreshIntervalMs(intervalInput, 'default') ?? CLOSED_REVIEW_REFRESH_INTERVAL_MS,
       refresh: async (force = true, signal, intent) => {
+        // A timer's read and a failed read's backoff are polls: no use of an idle WSL host (#46567).
+        const background = intent === 'timer' || intent === 'retry' || undefined
         let outcome: PRSnapshotReply | undefined
         const before = getState()
         const beforeFetchedAt = knownGitHub
@@ -221,8 +228,9 @@ export function getVisibleHostedReviewRefreshTargets(
           ? before.fetchPRForBranch(candidate.repoPath, candidate.branch, {
               force: true,
               signal,
-              reason: (intent ? intent === 'discovery' : force) ? 'active' : 'swr',
+              reason: (intent ? intent !== 'timer' : force) ? 'active' : 'swr',
               selected,
+              background,
               onReadOutcome: (next) => {
                 outcome = next
               },
@@ -242,7 +250,8 @@ export function getVisibleHostedReviewRefreshTargets(
               fallbackGitHubPR: nonGitHub ? null : candidate.fallbackPRNumber,
               currentHeadOid: exactRequest ? null : candidate.currentHeadOid,
               active: selected,
-              admissionTier: selected ? 'interactive' : 'background'
+              admissionTier: selected ? 'interactive' : 'background',
+              background
             }))
         const after = getState()
         if (runtime && outcome) {

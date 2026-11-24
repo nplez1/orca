@@ -25,6 +25,7 @@ import {
   SessionSearchOrphanCleanup
 } from './session-search-retention-delete'
 import { openSessionSearchDatabase } from './session-search-schema'
+import { seedSessionSearchDeletedRows } from './session-search-index-compaction'
 
 /**
  * The content consent the owning instance recorded for this index, for the
@@ -72,6 +73,7 @@ export class SessionSearchStore {
   ) {
     this.db = openSessionSearchDatabase(path)
     ensureSessionSearchQuerySchema(this.db)
+    seedSessionSearchDeletedRows(this.db)
     const content = storeContent ?? readSessionSearchContentConsent(this.db)
     // Why here and not at the caller: which tier the rows were decoded under is a
     // fact about the rows, so the store is what keeps it true across a consent change.
@@ -358,6 +360,7 @@ export class SessionSearchStore {
   removeFile(path: string): void {
     try {
       this.writer.removeFile(path)
+      this.orphanCleanup.checkCompaction()
     } catch (error) {
       this.onError(error)
     }

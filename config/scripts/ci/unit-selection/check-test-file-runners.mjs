@@ -51,19 +51,9 @@ const NON_UNIT_TEST_RUNNERS = [
   {
     name: 'bots chat-tree bench (node tests/tools/benchmarks/bot-chat-tree/bot-chat-tree-bench.mjs)',
     manual: true,
-    include: ['tests/tools/benchmarks/bot-chat-tree/*-benchmark.{ts,test.tsx}'],
+    include: ['tests/tools/benchmarks/bot-chat-tree/*-benchmark.ts'],
     sources: ['tests/tools/benchmarks/bot-chat-tree/vitest.bot-chat-tree-bench.config.ts'],
-    mirrors: [
-      "'tests/tools/benchmarks/bot-chat-tree/bot-chat-tree-notices-benchmark.ts'",
-      "'tests/tools/benchmarks/bot-chat-tree/bots-changed-renders-benchmark.test.tsx'"
-    ]
-  },
-  {
-    name: 'bot panel fold bench (pnpm exec vitest run --config tests/tools/benchmarks/bot-panel-fold/vitest.bot-panel-fold-bench.config.ts)',
-    manual: true,
-    include: ['tests/tools/benchmarks/bot-panel-fold/*-benchmark.test.tsx'],
-    sources: ['tests/tools/benchmarks/bot-panel-fold/vitest.bot-panel-fold-bench.config.ts'],
-    mirrors: ["'tests/tools/benchmarks/bot-panel-fold/bot-panel-fold-benchmark.test.tsx'"]
+    mirrors: ["'tests/tools/benchmarks/bot-chat-tree/bot-chat-tree-notices-benchmark.ts'"]
   },
   {
     name: 'mobile',
@@ -80,14 +70,13 @@ const NON_UNIT_TEST_RUNNERS = [
     sources: [`cloud/apps/${app}/vitest.config.ts`],
     mirrors: ["include: ['src/**/*.test.ts']"]
   })),
-  {
-    name: 'cloud relay-edge',
-    include: ['cloud/apps/relay-edge/test/**/*.test.ts'],
-    sources: ['cloud/apps/relay-edge/vitest.config.ts'],
+  ...['relay-edge', 'connector-wake'].map((app) => ({
+    name: `cloud ${app}`,
+    include: [`cloud/apps/${app}/test/**/*.test.ts`],
+    sources: [`cloud/apps/${app}/vitest.config.ts`],
     mirrors: ["include: ['test/**/*.test.ts']"]
-  },
+  })),
   ...[
-    'cloud/apps/relay-fence-broker',
     'cloud/apps/relay-ingress',
     'cloud/packages/cloud-database',
     'cloud/packages/connector-contract',
@@ -100,18 +89,6 @@ const NON_UNIT_TEST_RUNNERS = [
     sources: [`${dir}/package.json`],
     mirrors: ['vitest run']
   })),
-  {
-    name: 'cloud node:test',
-    include: [
-      'cloud/dev/scripts/run-relay-tests.test.mjs',
-      '.github/actions/cloud-sql-rollout-lease/*.test.mjs'
-    ],
-    sources: ['cloud/package.json'],
-    mirrors: [
-      'dev/scripts/run-relay-tests.test.mjs',
-      '../.github/actions/cloud-sql-rollout-lease/*.test.mjs'
-    ]
-  },
   {
     // Why: fork-local `node --test` files, run by `local/run-fork-tests.mjs` in both fork lanes.
     name: 'fork-local node:test (fork-main-gates)',

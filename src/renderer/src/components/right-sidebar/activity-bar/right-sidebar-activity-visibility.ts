@@ -3,8 +3,8 @@ import type { ActivityBarItem } from './activity-bar-buttons'
 type RightSidebarActivityVisibilityState = {
   isFolder: boolean
   isFolderWorkspace: boolean
-  /** The workspace runs on an SSH host, reached directly or through its managed server. */
-  hasSshHost: boolean
+  /** The workspace runs on an SSH host (directly or through its managed server) or a paired server. */
+  hasRemoteHost: boolean
   /** The workspace is a bot's home, whose page keeps only its own panels. */
   isBot: boolean
   /** The workspace is a bot group's home: members' workers attach to each bot's own home, so its folder panels are always empty. */
@@ -12,7 +12,7 @@ type RightSidebarActivityVisibilityState = {
   /** The focused native chat has started orchestration workers, which the Activity panel lists. */
   hasChatWorkers?: boolean
   /** Data-dependent, unlike the static workspace-shape flags above. */
-  hasLinkedIssue: boolean
+  hasLinkedIssue?: boolean
 }
 
 export function getVisibleRightSidebarActivityItems(
@@ -20,11 +20,11 @@ export function getVisibleRightSidebarActivityItems(
   {
     isFolder,
     isFolderWorkspace,
-    hasSshHost,
+    hasRemoteHost,
     isBot,
     isGroupHome = false,
     hasChatWorkers = false,
-    hasLinkedIssue
+    hasLinkedIssue = false
   }: RightSidebarActivityVisibilityState
 ): ActivityBarItem[] {
   if (isGroupHome) {
@@ -47,7 +47,7 @@ export function getVisibleRightSidebarActivityItems(
             !isFolder ||
             (isFolderWorkspace && !isGroupHome && item.id === 'source-control')) &&
           (!item.folderOnly || (isFolderWorkspace && !isGroupHome)) &&
-          (!item.sshOnly || hasSshHost) &&
+          (!item.remoteHostOnly || hasRemoteHost) &&
           (!item.linkedIssueOnly || hasLinkedIssue))
   )
 }

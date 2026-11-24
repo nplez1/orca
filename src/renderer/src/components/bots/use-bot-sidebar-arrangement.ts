@@ -1,3 +1,4 @@
+import { useAppStoreWithHostStatuses } from '@/store/slices/runtime-status/views/use-runtime-status-view'
 import { useMemo } from 'react'
 import { useAppStore } from '@/store'
 import { selectSidebarChildrenByParentIdentity } from '@/store/slices/worktrees/metadata/cross-store-lineage-parents'
@@ -23,7 +24,7 @@ export function useBotHomeWorkers(homes: readonly FolderWorkspace[]): {
   workers: Worktree[]
   workerStatuses: WorktreeStatus[]
 }[] {
-  const childrenByParent = useAppStore(selectSidebarChildrenByParentIdentity)
+  const childrenByParent = useAppStoreWithHostStatuses(selectSidebarChildrenByParentIdentity)
   const workersByHome = useMemo(
     () =>
       homes.map(
