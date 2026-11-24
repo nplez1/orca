@@ -970,10 +970,11 @@ Anchors, both on upstream-owned files and marked `LOCAL(nplez1)`:
   shell/watcher stories, and the Grok lane's own `workingMode` assertion — were retired by upstream's
   2026-11-24 test-inventory pass, as were the Grok/Claude cancel and helper-settlement suites
   (`main-agent-status-parity` went in the 2026-11-08 sync, `server-grok-background-status.test.ts` in
-  the 2026-11-20 sync). The cancel verdict's upstream suite went the same way on 2026-11-24 —
-  `agent-hook-cancel-verdict-latch.test.ts` drives upstream's `agent_start:subagent` event, which this
-  fork's pi lane never emits, so it is a `fork-refactor` deletion in
-  `local/sync/expected-deletions.json`; the invariant it guarded is now
+  the 2026-11-20 sync). The cancel verdict's upstream suite survived 2026-11-24 and is kept
+  (`agent-hook-cancel-verdict-latch.test.ts`, with the snapshot rule marked LOCAL(nplez1) above). The
+  held-turn repost suite (#48146) is the `fork-refactor` deletion in
+  `local/sync/expected-deletions.json`, because it drives the two `subagent:async-*` bindings this fork
+  removed; the cancel invariant is also pinned by
   `src/shared/agent-hook-listener-descendant-lifecycle.test.ts` › "starts a background child right
   after a cancel, instead of holding it as late work". The
   helper-settlement badge has no owner at HEAD, so re-homing that case is owed. The

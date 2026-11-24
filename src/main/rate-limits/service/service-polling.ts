@@ -68,7 +68,7 @@ export abstract class RateLimitServicePolling extends RateLimitServiceFetchQueue
   }
 
   protected shouldBackgroundPoll(): boolean {
-    // Poll only while someone watches: a paired client's stream, or a desktop window that exists.
+    // Poll only while someone watches: a paired client's stream, or a foreground desktop window.
     if (this.usageViewers > 0) {
       return true
     }
