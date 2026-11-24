@@ -7,7 +7,7 @@ import { cleanupUnusedWorktreePushTargetRemote } from '../worktree-remote'
 import { preservedBranchCleanupScopeKey } from '../../../../shared/git/branches/preserved-branch-cleanup'
 import type { WorktreeIpcContext } from '../worktree-ipc-context'
 import { preservedBranchCleanupByScope } from './preserved-branch-cleanup'
-import { removeWorktreeMetadataAndTransientState } from './worktree-removal-ownership'
+import { removeDeletedCheckoutMetadataAndTransientState } from './worktree-removal-ownership'
 
 /**
  * Finishes a removal Git refused because it no longer tracks the worktree: the directory, the
@@ -48,7 +48,9 @@ export async function cleanupOrphanedLocalWorktreeRemoval(args: {
     args.localWorktreeGitOptions
   )
   runtime.clearOptimisticReconcileToken(args.worktreeId)
-  removeWorktreeMetadataAndTransientState(
+  // Why the deleted-checkout purge: the directory above is gone, so a trusted path left behind would
+  // pre-trust whatever worktree is created there next.
+  await removeDeletedCheckoutMetadataAndTransientState(
     { store, runtime },
     args.worktreeId,
     args.removalHostId,
