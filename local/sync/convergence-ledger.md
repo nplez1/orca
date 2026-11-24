@@ -526,7 +526,7 @@ that drive them. They did not get the same answer, because only one of them was 
   same start through `normalizeAndAccept` rather than the latch directly.
 - `agent-status-extension-held-turn-repost.test.ts` **is retired**, as a `fork-refactor` deletion in
   `expected-deletions.json`. Every case in it needs the two bindings re-added, and porting upstream's
-  repost into the fork's lane is a feature, not a sync repair. **Coverage owed:** the fork's roster
+  repost into the fork's lane is a feature, not a sync repair. **Coverage owed (#464):** the fork's roster
   lane still reposts a child-held turn, and nothing on this tree pins the cadence, the single timer
   across a Pi reload, the one-day cap, or whether a pi pane held by an async child past
   `AGENT_STATUS_STALE_AFTER_MS` goes stale. Port those cases onto the `task:subagent:lifecycle` lane

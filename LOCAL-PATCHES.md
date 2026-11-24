@@ -3498,7 +3498,7 @@ section stays readable. `tests/tools/fork-process-docs.test.mjs` holds the three
     `LOCAL(nplez1)` rule and the suite is kept and green, OMP-lifecycle and replay holds included.
     `agent-status-extension-held-turn-repost.test.ts` (#48146) is a `fork-refactor` deletion in
     `expected-deletions.json`: every case needs the two `subagent:async-*` bindings this fork removed,
-    and **its coverage is owed** — the roster lane still reposts a child-held turn and nothing pins
+    and **its coverage is owed (#464)** — the roster lane still reposts a child-held turn and nothing pins
     that cadence on this tree. See `convergence-ledger.md` § "pi subagent bindings".
   - **`macos-updater-tests.yml` left `REQUIRED`.** Upstream #46786 deleted the workflow with the
     updater suites it ran, so the contract named a path no commit on either side carries — a
