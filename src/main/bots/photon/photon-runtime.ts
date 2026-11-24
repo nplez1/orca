@@ -180,6 +180,7 @@ export async function photonChannelStatus(
         phoneNumber: record.phoneNumber ?? null,
         handles: record.assignments.map((entry) => entry.handle),
         stream: streamWord(status, record.released),
+        completedThrough: record.completedThrough ?? null,
         released: record.released,
         unknownSenderCount: record.unknownSenderCount,
         parkedMessageCount: record.parkedMessageCount,

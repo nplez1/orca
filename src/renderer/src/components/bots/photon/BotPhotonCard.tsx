@@ -278,16 +278,26 @@ export function BotPhotonCard({
       </BotConnectorRowFrame>
     )
   }
+  // `assignment` is the only finished step: before it the record has a project but no number, so the
+  // card must not say Connected and must send the owner to Repair.
+  const unfinished = line !== undefined && !line.released && line.completedThrough !== 'assignment'
+  const notReceiving = line?.stream === 'deaf' || line?.stream === 'stopped'
   const description = !channel?.connected
     ? t('bots.photon.notConnected', 'Not set up yet: Photon provides the number.')
     : line === undefined
       ? t('bots.photon.noLine', 'Not connected to Photon.')
       : line.released
         ? t('bots.photon.released', 'Released')
-        : t('bots.photon.answersOn', 'Answers on {{number}}.', {
-            number:
-              line.phoneNumber ?? t('bots.photon.numberPending', 'a number Photon is assigning')
-          })
+        : unfinished
+          ? t(
+              'bots.photon.unfinished',
+              'Set up only as far as {{step}}, so it has no number yet. Repair finishes it.',
+              { step: line.completedThrough ?? 'project' }
+            )
+          : t('bots.photon.answersOn', 'Answers on {{number}}.', {
+              number:
+                line.phoneNumber ?? t('bots.photon.numberPending', 'a number Photon is assigning')
+            })
   return (
     <BotConnectorRowFrame
       icon={<MessageCircle className="size-4" />}
@@ -295,7 +305,11 @@ export function BotPhotonCard({
       description={description}
       status={
         channel?.connected && line && !line.released
-          ? { label: t('bots.photon.connected', 'Connected'), tone: 'connected' }
+          ? unfinished
+            ? { label: t('bots.photon.needsYou', 'Needs you'), tone: 'attention' }
+            : notReceiving
+              ? { label: t('bots.photon.notReceiving', 'Not receiving'), tone: 'attention' }
+              : { label: t('bots.photon.connected', 'Connected'), tone: 'connected' }
           : null
       }
       actions={{}}

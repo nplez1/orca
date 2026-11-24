@@ -168,7 +168,7 @@ export function botStructuredSessionWiring(deps: {
           botLinkedSkillsFolder(botId),
           roots
         )
-        return linkedSkillsSection(linked.projects, [], true)
+        return linkedSkillsSection(linked.projects, [])
       }
     },
     deps.recentChats,

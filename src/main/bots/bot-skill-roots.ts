@@ -1,7 +1,7 @@
 // Skills from places that are not a linked project: the bot's own home folder, which it can write to,
 // and the folders of skills this computer shares with every bot.
 import { homedir } from 'node:os'
-import { isAbsolute, join } from 'node:path'
+import { isAbsolute, join, parse, resolve } from 'node:path'
 import type { Bot } from '../../shared/bot-types'
 import { botsRootFolder } from './bot-home'
 import { SKILL_FOLDERS, scanSkillsFolder, type ScannedSkill } from './bot-skill-folder-scan'
@@ -15,18 +15,22 @@ export function linkedSkillKeys(
   return ids || roots.length > 0 ? [...(ids ?? []), ...roots] : null
 }
 
-/** A settings folder as main reads it: `~` expanded, and null for what is not a path at all — main's
- *  cwd is nobody's home, so a relative one names a different folder per chat and is never guessed at. */
+/** A settings folder as main reads it: `~` expanded, normalised, and null for what is not a path at
+ *  all — main's cwd is nobody's home, so a relative one names a different folder per chat. */
 export function resolveSkillRoot(root: string): string | null {
   const trimmed = root.trim()
-  const path = /^~[\\/]/.test(trimmed) ? join(homedir(), trimmed.slice(2)) : trimmed
-  // A bare home or root would walk every folder below it and load every SKILL.md it found.
-  const tooBroad = ['/', homedir(), join(homedir(), '')]
-  return isAbsolute(path) && !tooBroad.includes(path) ? path : null
+  const expanded = /^~[\\/]/.test(trimmed) ? join(homedir(), trimmed.slice(2)) : trimmed
+  if (!isAbsolute(expanded)) {
+    return null
+  }
+  const path = resolve(expanded)
+  // A bare root or home would walk every folder below it and load every SKILL.md it found; comparing
+  // resolved paths is what makes `~/.`, `/Users/me/` and `C:\\` fail like the bare form does.
+  const tooBroad = new Set([parse(path).root, resolve(homedir())])
+  return tooBroad.has(path) ? null : path
 }
 
-/** The bot's own folder of skills: where it writes one, and where the owner drops one. It is scanned
- *  like a skills folder, and listed first so its skill wins a name a project also uses. */
+/** The bot's own folder of skills: where it writes one, and where the owner drops one. */
 export async function scanOwnSkills(
   bot: Pick<Bot, 'folder'>,
   botsRoot?: string
@@ -36,15 +40,25 @@ export async function scanOwnSkills(
   if (!home || !bot.folder) {
     return []
   }
-  // Either folder, because a bot may have been created for one agent and run another.
-  for (const skillFolder of SKILL_FOLDERS) {
-    const path = join(home, bot.folder, skillFolder, 'skills')
-    const skills = await scanSkillsFolder(path)
-    if (skills.length > 0) {
-      return [{ name: bot.folder, path, skills, kind: 'own' }]
-    }
-  }
-  return []
+  // Both folders, merged: a bot created for one agent and run under another keeps what it wrote in the
+  // folder its old agent used, and picking one would hide the other.
+  const scanned = await Promise.all(
+    SKILL_FOLDERS.map(async (skillFolder) => {
+      const path = join(home, bot.folder, skillFolder, 'skills')
+      return { path, skills: await scanSkillsFolder(path) }
+    })
+  )
+  const withSkills = scanned.filter((entry) => entry.skills.length > 0)
+  return withSkills.length === 0
+    ? []
+    : [
+        {
+          name: bot.folder,
+          path: withSkills[0].path,
+          skills: withSkills.flatMap((entry) => entry.skills),
+          kind: 'own' as const
+        }
+      ]
 }
 
 export async function scanSkillRoots(

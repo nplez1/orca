@@ -595,6 +595,26 @@ describe("a bot chat's linked-project skills", () => {
     expect(await textOf(h)).not.toContain(SECTION)
   })
 
+  // A bot writes a skill into its own folder between turns: the key cannot see it, so the listing has
+  // to be asked for anyway and the new text sent.
+  it('sends a list a bot wrote a skill into, whose links did not change', async () => {
+    let current = SECTION
+    const linked = { ...listing(SECTION), listed: async () => current }
+    const h = home('Be brief.', '- a fact', undefined, {}, linked)
+    h.context.linkedSkillsLaunched('s1', SECTION, true)
+    expect(await textOf(h)).not.toContain('own')
+    current = '## Skills\n\nYour own skills (scout): read these first.'
+    expect(await textOf(h)).toContain('Your own skills')
+  })
+
+  // The launch gave a live agent this exact text, so asking again must not read as a change.
+  it('says nothing when the listing is the text the launch already gave', async () => {
+    const h = home('Be brief.', '- a fact', undefined, {}, listing(SECTION))
+    h.context.linkedSkillsLaunched('s1', SECTION, true)
+    expect((await h.plan())?.text).toBeUndefined()
+    expect((await h.plan())?.text).toBeUndefined()
+  })
+
   it('sends the list once the agent turns down the folders it was told it loaded', async () => {
     const h = home('Be brief.', '- a fact', undefined, {}, listing(SECTION))
     h.context.linkedSkillsLaunched('s1', 'loaded natively', true)
@@ -605,7 +625,7 @@ describe("a bot chat's linked-project skills", () => {
     const h = home('Be brief.', '- a fact')
     h.context.linkedSkillsLaunched('s1', null, false)
     const first = await h.plan()
-    expect(first?.text).toContain('no skills from linked projects now')
+    expect(first?.text).toContain('You have no skills now')
     first?.given(TAKEN)
     expect(await textOf(h)).not.toContain('linked projects')
   })
@@ -628,7 +648,7 @@ describe("a bot chat's linked-project skills", () => {
 
 describe('a project linked while a bot chat runs', () => {
   const NEW_LIST =
-    '[The skills from your linked projects, as they are now; this replaces any earlier list.]\n\norca: review -> /orca/.agents/skills/review/SKILL.md'
+    '[Your skills, as they are now; this replaces any earlier list.]\n\norca: review -> /orca/.agents/skills/review/SKILL.md'
 
   function running(launchScanned: string[] = [], linkedAtLaunch: string[] = []) {
     const state = { linked: linkedAtLaunch }
@@ -712,8 +732,6 @@ describe('the empty linked-skills replacement on a resumed chat', () => {
       null,
       h.fs
     )
-    expect((await h.context.launchUpdate?.('s1'))?.text).toContain(
-      'no skills from linked projects now'
-    )
+    expect((await h.context.launchUpdate?.('s1'))?.text).toContain('You have no skills now')
   })
 })

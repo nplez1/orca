@@ -80,6 +80,9 @@ export type PhotonChannelStatus = {
     /** The handles that may text it. This list is the allowlist, not a copy of one. */
     handles: string[]
     stream: 'live' | 'deaf' | 'stopped' | 'not started' | 'released'
+    /** How far this bot's setup got: `assignment` is the only finished state, because that is where it
+     *  has a number. Anything less is a repair, not a channel. */
+    completedThrough: 'project' | 'key' | 'assignment' | null
     /** The channel was let go: its numbers and key are gone and its project is all that is left. */
     released: boolean
     /** Messages from handles this bot has no assignment for. Non-zero means the assignment list here

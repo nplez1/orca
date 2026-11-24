@@ -154,8 +154,8 @@ export function BotConnectorsSection({ bot }: { bot: Bot }): React.JSX.Element {
         empty ? (
           <section className="flex flex-col gap-0.5">
             <BotConnectorsHostNotice bot={bot} />
-            <NoConnectors bot={bot} onAdd={open} />
             {rows}
+            <NoConnectors bot={bot} onAdd={open} />
           </section>
         ) : (
           <section className="flex flex-col gap-0.5">

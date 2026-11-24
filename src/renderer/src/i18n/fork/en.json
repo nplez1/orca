@@ -1671,7 +1671,9 @@
       "itsOwnAgent": "Its own Photon agent, “{{slug}}”, with its own key and its own list of people. Photon gives one project per bot.",
       "notYetAnywhere": "{{bot}} has nothing in Photon yet. Connecting makes it its own Photon agent, with its own key and its own number; Orca makes none of that until you ask.",
       "connectBot": "Connect {{bot}} to Photon",
-      "notNow": "Not now"
+      "notNow": "Not now",
+      "unfinished": "Set up only as far as {{step}}, so it has no number yet. Repair finishes it.",
+      "notReceiving": "Not receiving"
     }
   }
 }
