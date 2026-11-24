@@ -51,6 +51,9 @@ function needPage(entry: PhoneConnectorEntry): ConnectorPage | null {
       return { kind: 'tool', name: entry.tool.name, signIn: false }
     case 'webhooks':
       return null
+    // fork-comment-ok: a Photon connector never needs the owner, so it cannot reach this list.
+    case 'photon':
+      return null
   }
 }
 

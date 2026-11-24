@@ -31,6 +31,23 @@ export type CancelVerdictLatchDecision =
 
 const HOLD: CancelVerdictLatchDecision = { hold: true }
 
+// fork-comment-ok: the fork's pi lane has no `agent_start:subagent` to name a start with.
+/** The fork's pi lane publishes one snapshot per post instead of upstream's `agent_start:subagent`. */
+const PI_SUBAGENT_SNAPSHOT_EVENT = 'subagent_async_state'
+
+// fork-comment-ok: #47627's rule for the lane above; LOCAL-PATCHES.md § local(agents).
+/**
+ * LOCAL(nplez1): a snapshot naming a run the cancelled row did not carry is a child that started, not
+ * a late restatement. Holding it leaves the pane reading done while the child works.
+ */
+function startsChildRun(previous: CancelledRow, incoming: AgentHookEventPayload): boolean {
+  if (incoming.hookEventName !== PI_SUBAGENT_SNAPSHOT_EVENT || incoming.isReplay === true) {
+    return false
+  }
+  const before = new Set((previous.payload.subagents ?? []).map((child) => child.id))
+  return (incoming.payload.subagents ?? []).some((child) => !before.has(child.id))
+}
+
 /** Derive cancellation from mainAgent, or interrupted done rows on older hosts; never store another latch. */
 function isCancelVerdictLatched(previous: CancelledRow): boolean {
   const mainAgent = previous.payload.mainAgent
@@ -114,6 +131,7 @@ export function resolveCancelVerdictLatch(
     previous.observation?.origin === 'launch' ||
     previous.payload.agentType !== incoming.payload.agentType ||
     restatesAnotherPrompt(previous, incoming) ||
+    startsChildRun(previous, incoming) ||
     incoming.payload.mainAgent?.state === 'done' ||
     opensNewTurn(incoming)
   ) {

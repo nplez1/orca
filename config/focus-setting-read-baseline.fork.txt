@@ -15,7 +15,6 @@
 2 src/renderer/src/components/settings/host-scope/use-settings-host-scope.ts # settings scope: the pane's defaultHostId is the host Settings is showing, which is the focused host by definition until the pane's own host picker overrides it (#361, the per-host settings scope). Same rule as JiraBoardSettings.tsx above
 0 src/renderer/src/components/sidebar/workspace-board/projection/workspace-board-task-status-sync.ts # fork has 0 where upstream allows 4; lowered by a fork prune
 1 src/renderer/src/components/sidebar/worktree-list/listing/create-sidebar-host-options-selector.ts # the sidebar host-option selector resolves the default creation host for a host that has no source row; extracted here by the 2026-11-10 max-lines split
-1 src/renderer/src/components/sidebar/worktree-list/listing/use-window-list-model.ts # the window list model resolves the default creation host for a host with no source row, same rule as the selector beside it
 10 src/renderer/src/components/task-page/TaskPage.tsx # 10 where upstream allows 9: the merge added one transitive reader under the page. The page routes by the row s owner; the extra is a composition-root reader. Follow-up: re-route it and lower this row
 1 src/renderer/src/components/task-page/jira/creation/IssueAssigneeField.tsx
 2 src/renderer/src/components/task-page/jira/creation/use-task-page-jira-creation-metadata.ts

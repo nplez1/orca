@@ -24,7 +24,7 @@ export abstract class RateLimitServicePolling extends RateLimitServiceFetchQueue
   protected startTimer(): void {
     this.stopTimer()
     this.timer = setInterval(() => {
-      if (!this.shouldBackgroundPoll()) {
+      if (!this.shouldTimerPoll()) {
         return
       }
       void this.fetchAll()
@@ -42,7 +42,8 @@ export abstract class RateLimitServicePolling extends RateLimitServiceFetchQueue
     this.clearDeferredStartupRefresh()
     this.deferredStartupRefreshTimer = setTimeout(() => {
       this.deferredStartupRefreshTimer = null
-      void this.refreshIfWatched()
+      // fork-comment-ok: LOCAL(nplez1) — the fork's startup gate, not upstream's; see `shouldTimerPoll`.
+      void this.refreshIfPolling()
     }, DEFERRED_STARTUP_ACTIVE_REFRESH_MS)
   }
 
@@ -53,6 +54,16 @@ export abstract class RateLimitServicePolling extends RateLimitServiceFetchQueue
     }
   }
 
+  // fork-comment-ok: the fork polls an unwatched desktop window; see LOCAL-PATCHES.md `local(usage)`.
+  // Why a second gate: `shouldBackgroundPoll` answers the *foreground* question, which upstream's
+  // activation-refresh case pins; this one answers the clock's, and also the deferred startup read.
+  protected shouldTimerPoll(): boolean {
+    if (this.usageViewers > 0) {
+      return true
+    }
+    return Boolean(this.mainWindow && !this.mainWindow.isDestroyed())
+  }
+
   protected shouldBackgroundPoll(): boolean {
     // Poll only while someone watches: a paired client's stream, or the focused desktop window.
     if (this.usageViewers > 0) {
@@ -61,12 +72,11 @@ export abstract class RateLimitServicePolling extends RateLimitServiceFetchQueue
     if (!this.mainWindow || this.mainWindow.isDestroyed()) {
       return false
     }
-    // fork-comment-ok: an unwatched desktop window polls too; see LOCAL-PATCHES.md `local(usage)`.
-    // Why beyond upstream: `usageViewers` covers a watched host, so what this adds is a hidden or
-    // unfocused desktop window — fresh numbers before the user looks, at one probe turn per interval
-    // while the usage endpoint is throttled. Deliberately revertible; the paragraph in LOCAL-PATCHES
-    // names the three things to delete.
-    return true
+    // UI-only polling pauses while inactive to save CLI/API budget; activation refreshes it.
+    if (!this.mainWindow.isVisible() || this.mainWindow.isMinimized()) {
+      return false
+    }
+    return this.mainWindow.isFocused()
   }
 
   protected getActiveProviderState(): ActiveProviderState[] {
@@ -209,6 +219,18 @@ export abstract class RateLimitServicePolling extends RateLimitServiceFetchQueue
     if (!this.shouldBackgroundPoll()) {
       return
     }
+    await this.refreshActiveWindow()
+  }
+
+  // fork-comment-ok: the startup read is the fork's; an unfocused window at first paint still reads.
+  protected async refreshIfPolling(): Promise<void> {
+    if (!this.shouldTimerPoll()) {
+      return
+    }
+    await this.refreshActiveWindow()
+  }
+
+  private async refreshActiveWindow(): Promise<void> {
     const plan = this.getActiveWindowRefreshPlan(Date.now())
     await this.runActiveWindowRefreshPlan(plan)
   }

@@ -16,40 +16,13 @@
     "a genuinely new cause then reads as unexpected. `local/lib/known-red.mjs` is the one matcher that",
     "enforces this, and `local/check-e2e-known-failure-titles.mjs` reports an entry with neither field as a",
     "problem.",
-    "2026-11-09 (#317): pruned 2 entries whose spec file no longer exists — upstream deleted both tests (tests/e2e/plugin-startup-budget.spec.ts in 8fb8e6ef0f2, #37421; tests/e2e/sidebar-measured-row-scroll.spec.ts in e98c6a439ac, #38030). A title for a deleted spec can never match, and the verdict only reports a stale entry that passed, so both would have sat here for ever. The contract test now fails when an entry names a file this tree does not have."
+    "2026-11-09 (#317): pruned 2 entries whose spec file no longer exists — upstream deleted both tests (tests/e2e/plugin-startup-budget.spec.ts in 8fb8e6ef0f2, #37421; tests/e2e/sidebar-measured-row-scroll.spec.ts in e98c6a439ac, #38030). A title for a deleted spec can never match, and the verdict only reports a stale entry that passed, so both would have sat here for ever. The contract test now fails when an entry names a file this tree does not have.",
+    "2026-11-24: the list is empty, and that is the fail-closed state rather than a widening. Upstream #46786 cut tests/e2e from ~500 specs to 18 and retired every spec the three remaining entries named — source-control/source-control-commit-message-ai, terminal/rendering/terminal-column-desync-repro and terminal/links/terminal-link-click-ownership. None was renamed; all three are absent from upstream 7daf01d99f3 and from this tree. With no entry, every E2E failure fails the run, which is the opposite of hiding one. A future red that upstream also carries gets an entry here again, with its observed cause."
   ],
   "recordedAt": "2026-09-27",
   "sampledRuns": {
     "forkScheduled": 12,
     "upstreamScheduled": 8
   },
-  "titles": [
-    {
-      "file": "tests/e2e/source-control/source-control-commit-message-ai.spec.ts",
-      "title": "Source Control AI commit messages › substitutes the workspace-linked issue into the commit-message recipe",
-      "owner": "upstream",
-      "observedForkRuns": 0,
-      "observedUpstreamRuns": 1,
-      "flaky": true,
-      "movedFrom": "tests/e2e/source-control-commit-message-ai.spec.ts"
-    },
-    {
-      "file": "tests/e2e/terminal/rendering/terminal-column-desync-repro.spec.ts",
-      "title": "Terminal column desync repro › PTY columns re-sync after the terminal is resized while hidden",
-      "owner": "unattributed",
-      "observedForkRuns": 3,
-      "observedUpstreamRuns": 0,
-      "match": "^expect\\(received\\)\\.toBe\\(expected\\) // Object\\.is equality",
-      "movedFrom": "tests/e2e/terminal-column-desync-repro.spec.ts"
-    },
-    {
-      "file": "tests/e2e/terminal/links/terminal-link-click-ownership.spec.ts",
-      "title": "terminal link click ownership › a plain click stays child-owned when link actions are disabled",
-      "owner": "upstream",
-      "observedForkRuns": 12,
-      "observedUpstreamRuns": 8,
-      "match": "^expect\\(locator\\)\\.toHaveCount\\(expected\\) failed",
-      "movedFrom": "tests/e2e/terminal-link-click-ownership.spec.ts"
-    }
-  ]
+  "titles": []
 }

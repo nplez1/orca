@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- Why: upstream-owned and at its budget (286/300); the fork's +32-line own-PR guard rides inside it, and splitting costs a permanent sync hunk. */
+/* eslint-disable max-lines -- Why: upstream-owned and already near its 300-line budget on its own; the fork's own-PR guard rides inside it and takes it over, and splitting an upstream file costs a permanent sync hunk. LOCAL-PATCHES.md § local(lint). */
 import type { BotSessionHooks } from '../bots/bot-turn-ended'
 import { UNSET_BOT_SESSION_HOOKS } from '../bots/bot-session-hooks-unset'
 import { sessionRepliesInSlack } from '../external-conversations/external-conversation-links'
