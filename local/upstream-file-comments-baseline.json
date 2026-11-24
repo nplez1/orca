@@ -2,8 +2,8 @@
   "note": "Fork comments in upstream-owned files (LOCAL-PATCHES.md). Frozen per-file maxima at or above 5 lines plus the frozen total; both may only shrink. Regenerate with `node local/check-upstream-file-comments.mjs --init`.",
   "base": "7daf01d99f3d3301bf3c867e293ebb9d1f9a324e",
   "perFileThreshold": 5,
-  "accepted": "the 2026-11-24 sync merged with this fork's CI-health branch (ff2c90c5211), and the two sides measured different trees: the bot's baseline froze 4752, the release line froze 4764, and the merged tree measures 4765. The 13 lines above the bot's total are HEAD's own fork comments its tree did not carry, chiefly the 6-line VIEWS_OWNING_CONTENT_HEADER comment in src/renderer/src/app-shell/AppWorkspaceShell.tsx (automations and artifacts are deliberately absent from that set, which is not derivable from the code it guards; upstream #47038) and the rate-limit-service row it dropped. Absorbed here rather than deleted, so the rationale beside the fork hunks stays readable; the one line over the release line's 4764 went with the rate-limits conflict resolution, and --prune locked it in.",
-  "total": 4765,
+  "accepted": "The 2026-11-24 release: the Photon runtime's socket.io-client packaging root records why a fork dependency must be copied beside the main bundle (three platform package jobs failed without it), and the zsh login-shell arm's guard explains why the binary rather than the platform decides.",
+  "total": 4767,
   "files": {
     ".github/workflows/e2e.yml": 11,
     ".github/workflows/pr.yml": 7,
