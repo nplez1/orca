@@ -42,7 +42,7 @@ export abstract class RateLimitServicePolling extends RateLimitServiceFetchQueue
     this.clearDeferredStartupRefresh()
     this.deferredStartupRefreshTimer = setTimeout(() => {
       this.deferredStartupRefreshTimer = null
-      // LOCAL(nplez1): the fork's startup gate, not upstream's; see `shouldTimerPoll` below.
+      // fork-comment-ok: LOCAL(nplez1) — the fork's startup gate, not upstream's; see `shouldTimerPoll`.
       void this.refreshIfPolling()
     }, DEFERRED_STARTUP_ACTIVE_REFRESH_MS)
   }

@@ -31,14 +31,14 @@ export type CancelVerdictLatchDecision =
 
 const HOLD: CancelVerdictLatchDecision = { hold: true }
 
+// fork-comment-ok: the fork's pi lane has no `agent_start:subagent` to name a start with.
 /** The fork's pi lane publishes one snapshot per post instead of upstream's `agent_start:subagent`. */
 const PI_SUBAGENT_SNAPSHOT_EVENT = 'subagent_async_state'
 
+// fork-comment-ok: #47627's rule for the lane above; LOCAL-PATCHES.md § local(agents).
 /**
  * LOCAL(nplez1): a snapshot naming a run the cancelled row did not carry is a child that started, not
- * a late restatement of the cancelled turn (#47627). This lane has no `agent_start:subagent` to say so
- * by name, and holding the start leaves the pane reading done while the child works. A replay, and a
- * lifecycle start the cancelled turn may own, add nothing the row did not already have.
+ * a late restatement. Holding it leaves the pane reading done while the child works.
  */
 function startsChildRun(previous: CancelledRow, incoming: AgentHookEventPayload): boolean {
   if (incoming.hookEventName !== PI_SUBAGENT_SNAPSHOT_EVENT || incoming.isReplay === true) {

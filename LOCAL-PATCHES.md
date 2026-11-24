@@ -590,6 +590,22 @@ a `/reload` — which re-evaluates the module — keep the children a same-file 
 deliberately **not** the authority for attribution, because a child bound before its session named
 itself would otherwise land in the previous session's bucket.
 
+### `local(agents)`: the cancel latch reads this lane's snapshot as a start
+
+Upstream's cancel latch (`agent-hook-cancel-verdict-latch.ts`, `#47627`) recognises a child that
+starts right after Esc by `hookEventName === 'agent_start:subagent'`. This fork's lane above has no
+such event — it publishes one `subagent_async_state` snapshot per post — so the start matched nothing
+and was held as a late restatement of the cancelled turn for the whole 15s window, leaving the pane
+reading done while the child worked.
+
+The latch carries one marked hunk: a snapshot naming a run the cancelled row did not carry is a start.
+A replay and an OMP `task:subagent:lifecycle` start add nothing the row did not already have, so both
+stay held, which is what upstream's own suite asserts. That suite is kept and green here rather than
+retired, because the defect was the fork's.
+
+**Do not** widen it to "any snapshot is a start": a restatement of the same children is exactly the
+late work this latch exists to swallow.
+
 **Settlement is the other half.** `session_start` is this lane's descendant-scope reset, so the
 resume placeholder is gated through `gatePaneStateOnDescendants`, an empty live set is never
 defaulted to `working`, and a hold **nobody claims** — no lead verdict and an empty roster — is
