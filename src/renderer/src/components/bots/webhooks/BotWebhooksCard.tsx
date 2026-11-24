@@ -66,14 +66,17 @@ export function BotWebhooksCard({
     return null
   }
   const hooks = read.value
-  const face = signedOut
-    ? {
-        ...signedOutConnectorFace(),
-        description: t('bots.webhooks.pausedSignedOut', '{{hooks}} · paused while signed out', {
-          hooks: hooks.map((hook) => hook.automationName).join(', ')
-        })
-      }
-    : rowFace(hooks, now)
+  // A hook this computer answers keeps receiving while Orca Cloud is signed out; only the cloud's are paused.
+  const paused = signedOut ? hooks.filter((hook) => hook.servedHere !== true) : []
+  const face =
+    paused.length > 0
+      ? {
+          ...signedOutConnectorFace(),
+          description: t('bots.webhooks.pausedSignedOut', '{{hooks}} · paused while signed out', {
+            hooks: paused.map((hook) => hook.automationName).join(', ')
+          })
+        }
+      : rowFace(hooks, now)
   return (
     <BotConnectorRowFrame
       icon={<Webhook className="size-4" />}
