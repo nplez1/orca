@@ -15,6 +15,8 @@
     "branchHostSelect": "len(host.group) > 1",
     "detailsRow": "!vars.newStyle || options.detailsRow",
     "metaRow": "!vars.compact && vars.detailsRow",
+    "hostSelectInRow": "vars.branchHostSelect && (vars.newStyle || vars.metaRow)",
+    "hostSelectInHeader": "vars.branchHostSelect && !vars.hostSelectInRow",
     "detachedInMeta": "vars.metaRow && !vars.folder && ws.detachedHead",
     "branch": "!vars.folder && len(ws.branch) > 0 && !vars.newStyle && (!vars.compact || ws.branch != ws.name)",
     "identityInMeta": "vars.newStyle && vars.metaRow && options.show.branch && ws.identity != null",
@@ -25,12 +27,12 @@
     "ports": "options.show.ports && ports.count > 0",
     "indicators": "vars.details || vars.ports",
     "lease": "host.lease",
-    "metaLead": "vars.metaRepo || vars.hostBadge || vars.folderInMeta || vars.branch || vars.identityInMeta || vars.detachedInMeta || vars.conflict || git.cacheTimerActive",
+    "metaLead": "vars.metaRepo || vars.hostSelectInRow || vars.hostBadge || vars.folderInMeta || vars.branch || vars.identityInMeta || vars.detachedInMeta || vars.conflict || git.cacheTimerActive",
     "metaIndicators": "vars.metaRow && vars.indicators && (vars.classic || vars.metaLead)",
     "titleIndicators": "vars.lease || (vars.indicators && !vars.metaIndicators)",
-    "hasMetaRow": "vars.metaRow ? vars.metaLead || vars.metaIndicators : vars.conflict || git.cacheTimerActive",
+    "hasMetaRow": "vars.metaRow ? vars.metaLead || vars.metaIndicators : vars.conflict || git.cacheTimerActive || vars.hostSelectInRow",
     "star": "vars.compact && ws.isMain && !vars.folder",
-    "headerActions": "vars.star || place.deleteQuickAction || vars.branchHostSelect",
+    "headerActions": "vars.star || place.deleteQuickAction || vars.hostSelectInHeader",
     "inlineAgents": "options.show.inlineAgents && !vars.compact",
     "title": "trim(ws.title)",
     "hoverBranch": "vars.newStyle ? ws.identity : vars.compact && vars.branch ? ws.branch : null",
@@ -141,7 +143,7 @@
                 "inset": "end"
               },
               "children": [
-                { "el": "BranchHostSelect", "when": "vars.branchHostSelect" },
+                { "el": "BranchHostSelect", "when": "vars.hostSelectInHeader" },
                 { "el": "PrimaryStar", "when": "vars.star" },
                 { "el": "DeleteQuickAction", "when": "place.deleteQuickAction" }
               ]
@@ -158,6 +160,11 @@
               "props": { "grow": true, "align": "center", "gap": "md", "overflow": "clip" },
               "children": [
                 { "el": "MetaRepoBadge", "when": "vars.metaRepo" },
+                {
+                  "el": "BranchHostSelect",
+                  "when": "vars.hostSelectInRow",
+                  "props": { "menuAlign": "start" }
+                },
                 {
                   "el": "HostBadge",
                   "when": "vars.metaRow && vars.hostBadge",

@@ -223,6 +223,38 @@ describe('the live workspace card and its host', () => {
     expect(hostSelectLabel(container)).toContain('GPU VM')
   })
 
+  it('draws the switcher in the row under the name, where the host chip sits', () => {
+    // Why: the switcher stands in for that chip, so it must travel with the chip's row, not the title row.
+    mocks.state = stateFor({ experimentalNewWorktreeCardStyle: true })
+    const { container } = renderCard({
+      branchGroup: members,
+      selectedBranchHostId: REMOTE,
+      branchGroupKey: GROUP_KEY
+    })
+
+    const metaRow = container.querySelector('[data-worktree-card-meta-row]')
+    expect(metaRow).not.toBeNull()
+    expect(metaRow?.querySelector('[data-branch-host-select]')).not.toBeNull()
+  })
+
+  it('keeps the switcher row when the details row is off', () => {
+    // The picker is the card's only host affordance: hiding the details row must not hide it.
+    mocks.state = stateFor({
+      experimentalNewWorktreeCardStyle: true,
+      worktreeCardDetailsRow: false
+    })
+    const { container } = renderCard({
+      branchGroup: members,
+      selectedBranchHostId: LOCAL,
+      branchGroupKey: GROUP_KEY
+    })
+
+    const metaRow = container.querySelector('[data-worktree-card-meta-row]')
+    expect(metaRow).not.toBeNull()
+    expect(metaRow?.querySelector('[data-branch-host-select]')).not.toBeNull()
+    expect(hostSelectLabel(container)).toContain('Local Mac')
+  })
+
   it('offers every host the branch is checked out on', () => {
     const onSelectBranchHost = vi.fn()
     const { container } = renderCard({
