@@ -2,8 +2,8 @@
   "note": "Fork comments in upstream-owned files (LOCAL-PATCHES.md). Frozen per-file maxima at or above 5 lines plus the frozen total; both may only shrink. Regenerate with `node local/check-upstream-file-comments.mjs --init`.",
   "base": "7daf01d99f3d3301bf3c867e293ebb9d1f9a324e",
   "perFileThreshold": 5,
-  "accepted": "the 2026-11-24 merge of upstream 7daf01d99f3 retired 6,116 files (5,217 test suites), so per-file maxima for retired files are gone and the fork's comment lines moved with the resolutions; the Workspace Layout resolution also records why both placement stores are written",
-  "total": 4756,
+  "accepted": "the 2026-11-24 merge of upstream 7daf01d99f moved the titlebar-exclusion set into VIEWS_OWNING_CONTENT_HEADER, and the 6-line comment in src/renderer/src/app-shell/AppWorkspaceShell.tsx records why automations and artifacts are deliberately absent from it (they rely on that stripe for the window-controls band, upstream #47038); the comment stays because the exclusion set is not derivable from the code it guards",
+  "total": 4764,
   "files": {
     ".github/workflows/e2e.yml": 11,
     ".github/workflows/pr.yml": 7,
@@ -150,6 +150,7 @@
     "src/preload/api/agent-accounts/agent-account-api.ts": 9,
     "src/preload/api/cloud-workspaces/ephemeral-vm-api.ts": 10,
     "src/preload/api/terminal/shell-api.ts": 5,
+    "src/renderer/src/app-shell/AppWorkspaceShell.tsx": 6,
     "src/renderer/src/app-shell/shutdown/window-close-request-coordinator.ts": 7,
     "src/renderer/src/components/dashboard/board/AgentKanbanBoard.tsx": 18,
     "src/renderer/src/components/dashboard/board/AgentKanbanCard.tsx": 6,

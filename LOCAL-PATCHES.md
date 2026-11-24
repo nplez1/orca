@@ -1865,6 +1865,51 @@ Anchors: `config/main-blocking-helper-baseline.fork.txt`,
 `config/workspace-path-sync-fs-baseline.txt` (6 rows), `config/process-host-direct-import-baseline.txt`,
 `local/upstream-file-comments-baseline.json`, `local/lint-known-red.json`.
 
+### `local(lint)`: the 2026-11-24 sync's lint gate — four prunes, one unrecorded overlay, one accepted comment
+
+The merge of upstream `7daf01d99f3` (1350 commits) left `gate-lint` at 5 failing steps and 14 new reds on
+`0705cff5d05`. No check was loosened and no red was recorded in `local/lint-known-red.json`; each was
+repaired at its cause and re-measured with the step's own tool.
+
+- **`verify:localization-catalogs`** — real drift, and the only one the gate could not name: it exits on
+  the first failing step, so the summary showed the `[ELIFECYCLE]` line alone. `ko.json` carried two
+  upstream keys that the fork's own tombstones already retire (`auto.runtime.jira.transitionFieldsNeedsUpdate`
+  and `auto.main.window.dashboard.popout.window.title`). `fork/ja.json` and `fork/zh.json` had both, as did
+  `fork/en.json`; `fork/ko.json` had neither, so the tombstones never reached Korean and the merge left
+  upstream's translations in place. The fix is the two tombstone children in `src/renderer/src/i18n/fork/ko.json`
+  — the same entry every other locale already carries — not a deletion of the upstream key and not a
+  regeneration.
+- **`check:focus-read-ratchet` / `check:workspace-path-sync-fs-ratchet` / `check:main-blocking-helper-ratchet`
+  — shrunk, so pruned.** The sync removed the focus read in `use-window-list-model.ts` (upstream moved the
+  default-creation-host resolution out of it), one workspace-path probe in `workspace-hooks/hooks.ts`, and ten
+  blocking-helper call sites across the codex/droid/ipc/native-chat/session-summary trees. `--prune` on each
+  step is that step's own path for a shrink: focus 610 → 609, workspace-path 23 → 22, blocking-helper
+  6451 → 6441 before the raises below.
+- **`config/main-blocking-helper-baseline.fork.txt` — nine rows raised, all with a trailing `# why`.**
+  Pruning the ten shrunk rows left eight files _above_ their allowance, and every one is this class: the
+  fork's graph reaches a helper upstream's new code calls. Seven belong to the fork's in-process session
+  search — upstream `#46549` added a compaction pass whose SQLite calls are helpers, so
+  `session-search-{index-compaction,index-writer,retention-delete,store,tool-purge}.ts` are charged for
+  calling them, and upstream runs that store in its session-search worker while the fork installs the search
+  in process (`LOCAL-PATCHES.md`: main-blocking-api's sqlite category, 2026-11-08). `session-search-store.ts`
+  also carries the fork's own `readSessionSearchContentConsent`. The other three are upstream code charged
+  through the fork's identity-layer probes: `droid/droid-hook-config-files.ts` (#47853) and
+  `cursor/hook-service.ts` through `createManagedCommandMatcher` in `agent-hooks/official-orca-profile.ts`,
+  and `perf-notices/perf-notice-signals.ts` through `getWorktreePathSettings` in
+  `ipc/project-folder-placement.ts`. The overlay's header records the class; the base file stays upstream's
+  bytes.
+- **`check-upstream-file-comments`** — re-taken with `--init --accept` at **4764**: the merge moved the
+  titlebar-exclusion set into `VIEWS_OWNING_CONTENT_HEADER` in `src/renderer/src/app-shell/AppWorkspaceShell.tsx`,
+  and its 6-line comment records why automations and artifacts stay out of it (they rely on that stripe for
+  the window-controls band, upstream #47038). The set is not derivable from the code it guards, so the
+  comment stays and the total is re-taken against the new merge base rather than trimmed. `--prune` refuses
+  a raise by design, so it runs only in the shrink direction.
+
+Anchors: `src/renderer/src/i18n/fork/ko.json` (the two tombstones),
+`config/main-blocking-helper-baseline.fork.txt` (header + the nine raised rows),
+`config/focus-setting-read-baseline.fork.txt`, `config/workspace-path-sync-fs-baseline.txt`,
+`local/upstream-file-comments-baseline.json`.
+
 ### `local(lint)`: two `fork-comment-ok` markers, and why they are not comments to delete
 
 `src/main/runtime/agent-session/ownership/agent-session-process-identity-probe.ts` carries two of the
