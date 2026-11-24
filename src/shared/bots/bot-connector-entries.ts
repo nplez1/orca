@@ -99,7 +99,8 @@ export type BotConnectorFacts<Connection extends ComposioSignIn, Tool extends Ap
   } | null
   words: {
     webhooks: string
-    photon: string
+    /** Only a host that can serve iMessage (the desktop) names it; a phone draws no photon row. */
+    photon?: string
     viaComposio: string
     composioApps: string
     titleSeparator: string
@@ -211,7 +212,9 @@ export function botConnectorEntries<Connection extends ComposioSignIn, Tool exte
       { service: 'Google', hints: [emails.join(', ')] }
     )
   }
-  add({ kind: 'photon', key: 'photon', needsOwner: false }, { service: words.photon })
+  if (words.photon) {
+    add({ kind: 'photon', key: 'photon', needsOwner: false }, { service: words.photon })
+  }
   // Shown once the bot has a hook; its row hides itself until then.
   add({ kind: 'webhooks', key: 'webhooks', needsOwner: false }, { service: words.webhooks })
   const { composio } = facts
