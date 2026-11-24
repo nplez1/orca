@@ -43,8 +43,8 @@ export const WorktreeBranchHostSelect = React.memo(function WorktreeBranchHostSe
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         {/* Why the chip variant: the switcher stands in for the host label a mixed-host card has no
-            chip for, and the variant keeps both from drifting apart. */}
-        <Badge asChild variant="hostContextTrigger" className="max-w-[7rem]">
+            chip for, and that variant keeps the two from drifting apart. */}
+        <Badge asChild variant="hostContext" className="max-w-[7rem]">
           <button
             type="button"
             data-branch-host-select=""

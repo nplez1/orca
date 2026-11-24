@@ -250,9 +250,11 @@ describe('the live workspace card and its host', () => {
     })
 
     expect(container.querySelector('[data-worktree-card-meta-row]')).toBeNull()
-    const nameRow = container.querySelector('[data-worktree-card-hover-trigger]')?.firstElementChild
-    expect(nameRow).not.toBeNull()
-    expect(nameRow?.querySelector('[data-branch-host-select]')).not.toBeNull()
+    // One level past the row that also carries the action cluster: this is the name's own group.
+    const nameGroup = container.querySelector('[data-worktree-card-hover-trigger]')
+      ?.firstElementChild?.firstElementChild
+    expect(nameGroup).not.toBeNull()
+    expect(nameGroup?.querySelector('[data-branch-host-select]')).not.toBeNull()
     expect(hostSelectLabel(container)).toContain('Local Mac')
   })
 
