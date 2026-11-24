@@ -1697,6 +1697,29 @@ classification. There is no per-revision cache, unlike `local/gate-unit.mjs`: th
 the base branch gets recorded with its evidence instead of being re-derived by hand.
 This file stays the evidence and the JSON the assertion, as with the unit red set.
 
+### `local(lint)`: three ratchets red on `main`, re-recorded where they had shrunk
+
+`pnpm check:changed` on `main` was red on three ratchets that no fork commit had touched:
+`direct-link-open`, `react-compiler-compat` and `main-blocking-api`. The upstream base
+(`0c6207e3d7`) is green on all three, so the drift arrived with the sync and was never
+re-recorded. Two of them had only shrunk — upstream removed direct-link opens and React
+Compiler bailouts, and the baselines kept the old allowance — so `--prune` /
+`--update` records the lower numbers and nothing else changes.
+
+`react-compiler-compat` also grew in three files the fork owns: two lifetime effects keep an
+`oxlint-disable-next-line react-hooks/exhaustive-deps` because the dependency array _is_ the
+signal that re-runs the effect (the body reads refs only), and `useCreateProjectDefaults`
+reads one more ref during render than it used to. `--update` is that ratchet's own path for a
+reviewed exception, and these are the exceptions: the disables say why on the line, and the
+ref count is the fork's `runtime-create-parent` extraction, not a new pattern.
+
+**Left red on purpose: `main-blocking-api`'s sqlite category.** The fork's AI-vault paging work
+(`ai-vault-search/session-search-list.ts`, and `session-search-instance.ts` importing the store)
+put upstream's worker-only sqlite on **orcad's** event loop, because orcad installs the search
+in process. That is 12 files and ~150 synchronous uses, so it is a code fix — run orcad's search
+through the session-search worker, or keep the store out of the module orcad loads — and not a
+baseline row. Recording it would silence the ratchet that exists to catch exactly this.
+
 ### `local(lint)`: the 2026-11-08 sync's lint gate — 14 red steps, what moved and why
 
 The merge of upstream `51c77320bc` (1537 commits, merge `5a02a4c8406`) left `gate-lint` at 14 failing
