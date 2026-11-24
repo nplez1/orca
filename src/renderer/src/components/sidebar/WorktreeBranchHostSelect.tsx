@@ -42,8 +42,9 @@ export const WorktreeBranchHostSelect = React.memo(function WorktreeBranchHostSe
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
-        {/* Why a badge: the switcher stands in for the host label a mixed-host card has no chip for. */}
-        <Badge asChild variant="hostContext">
+        {/* Why the chip variant: the switcher stands in for the host label a mixed-host card has no
+            chip for, and the variant keeps both from drifting apart. */}
+        <Badge asChild variant="hostContextTrigger" className="max-w-[7rem]">
           <button
             type="button"
             data-branch-host-select=""
@@ -54,7 +55,6 @@ export const WorktreeBranchHostSelect = React.memo(function WorktreeBranchHostSe
               onPointerDown?.(event)
             }}
             onClick={(event) => event.stopPropagation()}
-            className="max-w-[7rem] cursor-pointer gap-0.5 hover:bg-worktree-sidebar-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-worktree-sidebar-ring focus-visible:outline-none data-[state=open]:bg-worktree-sidebar-accent data-[state=open]:text-foreground"
           >
             <span className="truncate">{selectedLabel}</span>
             <ChevronDown className="shrink-0 opacity-70" />

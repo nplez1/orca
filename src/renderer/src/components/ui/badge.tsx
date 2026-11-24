@@ -4,6 +4,13 @@ import * as Slot from 'radix-ui/slot'
 
 import { cn } from '@/lib/class-names'
 
+/**
+ * The execution-host chip's recipe. Shared by the static chip and the host switcher, which must look
+ * the same as the chip it stands in for, so neither can drift from the other.
+ */
+const HOST_CONTEXT_CHIP =
+  'h-4 rounded border-border bg-[var(--host-badge,var(--accent))] px-1.5 text-[10px] leading-none text-[var(--host-badge-foreground,var(--muted-foreground))] dark:border-border/50 dark:bg-[var(--host-badge,color-mix(in_oklab,var(--accent)_80%,transparent))]'
+
 const badgeVariants = cva(
   'inline-flex w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-full border border-transparent px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3',
   {
@@ -19,8 +26,9 @@ const badgeVariants = cva(
         ghost: '[a&]:hover:bg-accent [a&]:hover:text-accent-foreground',
         link: 'text-primary underline-offset-4 [a&]:hover:underline',
         /** Workspace execution-host context, quieter and squarer than status chips. */
-        hostContext:
-          'h-4 rounded border-border bg-[var(--host-badge,var(--accent))] px-1.5 text-[10px] leading-none text-[var(--host-badge-foreground,var(--muted-foreground))] dark:border-border/50 dark:bg-[var(--host-badge,color-mix(in_oklab,var(--accent)_80%,transparent))]',
+        hostContext: HOST_CONTEXT_CHIP,
+        /** That same chip as a menu trigger: a card merging several hosts draws it instead of a label. */
+        hostContextTrigger: `${HOST_CONTEXT_CHIP} cursor-pointer hover:bg-worktree-sidebar-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-worktree-sidebar-ring focus-visible:ring-inset data-[state=open]:bg-worktree-sidebar-accent data-[state=open]:text-foreground`,
         /** Status tones for the compact meta pill shown beside a workspace's review details.
          *  Sizing lives in the variant (like `hostContext`) because a state pill may not be
          *  repainted by hand — its colour is the one signal a reader trusts without reading

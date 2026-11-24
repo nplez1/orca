@@ -99,7 +99,7 @@ function branchHostSelect(props: Readonly<Record<string, unknown>>, card: Card):
       groupKey={card.branchGroupKey ?? ''}
       onSelectHost={card.onSelectBranchHost}
       onPointerDown={card.stopQuickActionPointerPropagation}
-      menuAlign={props.menuAlign === 'start' ? 'start' : 'end'}
+      menuAlign={props.menuAlign === 'start' ? 'start' : undefined}
     />
   )
 }

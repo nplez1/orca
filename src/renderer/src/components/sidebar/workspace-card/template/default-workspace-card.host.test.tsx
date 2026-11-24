@@ -224,7 +224,7 @@ describe('the live workspace card and its host', () => {
   })
 
   it('draws the switcher in the row under the name, where the host chip sits', () => {
-    // Why: the switcher stands in for that chip, so it must travel with the chip's row, not the title row.
+    // Why: the switcher stands in for that chip, so it must travel with the chip's row.
     mocks.state = stateFor({ experimentalNewWorktreeCardStyle: true })
     const { container } = renderCard({
       branchGroup: members,
@@ -237,8 +237,8 @@ describe('the live workspace card and its host', () => {
     expect(metaRow?.querySelector('[data-branch-host-select]')).not.toBeNull()
   })
 
-  it('keeps the switcher row when the details row is off', () => {
-    // The picker is the card's only host affordance: hiding the details row must not hide it.
+  it('takes the chip’s title-row slot when the details row is off', () => {
+    // With the row off the chip does not get one either: both ride the name row.
     mocks.state = stateFor({
       experimentalNewWorktreeCardStyle: true,
       worktreeCardDetailsRow: false
@@ -249,9 +249,10 @@ describe('the live workspace card and its host', () => {
       branchGroupKey: GROUP_KEY
     })
 
-    const metaRow = container.querySelector('[data-worktree-card-meta-row]')
-    expect(metaRow).not.toBeNull()
-    expect(metaRow?.querySelector('[data-branch-host-select]')).not.toBeNull()
+    expect(container.querySelector('[data-worktree-card-meta-row]')).toBeNull()
+    const nameRow = container.querySelector('[data-worktree-card-hover-trigger]')?.firstElementChild
+    expect(nameRow).not.toBeNull()
+    expect(nameRow?.querySelector('[data-branch-host-select]')).not.toBeNull()
     expect(hostSelectLabel(container)).toContain('Local Mac')
   })
 
@@ -306,7 +307,7 @@ describe('the live workspace card and its host', () => {
     expect(container.textContent).toContain('Exp 3h')
   })
 
-  it('keeps the ephemeral host lease beside the switcher on a grouped card', () => {
+  it('keeps the ephemeral host lease and the switcher on a grouped card', () => {
     mocks.lease = lease
     const { container } = renderCard({
       branchGroup: members,

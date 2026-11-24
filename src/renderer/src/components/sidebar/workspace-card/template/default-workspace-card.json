@@ -15,8 +15,9 @@
     "branchHostSelect": "len(host.group) > 1",
     "detailsRow": "!vars.newStyle || options.detailsRow",
     "metaRow": "!vars.compact && vars.detailsRow",
-    "hostSelectInRow": "vars.branchHostSelect && (vars.newStyle || vars.metaRow)",
-    "hostSelectInHeader": "vars.branchHostSelect && !vars.hostSelectInRow",
+    "hostSelectInRow": "vars.branchHostSelect && vars.metaRow",
+    "hostSelectInTitle": "vars.branchHostSelect && vars.newStyle && !vars.metaRow",
+    "hostSelectInHeader": "vars.branchHostSelect && !vars.hostSelectInRow && !vars.hostSelectInTitle",
     "detachedInMeta": "vars.metaRow && !vars.folder && ws.detachedHead",
     "branch": "!vars.folder && len(ws.branch) > 0 && !vars.newStyle && (!vars.compact || ws.branch != ws.name)",
     "identityInMeta": "vars.newStyle && vars.metaRow && options.show.branch && ws.identity != null",
@@ -30,7 +31,7 @@
     "metaLead": "vars.metaRepo || vars.hostSelectInRow || vars.hostBadge || vars.folderInMeta || vars.branch || vars.identityInMeta || vars.detachedInMeta || vars.conflict || git.cacheTimerActive",
     "metaIndicators": "vars.metaRow && vars.indicators && (vars.classic || vars.metaLead)",
     "titleIndicators": "vars.lease || (vars.indicators && !vars.metaIndicators)",
-    "hasMetaRow": "vars.metaRow ? vars.metaLead || vars.metaIndicators : vars.conflict || git.cacheTimerActive || vars.hostSelectInRow",
+    "hasMetaRow": "vars.metaRow ? vars.metaLead || vars.metaIndicators : vars.conflict || git.cacheTimerActive",
     "star": "vars.compact && ws.isMain && !vars.folder",
     "headerActions": "vars.star || place.deleteQuickAction || vars.hostSelectInHeader",
     "inlineAgents": "options.show.inlineAgents && !vars.compact",
@@ -95,6 +96,11 @@
                   "el": "HostBadge",
                   "when": "vars.newStyle && !vars.metaRow && vars.hostBadge",
                   "props": { "label": "=vars.hostLabel" }
+                },
+                {
+                  "el": "BranchHostSelect",
+                  "when": "vars.hostSelectInTitle",
+                  "props": { "menuAlign": "start" }
                 },
                 {
                   "el": "Row",
