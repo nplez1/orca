@@ -291,5 +291,9 @@ describe('a settings folder as main reads it', () => {
     expect(resolveSkillRoot('/opt/orca/skills')).toBe('/opt/orca/skills')
     // Main's cwd is nobody's home: a relative folder would name a different one per chat.
     expect(resolveSkillRoot('agents/skills')).toBeNull()
+    // A bare home or root would load every SKILL.md below it into every bot on the machine.
+    expect(resolveSkillRoot('~/')).toBeNull()
+    expect(resolveSkillRoot('/')).toBeNull()
+    expect(resolveSkillRoot(homedir())).toBeNull()
   })
 })

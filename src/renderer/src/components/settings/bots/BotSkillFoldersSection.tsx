@@ -8,10 +8,19 @@ import { SettingsSubsectionHeader } from '@/components/settings/form-controls/Se
 import { useTranslate } from '@/i18n/use-translate'
 import { useAppStore } from '@/store'
 
-/** Whether a folder here is a path main can resolve: absolute, or `~`-rooted, which it expands. */
+/** Whether a folder here is one main can resolve: absolute on any platform, or `~`-rooted, which it
+ *  expands. A bare home or root is refused there too, because it would load everything below it. */
 export function isSkillFolderPath(value: string): boolean {
   const trimmed = value.trim()
-  return trimmed.startsWith('~/') || (trimmed.length > 1 && trimmed.startsWith('/'))
+  if (/^~[\\/]$/.test(trimmed) || trimmed === '/') {
+    return false
+  }
+  return (
+    /^~[\\/]./.test(trimmed) ||
+    /^[A-Za-z]:[\\/]./.test(trimmed) ||
+    /^\\\\[^\\]+/.test(trimmed) ||
+    /^\/.+/.test(trimmed)
+  )
 }
 
 export function BotSkillFoldersSection(): React.JSX.Element {

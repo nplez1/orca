@@ -1642,7 +1642,7 @@
       "connectedSession": "Connected for this session only.",
       "refresh": "Refresh",
       "cannotStoreKey": "This computer has no keyring to seal a key with, so it is not written: the key lasts this session.",
-      "releasedWhatLeft": "Its number and key are gone; only the Photon project is left, and Orca will not burn a project from Settings. Delete that project in Photon if the slug is not needed again.",
+      "releasedWhatLeft": "Its number and key are gone, and only the Photon project is left. Deleting that project in Photon does not clear the record here: giving this bot a number again needs `bots.photon.project.delete`, which Settings does not offer because it burns the slug for good.",
       "removeMemberFor": "Stop {{handle}} texting it",
       "removeMember": "Remove",
       "unknownSenders": "{{count}} messages from numbers it has no assignment for. Repair re-reads the assignment list from Photon.",
@@ -1650,10 +1650,11 @@
       "parkedUnknown": "not recorded",
       "undelivered": "{{count}} answers never arrived within its retry window. Last reason: {{reason}}",
       "releaseConfirmTitle": "Release {{bot}}’s number?",
-      "releaseConfirmBody": "Its numbers are released and its key is revoked. Settings has no way back: giving it a number again needs the project deleted first, which Orca leaves to the Photon dashboard.",
+      "releaseConfirmBody": "Its numbers are released and its key is revoked. Settings has no way back: giving it a number again means deleting its Photon project with `bots.photon.project.delete`, which burns the slug for good, so the record stays with only a project left.",
       "cancel": "Cancel",
       "connectedSealed": "Connected, and the key is sealed on this computer.",
-      "connectedUnsealed": "Connected, and the stored key is only base64: this host has no keyring to seal it."
+      "connectedUnsealed": "Connected, and a key is kept here, but this host cannot seal one now: it may need pasting again after a restart.",
+      "memberAlreadyGone": "{{handle}} was not on its list any more."
     }
   }
 }

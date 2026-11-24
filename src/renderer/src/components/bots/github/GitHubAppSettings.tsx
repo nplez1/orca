@@ -176,7 +176,7 @@ function ConnectedApp({
         </p>
       ) : null}
       {inUse && inUse.canPushWorkflows === false ? (
-        <p role="alert" className="text-xs text-destructive">
+        <p className="text-xs text-muted-foreground">
           {t(
             'bots.github.app.workflowsMissing',
             'This installation has no Workflows: write, so a push that changes .github/workflows is refused. Grant it on GitHub, then Refresh.'

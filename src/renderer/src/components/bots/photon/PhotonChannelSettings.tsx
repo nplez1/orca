@@ -86,7 +86,7 @@ export function PhotonChannelSettings({
                 )
               : t(
                   'bots.photon.connectedUnsealed',
-                  'Connected, and the stored key is only base64: this host has no keyring to seal it.'
+                  'Connected, and a key is kept here, but this host cannot seal one now: it may need pasting again after a restart.'
                 )
             : t('bots.photon.connectedSession', 'Connected for this session only.')}
         </p>

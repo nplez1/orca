@@ -171,6 +171,21 @@ function serialized<T>(folder: string, run: () => Promise<T>): Promise<T> {
   })
 }
 
+/** One skill, listed once: a folder that a project already lists adds only what is new, so the agent
+ *  is not told it is both a project's skill and a computer folder's. */
+function withoutRepeatedSkills<
+  T extends { name: string; skills: readonly ScannedSkill[]; kind?: 'project' | 'folder' }
+>(entries: readonly T[]): T[] {
+  const seen = new Set<string>()
+  return entries.map((entry) => {
+    const skills = entry.skills.filter((skill) => !seen.has(skill.folder))
+    for (const skill of skills) {
+      seen.add(skill.folder)
+    }
+    return { ...entry, skills }
+  })
+}
+
 function isLocalRepo(repo: Repo): boolean {
   return getRepoExecutionHostId(repo) === LOCAL_EXECUTION_HOST_ID
 }
@@ -207,7 +222,7 @@ export async function linkedSkillListing(
     })),
     ...(await scanSkillRoots(roots))
   ]
-  return scanned.map(({ name, skills, kind }) => ({
+  return withoutRepeatedSkills(scanned).map(({ name, skills, kind }) => ({
     name,
     kind,
     skills: skills.map(({ folder: _folder, ...skill }) => skill)
@@ -217,8 +232,11 @@ export async function linkedSkillListing(
 /** A settings folder as main reads it: `~` expanded, and null for what is not a path at all — main's
  *  cwd is nobody's home, so a relative one names a different folder per chat and is never guessed at. */
 export function resolveSkillRoot(root: string): string | null {
-  const path = root.startsWith('~/') ? join(homedir(), root.slice(2)) : root
-  return isAbsolute(path) ? path : null
+  const trimmed = root.trim()
+  const path = /^~[\\/]/.test(trimmed) ? join(homedir(), trimmed.slice(2)) : trimmed
+  // A bare home or root would walk every folder below it and load every SKILL.md it found.
+  const tooBroad = ['/', homedir(), join(homedir(), '')]
+  return isAbsolute(path) && !tooBroad.includes(path) ? path : null
 }
 
 /** A bot's linked-skill keys: its projects and this computer's folders, so a folder change relinks. */
@@ -274,10 +292,11 @@ export async function linkedSkillProjects(
       })),
       ...(await scanSkillRoots(roots))
     ]
-    const links = skillLinks(scanned.flatMap((project) => project.skills))
+    const unique = withoutRepeatedSkills(scanned)
+    const links = skillLinks(unique.flatMap((project) => project.skills))
     await syncLinks(join(folder, 'skills'), links)
     await syncLinks(join(folder, '.claude', 'skills'), links)
-    return scanned
+    return unique
   })
   return {
     root: { skillsRoot: join(folder, 'skills'), pluginDir: folder, linksOut: true },

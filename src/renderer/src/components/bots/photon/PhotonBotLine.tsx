@@ -55,16 +55,32 @@ export function PhotonBotLine({
           setNotes(notesOf(result))
           onChanged()
         },
-        (caught: unknown) =>
+        (caught: unknown) => {
+          setNotes([])
           setError(
             photonErrorMessage(caught) ??
               t('bots.photon.changeFailed', 'Photon refused that change.')
           )
+        }
       )
       .finally(() => setBusy(false))
   }
   const release = (member: string): void => {
-    run(() => photonCalls(hostId).releaseMember({ botId: bot.id, handle: member }))
+    run(() =>
+      photonCalls(hostId)
+        .releaseMember({ botId: bot.id, handle: member })
+        .then((result) => {
+          // Photon answers `released: false` for a handle it no longer has; that is not a success.
+          if (result && typeof result === 'object' && 'released' in result && !result.released) {
+            throw new Error(
+              t('bots.photon.memberAlreadyGone', '{{handle}} was not on its list any more.', {
+                handle: member
+              })
+            )
+          }
+          return result
+        })
+    )
   }
   return (
     <li className="space-y-2 px-3 py-2.5">
@@ -82,7 +98,7 @@ export function PhotonBotLine({
         <p className="text-xs text-muted-foreground">
           {t(
             'bots.photon.releasedWhatLeft',
-            'Its number and key are gone; only the Photon project is left, and Orca will not burn a project from Settings. Delete that project in Photon if the slug is not needed again.'
+            'Its number and key are gone, and only the Photon project is left. Deleting that project in Photon does not clear the record here: giving this bot a number again needs `bots.photon.project.delete`, which Settings does not offer because it burns the slug for good.'
           )}
         </p>
       ) : null}
@@ -200,8 +216,8 @@ export function PhotonBotLine({
       )}
       {notes.length > 0 ? (
         <ul className="space-y-1 text-xs text-muted-foreground">
-          {notes.map((note) => (
-            <li key={note}>{note}</li>
+          {notes.map((note, index) => (
+            <li key={`${index}:${note}`}>{note}</li>
           ))}
         </ul>
       ) : null}
@@ -221,7 +237,7 @@ export function PhotonBotLine({
             <DialogDescription>
               {t(
                 'bots.photon.releaseConfirmBody',
-                'Its numbers are released and its key is revoked. Settings has no way back: giving it a number again needs the project deleted first, which Orca leaves to the Photon dashboard.'
+                'Its numbers are released and its key is revoked. Settings has no way back: giving it a number again means deleting its Photon project with `bots.photon.project.delete`, which burns the slug for good, so the record stays with only a project left.'
               )}
             </DialogDescription>
           </DialogHeader>
