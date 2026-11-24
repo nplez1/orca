@@ -115,8 +115,6 @@ function serialized<T>(folder: string, run: () => Promise<T>): Promise<T> {
 function withoutRepeatedSkills<
   T extends { name: string; skills: readonly ScannedSkill[]; kind?: 'project' | 'folder' | 'own' }
 >(entries: readonly T[]): T[] {
-  // One link per skill and one entry per declared name: a second skill calling itself `pdf` would be
-  // two folders the agent cannot tell apart, so the first source wins (own, then projects, then folders).
   const seen = new Set<string>()
   const named = new Set<string>()
   return entries.map((entry) => {

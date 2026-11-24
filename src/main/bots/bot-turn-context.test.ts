@@ -595,8 +595,6 @@ describe("a bot chat's linked-project skills", () => {
     expect(await textOf(h)).not.toContain(SECTION)
   })
 
-  // A bot writes a skill into its own folder between turns: the key cannot see it, so the listing has
-  // to be asked for anyway and the new text sent.
   it('sends a list a bot wrote a skill into, whose links did not change', async () => {
     let current = SECTION
     const linked = { ...listing(SECTION), listed: async () => current }
@@ -607,7 +605,6 @@ describe("a bot chat's linked-project skills", () => {
     expect(await textOf(h)).toContain('Your own skills')
   })
 
-  // The launch gave a live agent this exact text, so asking again must not read as a change.
   it('says nothing when the listing is the text the launch already gave', async () => {
     const h = home('Be brief.', '- a fact', undefined, {}, listing(SECTION))
     h.context.linkedSkillsLaunched('s1', SECTION, true)
