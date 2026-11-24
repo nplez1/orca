@@ -4083,8 +4083,18 @@ equivalent minutes a month, still $0.
 | `dependency-security.yml`   | `pull_request` (path-gated), call, dispatch | supply-chain audit; lockfile/Cargo/patches changes only                  |
 | `mobile.yml`                | `pull_request`, push `main`                 | mobile parity is first-class and no PR lane covered it                   |
 | `node-server-tests.yml`     | `pull_request`, call, schedule, dispatch    | headless/remote server path                                              |
-| `macos-updater-tests.yml`   | `pull_request`, dispatch                    | auto-update correctness, ~7 min of macOS in six runs                     |
+| `macos-updater-tests.yml`   | `pull_request`, dispatch                    | retired upstream 2026-11-24, see the note below                          |
 | `performance-contracts.yml` | schedule, `pull_request`, dispatch          | perf regression contract, 21 of 24 runs green                            |
+
+**2026-11-24 sync: `macos-updater-tests.yml` is gone.** Upstream retired that workflow in the
+1,350-commit sync, so the fork cannot keep it in `REQUIRED` — a required lane that no longer exists is
+reported `MISSING` forever and teaches the next reader to ignore the check. Its rows left `REQUIRED`
+and `EXPECTED_TRIGGERS` in `local/actions-enablement-contract.mjs` in the sync's own ratchet commit;
+its repository row was disabled by hand (the sweep can only act on a workflow it can read); the lane
+it ran — auto-update correctness, ~7 min of macOS — now has **no** cover here. Carrying it as a
+fork-owned `fork-updater-tests.yml` is a named follow-up, not a sync fix. The same sweep disabled two
+workflows the merge brought back enabled (`pr-description.yml`, `mobile-native-fingerprint.yml`), and
+the fleet stands at **18 active: 11 required + 7 inert** of 74 workflows.
 
 **The ordering is the load-bearing part.** `local/sync/publish-sync.mjs` is the release-line push and
 `check-actions-enablement --fix` in one command, so a lane that is active but not on the list is disabled
