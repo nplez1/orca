@@ -47,7 +47,8 @@ function view(installation: GithubAppInstallation): GithubAppInstallationView {
     account: installation.account,
     repositorySelection: installation.repositorySelection,
     repositories: [...installation.repositories],
-    canPush: installation.contentsWrite ?? null
+    canPush: installation.contentsWrite ?? null,
+    canPushWorkflows: installation.workflowsWrite ?? null
   }
 }
 

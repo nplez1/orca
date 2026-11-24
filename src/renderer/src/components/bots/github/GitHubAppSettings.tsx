@@ -167,6 +167,14 @@ function ConnectedApp({
           )}
         </p>
       ) : null}
+      {inUse && inUse.canPushWorkflows === true ? (
+        <p className="text-xs text-muted-foreground">
+          {t(
+            'bots.github.app.workflowsWrite',
+            'This installation also has Workflows: write, so a push as the App can change .github/workflows.'
+          )}
+        </p>
+      ) : null}
       {expiresAt ? (
         <p className="text-xs text-muted-foreground">
           {t(
