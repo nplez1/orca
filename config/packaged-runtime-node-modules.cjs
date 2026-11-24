@@ -37,6 +37,9 @@ const PACKAGED_RUNTIME_PACKAGE_ROOTS = [
   'proper-lockfile',
   'qrcode',
   'smol-toml',
+  // Why: the photon runtime (bots/photon) imports it statically in the main bundle, and packaging
+  // refuses a bare import whose node_modules is not copied beside it.
+  'socket.io-client',
   'ssh2',
   'tweetnacl',
   'ws',
