@@ -97,8 +97,6 @@ export function botStructuredSessionWiring(deps: {
   >
 > {
   const bots = (): readonly Bot[] => deps.store().getBots?.() ?? []
-  /** The paired servers' bots a message names, as each server last listed them, so a send never waits
-   *  on another computer; one this host isn't paired to, or its server no longer lists, adds nothing. */
   const serverBotLines = async (words: string) => {
     const picks = mentionedServerBots(words)
     if (picks.length === 0 || !deps.pairedBotRosters) {
@@ -321,8 +319,6 @@ export function botStructuredSessionWiring(deps: {
   }
 }
 
-/** A picked chat as the host's own list has it: `--chat` only for a chat that takes mail; any doubt (an
- *  unread list included) says it can't, and never falls back to the Home Chat. */
 function checkedChat(rows: readonly BotChatRow[] | null, chatId: string): BotMentionChat {
   const row = rows?.find((entry) => entry.id === chatId)
   if (!row) {

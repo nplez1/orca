@@ -17,11 +17,8 @@ export type LinkedProjectSkill = {
   skillFile: string
 }
 
-/** A project or a computer folder a bot loads for skills, as a chat about to start loads it. */
 export type LinkedSkillProject = {
   name: string
-  /** `folder`: one of this computer's skill folders, which is nobody's project and reaches no worker.
-   *  `own`: the bot's own folder, the one it writes to. */
   kind?: 'project' | 'folder' | 'own'
   repoPath: string
   skills: readonly LinkedProjectSkill[]
@@ -85,7 +82,6 @@ export function linkedSkillsSection(
   const folders = projects.filter((project) => project.kind === 'folder')
   const names = linked.map((project) => project.name).join(', ')
   return [
-    // A folder-only list has no projects to name, and a heading that says otherwise would be a lie.
     folders.length > 0 || own.length > 0 ? '## Skills' : '## Skills from linked projects',
     '',
     ...(own.length > 0

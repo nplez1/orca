@@ -188,7 +188,6 @@ export function botConnectorEntries(
       { service: 'Google', hints: [accounts.map((account) => account.email).join(', ')] }
     )
   }
-  // Its card sets the whole channel up, so the row is listed before Photon is connected too.
   add(
     { kind: 'photon', key: 'photon', needsOwner: false },
     { service: t('bots.photon.title', 'iMessage') }

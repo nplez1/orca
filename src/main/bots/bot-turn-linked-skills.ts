@@ -49,12 +49,6 @@ export function linkedSkillsUpdate(entry: BotTurnSkills): { text: string; skills
   }
 }
 
-/** The list as it is now, for a chat whose links changed or whose own skills folder gained one; null
- *  when the listing failed, which keeps the last good list and tries again next turn.
- *
- *  It asks every turn rather than only when the key changed: a bot writes a skill into its own folder,
- *  and a key made of project and folder names cannot see inside a folder. The fingerprint, not the key,
- *  is what decides whether the agent hears about the change. */
 export async function relinkedSkills(
   linkedSkills: BotTurnLinkedSkills,
   sessionId: string,

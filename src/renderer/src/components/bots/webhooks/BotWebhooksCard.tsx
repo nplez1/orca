@@ -66,7 +66,6 @@ export function BotWebhooksCard({
     return null
   }
   const hooks = read.value
-  // A hook this computer answers keeps receiving while Orca Cloud is signed out; only the cloud's are paused.
   const paused = signedOut ? hooks.filter((hook) => hook.servedHere !== true) : []
   const face =
     paused.length > 0

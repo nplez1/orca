@@ -102,7 +102,6 @@ export type WebhookSummary = {
   lastCall: { at: number; state: WebhookCallState; signatureValid: boolean } | null
   /** Where the hook's execution host stands, in the wording other connectors use. */
   host: 'online' | 'offline'
-  /** This computer answers the hook itself, so signing out of Orca Cloud does not pause it. */
   servedHere?: boolean
   automationName: string
   /** The automation's own destination, so the card and row never assume Chat. */

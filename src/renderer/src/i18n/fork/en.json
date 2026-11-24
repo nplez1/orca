@@ -1627,12 +1627,12 @@
       "storesKey": "Keep the key on this computer, sealed by its keyring. Otherwise it lasts this session.",
       "connect": "Connect Photon",
       "changeFailed": "Photon refused that change.",
-      "noLine": "No number yet.",
+      "noLine": "Not connected to Photon.",
       "released": "Released",
       "numberPending": "a number Photon is assigning",
       "handlePlaceholder": "+15551234567",
       "addMember": "Let them text it",
-      "giveNumber": "Give it a number",
+      "giveNumber": "Connect and give it a number",
       "repair": "Repair",
       "releaseBot": "Release the number",
       "title": "iMessage",
@@ -1660,7 +1660,7 @@
       "addHandle": "Phone number or Apple ID to let text it",
       "createFailed": "Photon could not give {{bot}} a number.",
       "ownerHandle": "Your phone number or Apple ID",
-      "ownerHandleHint": "Photon assigns the number, so nobody needs to buy one. This makes {{bot}} its own Photon agent, with its own list of people; your handle is the first on it.",
+      "ownerHandleHint": "Required: you are the first person on {{bot}}’s list, and the only one who can text it until you add others. Photon assigns the number, so nobody buys one.",
       "needsYou": "Needs you",
       "notConnected": "Not set up yet: Photon provides the number.",
       "answersOn": "Answers on {{number}}.",
@@ -1668,7 +1668,10 @@
       "setupNote": "Texting a bot needs an iMessage number, and Photon assigns it. Connect your own Photon account once on this computer; no Orca account is involved.",
       "readFailedAccount": "Could not read the iMessage account on this computer.",
       "giveNumbersInBot": "A number and who may text it belong to one bot: open the bot and use its Connectors › iMessage.",
-      "itsOwnAgent": "Its own Photon agent, “{{slug}}”, with its own key and its own list of people. Photon gives one project per bot."
+      "itsOwnAgent": "Its own Photon agent, “{{slug}}”, with its own key and its own list of people. Photon gives one project per bot.",
+      "notYetAnywhere": "{{bot}} has nothing in Photon yet. Connecting makes it its own Photon agent, with its own key and its own number; Orca makes none of that until you ask.",
+      "connectBot": "Connect {{bot}} to Photon",
+      "notNow": "Not now"
     }
   }
 }

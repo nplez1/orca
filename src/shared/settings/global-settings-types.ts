@@ -254,8 +254,6 @@ export type GlobalSettings = GlobalSettingsBase & {
   artifactSharingEnabled?: boolean
   /** Capability gate for agent/CLI skill publishing; manual reviewed publishing remains available. */
   agentSkillSharingEnabled?: boolean
-  /** Folders on this computer whose children are skill folders, which every bot here loads. A path,
-   *  not a project: it is how a skills tree kept outside Orca (such as `~/.agents/skills`) reaches bots. */
   botSkillFolders?: string[]
   /** Escalate native-chat worker turn errors to the dispatching Run; absent means on. Renderer-only so workers cannot silence failures via CLI. */
   /** Close a finished worker's terminal or chat after a grace period; absent means on. The coordinator's runtime decides. */

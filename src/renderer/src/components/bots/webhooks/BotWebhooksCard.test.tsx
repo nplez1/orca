@@ -296,7 +296,6 @@ describe('BotWebhooksCard', () => {
         useAppStore.setState({ orcaProfileAuthStatus: ORCA_SIGNED_OUT })
         notifyWebhooksChanged()
       })
-      // The route it names is this computer's, so a signed-out cloud says nothing about it.
       expect(await screen.findByText('1 hook · no calls yet')).toBeTruthy()
       expect(screen.queryByText('Investigate Sentry alert · paused while signed out')).toBeNull()
     } finally {

@@ -12,7 +12,6 @@ import {
   DialogTitle
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { useTranslate } from '@/i18n/use-translate'
 import { photonCalls, photonErrorMessage, usePhotonChannel } from '@/lib/photon-channel-client'
 import type { Bot } from '../../../../../shared/bot-types'
@@ -22,6 +21,7 @@ import { BotConnectorRowFrame } from '../BotConnectorRow'
 import { BotConnectorCaption } from '../bot-connector-people'
 import type { BotConnectorTitle } from '../bot-connector-titles'
 import { PhotonConnectForm } from './PhotonConnectForm'
+import { PhotonNoLineYet } from './PhotonNoLineYet'
 
 type PhotonBot = PhotonChannelStatus['bots'][number]
 
@@ -244,83 +244,6 @@ function PhotonLine({
   )
 }
 
-/** A bot with no number yet: give it one, and say who starts out able to text it. */
-function NoLineYet({
-  bot,
-  hostId,
-  onChanged
-}: {
-  bot: Bot
-  hostId: Bot['hostId']
-  onChanged: () => void
-}): React.JSX.Element {
-  const t = useTranslate()
-  const [handle, setHandle] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const ready = isPhotonHandle(handle) && !busy
-  return (
-    <form
-      className="space-y-2"
-      onSubmit={(event) => {
-        event.preventDefault()
-        if (!ready) {
-          return
-        }
-        setBusy(true)
-        setError(null)
-        void photonCalls(hostId)
-          .createBot({ botId: bot.id, handle: handle.trim() })
-          .then(
-            () => {
-              setHandle('')
-              onChanged()
-            },
-            (caught: unknown) =>
-              setError(
-                photonErrorMessage(caught) ??
-                  t('bots.photon.createFailed', 'Photon could not give {{bot}} a number.', {
-                    bot: bot.name
-                  })
-              )
-          )
-          .finally(() => setBusy(false))
-      }}
-    >
-      <Label htmlFor={`photon-handle-${bot.id}`} variant="settings">
-        {t('bots.photon.ownerHandle', 'Your phone number or Apple ID')}
-      </Label>
-      <div className="flex flex-wrap items-center gap-2">
-        <Input
-          id={`photon-handle-${bot.id}`}
-          autoComplete="off"
-          spellCheck={false}
-          className="h-7 max-w-52"
-          value={handle}
-          aria-invalid={handle.trim().length > 0 && !isPhotonHandle(handle)}
-          placeholder={t('bots.photon.handlePlaceholder', '+15551234567')}
-          onChange={(event) => setHandle(event.target.value)}
-        />
-        <Button type="submit" size="xs" variant="outline" disabled={!ready}>
-          {t('bots.photon.giveNumber', 'Give it a number')}
-        </Button>
-      </div>
-      <p className="text-xs text-muted-foreground">
-        {t(
-          'bots.photon.ownerHandleHint',
-          'Photon assigns the number, so nobody needs to buy one. This makes {{bot}} its own Photon agent, with its own list of people; your handle is the first on it.',
-          { bot: bot.name }
-        )}
-      </p>
-      {error ? (
-        <p role="alert" className="text-xs text-destructive">
-          {error}
-        </p>
-      ) : null}
-    </form>
-  )
-}
-
 /** Settings › a bot's Connectors › iMessage: the whole channel for one bot, including the account. */
 export function BotPhotonCard({
   bot,
@@ -358,7 +281,7 @@ export function BotPhotonCard({
   const description = !channel?.connected
     ? t('bots.photon.notConnected', 'Not set up yet: Photon provides the number.')
     : line === undefined
-      ? t('bots.photon.noLine', 'No number yet.')
+      ? t('bots.photon.noLine', 'Not connected to Photon.')
       : line.released
         ? t('bots.photon.released', 'Released')
         : t('bots.photon.answersOn', 'Answers on {{number}}.', {
@@ -392,7 +315,7 @@ export function BotPhotonCard({
           />
         </div>
       ) : line === undefined ? (
-        <NoLineYet bot={bot} hostId={bot.hostId} onChanged={reload} />
+        <PhotonNoLineYet bot={bot} hostId={bot.hostId} onChanged={reload} />
       ) : (
         <PhotonLine bot={bot} hostId={bot.hostId} line={line} onChanged={reload} />
       )}

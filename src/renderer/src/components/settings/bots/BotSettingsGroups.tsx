@@ -152,7 +152,6 @@ function ComputerConnectors({
   appLogin
 }: {
   computer: BotSettingsComputer
-  /** The connected App's login. The group reads it once and hands it to the App's panel too. */
   appLogin: string | null
 }): React.JSX.Element {
   const t = useTranslate()

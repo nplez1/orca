@@ -15,7 +15,6 @@ import { codexItemBody } from '../codex/structured/items/codex-structured-item-t
 
 const FOLDER = '/home/me/.orca/bots/scout'
 
-/** A listing as the wiring reports it, so a turn asks about the same skills a launch gave. */
 function listing(section: string | null): BotTurnLinkedSkills {
   return {
     projects: () => (section === null ? [] : ['orca']),

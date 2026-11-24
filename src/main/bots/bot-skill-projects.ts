@@ -49,7 +49,6 @@ function skillLinks(skills: readonly ScannedSkill[]): Map<string, string> {
   const taken = new Set<string>()
   const linked = new Set<string>()
   for (const skill of skills) {
-    // One skill under two roots or a project and a root is one link: a second would list it twice.
     if (linked.has(skill.folder)) {
       continue
     }
@@ -113,8 +112,6 @@ function serialized<T>(folder: string, run: () => Promise<T>): Promise<T> {
   })
 }
 
-/** One skill, listed once: a folder that a project already lists adds only what is new, so the agent
- *  is not told it is both a project's skill and a computer folder's. */
 function withoutRepeatedSkills<
   T extends { name: string; skills: readonly ScannedSkill[]; kind?: 'project' | 'folder' | 'own' }
 >(entries: readonly T[]): T[] {

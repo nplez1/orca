@@ -144,8 +144,6 @@ export function BotConnectorsSection({ bot }: { bot: Bot }): React.JSX.Element {
   const rows = entries.map((entry) => (
     <BotConnectorEntryRow key={`${botRefKey(bot)}\u0000${entry.key}`} bot={bot} entry={entry} />
   ))
-  // Webhooks shows only once a hook exists, and iMessage stays listed so its setup is reachable; either
-  // alone is a bot with no connectors yet, which the empty state still offers to change.
   const empty =
     entries.every((entry) => entry.kind === 'webhooks' || entry.kind === 'photon') &&
     webhooks !== 'added'
