@@ -1,7 +1,8 @@
 # Local webhooks: GitHub events on a bot with no Orca account
 
-**Status:** built 2026-11-23 (PR #453). The route works; the card, signature verification, the `orcad`
-window and the app-inbound half are deferred, each for the reason given below. What shipped and the
+**Status:** built 2026-11-23 (PR #453); the card's pause line was corrected in the release-gaps pass, which
+is the only card work done. The per-rule host choice, signature verification, the `orcad` window and the
+app-inbound half are deferred, each for the reason given below. What shipped and the
 anchors it costs are `LOCAL-PATCHES.md` § `local(webhooks)`.
 **Scope:** fork-only (`local(webhooks)`), never proposed upstream. The cloud path stays exactly as it is;
 this is a _second_ delivery route for the same event source, chosen per save rather than by a host-wide
@@ -325,15 +326,16 @@ cost is the anchors in files upstream edits whenever it touches webhooks; the ex
 `LOCAL-PATCHES.md` § `local(webhooks)`, and a sync that moves one is the signal to re-read this document.
 In outline:
 
-| Change                                                                                            | File                                                   | Sync tax     |
-| ------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | ------------ |
-| Webhooks install without a connector cloud; the sweep walks both hosts' files                     | `connector-cloud/connector-host-install.ts`            | 1 hunk       |
-| A rule is refused per source, not per host                                                        | `webhooks/automation-webhook-saves.ts`, two call sites | 3 one-liners |
-| Ownership of call files spans both ledgers                                                        | `webhooks/webhook-host-ledger.ts` (`files()`)          | 2 lines      |
-| A host may answer a rule itself, and a local hook's card is its own                               | `webhooks/webhook-host-service.ts` (one optional dep)  | 1 line       |
-| A hello never lists a rule this computer serves                                                   | `connector-cloud/connector-triggers.ts` + its install  | 3 lines      |
-| `orca webhooks show` prints a **loopback** URL (the CLI rule against URLs is about the cloud key) | `cli/webhooks/webhooks.ts`, `cli/specs/webhooks.ts`    | 2 hunks      |
-| Card showing "this computer" beside "Orca Cloud" — deferred                                       | `renderer/src/components/bots/**`                      | not built    |
+| Change                                                                                            | File                                                    | Sync tax          |
+| ------------------------------------------------------------------------------------------------- | ------------------------------------------------------- | ----------------- |
+| Webhooks install without a connector cloud; the sweep walks both hosts' files                     | `connector-cloud/connector-host-install.ts`             | 1 hunk            |
+| A rule is refused per source, not per host                                                        | `webhooks/automation-webhook-saves.ts`, two call sites  | 3 one-liners      |
+| Ownership of call files spans both ledgers                                                        | `webhooks/webhook-host-ledger.ts` (`files()`)           | 2 lines           |
+| A host may answer a rule itself, and a local hook's card is its own                               | `webhooks/webhook-host-service.ts` (one optional dep)   | 1 line            |
+| A hello never lists a rule this computer serves                                                   | `connector-cloud/connector-triggers.ts` + its install   | 3 lines           |
+| `orca webhooks show` prints a **loopback** URL (the CLI rule against URLs is about the cloud key) | `cli/webhooks/webhooks.ts`, `cli/specs/webhooks.ts`     | 2 hunks           |
+| The card's pause line reads `servedHere`, so a working local hook is never called paused          | `webhooks-params.ts`, `local-webhook-host.ts`, the card | built (gaps pass) |
+| Card showing "this computer" beside "Orca Cloud" — deferred                                       | `renderer/src/components/bots/**`                       | not built         |
 
 ## Verification
 

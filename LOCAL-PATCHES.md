@@ -5146,8 +5146,9 @@ suites.
 
 Step 0 and Step 3 of `local/design/talking-to-bots.md`: a person can ask a bot on this computer something
 from their own shell, the bot is told who asked, and every GitHub body a bot writes carries an invisible
-marker that its own event rules read as "not mine". Step 1 (the loopback `POST /ask` listener) and Step 2
-(the Photon iMessage channel) are not built; the design note's status line says so. Authority does not
+marker that its own event rules read as "not mine". Step 1 (the loopback `POST /ask` listener) is still
+not built; Step 2 (the Photon iMessage channel) shipped in #454/#457, and its settings card in the release
+gaps pass, so the design note's status line is the place to look, not this one. Authority does not
 move: a local ask runs as the owner, on the owner's credentials, exactly as a cloud turn does. What this
 patch adds is attribution — who is addressed, and which writes were the bot's.
 
@@ -5567,7 +5568,7 @@ optional.
 | File                                                               | Anchor                                   | Change                                                                                                               |
 | ------------------------------------------------------------------ | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | `src/shared/connectors/external-conversation-link.ts`              | `CONNECTOR_SOURCES` and the names record | `'photon'` added as one union member, named `Photon`                                                                 |
-| `src/shared/bots/bot-connectors-view.ts`                           | `BotConnectorService.source`             | widened by `'photon'`, which is not an offer source: its card is deferred                                            |
+| `src/shared/bots/bot-connectors-view.ts`                           | `BotConnectorService.source`             | widened by `'photon'`, which is not an offer source: its own card is the channel's settings section                  |
 | `src/shared/bots/bot-connectors-view.ts`                           | `botConnectorServices`                   | one optional `photon` argument and a `photonService` row: the number and who may text it                             |
 | `src/shared/bots/bot-connectors-view.ts`                           | `serviceLines`                           | names the row `iMessage`, since `CONNECTOR_OFFER_NAMES` has no entry for it                                          |
 | `src/main/bots/bot-chat-tree-base.ts`                              | the link-origin loop                     | a photon link shows as a side chat, as Discord's does (upstream's own comment line kept)                             |
@@ -5607,12 +5608,15 @@ long outage is therefore a gap. The setup text has to say one more thing the cod
 assigned number's inbound is dropped until the line is picked up at token renewal, so the instructions end
 "restart Orca, then text it".
 
-**Deliberately not done, each for its own reason.** The renderer settings card and the Connect / Create /
-Add-member UI — the RPCs are the v1 surface, and a card needs Electron validation and its own STYLEGUIDE
-pass, exactly as the webhook card was deferred. **Every live-account verification**: there is no Photon
-account here, no line and no project, so the test the note calls for (text the bot, quit Orca, text again,
-reopen, confirm the turn runs) is unverified, as is the claim that a new assignment's inbound is dropped
-until renewal — neither is faked. Attachments and length limits (the note lists them as unknown, so a long
+**The settings card is now built** (`components/bots/photon/PhotonChannelSettings.tsx`): connect with an
+organization id and an account key, then per bot give it a number, add a person who may text it, Repair and
+Release. It renders nothing on a host that answers `method_not_found`, so an older host is untouched.
+
+**Deliberately not done, each for its own reason.** The project-delete step has no button: its RPC needs the
+slug typed back and burning a slug is irreversible, so it stays a CLI/RPC-only action. **Every
+live-account verification**: there is no Photon account here, no line and no project, so the test the note
+calls for (text the bot, quit Orca, text again, reopen, confirm the turn runs) is unverified, as is the
+claim that a new assignment's inbound is dropped until renewal — neither is faked. Attachments and length limits (the note lists them as unknown, so a long
 answer is capped into one message rather than pretending an upload works), group chats and the Business
 tier, and Stable. And the sidecar question is settled for Beta, so none was built.
 
@@ -5716,3 +5720,44 @@ means here rather than "broken".
   30000ms` on `google-key-download-watch.test.ts`. Recording it properly means a fresh `observedRun`
   (one failing record, one allowlisted) and the fifty historical prune rows kept somewhere that is not
   the assertion — the plan sketched in this branch's review replies.
+
+### `local(bots)`: what a release needed before the bot features were reachable
+
+Four defects found by auditing the tree against what shipped in #451–#459, all of them copy or reach
+rather than transport. Each is small; together they were the difference between "the feature exists" and
+"a person can use it".
+
+**iMessage had no way in.** Every Photon RPC existed and nothing called it, so the channel was merged and
+unreachable. `components/bots/photon/PhotonChannelSettings.tsx` is the card: connect with an organization
+id and account key (stored only if the owner says so), then per bot a number, the people who may text it,
+Repair, and Release. It mounts in the computer's group beside the GitHub App, and renders nothing on a host
+that answers `method_not_found`. `src/renderer/src/lib/photon-channel-client.ts` is the RPC client, shaped
+like `github-app-client.ts`.
+
+**A working webhook was called paused.** `BotWebhooksCard` replaced its whole face with "paused while
+signed out" whenever Orca Cloud was signed out, while a local hook went on firing. `WebhookSummary` now
+carries `servedHere`, set by `LocalWebhookHostService` for the hooks this computer holds — in `card` and in
+one `list` override — and the card pauses only the cloud's hooks. The per-rule "this computer" choice
+beside "Orca Cloud" stays deferred: on a host with no cloud the save already routes to this computer, so
+the missing card is a preference for cloud users, not a gap for an account-free one.
+
+**The GitHub row said "Coming soon" with an App connected.** `useBotConnectorAvailable` gates GitHub on the
+cloud, which is right for adding a linked account and wrong once an App is connected: the row now shows,
+and reads `Bots act as <slug>[bot]`. `src/shared/rpc-contract/github/github-app-params.ts` gains
+`canPushWorkflows`, read from GitHub's own `permissions.workflows` by `readWritePermission` in
+`github-app-api.ts`, stored beside `contentsWrite`, and shown under the connected App — the setup steps used
+to claim a `.github/workflows` push is always rejected, which was false for any installation that holds it.
+
+**A skills tree outside Orca could not reach a bot.** Bot skills were project-only: `<repo>/.agents/skills`
+or `<repo>/.claude/skills`, linked per bot. A tree kept outside Orca — `~/.agents/skills`, where a Hermes
+setup keeps its skills — could only be linked by registering its parent as a folder project. The setting
+`botSkillFolders` (`GlobalSettings`, disposition `hostLocal`) is a list of folders whose children are skills;
+`scanSkillRoots` in `bot-skill-projects.ts` scans them and `linkedSkillProjects` / `linkedSkillListing` link
+them beside the projects, so every bot on the computer loads them. Settings › Bots › this computer edits the
+list, and a change reaches a bot with its next message. One per computer, not per bot, because the tools
+they document are installed once on that computer.
+
+**Not rebuilt, on purpose.** `src/main/bots/bot-pr-events.ts` is inert in upstream and no fork commit
+touched it: a bot is no longer woken by its workers' pull requests. The account-free way to react to GitHub
+is the local webhook route plus an automation rule, which is what #453 ships. Diverging here would fight an
+upstream decision for a behaviour the fork does not need.
