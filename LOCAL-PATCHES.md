@@ -122,8 +122,8 @@ went with upstream's bulk test removals and ownership refactors in the 2026-11-2
 #43277), and `updater-release-builds` lost its test the same way in the 2026-11-08 sync (the module
 itself moved into `updater/releases/`). The prerelease-feed and feed-readiness suites were the last two
 of that family and went in upstream's 2026-11-24 test-inventory pass, so the mapping is covered through
-the two above and re-homing the retired updater cases is owed, as
-`local/sync/convergence-ledger.md` records.
+the two above and the retired updater cases are re-homed in
+`src/main/updater/releases/updater-fork-feed.test.ts`, as `local/sync/convergence-ledger.md` records.
 
 **The project's own links follow the same constant.** `src/shared/orca-repository.ts` derives
 `ORCA_REPOSITORY` / `ORCA_REPOSITORY_URL`, plus the scheme-less `ORCA_REPOSITORY_DISPLAY_URL` that
@@ -196,11 +196,13 @@ Anchors:
   have crowded out the atom feed` (this incident), `takes its candidate tags from the release list`, the
   draft/asset-less case, and both fallback cases — lived in the prerelease-feed suite, and the fork-feed
   regression case that exercised the atom fallback in the feed-readiness suite. Both suites went in
-  upstream's 2026-11-24 test-inventory pass and no test re-homes those cases yet; that is owed.
+  upstream's 2026-11-24 test-inventory pass, and every one of those cases is re-homed in
+  `src/main/updater/releases/updater-fork-feed.test.ts` — the atom-fallback regression among them.
 - the last-good pin reaching `available` — the suite that asserted that transition,
   `updater.publishing-window-feed.test.ts`, was retired upstream in the 2026-11-20 sync's bulk test
-  removals (#43277) and no test re-homes the case yet; the prerelease-feed suite that pinned the
-  `lastGoodTag` the pin is built on went in the 2026-11-24 test-inventory pass, so nothing pins it now.
+  removals (#43277); the prerelease-feed suite that pinned the `lastGoodTag` the pin is built on went in
+  the 2026-11-24 test-inventory pass, and the transition itself is re-homed in that same fork-owned
+  suite.
 - `src/main/updater-release-targets.ts` and `src/main/updater-release-readiness.ts` — the URL and
   probe halves, split out of the resolver so it stays inside the 300-line module limit. A sync that
   restores the single file has to take these two with it.
@@ -2807,8 +2809,8 @@ Two manifests changed in the same commit, as `AGENTS.md` requires:
   `tests/tools/unit-gate.test.mjs` now checks that every entry names a file this tree has and a full name
   that file can still produce. That suite has since been retired — the whole
   `src/main/daemon/providers/adapter/testing/` tree went in upstream's 2026-11-24 test-inventory pass —
-  so the manifest entry now names a file this tree does not have, which the check just described reports;
-  re-homing or pruning it is owed.
+  so the entry named a file this tree no longer has, which the check just described reports. It was
+  pruned, not re-homed: the suite is gone and only upstream owned that red.
 - `local/e2e-known-failure-titles.json`: 30 titles, none with a cause. 17 of the 28 that remain carry a
   `match` built from the `::notice::known failure … — <detail>` lines of the eleven retained scheduled
   runs (2026-09-27 … 2026-10-08, runs `36346182978`…`37848060391`), unioned across every shape observed
