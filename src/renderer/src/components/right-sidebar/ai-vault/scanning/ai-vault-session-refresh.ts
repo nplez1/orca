@@ -270,11 +270,9 @@ export function useAiVaultSessionRefresh(
       pendingBackgroundRef.current = true
       refreshIdRef.current += 1
       refreshInFlightRef.current = false
-      void window.api.aiVault.cancelListSessions({
-        requestToken
-      })
+      // The scan keeps running so the host caches it; the next visit joins it rather than restarting.
     }
-  }, [publicationGate, requestToken])
+  }, [publicationGate])
 
   // Panel entry reuses the renderer result, else paints the last list while the host answers.
   useEffect(() => {

@@ -57,8 +57,18 @@ export function useNestWorkspacesSetting(
     updateLocalSettings: updateSettings,
     updateFailedMessage: getHostSettingUpdateFailedMessage(hostLabel, t)
   })
-  // A machine-only scope has no endpoint, so the switch has nothing to read or write.
-  return target === null ? { setting: { state: 'loading' }, update: async () => {} } : host
+  // A machine-only scope has no endpoint: nothing to read there, and its write stays on this computer.
+  const remote = target?.kind === 'environment'
+  return {
+    setting: target === null ? { state: 'loading' } : host.setting,
+    update: async (value) => {
+      // Why this computer's copy too: a create sends its own boolean, which the host prefers.
+      await updateSettings({ nestWorkspaces: value })
+      if (remote) {
+        await host.update(value)
+      }
+    }
+  }
 }
 
 export function GeneralWorkspaceSettingsSection({
