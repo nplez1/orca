@@ -1885,9 +1885,9 @@ repaired at its cause and re-measured with the step's own tool.
   blocking-helper call sites across the codex/droid/ipc/native-chat/session-summary trees. `--prune` on each
   step is that step's own path for a shrink: focus 610 → 609, workspace-path 23 → 22, blocking-helper
   6451 → 6441 before the raises below.
-- **`config/main-blocking-helper-baseline.fork.txt` — nine rows raised, all with a trailing `# why`.**
+- **`config/main-blocking-helper-baseline.fork.txt` — eight rows raised, all with a trailing `# why`.**
   Pruning the ten shrunk rows left eight files _above_ their allowance, and every one is this class: the
-  fork's graph reaches a helper upstream's new code calls. Seven belong to the fork's in-process session
+  fork's graph reaches a helper upstream's new code calls. Five belong to the fork's in-process session
   search — upstream `#46549` added a compaction pass whose SQLite calls are helpers, so
   `session-search-{index-compaction,index-writer,retention-delete,store,tool-purge}.ts` are charged for
   calling them, and upstream runs that store in its session-search worker while the fork installs the search

@@ -395,8 +395,10 @@ describe('pi async subagent runs reach the pane as descendants (STA-6378)', () =
     // set must shrink here instead of stranding the child until the quiet-reap window.
     await emit(harness, RUNNER_EXIT, { runId: 'run-1', state: 'observed' })
     expect(harness.posted.at(-1)?.subagent_runs).toEqual([])
-    // The pane recomputes its hold from the new set; the exit itself never settles it.
-    expect(harness.accepted.at(-1)?.state).toBe('done')
+    // The exit shrinks the live set and does not settle the pane: the roster's own onRunnerExit waits
+    // RUNNER_EXIT_GRACE_MS so a late completion or the lead's wake turn lands first, and the settle
+    // after that grace is the roster's suite to pin, not this lane's.
+    expect(harness.accepted.at(-1)?.state).toBe('working')
   })
 
   it('ignores a bus payload with no child id rather than inventing a child', async () => {
