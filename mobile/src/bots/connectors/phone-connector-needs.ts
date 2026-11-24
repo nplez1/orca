@@ -49,7 +49,7 @@ function needPage(entry: PhoneConnectorEntry): ConnectorPage | null {
       return entry.problem === 'key' ? { kind: 'composio-key' } : { kind: 'list' }
     case 'app':
       return { kind: 'tool', name: entry.tool.name, signIn: false }
-    // Photon has no phone page (a phone cannot serve iMessage), so a row for it fixes nothing here.
+    // fork-comment-ok: Photon has no phone page (a phone cannot serve iMessage), so its row fixes nothing.
     case 'photon':
     case 'webhooks':
       return null

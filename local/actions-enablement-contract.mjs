@@ -39,6 +39,9 @@ export const REQUIRED = [
   // for dispatch and call, so a manual dispatch lands on `blacksmith-*` labels this fork lacks; PR and
   // schedule events pass no input and stay on hosted runners.
   '.github/workflows/node-server-tests.yml',
+  // Retired 2026-11-24 with `macos-updater-tests.yml` itself: upstream deleted the workflow in
+  // #46786 along with the updater suites it ran, so there is no file left to enable and nothing is
+  // being hidden by dropping the requirement. See LOCAL-PATCHES.md § local(ci).
   // Why: perf regression contract on PRs, and every other day through `fork-performance-contracts.yml`
   // — the contracts config is separate from the nightly unit suite, so nothing else covers it.
   '.github/workflows/performance-contracts.yml',

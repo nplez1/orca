@@ -471,8 +471,9 @@ describe('a host with both kinds of hook', () => {
 
     const hearing = saves.hearing(bot)
     expect(hearing.cloudSignedOut).toBe(true)
-    // Upstream rewrote this copy to name the signed-out host (host-orca-sign-in.ts); the fork never
-    // patched bot-event-sources.ts, so the refusal's wording is upstream's.
+    // Why a fragment and not the old wording: upstream #45929 replaced "signed out of Orca" with the
+    // host-facing "This computer isn't signed in to Orca Cloud", which `hostNotSignedIn` builds and
+    // the localization catalogs carry. The cause is what this case is about.
     expect(botEventTriggerRefusal(hearing, saves.cloudRules([slack])!)).toContain(
       "isn't signed in to Orca Cloud"
     )

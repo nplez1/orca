@@ -472,6 +472,23 @@ describe('a title imported from a spec module', () => {
       rmSync(dir, { recursive: true, force: true })
     }
   })
+
+  // Why the fallback is pinned too: after #46786 no test in this tree imports its cases from a
+  // `.spec` module, so every manifest entry is read through the fallback — a file with no spec
+  // imports must be read as itself rather than as nothing.
+  it('falls back to the file itself when nothing is imported', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'unit-gate-no-spec-import-'))
+    const file = join(dir, 'plain-cases.test.ts')
+    const title = 'a case written in the file that names it'
+    writeFileSync(file, `describe('plain', () => { it('${title}', () => {}) })\n`)
+
+    try {
+      expect(importedCaseSpecifiers(readFileSync(file, 'utf8'))).toEqual([])
+      expect(titleExistsInSource(title, sourceWithImportedCases(file))).toBe(true)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('the known-red manifest', () => {

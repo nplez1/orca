@@ -7,6 +7,14 @@
   },
   "deletions": [
     {
+      "path": "src/main/pi/managed-extensions/agent-status/agent-status-extension-held-turn-repost.test.ts",
+      "commit": "513c1bedf42",
+      "upstreamBlob": "e1bb6e39464415e2be451dcf666ac7e2b0d5a2cf",
+      "class": "fork-refactor",
+      "status": "expected-deletion",
+      "reason": "Upstream #48146's held-turn repost suite drives the two `subagent:async-*` bindings the fork removed from upstream's roster setup (convergence-ledger.md § \"pi subagent bindings: one binding per channel\" — \"Do not re-add\"), so every case in it exercises a lane this fork does not run, and it cannot pass without re-adding them. COVERAGE OWED (#464): the fork's roster lane still reposts a child-held turn, and nothing pins that on this tree — the repost cadence, the single timer across a Pi reload and the one-day cap are untested since this deletion, and whether a pi pane held by an async child for longer than the 30-minute staleness window goes stale is unowned. Port those cases onto the `task:subagent:lifecycle` lane that the fork does run, or record the gap on the issue that closes it."
+    },
+    {
       "path": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/TrustedOrcaApplication.swift",
       "commit": "accb095dd6",
       "upstreamBlob": "7fb9dc71dea0365106017acd21d0e002f77f26e1",

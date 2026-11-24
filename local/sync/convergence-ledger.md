@@ -513,6 +513,27 @@ rather than upstream's.
 `subagent:process-terminal` from the fork's bus — a child whose only end signal is its runner exit
 then stays in the live set until the descendant lane's quiet-reap window retracts it.
 
+**2026-11-24 addendum — the two upstream suites that arrived on those bindings.** Upstream #48146
+(held-turn repost) and #47627 (a background subagent start right after Esc marks the row working) both
+build on the two bindings this section forbids, and both arrived in the `7daf01d99f3` sync as suites
+that drive them. They did not get the same answer, because only one of them was a fork defect.
+
+- `agent-hook-cancel-verdict-latch.test.ts` **is kept and passes.** Its failure was real: the fork's
+  pi lane publishes one `subagent_async_state` snapshot per post instead of upstream's
+  `agent_start:subagent`, so `resolveCancelVerdictLatch` had no way to tell a child that started after
+  Esc from a late restatement of the cancelled turn, and held the start for the whole 15s window. The
+  latch gained a marked `LOCAL(nplez1)` rule — a snapshot naming a run the cancelled row did not carry
+  is a start — and the suite, including its OMP-lifecycle and replay holds, passes against it.
+  `agent-hook-listener-descendant-lifecycle.test.ts` gained the end-to-end companion, which drives the
+  same start through `normalizeAndAccept` rather than the latch directly.
+- `agent-status-extension-held-turn-repost.test.ts` **is retired**, as a `fork-refactor` deletion in
+  `expected-deletions.json`. Every case in it needs the two bindings re-added, and porting upstream's
+  repost into the fork's lane is a feature, not a sync repair. **Coverage owed (#464):** the fork's roster
+  lane still reposts a child-held turn, and nothing on this tree pins the cadence, the single timer
+  across a Pi reload, the one-day cap, or whether a pi pane held by an async child past
+  `AGENT_STATUS_STALE_AFTER_MS` goes stale. Port those cases onto the `task:subagent:lifecycle` lane
+  the fork does run; do not read the deletion as "the fork does not repost".
+
 ---
 
 ## Status bar, usage providers, rate limits

@@ -43,8 +43,9 @@ describe('known-failure verdict wiring', () => {
     )
     // Why the outcome argument: the verdict reads the report, and a report alone cannot tell an empty
     // run or a Playwright exit with no spec behind it apart from a green one (#210 G7).
-    // Why no `--selected`: this lane runs the whole suite, so there is no shard selection to prove the
-    // report against — the selection check stays on the caller lanes that hand this workflow a list.
+    // Why no `--selected`: upstream replaced the sharded matrix with one unsharded job that runs the
+    // whole suite, so there is no selection manifest to prove a spec never ran against. The report is
+    // still the verdict's input, and an empty one still fails closed.
     expect(verdict.run).toBe(
       'node local/check-e2e-known-failure-titles.mjs e2e-results/results.json local/e2e-known-failure-titles.json ${{ steps.run-e2e.outcome }}'
     )
@@ -71,7 +72,8 @@ describe('known-failure verdict wiring', () => {
     // Why an empty list is allowed and why it must be recorded: the 2026-11-24 sync took upstream
     // #46786, which deleted every spec this manifest had recorded, so the inherited quarantine is now
     // empty by decision. A silently emptied list is still caught — an empty `titles` has to say why
-    // it is empty in its own note.
+    // it is empty in its own note. An empty list also quarantines nothing, so every E2E failure fails
+    // the run: that is the fail-closed state, not a widening.
     if (manifest.titles.length === 0) {
       expect(manifest.note.join(' ')).toContain('#46786')
       return
