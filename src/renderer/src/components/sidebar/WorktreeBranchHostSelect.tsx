@@ -1,6 +1,7 @@
 import React from 'react'
 import { ChevronDown } from 'lucide-react'
 
+import { Badge } from '@/components/ui/badge'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +22,7 @@ type WorktreeBranchHostSelectProps = {
   groupKey: string
   onSelectHost?: (groupKey: string, hostId: ExecutionHostId) => void
   onPointerDown?: (event: React.PointerEvent<HTMLButtonElement>) => void
+  menuAlign?: 'start' | 'end'
 }
 
 /** Per-card host switcher for a Group by branch card: one row per host. */
@@ -29,7 +31,8 @@ export const WorktreeBranchHostSelect = React.memo(function WorktreeBranchHostSe
   selectedHostId,
   groupKey,
   onSelectHost,
-  onPointerDown
+  onPointerDown,
+  menuAlign = 'end'
 }: WorktreeBranchHostSelectProps) {
   const t = useTranslate()
   const selectedLabel =
@@ -39,23 +42,26 @@ export const WorktreeBranchHostSelect = React.memo(function WorktreeBranchHostSe
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          data-branch-host-select=""
-          aria-label={t('auto.components.sidebar.WorktreeBranchHostSelect.label', 'Select host')}
-          onPointerDown={(event) => {
-            // Why: the card body activates the workspace on click; the switcher must not.
-            event.stopPropagation()
-            onPointerDown?.(event)
-          }}
-          onClick={(event) => event.stopPropagation()}
-          className="inline-flex h-5 max-w-[7rem] shrink-0 items-center gap-0.5 rounded px-1 text-[10px] font-medium leading-none text-muted-foreground hover:bg-worktree-sidebar-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-worktree-sidebar-ring focus-visible:outline-none"
-        >
-          <span className="truncate">{selectedLabel}</span>
-          <ChevronDown className="size-3 shrink-0" />
-        </button>
+        {/* Why the chip variant: the switcher stands in for the host label a mixed-host card has no
+            chip for, and that variant keeps the two from drifting apart. */}
+        <Badge asChild variant="hostContext" className="max-w-[7rem]">
+          <button
+            type="button"
+            data-branch-host-select=""
+            aria-label={t('auto.components.sidebar.WorktreeBranchHostSelect.label', 'Select host')}
+            onPointerDown={(event) => {
+              // Why: the card body activates the workspace on click; the switcher must not.
+              event.stopPropagation()
+              onPointerDown?.(event)
+            }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <span className="truncate">{selectedLabel}</span>
+            <ChevronDown className="shrink-0 opacity-70" />
+          </button>
+        </Badge>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-44">
+      <DropdownMenuContent align={menuAlign} className="w-44">
         <DropdownMenuRadioGroup
           value={selectedHostId}
           onValueChange={(value) => {

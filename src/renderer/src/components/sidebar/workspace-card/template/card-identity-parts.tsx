@@ -87,7 +87,7 @@ function sshControl(props: Readonly<Record<string, unknown>>, card: Card): React
   )
 }
 
-function branchHostSelect(card: Card): React.ReactNode {
+function branchHostSelect(props: Readonly<Record<string, unknown>>, card: Card): React.ReactNode {
   const members = card.branchGroup
   if (!members || members.length < 2) {
     return null
@@ -99,6 +99,7 @@ function branchHostSelect(card: Card): React.ReactNode {
       groupKey={card.branchGroupKey ?? ''}
       onSelectHost={card.onSelectBranchHost}
       onPointerDown={card.stopQuickActionPointerPropagation}
+      menuAlign={props.menuAlign === 'start' ? 'start' : undefined}
     />
   )
 }
@@ -160,7 +161,7 @@ export const CARD_IDENTITY_PARTS = {
       onClick={card.handleWorkspaceQuickAction}
     />
   )),
-  BranchHostSelect: part([], (_props, _children, card) => branchHostSelect(card)),
+  BranchHostSelect: part(['menuAlign'], (props, _children, card) => branchHostSelect(props, card)),
   MetaRepoBadge: part([], (_props, _children, { repo }) =>
     repo ? <WorktreeCardMetaRepoBadge repo={repo} /> : null
   ),
