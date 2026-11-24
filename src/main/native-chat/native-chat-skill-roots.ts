@@ -20,8 +20,9 @@ export type LinkedProjectSkill = {
 /** A project or a computer folder a bot loads for skills, as a chat about to start loads it. */
 export type LinkedSkillProject = {
   name: string
-  /** `folder`: one of this computer's skill folders, which is nobody's project and reaches no worker. */
-  kind?: 'project' | 'folder'
+  /** `folder`: one of this computer's skill folders, which is nobody's project and reaches no worker.
+   *  `own`: the bot's own folder, the one it writes to. */
+  kind?: 'project' | 'folder' | 'own'
   repoPath: string
   skills: readonly LinkedProjectSkill[]
 }
@@ -79,13 +80,19 @@ export function linkedSkillsSection(
   if (projects.length === 0) {
     return null
   }
-  const linked = projects.filter((project) => project.kind !== 'folder')
+  const own = projects.filter((project) => project.kind === 'own')
+  const linked = projects.filter((project) => project.kind !== 'folder' && project.kind !== 'own')
   const folders = projects.filter((project) => project.kind === 'folder')
   const names = linked.map((project) => project.name).join(', ')
   return [
     // A folder-only list has no projects to name, and a heading that says otherwise would be a lie.
-    folders.length > 0 ? '## Skills' : '## Skills from linked projects',
+    folders.length > 0 || own.length > 0 ? '## Skills' : '## Skills from linked projects',
     '',
+    ...(own.length > 0
+      ? [
+          `Your own skills (${own.map((project) => project.name).join(', ')}): read these first; they are yours to change, and a new one in your own skills folder is known from your next turn.`
+        ]
+      : []),
     ...(linked.length > 0
       ? [
           `Skills from ${names}: use them to plan and drive that project's work; code work still goes to a worker in that project, which has them too; name the skill in the spec.`

@@ -5760,6 +5760,18 @@ and reads `Bots act as <slug>[bot]`. `src/shared/rpc-contract/github/github-app-
 `github-app-api.ts`, stored beside `contentsWrite`, and shown under the connected App — the setup steps used
 to claim a `.github/workflows` push is always rejected, which was false for any installation that holds it.
 
+**A bot's own skills load first, and it can write them.** A bot created from a template already had
+skills written into its home (`skillsFolderFor(agent)`), but nothing loaded that folder explicitly: whether
+they arrived depended on the agent's own cwd conventions, and a skill the bot wrote later was seen by
+whatever happened to rescan. `bot-skill-roots.ts` now reads the bot's own `.agents/skills` (or
+`.claude/skills`) as a skill root and links it ahead of the projects, so every agent Orca launches - Claude
+by added directory, Codex by skill root, pi by `skillDirs`, the ACP agents by plugin folder - loads what the
+bot wrote for itself. `relinkedSkills` asks for the list every turn instead of only when the linked
+projects changed, because a key made of folder names cannot see a new skill inside a folder; the
+fingerprint still decides whether the agent hears about it. Sharing between bots is a folder symlink in a
+bot's own skills folder - the scan admits a linked folder and resolves it - and the shared, cross-bot set
+is `botSkillFolders` above. `bot-skill-folder-scan.ts` holds the SKILL.md reading those three sources share.
+
 **A skills tree outside Orca could not reach a bot.** Bot skills were project-only: `<repo>/.agents/skills`
 or `<repo>/.claude/skills`, linked per bot. A tree kept outside Orca — `~/.agents/skills`, where a Hermes
 setup keeps its skills — could only be linked by registering its parent as a folder project. The setting

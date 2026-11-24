@@ -6,6 +6,7 @@ import type {
   AgentJournalRenderItem
 } from '../../shared/agent-session/journal/agent-session-journal-types'
 import { type BotFirstRun, createBotTurnContext } from './bot-turn-context'
+import type { BotTurnLinkedSkills } from './bot-turn-linked-skills'
 import type { BotRecentChatsSection } from './bot-recent-chats'
 import { botSessionInstructions } from './bot-session-instructions'
 import { botRulesBlock } from './bot-preamble'
@@ -14,11 +15,21 @@ import { codexItemBody } from '../codex/structured/items/codex-structured-item-t
 
 const FOLDER = '/home/me/.orca/bots/scout'
 
+/** A listing as the wiring reports it, so a turn asks about the same skills a launch gave. */
+function listing(section: string | null): BotTurnLinkedSkills {
+  return {
+    projects: () => (section === null ? [] : ['orca']),
+    launchScanned: () => null,
+    listed: async () => section
+  }
+}
+
 function home(
   soul: string,
   memory: string,
   firstRun?: BotFirstRun,
-  topics: Record<string, string> = {}
+  topics: Record<string, string> = {},
+  linkedSkills?: BotTurnLinkedSkills
 ) {
   const files = new Map([
     [join(FOLDER, 'SOUL.md'), soul],
@@ -34,7 +45,7 @@ function home(
     replaceText: async () => false,
     writeText: async () => false
   }
-  const context = createBotTurnContext(fs, firstRun)
+  const context = createBotTurnContext(fs, firstRun, undefined, undefined, undefined, linkedSkills)
   context.launched('s1', 'bot-1', FOLDER, { soul, memory }, true, HELD_BOT_RULES)
   // Each turn end reads the journal as it stands; a turn adds its rows.
   const journal: AgentJournalRenderItem[] = []
@@ -571,7 +582,7 @@ describe("a bot chat's linked-project skills", () => {
   const textOf = async (h: ReturnType<typeof home>): Promise<string> => (await h.plan())?.text ?? ''
 
   it('sends the current list on the first turn of a resumed chat, whose instructions stay its first ones', async () => {
-    const h = home('Be brief.', '- a fact')
+    const h = home('Be brief.', '- a fact', undefined, {}, listing(SECTION))
     h.context.linkedSkillsLaunched('s1', SECTION, false)
     const first = await h.plan()
     expect(first?.text).toContain(SECTION)
@@ -586,7 +597,7 @@ describe("a bot chat's linked-project skills", () => {
   })
 
   it('sends the list once the agent turns down the folders it was told it loaded', async () => {
-    const h = home('Be brief.', '- a fact')
+    const h = home('Be brief.', '- a fact', undefined, {}, listing(SECTION))
     h.context.linkedSkillsLaunched('s1', 'loaded natively', true)
     h.context.linkedSkillsLaunched('s1', SECTION, false)
     expect(await textOf(h)).toContain(SECTION)
@@ -601,7 +612,7 @@ describe("a bot chat's linked-project skills", () => {
   })
 
   it("rides a worker's report through the launch update, given once", async () => {
-    const h = home('Be brief.', '- a fact')
+    const h = home('Be brief.', '- a fact', undefined, {}, listing(SECTION))
     h.context.linkedSkillsLaunched('s1', SECTION, false)
     const update = await h.context.launchUpdate?.('s1')
     expect(update?.text).toContain(SECTION)

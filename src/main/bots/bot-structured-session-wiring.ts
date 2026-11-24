@@ -157,16 +157,18 @@ export function botStructuredSessionWiring(deps: {
       launchScanned: (sessionId) => launchScans.get(sessionId) ?? null,
       listed: async (botId, projects, sessionId) => {
         const repos = deps.store().getRepos()
+        const bot = botById(botId)
+        const roots = deps.botSkillFolders?.() ?? []
         if (!liveSkills.has(sessionId)) {
-          const linked = await linkedSkillListing(projects, repos, deps.botSkillFolders?.() ?? [])
+          const linked = await linkedSkillListing(projects, repos, roots, bot)
           return linkedSkillsSection(linked, linked)
         }
         // The running agent rereads the folder, so it is brought up to date before the names go.
         const linked = await linkedSkillProjects(
-          { skillProjects: [...projects] },
+          { folder: bot?.folder ?? '', skillProjects: [...projects] },
           repos,
           botLinkedSkillsFolder(botId),
-          deps.botSkillFolders?.() ?? []
+          roots
         )
         return linkedSkillsSection(linked.projects, [], true)
       }

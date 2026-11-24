@@ -1519,7 +1519,10 @@
       "skillFoldersRemoveOne": "Stop loading {{folder}}",
       "skillFoldersDuplicate": "That folder is already listed.",
       "skillFoldersMustBeAbsolute": "Give a full path, or one that starts with ~/. A relative path means a different folder per chat.",
-      "skillFoldersShared": "Whatever is in these folders is loaded by every bot on this computer, including bots other people can message. Keep a shared folder to tools you would hand them anyway."
+      "skillFoldersShared": "Whatever is in these folders is loaded by every bot on this computer, including bots other people can message. Keep a shared folder to tools you would hand them anyway.",
+      "skills": {
+        "itsOwn": "{{bot}} also has its own skills folder, {{folder}}, inside its home — the one it can write a skill into itself. What is in it loads for this bot alone, before any project’s, and a new one is known from its next message."
+      }
     }
   },
   "terminal": {

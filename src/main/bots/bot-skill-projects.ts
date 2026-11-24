@@ -1,8 +1,7 @@
 // The projects a bot links for skills: which skills each has, read on this host, and the bot's one
 // skill-only folder its chats load them from.
-import { lstat, mkdir, open, readdir, realpath, rm, symlink } from 'node:fs/promises'
-import { homedir } from 'node:os'
-import { basename, dirname, isAbsolute, join } from 'node:path'
+import { mkdir, readdir, realpath, rm, symlink } from 'node:fs/promises'
+import { basename, join } from 'node:path'
 import type { Bot } from '../../shared/bot-types'
 import type { BotSkillProjectView } from '../../shared/bots/bot-skill-projects'
 import type { Repo } from '../../shared/repository/repo-types'
@@ -10,76 +9,19 @@ import {
   getRepoExecutionHostId,
   LOCAL_EXECUTION_HOST_ID
 } from '../../shared/execution-host/execution-host'
-import { skillDirectoryMaxDepth } from '../../shared/skills/discovery/skill-discovery-depth'
-import { declaredSkillMetadata } from '../../shared/skills/discovery/skill-metadata'
-import { findSkillFiles } from '../skills/discovery/skill-root-file-walk'
-import type {
-  LinkedProjectSkill,
-  LinkedSkillListing,
-  LinkedSkills
-} from '../native-chat/native-chat-skill-roots'
+import {
+  SKILL_FOLDERS,
+  scanSkillsFolder,
+  type ScannedProject,
+  type ScannedSkill
+} from './bot-skill-folder-scan'
+import { scanOwnSkills, scanSkillRoots } from './bot-skill-roots'
+import type { LinkedSkillListing, LinkedSkills } from '../native-chat/native-chat-skill-roots'
 import { getProfileUserDataPath } from '../orca-profiles/profile-storage-paths'
 import { retireAtRestCommandContext } from '../native-chat/agent-session-wire/options/at-rest-command-context'
 import { folderWorkspaceKey } from '../../shared/workspace/identity/workspace-scope'
 
-/** Where a project keeps skills for every agent, then Claude's own folder. */
-const SKILL_FOLDERS = ['.agents', '.claude'] as const
-const MAX_SKILL_FILE_BYTES = 256 * 1024
-
-/** An admitted skill, with the real folder its link in Orca's folder points to. */
-type ScannedSkill = LinkedProjectSkill & { folder: string }
-
-type ScannedProject = { skillsDir: string; skills: ScannedSkill[] }
-
-/** A file's text, up to the cap; null when it can't be read. */
-async function readCapped(path: string): Promise<string | null> {
-  try {
-    const file = await open(path, 'r')
-    try {
-      const buffer = Buffer.alloc(Math.min((await file.stat()).size, MAX_SKILL_FILE_BYTES))
-      const { bytesRead } = await file.read(buffer, 0, buffer.length, 0)
-      return buffer.toString('utf8', 0, bytesRead)
-    } finally {
-      await file.close()
-    }
-  } catch {
-    return null
-  }
-}
-
-/** A skill folder (team setup scripts link them in) holding a real SKILL.md that declares its name
- *  and description. A SKILL.md that is itself a link could be any file, so it never counts. */
-async function admittedSkill(skillFile: string): Promise<ScannedSkill | null> {
-  const entry = await lstat(skillFile).catch(() => null)
-  if (!entry?.isFile()) {
-    return null
-  }
-  const folder = await realpath(dirname(skillFile)).catch(() => null)
-  const text = folder ? await readCapped(join(folder, 'SKILL.md')) : null
-  const declared = text === null ? null : declaredSkillMetadata(text)
-  if (!folder || !declared) {
-    return null
-  }
-  const oneLine = (value: string): string => value.replace(/\s+/g, ' ').trim()
-  return {
-    name: oneLine(declared.name),
-    description: oneLine(declared.description),
-    skillFile: join(folder, 'SKILL.md'),
-    folder
-  }
-}
-
-async function scanSkillsFolder(skillsDir: string): Promise<ScannedSkill[]> {
-  const files = await findSkillFiles(skillsDir, skillDirectoryMaxDepth('repo'))
-  const admitted = await Promise.all(files.map(admittedSkill))
-  const byFolder = new Map<string, ScannedSkill>()
-  for (const skill of admitted) {
-    if (skill && !byFolder.has(skill.folder)) {
-      byFolder.set(skill.folder, skill)
-    }
-  }
-  return [...byFolder.values()].sort((a, b) => a.name.localeCompare(b.name))
-}
+export { linkedSkillKeys, resolveSkillRoot } from './bot-skill-roots'
 
 /** The project's skills from .agents/skills, else .claude/skills; null when it has none. */
 export async function scanSkillProject(repoPath: string): Promise<ScannedProject | null> {
@@ -174,7 +116,7 @@ function serialized<T>(folder: string, run: () => Promise<T>): Promise<T> {
 /** One skill, listed once: a folder that a project already lists adds only what is new, so the agent
  *  is not told it is both a project's skill and a computer folder's. */
 function withoutRepeatedSkills<
-  T extends { name: string; skills: readonly ScannedSkill[]; kind?: 'project' | 'folder' }
+  T extends { name: string; skills: readonly ScannedSkill[]; kind?: 'project' | 'folder' | 'own' }
 >(entries: readonly T[]): T[] {
   const seen = new Set<string>()
   return entries.map((entry) => {
@@ -212,9 +154,12 @@ async function scanLinkedProjects(
 export async function linkedSkillListing(
   ids: readonly string[],
   repos: readonly Repo[],
-  roots: readonly string[] = []
+  roots: readonly string[] = [],
+  bot?: Pick<Bot, 'folder'>,
+  botsRoot?: string
 ): Promise<LinkedSkillListing[]> {
   const scanned = [
+    ...(bot ? await scanOwnSkills(bot, botsRoot) : []),
     ...(await scanLinkedProjects(ids, repos)).map(({ repo, skills }) => ({
       name: repo.displayName,
       skills,
@@ -229,45 +174,6 @@ export async function linkedSkillListing(
   }))
 }
 
-/** A settings folder as main reads it: `~` expanded, and null for what is not a path at all — main's
- *  cwd is nobody's home, so a relative one names a different folder per chat and is never guessed at. */
-export function resolveSkillRoot(root: string): string | null {
-  const trimmed = root.trim()
-  const path = /^~[\\/]/.test(trimmed) ? join(homedir(), trimmed.slice(2)) : trimmed
-  // A bare home or root would walk every folder below it and load every SKILL.md it found.
-  const tooBroad = ['/', homedir(), join(homedir(), '')]
-  return isAbsolute(path) && !tooBroad.includes(path) ? path : null
-}
-
-/** A bot's linked-skill keys: its projects and this computer's folders, so a folder change relinks. */
-export function linkedSkillKeys(
-  ids: readonly string[] | null | undefined,
-  folders?: () => readonly string[]
-): readonly string[] | null {
-  const roots = (folders?.() ?? []).map((root) => `folder:${root}`)
-  return ids || roots.length > 0 ? [...(ids ?? []), ...roots] : null
-}
-
-async function scanSkillRoots(
-  roots: readonly string[]
-): Promise<{ name: string; path: string; skills: ScannedSkill[]; kind: 'folder' }[]> {
-  const scanned = await Promise.all(
-    roots.map(
-      async (
-        root
-      ): Promise<{ name: string; path: string; skills: ScannedSkill[]; kind: 'folder' }[]> => {
-        const path = resolveSkillRoot(root)
-        if (path === null) {
-          return []
-        }
-        const skills = await scanSkillsFolder(path)
-        return skills.length > 0 ? [{ name: path, path, skills, kind: 'folder' as const }] : []
-      }
-    )
-  )
-  return scanned.flat()
-}
-
 /**
  * The bot's linked projects on this host that have skills, with its folder brought up to date: a
  * link per admitted skill under skills/ (plugin-folder agents, Codex, OpenCode) and .claude/skills/
@@ -276,14 +182,16 @@ async function scanSkillRoots(
  * drops an unlinked one's, without a restart.
  */
 export async function linkedSkillProjects(
-  bot: Pick<Bot, 'skillProjects'>,
+  bot: Pick<Bot, 'folder' | 'skillProjects'>,
   repos: readonly Repo[],
   folder: string,
-  roots: readonly string[] = []
+  roots: readonly string[] = [],
+  botsRoot?: string
 ): Promise<LinkedSkills> {
   // Rejects when the folder can't be brought up to date, so no caller takes a partial list.
   const scanned = await serialized(folder, async () => {
     const scanned = [
+      ...(await scanOwnSkills(bot, botsRoot)),
       ...(await scanLinkedProjects(bot.skillProjects ?? [], repos)).map(({ repo, skills }) => ({
         name: repo.displayName,
         path: repo.path,
@@ -312,7 +220,7 @@ export async function linkedSkillProjects(
 /** The bot's links changed: its open chats load the skills before their next turn, and its resting
  *  chats' `/` menus reread them. */
 export function relinkBotSkills(
-  bot: Pick<Bot, 'id' | 'skillProjects' | 'folderWorkspaceId'>,
+  bot: Pick<Bot, 'id' | 'folder' | 'skillProjects' | 'folderWorkspaceId'>,
   repos: readonly Repo[],
   roots: readonly string[] = []
 ): void {
