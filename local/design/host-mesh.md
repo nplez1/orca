@@ -130,3 +130,40 @@ removal cuts both directions and a tombstone refuses re-introduction. 81 unit te
 likeliest cause of a half-join — and removal while a member is asleep. `verifyPairingCode` refuses loopback
 outside tests, so a real offer exchange needs two real Electron main processes. Until a Studio-plus-laptop-plus-VM
 run happens, a group is proven on one network and unproven across two.
+
+## Upstream sync surface
+
+This feature is 10k lines, and 42 of them are in files upstream owns. That ratio is deliberate and it is
+checked: `node local/checks/host-mesh-upstream-seams.mjs` (wired into `local/gate-lint.mjs`) fails when an
+upstream-owned file is touched without being declared, or when a declared seam grows past its budget.
+
+| Upstream file                                                        | Lines | What it is                                                          | If a sync conflicts                                                                                                                                                             |
+| -------------------------------------------------------------------- | ----- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `status-bar/host-connections/SshStatusSegment.tsx`                   | 21    | the relayed-fleet menu block                                        | keep our call site, the hook destructure, and the two counts (`relayed` in the early return, `relayed` in `connectedHostCount`); the JSX lives in `RelayedFleetStatusItems.tsx` |
+| `cli/hosts/host-handler-groups.ts`                                   | 6     | one import and `HOST_MESH_HANDLER_GROUP`                            | keep both; the entry itself is in `host-mesh-handler-group.ts`                                                                                                                  |
+| `startup/runtime-startup/main-process-runtime-launch.ts`             | 3     | import, `installHostMeshRuntime(runtimeRpc)`, `max-lines` directive | keep all three; the directive is only there because upstream's file sits exactly at the 300-line cap                                                                            |
+| `settings/.../RuntimeEnvironmentsPane.tsx`                           | 3     | one import and `<HostGroupSection />`                               | keep both                                                                                                                                                                       |
+| `runtime/rpc/methods/rpc-method-registry.ts`                         | 2     | `FORK_RPC_METHODS` import and spread                                | keep both                                                                                                                                                                       |
+| `shared/remote-runtime/protocol/protocol-version.ts`                 | 2     | the runtime capability entry                                        | keep; it is how peers negotiate the fleet                                                                                                                                       |
+| `runtime-environments/runtime-environment-connection-observation.ts` | 2     | one call to `notifyHostGraphOfConnectionChange`                     | keep                                                                                                                                                                            |
+| `cli/specs/index.ts`                                                 | 2     | `HOST_MESH_COMMAND_SPECS` import and spread                         | keep                                                                                                                                                                            |
+| `cli/dispatch/remote-selection-scope.ts`                             | 1     | `commandPath[0] === 'group'`                                        | keep                                                                                                                                                                            |
+
+Rules this follows, each learned the expensive way:
+
+- **No comments in upstream files.** `local/check-upstream-file-comments.mjs` forbids them on measured
+  evidence (162 of the 233 conflicts in the 2026-10-28 sync came from fork comments above upstream code). The
+  register therefore lives here and in `LOCAL-PATCHES.md`, where nothing upstream can collide with it.
+- **A seam is one line, and the line calls a fork-owned module.** `installHostMeshRuntime`,
+  `FORK_RPC_METHODS`, `HOST_MESH_HANDLER_GROUP`, `notifyHostGraphOfConnectionChange`, `RelayedFleetStatusItems`
+  and `hostMeshGroupIdFor`'s neighbours all exist so the upstream side is a call, not an implementation.
+- **Deliberately deleted, not moved:** the mesh service is a configured singleton, so threading it through
+  `RpcContext` would have touched four more upstream files (`core`, the admission prologue, the mobile pairing
+  subclass, the stream options) to copy a constant. The handler resolves it itself, and those four files are
+  untouched.
+- **Fork extension points are used as they are.** IPC registration goes through `register-fork-handlers.ts`,
+  the preload bridge through `fork-preload-api.ts`, strings through `i18n/fork/en.json`. A sync never has to
+  reconcile those.
+
+Verification for a sync: `node local/checks/host-mesh-upstream-seams.mjs` and
+`node local/check-upstream-file-comments.mjs` both green, then `pnpm test src/main/host-mesh src/shared/host-mesh`.

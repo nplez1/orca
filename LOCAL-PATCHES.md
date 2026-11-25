@@ -6240,3 +6240,30 @@ Verified by three simulations of exactly this rollout: the hub upgrading first m
 peers as needing an update; a leaf picked up the moment it updates converges on the hub's group and learns
 the member it had never met; and when the last machine updates, all three hold one group with every pair
 complete.
+
+### `local(hosts)`: the fleet every instance sees, and one join that pairs it with all
+
+Two features, one PR: discovery (what each host knows about the machines you own) and the group (join one
+member, be paired with every member, so the workspace list is identical everywhere). They are one patch
+because discovery without the group gives you a fleet you cannot act on, and the group without discovery
+cannot tell you which machines exist.
+
+**Upstream surface: 42 lines across 9 files.** The register is `local/checks/host-mesh-upstream-seams.mjs`,
+which is wired into `local/gate-lint.mjs`; it fails when an upstream-owned file is touched without being
+declared there, or when a seam grows past its metres. Per-seam resolution notes are in
+`local/design/host-mesh.md` § Upstream sync surface. Nothing above upstream's code: the fork's own
+`check-upstream-file-comments` ratchet measured 162 of 233 sync conflicts coming from exactly that, so this
+patch adds **zero** fork comment lines to upstream files — the register lives here and in the design note.
+
+Where a hook was unavoidable, the upstream line calls a fork-owned module (`installHostMeshRuntime`,
+`FORK_RPC_METHODS`, `HOST_MESH_HANDLER_GROUP`, `notifyHostGraphOfConnectionChange`,
+`RelayedFleetStatusItems`). Where it was avoidable it was deleted instead: the mesh service is a configured
+singleton, so threading it through `RpcContext` would have put this feature into `core.ts`, the admission
+prologue, the mobile pairing subclass and the stream options to copy a constant — all four are untouched.
+
+Fork extension points are used as designed: `register-fork-handlers.ts`, `fork-preload-api.ts`,
+`i18n/fork/en.json`. The generated RPC param catalog is regenerated, never hand-edited.
+
+**Not upstream-ready, and not proposed upstream:** the mesh assumes every member holds `host-admin` (the
+paired-desktop standard), and a group's membership list is not authenticated — the conceded premise of
+auto-pairing. Both are in the design note.
