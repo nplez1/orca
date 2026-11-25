@@ -6171,3 +6171,19 @@ cause of a half-join and needs three real machines; loopback is refused outside 
 between two real Electron main processes cannot be exercised on one Mac. Removal while a member sleeps is
 likewise proven only at the store level. Until that run happens, treat a group as reliable on one network and
 unproven across two.
+
+**Reviewed, and what the review changed.** Opus 5.5 at high on the combined diff found that the first join
+could not work at all (the hello carried an empty group id the params schema refused), that removal revoked
+nothing (`mintRuntimeOffer` discarded the device row id, so `forgetDevice` had nothing to delete), and that a
+pair was reported complete when only one direction existed. All three are fixed, along with redemption
+verifying the offer's own key _before_ saving an environment, a host that was ejected now acting on the
+notice, and the introduction limit actually being counted. A delta re-check found one new blocker — the
+opt-in could not be turned on, because the patch schema and the store did not name it — which is now fixed
+and pinned by a test. **That last fix has not been re-reviewed**; a third round needs the owner's approval.
+
+**Known limits, stated rather than hidden.** A relayed offer is bound to its recipient and to the machine
+that minted it, but the single-use nonce that `host-mesh-contract.ts` promises is not yet enforced, so a box
+can be replayed inside its ten-minute window. A member list arrives unauthenticated, which is the conceded
+cost of auto-pairing: one member can name a machine it controls and every member will pair with it. Any
+`workspace` caller can drain another host's pending boxes (a denial of service, since only the addressee can
+open one). The store has no lock, so two concurrent RPCs can lose an update.
