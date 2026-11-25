@@ -29,6 +29,7 @@ import {
   isCopilotBackgroundShellLaunch,
   isCopilotBackgroundSubagentLaunch,
   isCopilotBackgroundWorkCompletionNotification,
+  readCopilotRequestedAgentId,
   readCopilotShellDescription,
   readCopilotToolName,
   readCopilotToolResultText,
@@ -120,7 +121,7 @@ export function normalizeCopilotEvent(
     : undefined
   const readAgentEndedId =
     toolName?.toLowerCase() === 'read_agent'
-      ? readEndedAgentIdFromReadAgent(postToolResultText)
+      ? readEndedAgentIdFromReadAgent(postToolResultText, readCopilotRequestedAgentId(hookPayload))
       : undefined
   const reengagedAgentIds =
     normalizedEventName === 'PostToolUse' ? readCopilotWriteAgentTargets(hookPayload) : []
@@ -201,7 +202,7 @@ export function normalizeCopilotEvent(
   } else if (failedBackgroundLaunch && backgroundWorkState) {
     const leadStopped = preserveLeadStopped(backgroundWorkState)
     backgroundWorkState = {
-      ...consumeCopilotSubagent(backgroundWorkState, { includeRoster: false }),
+      ...consumeCopilotSubagent(backgroundWorkState, undefined),
       leadStopped
     }
     storeBackgroundWork(backgroundWorkState)

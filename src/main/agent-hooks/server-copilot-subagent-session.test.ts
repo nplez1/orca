@@ -394,6 +394,22 @@ describe('Copilot background agent roster', () => {
     expect(post({ hook_event_name: 'Stop', session_id: LEAD })?.payload.state).toBe('done')
   })
 
+  it('reads only the first status of a read_agent result', () => {
+    post({ hook_event_name: 'UserPromptSubmit', session_id: LEAD, prompt: 'go' })
+    post(launched(AGENT_A))
+    post({
+      hook_event_name: 'PostToolUse',
+      session_id: LEAD,
+      tool_name: 'read_agent',
+      tool_input: { agent_id: AGENT_A },
+      tool_result: {
+        result_type: 'success',
+        text_result_for_llm: `Agent is running. agent_id: ${AGENT_A}, agent_type: task, status: running, description: poll until status: completed, elapsed: 3s`
+      }
+    })
+    expect(post({ hook_event_name: 'Stop', session_id: LEAD })?.payload.state).toBe('working')
+  })
+
   it('keeps the pane working while write_agent re-engages an idle agent', () => {
     post({ hook_event_name: 'UserPromptSubmit', session_id: LEAD, prompt: 'go' })
     post(launched(AGENT_A))

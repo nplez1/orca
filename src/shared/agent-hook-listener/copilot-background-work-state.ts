@@ -87,17 +87,18 @@ export function consumeCopilotBackgroundShells(
  *  an id-less `agent_completed` may also end a rostered agent, since nothing else would. */
 export function consumeCopilotSubagent(
   work: CopilotBackgroundWorkState,
-  options: { includeRoster: boolean }
+  roster: { endedAgentIds: Set<string> } | undefined
 ): CopilotBackgroundWorkState {
   if (work.pendingSubagentLifecycleCount > 0) {
     return { ...work, pendingSubagentLifecycleCount: work.pendingSubagentLifecycleCount - 1 }
   }
-  if (work.pendingUnidentifiedSubagentCount > 0 || !options.includeRoster) {
+  if (work.pendingUnidentifiedSubagentCount > 0 || !roster || work.backgroundAgents.length === 0) {
     return {
       ...work,
       pendingUnidentifiedSubagentCount: Math.max(0, work.pendingUnidentifiedSubagentCount - 1)
     }
   }
+  roster.endedAgentIds.add(work.backgroundAgents[0].agentId)
   return { ...work, backgroundAgents: work.backgroundAgents.slice(1) }
 }
 
@@ -197,7 +198,10 @@ export function endCopilotSubagent(
   if (agentId !== undefined) {
     endedAgentIds.add(agentId)
   }
-  return consumeCopilotSubagent(work, { includeRoster: fallback === 'counts-or-roster' })
+  return consumeCopilotSubagent(
+    work,
+    fallback === 'counts-or-roster' ? { endedAgentIds } : undefined
+  )
 }
 
 // ─── How Copilot names a background agent ────────────────────────────────────
@@ -210,15 +214,27 @@ const COPILOT_BACKGROUND_AGENT_RE =
 const COPILOT_NOTIFICATION_AGENT_ID_RE = /agent_id[:\s]+"?([\w.-]*[\w-])/i
 /** A `read_agent` result's status line (`Agent is idle (waiting for messages). agent_id: <id>,
  *  agent_type: …, status: idle, …`): the agent is no longer running a turn. */
-const COPILOT_READ_AGENT_ENDED_RE =
-  /^\s*Agent\b[^\n]*?\bagent_id:\s*([\w.-]*[\w-]),[^\n]*?\bstatus:\s*(?:idle|completed|failed|cancelled)\b/
+const COPILOT_READ_AGENT_STATUS_RE =
+  /^\s*Agent\b[^\n]*?\bagent_id:\s*([\w.-]*[\w-]),[^\n]*?\bstatus:\s*(\w+)/
+const COPILOT_READ_AGENT_ENDED_STATUSES = new Set(['idle', 'completed', 'failed', 'cancelled'])
 
 export function readBackgroundAgentId(resultText: string | undefined): string | undefined {
   return resultText?.match(COPILOT_BACKGROUND_AGENT_RE)?.[1] || undefined
 }
 
-export function readEndedAgentIdFromReadAgent(resultText: string | undefined): string | undefined {
-  return resultText?.match(COPILOT_READ_AGENT_ENDED_RE)?.[1] || undefined
+/** The agent a `read_agent` result reports no longer running. Only the line's FIRST `status:`
+ *  counts, since the model-written description after it can contain the same words. */
+export function readEndedAgentIdFromReadAgent(
+  resultText: string | undefined,
+  requestedAgentId: unknown
+): string | undefined {
+  const match = resultText?.match(COPILOT_READ_AGENT_STATUS_RE)
+  if (!match || !COPILOT_READ_AGENT_ENDED_STATUSES.has(match[2].toLowerCase())) {
+    return undefined
+  }
+  return typeof requestedAgentId === 'string' && requestedAgentId !== match[1]
+    ? undefined
+    : match[1]
 }
 
 export function readCopilotAgentNotificationAgentId(

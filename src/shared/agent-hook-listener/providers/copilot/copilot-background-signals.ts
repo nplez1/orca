@@ -121,3 +121,9 @@ export function readCopilotWriteAgentTargets(hookPayload: Record<string, unknown
         : []
   return ids.filter((id): id is string => typeof id === 'string' && id.length > 0)
 }
+
+/** The single agent a `read_agent`/`write_agent` call addressed. */
+export function readCopilotRequestedAgentId(hookPayload: Record<string, unknown>): unknown {
+  const toolInput = readCopilotToolInput(hookPayload)
+  return isRecord(toolInput) ? toolInput.agent_id : undefined
+}
