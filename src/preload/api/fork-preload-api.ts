@@ -10,6 +10,8 @@ import { deepseekCredentialsApi } from './deepseek-credentials-bridge'
 import { fireworksCredentialsApi } from './fireworks-credentials-bridge'
 import type { JenkinsApi } from './jenkins-api'
 import { jenkinsApi } from './jenkins-bridge'
+import type { HostGraphApi } from './host-graph-api'
+import { hostGraphApi } from './host-graph-bridge'
 import type { SessionSummaryApi } from './session-summary-api'
 import { sessionSummaryApi } from './session-summary-bridge'
 import { uiHangDiagnosticsApi, type UiHangDiagnosticsApi } from './ui-hang-diagnostics-api'
@@ -22,6 +24,7 @@ import { uiHangDiagnosticsApi, type UiHangDiagnosticsApi } from './ui-hang-diagn
  */
 export type ForkPreloadApi = {
   jenkins: JenkinsApi
+  hostGraph: HostGraphApi
   uiHangDiagnostics: UiHangDiagnosticsApi
   sessionSummary: SessionSummaryApi
   deepseekCredentials: DeepSeekCredentialsApi
@@ -32,6 +35,7 @@ export type ForkPreloadApi = {
 
 export const forkPreloadApi: ForkPreloadApi = {
   jenkins: jenkinsApi,
+  hostGraph: hostGraphApi,
   uiHangDiagnostics: uiHangDiagnosticsApi,
   sessionSummary: sessionSummaryApi,
   deepseekCredentials: deepseekCredentialsApi,
