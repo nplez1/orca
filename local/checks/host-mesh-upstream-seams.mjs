@@ -17,12 +17,22 @@
  * the deliberate one.
  *
  * Usage: node local/checks/host-mesh-upstream-seams.mjs [--base <ref>] [--quiet]
- * Exit: 0 pass, 1 the surface grew or an undeclared upstream file is touched.
+ * Exit: 0 pass, 1 the surface grew or an undeclared upstream file is touched, 2 the base or the upstream
+ * ruler could not be resolved here — a clone that cannot answer must not pass.
  */
 import { execFileSync } from 'node:child_process'
 import path from 'node:path'
+import { resolvePullRequestDiffBase } from '../../config/scripts/git/pr-diff-base/git-pull-request-diff-base.mjs'
+import {
+  commitExists,
+  commitHasPath,
+  fetchCommandFor,
+  readRecordedSyncBase
+} from '../lib/upstream-sync-base.mjs'
 
 const ROOT = path.resolve(import.meta.dirname, '../..')
+/** The fork's own trunk, in the order a clone is likely to carry it. Never upstream's, which is not the base. */
+const DIFF_BASE_CANDIDATES = ['origin/HEAD', 'origin/main', 'main']
 
 /**
  * Every upstream-owned file this feature may touch, the lines it may add or remove in total, and why.
@@ -91,35 +101,74 @@ const NOT_UPSTREAM = new Set([
   'src/shared/rpc-contract/rpc-params-catalog.generated.ts'
 ])
 
-function git(args) {
-  return execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' })
+function git(args, root = ROOT) {
+  return execFileSync('git', args, { cwd: root, encoding: 'utf8' })
 }
 
-/** Whether the merge base has this path, without letting git's "does not exist" reach the terminal. */
-function existsAt(mergeBase, filePath) {
+/** A probe whose failure is an answer (a clone without the ref), with git's stderr silenced. */
+function gitOrNull(args, root = ROOT) {
   try {
-    execFileSync('git', ['cat-file', '-e', `${mergeBase}:${filePath}`], {
-      cwd: ROOT,
-      stdio: 'ignore'
-    })
-    return true
+    return execFileSync('git', args, {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore']
+    }).trim()
   } catch {
-    return false
+    return null
   }
 }
 
-export function resolveBase(argv) {
-  const index = argv.indexOf('--base')
-  if (index === -1) {
-    return 'origin/main'
+/**
+ * The tree that decides whether a path is upstream's: `upstream/main` where this clone has it, else the
+ * upstream commit the sync baseline records — the same fallback `check-upstream-file-comments` makes, so a
+ * CI checkout with no upstream remote measures the files a laptop does. A fork ref is never the ruler: every
+ * path exists at the fork's main, so the rule would check nothing.
+ */
+export function resolveUpstreamRuler(root = ROOT) {
+  const tip = gitOrNull(['rev-parse', '--verify', 'upstream/main^{commit}'], root)
+  if (tip) {
+    return tip
   }
-  return argv[index + 1] ?? 'origin/main'
+  const recorded = readRecordedSyncBase(root)
+  if (recorded && commitExists(root, recorded)) {
+    return recorded
+  }
+  throw new Error(
+    recorded
+      ? `the recorded sync base ${recorded} is not in this clone — ${fetchCommandFor(recorded)}`
+      : 'no upstream/main and no recorded sync base — add the upstream remote, or record one in local/upstream-file-comments-baseline.json'
+  )
+}
+
+/**
+ * The commit the surface is measured from. Why not just `--base`: a pull request checks out the merge commit
+ * and fetches no branch ref, so `origin/main` does not exist there and its first parent is the base the change
+ * is reviewed against (#466).
+ */
+export function resolveBase(argv, root = ROOT) {
+  const index = argv.indexOf('--base')
+  const requested = index === -1 ? 'origin/main' : (argv[index + 1] ?? 'origin/main')
+  const pullRequestBase = resolvePullRequestDiffBase(root, null)
+  if (pullRequestBase) {
+    return pullRequestBase
+  }
+  for (const candidate of [requested, ...DIFF_BASE_CANDIDATES]) {
+    const commit = candidate
+      ? gitOrNull(['rev-parse', '--verify', `${candidate}^{commit}`], root)
+      : null
+    if (commit) {
+      return git(['merge-base', 'HEAD', commit], root).trim()
+    }
+  }
+  throw new Error(
+    `none of ${[requested, ...DIFF_BASE_CANDIDATES].join(', ')} resolves here — fetch one or pass --base <ref>`
+  )
 }
 
 /** The merged surface, per upstream-owned file, as `{ path, lines }`. */
-export function measureSurface(base) {
-  const mergeBase = git(['merge-base', 'HEAD', base]).trim()
-  const rows = git(['diff', '--numstat', `${mergeBase}..HEAD`])
+export function measureSurface(base, root = ROOT) {
+  const ruler = resolveUpstreamRuler(root)
+  const rows = git(['diff', '--numstat', `${base}..HEAD`], root)
     .trim()
     .split('\n')
     .filter(Boolean)
@@ -138,10 +187,10 @@ export function measureSurface(base) {
     ) {
       continue
     }
-    // Ownership is decided by upstream's own tree, not by the merge base: a file an earlier fork patch added
+    // Ownership is decided by upstream's own tree, not by the diff base: a file an earlier fork patch added
     // exists at the fork's main and would otherwise be miscounted as upstream's, which is how a fork file
     // ends up needing a seam declaration for its own edit.
-    if (!existsAt('upstream/main', entry.path)) {
+    if (!commitHasPath(root, ruler, entry.path)) {
       continue
     }
     touched.push({ path: entry.path, lines: entry.added + entry.removed })
@@ -174,7 +223,15 @@ export function auditSurface(touched) {
 
 function main(argv) {
   const verbose = !argv.includes('--quiet')
-  const touched = measureSurface(resolveBase(argv))
+  let touched
+  try {
+    touched = measureSurface(resolveBase(argv))
+  } catch (error) {
+    // Why an exit code and one line: a gate that cannot resolve its ruler must say so, not print a stack
+    // whose last line is the only thing the lint gate's summary can quote.
+    console.error(`host-mesh seams: ${error.message}`)
+    process.exit(2)
+  }
   const problems = auditSurface(touched)
   if (problems.length > 0) {
     for (const problem of problems) {
