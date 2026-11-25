@@ -68,6 +68,13 @@ export type PhotonStreamOptions = {
   resumeDelayMs?: (attempt: number) => number
   /** How long a connected socket may sit unsubscribed before the status reads `stalled`. */
   livenessTimeoutMs?: number
+  /**
+   * Resumes already spent before this stream existed, so a replacement inherits the backoff.
+   *
+   * Why: the health tick replaces a stopped stream, and a replacement that starts at zero turns a
+   * repeatable handler failure into a 1 s reconnect loop that never escalates.
+   */
+  resumes?: number
   log?: (message: string, ...rest: unknown[]) => void
   setTimer?: (callback: () => void, ms: number) => PhotonTimer
   clearTimer?: (timer: PhotonTimer) => void
@@ -112,6 +119,7 @@ export class PhotonStream {
       })
     this.clearTimer = options.clearTimer ?? ((timer) => timer.cancel())
     this.livenessMs = options.livenessTimeoutMs ?? DEFAULT_LIVENESS_MS
+    this.resumes = options.resumes ?? 0
   }
 
   start(): void {

@@ -12,6 +12,7 @@
 import { spawnSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..')
 const DEFAULT_TEMPLATE = resolve(REPO_ROOT, '.github/fork-release-notes.md')
@@ -320,6 +321,51 @@ function dedupe(entries) {
   return unique
 }
 
+/**
+ * A commit subject as Markdown that cannot act.
+ *
+ * Why: a subject is contributor text — from upstream too — pasted into a body this script publishes.
+ * Unescaped `[x](https://…)` becomes a link, `@handle` notifies whoever holds it, and a bare URL is
+ * autolinked. Backslashes handle the punctuation; `<` and `>` have no backslash escape, so they
+ * become entities.
+ *
+ * Why zero-width spaces: a backslash does not stop a mention (checked against GitHub's own
+ * `/markdown` renderer — `\@octocat` still mentions, and so does `&#64;`), and a backslash does not
+ * stop `#12`, `owner/repo#12`, `GH-12` or `www.host` from becoming links either. It also does not
+ * stop `://` autolinking. `@\u200B`, `#\u200B`, `GH\u200B-`, `www\u200B.` and `:\u200B//` all render as
+ * plain text; the character is invisible in the page and absent from the copied text's meaning.
+ */
+const SUBJECT_ESCAPES = {
+  '\\': '\\\\',
+  '`': '\\`',
+  '*': '\\*',
+  _: '\\_',
+  '[': '\\[',
+  ']': '\\]',
+  '(': '\\(',
+  ')': '\\)',
+  '#': '\\#',
+  '|': '\\|',
+  '~': '\\~',
+  '<': '&lt;',
+  '>': '&gt;'
+}
+
+export function escapeReleaseText(text) {
+  return (
+    text
+      .replace(/[\\`*_[\]()#|~<>]/g, (character) => SUBJECT_ESCAPES[character])
+      .replace(/@/g, '@\u200B')
+      .replace(/:\/\//g, ':\u200B//')
+      // Why these too: GitHub's renderer links `#12`, `owner/repo#12`, `GH-12` and `www.host` in a
+      // repository context whatever the backslash, and each of those is a clickable destination
+      // chosen by whoever wrote the subject. Checked each against `/markdown` with and without.
+      .replace(/#/g, '#\u200B')
+      .replace(/\bGH-(?=\d)/g, 'GH\u200B-')
+      .replace(/\bwww\./gi, 'www\u200B.')
+  )
+}
+
 function renderGroup(title, entries, maxPerGroup) {
   if (entries.length === 0) {
     return []
@@ -330,9 +376,9 @@ function renderGroup(title, entries, maxPerGroup) {
 
   const lines = [`### ${title}`, '']
   for (const entry of visible) {
-    const scope = entry.scope == null ? '' : `**${entry.scope}:** `
+    const scope = entry.scope == null ? '' : `**${escapeReleaseText(entry.scope)}:** `
     const repeat = entry.count > 1 ? ` (x${entry.count})` : ''
-    lines.push(`- ${scope}${entry.text}${repeat}`)
+    lines.push(`- ${scope}${escapeReleaseText(entry.text)}${repeat}`)
   }
   if (hidden > 0) {
     // The comparison link is in the lead; repeating a long URL after every group is worse than no
@@ -645,13 +691,16 @@ function main(argv) {
   }
 }
 
-try {
-  main(process.argv.slice(2))
-} catch (error) {
-  // Last resort: the workflow creates the release from whatever lands in the notes file, so this
-  // must still produce a body even when the template itself is unreadable.
-  warn(`release notes generation failed: ${error.message}`)
-  process.stdout.write(
-    `**Orca NP release notes could not be generated.** See this run's log for the reason.\n`
-  )
+// Why the guard: the escaping below is a codec, and a test that imports it must not run a release.
+if (process.argv[1] != null && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  try {
+    main(process.argv.slice(2))
+  } catch (error) {
+    // Last resort: the workflow creates the release from whatever lands in the notes file, so this
+    // must still produce a body even when the template itself is unreadable.
+    warn(`release notes generation failed: ${error.message}`)
+    process.stdout.write(
+      `**Orca NP release notes could not be generated.** See this run's log for the reason.\n`
+    )
+  }
 }

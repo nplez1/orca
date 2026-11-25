@@ -5,6 +5,7 @@
 // and it is the whole reason this store is separate from the cursor. Each entry carries the `seq` it
 // arrived on, so the entries with no `handledAt` can be replayed in order after a crash without waiting
 // for Photon to redeliver them.
+import { createHash } from 'node:crypto'
 import { z } from 'zod'
 import { PhotonInboundMessageSchema, type PhotonInboundMessage } from './photon-contract'
 import { listPhotonDir, readPhotonJson, writePhotonJson } from './photon-files'
@@ -60,8 +61,26 @@ export const PHOTON_INBOX_PARK_HORIZON_MS = 15 * 60 * 1000
 // rest of the set keeps a path traversal out, which is what this guard is for.
 const SAFE_ID = /^[A-Za-z0-9._:%-]{1,200}$/
 
+// A digest stands in for an id that cannot be a file name, so nothing a provider sends can fail to be
+// stored. The entry keeps the real id, which is what dedupe and the cursor match on.
+const DIGEST_ID_PREFIX = 'sha256-'
+
 export function photonInboxIdIsSafe(messageId: string): boolean {
   return SAFE_ID.test(messageId) && messageId !== '.' && messageId !== '..'
+}
+
+/**
+ * The name an entry is stored under.
+ *
+ * Why a digest rather than a refusal: `claim` used to throw on an id outside the safe alphabet, and
+ * that throw ran before the handler's own park-and-advance path — so one such id stopped the stream,
+ * replayed the same frame on every resume, and queued every later message behind it with nothing
+ * recorded to explain why. A storable id keeps its own name, so nothing already on disk moves.
+ */
+function inboxKey(messageId: string): string {
+  return photonInboxIdIsSafe(messageId)
+    ? messageId
+    : `${DIGEST_ID_PREFIX}${createHash('sha256').update(messageId).digest('hex')}`
 }
 
 export class PhotonInbox {
@@ -84,9 +103,6 @@ export class PhotonInbox {
     message: PhotonInboundMessage,
     seq?: number
   ): Promise<PhotonInboxClaim> {
-    if (!photonInboxIdIsSafe(message.id)) {
-      throw new Error(`Photon message id is not usable as a file name: ${message.id.slice(0, 80)}`)
-    }
     return this.serialise(projectId, async () => {
       const held = await this.read(projectId, message.id)
       if (held) {
@@ -183,16 +199,17 @@ export class PhotonInbox {
   }
 
   async has(projectId: string, messageId: string): Promise<boolean> {
-    return (await this.idsOf(projectId)).has(messageId)
+    return (await this.idsOf(projectId)).has(inboxKey(messageId))
   }
 
   async read(projectId: string, messageId: string): Promise<PhotonInboxEntry | null> {
-    if (!(await this.has(projectId, messageId))) {
+    const key = inboxKey(messageId)
+    if (!(await this.has(projectId, key))) {
       return null
     }
-    const read = await readPhotonJson(this.store.inboxPath(projectId, messageId), 'inbox entry')
+    const read = await readPhotonJson(this.store.inboxPath(projectId, key), 'inbox entry')
     if (read.kind === 'missing') {
-      ;(await this.idsOf(projectId)).delete(messageId)
+      ;(await this.idsOf(projectId)).delete(key)
       return null
     }
     if (read.kind === 'unreadable') {
@@ -231,8 +248,9 @@ export class PhotonInbox {
   }
 
   private async write(entry: PhotonInboxEntry): Promise<void> {
-    await writePhotonJson(this.store.inboxPath(entry.projectId, entry.messageId), entry)
-    ;(await this.idsOf(entry.projectId)).add(entry.messageId)
+    const key = inboxKey(entry.messageId)
+    await writePhotonJson(this.store.inboxPath(entry.projectId, key), entry)
+    ;(await this.idsOf(entry.projectId)).add(key)
   }
 
   /** One claim at a time per project: the file listing it consults is per project too. */

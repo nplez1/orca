@@ -3,6 +3,7 @@ import {
   classifyJenkinsTransportError,
   jenkinsAuthHeaders,
   jenkinsGetJson,
+  jenkinsScopeRefusal,
   jenkinsSignal,
   releaseBody,
   type JenkinsCredentialArgs,
@@ -67,6 +68,22 @@ export async function jenkinsPost(
   }
 ): Promise<JenkinsPostResult> {
   await applyJenkinsProxy(args.url)
+  // Why: a rebuild URL is derived from the same commit-status link the read path refuses, and a write
+  // carries the crumb as well as the token.
+  const outsideScope = jenkinsScopeRefusal(args.url, args.serverBaseUrl ?? null)
+  if (outsideScope !== null) {
+    return {
+      ok: false,
+      reason: 'failure',
+      status: 0,
+      failure: {
+        reason: args.configured === true ? 'not-jenkins' : 'not-configured',
+        message: outsideScope,
+        identifiedAsJenkins: false,
+        jenkinsVersion: null
+      }
+    }
+  }
 
   let response: Response
   try {
@@ -75,7 +92,8 @@ export async function jenkinsPost(
       // Why follow rather than manual: the desktop transport is Electron's `net.fetch`, which
       // rejects a manual-redirect request outright. Following the redirect and comparing the
       // landing URL to the one we posted at is what both hosts can do, and the landing page is
-      // never read as a verdict on the write (see the check below).
+      // never read as a verdict on the write (see the check below). The request URL itself is
+      // scope-checked above, so following cannot start the token anywhere it was not meant for.
       redirect: 'follow',
       headers: {
         Accept: 'application/json',

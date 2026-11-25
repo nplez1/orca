@@ -45,9 +45,26 @@ name: Fork release
 # inside the signing job. `oven-sh/setup-bun` in `unit-tests.yml` is already pinned, so the standard
 # is the repository's own. Refresh a pin by re-reading the tag's commit and updating both halves.
 
+# Why every job that holds a secret or a write token names `environment: release`: a
+# `workflow_dispatch --ref <branch>` runs *that branch's* copy of `fork-release-ref-guard.sh` and of
+# `release-draft`'s body, so a guard is only worth what the runner's ref policy is — anyone who can
+# push a branch and dispatch could neuter it and read the Apple signing secrets, or push a tag with
+# `contents: write`. The environment is branch-restricted to `main` in repository settings (Settings →
+# Environments → release → Deployment branches: `main`), which GitHub enforces before a job's steps
+# run. That setting is repository state a sync cannot carry, so it is recorded in LOCAL-PATCHES.md.
+#
 on:
   workflow_dispatch:
     inputs:
+      # Why this exists: the review gate runs on a local commit, but the build runs on whatever `main`
+      # is when the run starts. Without this, a merge that lands after the gate passes is published
+      # unreviewed. `local/dispatch-release.mjs` fills it from `git ls-remote`, so it names the tip
+      # the reviewer actually saw.
+      expected_sha:
+        description: 'Commit `main` must still be, or the run refuses (local/dispatch-release.mjs sets it)'
+        required: false
+        default: ''
+        type: string
       version_suffix:
         description: 'Suffix appended to package.json version (default: np.<run number>)'
         required: false
@@ -88,6 +105,7 @@ jobs:
   # to be "the tag exists, upload into it".
   release-ref:
     runs-on: ubuntu-latest
+    environment: release
     outputs:
       version: ${{ steps.guard.outputs.version }}
     steps:
@@ -106,8 +124,15 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SUFFIX: ${{ inputs.version_suffix }}
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
         run: |
           set -euo pipefail
+          # Why before the guard: the reviewer approved one commit and the build runs another if
+          # `main` moved since. A dispatch without the input (a hand-run) keeps the old behaviour.
+          if [ -n "$EXPECTED_SHA" ] && [ "$EXPECTED_SHA" != "$GITHUB_SHA" ]; then
+            echo "::error::dispatched for $EXPECTED_SHA, but this run is at $GITHUB_SHA — main moved since the review; re-review the new tip and dispatch again"
+            exit 1
+          fi
           base="$(node -p "require('./package.json').version")"
           version="${base}-${SUFFIX:-np.${GITHUB_RUN_NUMBER}}"
           bash .github/scripts/fork-release-ref-guard.sh \
@@ -245,6 +270,7 @@ jobs:
   release-draft:
     needs: [release-ref, unit-tests, typecheck, lint]
     runs-on: ubuntu-latest
+    environment: release
     timeout-minutes: 15
     env:
       RELEASE_VERSION: ${{ needs.release-ref.outputs.version }}
@@ -338,12 +364,18 @@ jobs:
     # off another job's `needs` is silently dropped the day that job's own `needs` change.
     needs: [release-ref, release-draft, unit-tests, typecheck, lint]
     runs-on: macos-15
+    environment: release
     env:
       RELEASE_VERSION: ${{ needs.release-ref.outputs.version }}
     steps:
       # Why the default one-commit clone: the notes, which need history, are `release-draft`'s; the
       # build reads only `git rev-parse HEAD`. A full clone cost this leg 2-3 minutes.
+      # Why no persisted credentials: `pnpm install` and the release build run third-party lifecycle
+      # scripts, and a token left in `.git/config` is a push they could make. Every write here uses
+      # `GH_TOKEN` from the environment instead.
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
@@ -362,9 +394,10 @@ jobs:
           path: |
             ~/Library/Caches/electron
             ~/Library/Caches/electron-builder
+          # Why no restore-keys: a prefix match lets any job on `main` — including the
+          # read-only ones that run third-party install scripts — seed the cache a signing leg
+          # then restores. A miss here is a cold download, which is the cheaper risk.
           key: electron-builder-mac-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            electron-builder-mac-
 
       # Why both CPUs: the mac config packages x64 and arm64 from this arm64 runner, so the
       # install must carry both variants of the native optional deps or beforePack refuses.
@@ -507,10 +540,15 @@ jobs:
   windows:
     needs: [release-ref, release-draft, unit-tests, typecheck, lint]
     runs-on: windows-2022
+    environment: release
     env:
       RELEASE_VERSION: ${{ needs.release-ref.outputs.version }}
     steps:
+      # Why no persisted credentials: the leg runs third-party install scripts, and a token left in
+      # `.git/config` is a push they could make.
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
@@ -529,9 +567,10 @@ jobs:
           path: |
             ~\AppData\Local\electron\Cache
             ~\AppData\Local\electron-builder\Cache
+          # Why no restore-keys: a prefix match lets any job on `main` — including the
+          # read-only ones that run third-party install scripts — seed the cache a signing leg
+          # then restores. A miss here is a cold download, which is the cheaper risk.
           key: electron-builder-win-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            electron-builder-win-
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -616,10 +655,15 @@ jobs:
   linux:
     needs: [release-ref, release-draft, unit-tests, typecheck, lint]
     runs-on: ubuntu-latest
+    environment: release
     env:
       RELEASE_VERSION: ${{ needs.release-ref.outputs.version }}
     steps:
+      # Why no persisted credentials: the leg runs third-party install scripts, and a token left in
+      # `.git/config` is a push they could make.
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
@@ -638,9 +682,10 @@ jobs:
           path: |
             ~/.cache/electron
             ~/.cache/electron-builder
+          # Why no restore-keys: a prefix match lets any job on `main` — including the
+          # read-only ones that run third-party install scripts — seed the cache a signing leg
+          # then restores. A miss here is a cold download, which is the cheaper risk.
           key: electron-builder-linux-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            electron-builder-linux-
 
       # Why no --cpu flags and no retry wrapper: this job packages only for its own runner OS and
       # architecture, so the default host-scoped install is the correct one (upstream's linux release
@@ -750,6 +795,7 @@ jobs:
   publish:
     needs: [release-ref, release-draft, unit-tests, typecheck, lint, macos, windows, linux]
     runs-on: ubuntu-latest
+    environment: release
     timeout-minutes: 15
     env:
       RELEASE_VERSION: ${{ needs.release-ref.outputs.version }}

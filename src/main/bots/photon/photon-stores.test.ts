@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -278,11 +278,25 @@ describe('the inbox, which is both the crash guard and the dedupe index', () => 
     expect((await restarted.read('p1', 'msg:2'))?.messageId).toBe('msg:2')
   })
 
-  it('refuses a message id that could escape its directory', async () => {
+  it('stores a message id that could escape its directory under a digest', async () => {
+    // Refusing the id instead threw out of `claim`, before the handler's park-and-advance path: the
+    // stream stopped, the same frame replayed on every resume, and every later message queued behind
+    // it. A digest keeps the id (which is what dedupe and the cursor match on) and nothing escapes.
     const inbox = new PhotonInbox(new PhotonStore(userDataPath))
-    await expect(inbox.claim('p1', message({ id: '../../etc/passwd' }))).rejects.toThrow(
-      /not usable/
-    )
+
+    expect(await inbox.claim('p1', message({ id: '../../etc/passwd' }), 41)).toMatchObject({
+      action: 'run'
+    })
+
+    const stored = readdirSync(join(userDataPath, 'local-photon', 'inbox', 'p1'))
+    expect(stored).toHaveLength(1)
+    expect(stored[0]).toMatch(/^sha256-[0-9a-f]{64}\.json$/)
+    expect((await inbox.read('p1', '../../etc/passwd'))?.messageId).toBe('../../etc/passwd')
+    // A second delivery of the same id is the same entry, so it cannot run twice.
+    expect(await inbox.claim('p1', message({ id: '../../etc/passwd' }), 42)).toMatchObject({
+      action: 'run',
+      entry: { seq: 41 }
+    })
   })
 })
 

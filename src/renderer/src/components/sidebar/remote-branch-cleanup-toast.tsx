@@ -58,6 +58,23 @@ export function showRemoteBranchCleanupNotice(
     'skipped-preserved': translate(
       'auto.components.sidebar.remote.branch.cleanup.toast.skippedPreserved',
       'Orca kept the local branch, so it left the remote branch in place too.'
+    ),
+    // Why each new outcome names the ref: the user opted into deleting "this workspace's branch", and
+    // these three are the cases where the branch on the server was not that.
+    'skipped-foreign-branch': translate(
+      'auto.components.sidebar.remote.branch.cleanup.toast.skippedForeignBranch',
+      'This branch tracks {{value0}}, a differently named branch Orca did not create, so it left it in place.',
+      { value0: `${cleanup.remoteName ?? ''}/${cleanup.branchName ?? ''}` }
+    ),
+    'skipped-default-branch': translate(
+      'auto.components.sidebar.remote.branch.cleanup.toast.skippedDefaultBranch',
+      '{{value0}} is the remote default branch, so Orca left it in place.',
+      { value0: `${cleanup.remoteName ?? ''}/${cleanup.branchName ?? ''}` }
+    ),
+    'skipped-changed-on-remote': translate(
+      'auto.components.sidebar.remote.branch.cleanup.toast.skippedChangedOnRemote',
+      '{{value0}} moved on the remote since the last fetch, so Orca left it in place rather than discard commits nobody here has seen.',
+      { value0: `${cleanup.remoteName ?? ''}/${cleanup.branchName ?? ''}` }
     )
   }[cleanup.status]
   toast.info(

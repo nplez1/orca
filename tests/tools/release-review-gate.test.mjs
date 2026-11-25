@@ -116,6 +116,20 @@ describe('release review gate', () => {
     expect(reviewNeutralOnly(['local/release-review-gate.mjs'])).toBe(false)
   })
 
+  // Why these three: each is `.md`, and each is published or executed, so a rule that reads only the
+  // suffix lets a change to one ship behind a review of code it no longer matches.
+  it('does not treat published or executed markdown as review-neutral', () => {
+    expect(reviewNeutralOnly(['.github/fork-release-notes.md'])).toBe(false)
+    expect(reviewNeutralOnly(['.agents/skills/electron/SKILL.md'])).toBe(false)
+    expect(reviewNeutralOnly(['resources/native-chat-visuals/skills/a/SKILL.md'])).toBe(false)
+  })
+
+  // Why: `docs/site` is a Next app, so the `docs/` prefix is not a claim about documentation.
+  it('exempts documentation markdown under docs, and nothing else there', () => {
+    expect(reviewNeutralOnly(['docs/reference/host-settings-replication.md'])).toBe(true)
+    expect(reviewNeutralOnly(['docs/site/next.config.ts'])).toBe(false)
+  })
+
   it('refuses a missing manifest outright', () => {
     expect(validateManifest(null, { revision: REVISION })).toEqual([
       'no manifest: the review of this revision is not recorded'

@@ -5,12 +5,17 @@ import type { Session } from 'electron'
 
 export type MainHttpClient = {
   fetch(url: string, init?: RequestInit): Promise<Response>
+  /** fork-comment-ok: fork-added seam; a 3xx comes back instead of being followed.
+   * Absent only where the transport cannot do it — a caller that must vet hops then refuses.
+   */
+  fetchManualRedirects?(url: string, init?: RequestInit): Promise<Response>
   proxySession(): Session | null
   partitionSession?(partition: string): Session
 }
 
 const nodeHttpClient: MainHttpClient = {
   fetch: (url, init) => globalThis.fetch(url, init),
+  fetchManualRedirects: (url, init) => globalThis.fetch(url, { ...init, redirect: 'manual' }),
   proxySession: () => null
 }
 

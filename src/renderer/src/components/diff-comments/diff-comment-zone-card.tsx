@@ -2,6 +2,7 @@ import type { GitHubImageIntake } from '@/components/github/use-github-image-upl
 import type { DiffCommentOwner } from '@/store/slices/diff-comments/diff-comment-owner'
 import type { RefObject } from 'react'
 import type { Root } from 'react-dom/client'
+import { toast } from 'sonner'
 import { formatDiffComments } from '../../../../shared/file-review/diff-comments-format'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { PRCommentThreadCard } from '../pr-comment-inline/PRCommentThreadCard'
@@ -94,26 +95,67 @@ export type DiffCommentZoneCardContext = {
   ) => Promise<boolean>
 }
 
+/** fork-comment-ok: callbacks are read at click time; a card re-renders only when its signature
+ * changes, so a captured ref is the one from when the zone was inserted, or `undefined`.
+ */
 function renderPRCommentThreadCard(
   root: Root,
   comment: DecoratedDiffComment,
   context: DiffCommentZoneCardContext
 ): void {
-  const onReplyToThread = context.onReplyToThreadRef?.current
-  const onSetThreadResolved = context.onSetThreadResolvedRef?.current
-  const onCollapseThread = context.onCollapseThreadRef?.current
+  const replyRef = context.onReplyToThreadRef
+  const resolveRef = context.onSetThreadResolvedRef
+  const collapseRef = context.onCollapseThreadRef
+  const threadId = comment.thread?.threadId
   root.render(
     // View zones are separate React roots outside the app root, so App.tsx context providers don't reach them.
     <TooltipProvider delayDuration={400}>
       <PRCommentThreadCard
         comment={comment}
-        onReply={onReplyToThread ? (body) => onReplyToThread(comment, body) : undefined}
-        onSetResolved={
-          onSetThreadResolved && comment.thread?.threadId
-            ? (resolve) => onSetThreadResolved(comment.thread?.threadId ?? '', resolve)
+        onReply={
+          replyRef
+            ? (body) =>
+                replyRef.current?.(comment, body) ??
+                Promise.resolve({
+                  ok: false,
+                  error: translate(
+                    'auto.components.diff.comments.diffCommentZoneCard.repliesUnavailable',
+                    'Replies are unavailable here.'
+                  )
+                })
             : undefined
         }
-        onCollapse={onCollapseThread ? () => onCollapseThread(comment.id) : undefined}
+        onSetResolved={
+          resolveRef && threadId
+            ? async (resolve) => {
+                const setResolved = resolveRef.current
+                // fork-comment-ok: the button shows wherever the ref is passed, target or not.
+                let ok: unknown = false
+                if (setResolved) {
+                  try {
+                    ok = await setResolved(threadId, resolve)
+                  } catch {
+                    ok = false
+                  }
+                }
+                if (ok === false) {
+                  toast.error(
+                    setResolved
+                      ? translate(
+                          'auto.components.diff.comments.diffCommentZoneCard.resolveFailed',
+                          'Could not update review thread. Check the GitHub API budget.'
+                        )
+                      : translate(
+                          'auto.components.diff.comments.diffCommentZoneCard.resolveUnavailable',
+                          'Resolving is unavailable here.'
+                        )
+                  )
+                }
+                return ok
+              }
+            : undefined
+        }
+        onCollapse={collapseRef ? () => collapseRef.current?.(comment.id) : undefined}
         onContentResize={() => context.resizeZone(comment.id)}
         observeRenderedSize
       />

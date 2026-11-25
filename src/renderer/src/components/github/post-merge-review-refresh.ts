@@ -316,7 +316,10 @@ export function startPostMergeReviewRefresh(
         ? undefined
         : state.getEffectiveGitHubPRRefreshState(resolved.prCacheKey)
       return {
-        state: data?.state ?? null,
+        // Why the number check: the branch cache is keyed by branch, so it can hold the *previous*
+        // PR that branch had — closed, and terminal. Reporting its state as this merge's settled the
+        // burst on the first tick and left the merged review showing as open.
+        state: data?.number === target.prNumber ? data.state : null,
         // Why paused counts: a paused refresh is a rate-limit hold, so re-entering it every second
         // until the deadline only churns the queue — the ordinary cadence picks it back up.
         failed: refreshState?.status === 'error' || refreshState?.status === 'paused'
@@ -340,6 +343,9 @@ export function startPostMergeReviewRefresh(
         force: true,
         reason: 'manual',
         repoId: resolved.repoId,
+        // Why the owner host: the branch's PR lives on the forge that owns the repo, which is not
+        // necessarily this host's own connection.
+        repoOwnerExecutionHostId: repo ? getRepoExecutionHostId(repo) : undefined,
         worktreeId: worktree?.id,
         linkedPRNumber,
         // Why: a branch-discovered PR is not linked in metadata, and only an explicit fallback lets

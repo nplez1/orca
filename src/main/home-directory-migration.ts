@@ -13,6 +13,7 @@ import {
 import { homedir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { HOME_DIRECTORY_NAME, LEGACY_HOME_DIRECTORY_NAME } from '../shared/app-directory-names'
+import { isProcessAlive } from '../shared/remote-runtime/serve-supervisor/serve-bundle-coordination'
 import { recordSwallowedFailure } from './observability/swallowed-failure'
 
 /**
@@ -329,13 +330,27 @@ function adoptLegacyCopy(legacy: string, current: string): void {
  *
  * Why this matters more than the disk space: a staged directory is a full copy of a credential store,
  * including the tokens, and it is named after a process id that will never run again.
+ *
+ * Why the liveness check: the name carries the pid, so the directories here are not all dead runs —
+ * the app and a headless host can migrate the same home directory at once, and deleting the other
+ * run's staging halfway through its copy fails its migration. A pid we cannot parse is not evidence
+ * of a dead run, so it is left alone too.
  */
 function sweepAbandonedStaging(directory: string, baseName: string): void {
+  const prefix = `${baseName}.migrating-`
   try {
     for (const entry of readdirSync(directory)) {
-      if (entry.startsWith(`${baseName}.migrating-`) && !entry.endsWith(`-${process.pid}`)) {
-        rmSync(join(directory, entry), { recursive: true, force: true })
+      if (!entry.startsWith(prefix)) {
+        continue
       }
+      const ownerPid = Number(entry.slice(prefix.length))
+      if (!Number.isSafeInteger(ownerPid) || ownerPid <= 0) {
+        continue
+      }
+      if (ownerPid === process.pid || isProcessAlive(ownerPid)) {
+        continue
+      }
+      rmSync(join(directory, entry), { recursive: true, force: true })
     }
   } catch {
     // A directory we cannot list is one we cannot clean; the copy below still has to run.

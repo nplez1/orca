@@ -53,12 +53,33 @@ export const manifestPath = (revision) => join(MANIFEST_DIR, `${revision}.json`)
  * committing the manifest moves HEAD past the revision it names — a fixed point is impossible. The PR
  * gate already answers this: a later commit voids the review only if it changes code inside the
  * reviewed range, and commits that touch only docs do not. Same rule here.
+ *
+ * Why docs and not every `.md`: the release body's install instructions
+ * (`.github/fork-release-notes.md`) and the skills an agent executes (under `.agents/skills` and
+ * `resources`, the latter packaged by `extraResources`) are published or executed content, not
+ * review records — a commit that edits them is a change nobody reviewed.
+ *
+ * Why `docs/**` is markdown-only, and `.mdx` only outside `docs/site`: that directory is a Next app
+ * with real route handlers and compiled MDX, so neither a path prefix nor a `.mdx` suffix is a claim
+ * about documentation.
  */
-const REVIEW_NEUTRAL = [/^local\/sync\/release-review\//, /\.md$/]
+const REVIEW_NEUTRAL = [
+  /^local\/sync\/release-review\//,
+  /^docs\/.*\.md$/,
+  /^docs\/(?!site\/).*\.mdx$/,
+  /^(?:[^/]+\/)*[^/]+\.md$/
+]
+
+/** Files whose suffix does not make them documentation: published install instructions, and skills an agent executes. */
+const NOT_DOCUMENTATION_PREFIXES = ['.github/', '.agents/', 'resources/']
 
 /** True when every path could be committed after a review without invalidating it. */
 export function reviewNeutralOnly(paths) {
-  return paths.every((path) => REVIEW_NEUTRAL.some((pattern) => pattern.test(path)))
+  return paths.every(
+    (path) =>
+      REVIEW_NEUTRAL.some((pattern) => pattern.test(path)) &&
+      !NOT_DOCUMENTATION_PREFIXES.some((prefix) => path.startsWith(prefix))
+  )
 }
 
 function gitOut(args) {

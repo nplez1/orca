@@ -20,17 +20,51 @@ function buildPatterns() {
     { kind: 'uuid', re: /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi },
     { kind: 'opaque-token', re: /\b[A-Za-z0-9_-]{40,}\b/g }
   ]
-  if (username.length >= 3) {
-    patterns.splice(5, 0, { kind: 'local-username', re: literalPattern(username) })
+  if (isDistinctiveIdentifier(username)) {
+    patterns.splice(5, 0, { kind: 'local-username', re: identifierPattern(username) })
   }
-  if (hostname.length >= 3) {
-    patterns.splice(5, 0, { kind: 'local-hostname', re: literalPattern(hostname) })
+  if (isDistinctiveIdentifier(hostname)) {
+    patterns.splice(5, 0, { kind: 'local-hostname', re: identifierPattern(hostname) })
   }
   return patterns
 }
 
-function literalPattern(value) {
-  return new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')
+/** fork-comment-ok: words a transcript contains on its own; matching one finds prose, not a leak. */
+const COMMON_IDENTIFIERS = new Set([
+  'root',
+  'user',
+  'users',
+  'admin',
+  'guest',
+  'unknown',
+  'test',
+  'local',
+  'localhost',
+  'dev',
+  'main',
+  'work',
+  'box',
+  'mac',
+  'runner',
+  'worker',
+  'ubuntu',
+  'build'
+])
+
+/** fork-comment-ok: three characters or more, and not an ordinary word. */
+export function isDistinctiveIdentifier(value) {
+  return value.length >= 3 && !COMMON_IDENTIFIERS.has(value.toLowerCase())
+}
+
+/** fork-comment-ok: the conditional edge is the rule — one added to an edge the value breaks
+ * (`/Users/x`) shifts the reported span or never matches.
+ * Bounded, so `nathanp` misses `nathanp2`.
+ */
+export function identifierPattern(value) {
+  const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const start = /^\w/.test(value) ? '\\b' : ''
+  const end = /\w$/.test(value) ? '\\b' : ''
+  return new RegExp(`${start}${escaped}${end}`, 'g')
 }
 
 /**

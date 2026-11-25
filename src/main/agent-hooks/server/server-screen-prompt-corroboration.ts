@@ -230,6 +230,14 @@ export class ScreenPromptCorroboration {
     // Why wait: a pane whose terminal is not bound yet (a restored one still reconnecting) cannot
     // answer, and releasing on that would report a live Working over a dialog nobody looked at.
     if (reading === undefined) {
+      // Why the claim decides here too: a pane whose own title still claims a dialog is blind, not
+      // empty — a collapsed card, a narrow pane — and widening it makes the dialog readable again
+      // with no new hook. Counting those against the limit released a live dialog to Working after
+      // about twenty blind reads, which is the answer this corroboration exists to stop.
+      if (this.host.claimsDialog?.(paneKey, current.payload.agentType) === true) {
+        this.scheduleRecheck(paneKey)
+        return
+      }
       pane.unreadableRechecks = (pane.unreadableRechecks ?? 0) + 1
       if (pane.unreadableRechecks <= SCREEN_PROMPT_UNREADABLE_RECHECK_LIMIT) {
         this.scheduleRecheck(paneKey)

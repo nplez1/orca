@@ -68,7 +68,13 @@ async function updateBot(params: BotUpdateParams, context: RpcContext) {
   } else if (params.updates.paused === false && !bot.paused) {
     // Every resume, not only a seen transition: a pause still being saved reads as unpaused here.
     releaseHeldBotMail(context.runtime, bot)
-    photonChannel(context.runtime).releaseHeld(bot.id)
+    // fork-comment-ok: `releaseHeld` replays held mail, so a rejection surfaces unhandled after the
+    // RPC answered.
+    void photonChannel(context.runtime)
+      .releaseHeld(bot.id)
+      .catch((error: unknown) =>
+        console.warn('[photon] could not replay held mail after resuming a bot', error)
+      )
   }
   const { removeMember, removeMembers = [], addMembers = [] } = params.updates
   // Who can ask decides who may make this host run commands, so the device that changed it is kept on record.

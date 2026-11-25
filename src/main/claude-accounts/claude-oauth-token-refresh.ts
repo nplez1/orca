@@ -138,9 +138,11 @@ async function exchangeClaudeOAuthToken(
   // Why re-read: a Claude run may have rotated the login since the usage poll started, and that
   // newer token is the one the endpoint will accept.
   let stored = await readClaudeOAuthCredential(target)
-  if (await retryUnsavedRotation(key)) {
-    stored = await readClaudeOAuthCredential(target)
-  }
+  // Why unconditional: a flush that wrote the rotation back, found the store already moved on
+  // (`superseded`), or found no login left (`absent`) all leave `stored` describing a token no
+  // endpoint accepts — and posting it reads to the user as "sign in again".
+  await retryUnsavedRotation(key)
+  stored = await readClaudeOAuthCredential(target)
   const storeRaw = stored.status === 'found' ? stored.raw : null
   const pending = pendingRotation(key)
   const base = pending && storeRaw ? applyRefreshedFields(storeRaw, pending.fields) : storeRaw
@@ -211,17 +213,21 @@ async function exchangeClaudeOAuthToken(
   // Why compose with the pending rotation: an answer with no new refresh token would otherwise
   // write the spent token back over the valid one that is still waiting to be saved.
   const fields = pending ? composeRefreshedFields(pending.fields, merged.fields) : merged.fields
+  // Why before the store write: the old refresh token is already spent server-side, so this answer
+  // is the only copy of a working login. A quit or a crash during the store write — a keychain that
+  // blocks for seconds — would otherwise lose it, and the store would be left holding a token no
+  // endpoint accepts. The file is durable, so writing it first costs nothing on the write that lands.
+  rememberPendingRotation(key, { target, spentStoreToken, fields })
   const written = await writeClaudeOAuthCredentialRotation(
     target,
     spentStoreToken,
     (current, format) => applyRefreshedFields(current, fields, format)
   )
   if (written === 'failed') {
-    // Why keep it: the old refresh token is spent server-side, so forgetting the replacement
-    // would leave the store holding a token no endpoint will accept.
-    rememberPendingRotation(key, { target, spentStoreToken, fields })
     console.warn('[claude-oauth-refresh] could not persist the rotated credential')
   } else {
+    // `written`, `superseded` and `absent` all mean the store no longer needs it: it holds this
+    // rotation or a newer login, or there is no login left to write to.
     forgetPendingRotation(key)
   }
   mintedTokens.set(key, { accessToken: merged.accessToken, mintedAt: Date.now() })

@@ -14,6 +14,15 @@ export type RemoteBranchCleanupStatus =
   | 'no-upstream'
   /** The local branch is still present, so its remote was deliberately left alone. */
   | 'skipped-preserved'
+  /**
+   * The branch tracks a remote branch of a different name, so there is no evidence this workspace
+   * ever owned it.
+   */
+  | 'skipped-foreign-branch'
+  /** The target is the remote's default (HEAD) branch, which is never a workspace's to delete. */
+  | 'skipped-default-branch'
+  /** The remote moved since the last fetch, so deleting would discard commits nobody has seen. */
+  | 'skipped-changed-on-remote'
   | 'failed'
 
 export type RemoteBranchCleanup = {
@@ -32,6 +41,9 @@ export type RemoteBranchTargetResolution =
 
 /** Git's wording when `push --delete` targets a ref the server does not have. */
 const REMOTE_REF_ABSENT_RE = /remote ref does not exist/i
+
+/** Git's wording when the leased ref is not the commit we last saw. */
+const REMOTE_REF_STALE_RE = /stale info/i
 
 function isValidRemoteBranchName(branchName: string): boolean {
   return (
@@ -63,6 +75,52 @@ export async function resolveRemoteBranchTarget(
   return {
     kind: 'resolved',
     target: { remoteName: upstream.remoteName, branchName: upstream.branchName }
+  }
+}
+
+/**
+ * The remote's own HEAD branch, as far as this clone knows it.
+ *
+ * Read from `refs/remotes/<remote>/HEAD` rather than asked of the server: this runs after the
+ * checkout is already gone, where a network round trip can only delay a delete. A clone that never
+ * recorded it yields null, which is the same evidence we had before.
+ */
+async function remoteDefaultBranch(
+  runGit: GitCommandRunner,
+  remoteName: string
+): Promise<string | null> {
+  try {
+    const { stdout } = await runGit([
+      'symbolic-ref',
+      '--quiet',
+      '--short',
+      `refs/remotes/${remoteName}/HEAD`
+    ])
+    const ref = stdout.trim()
+    const prefix = `${remoteName}/`
+    return ref.startsWith(prefix) ? ref.slice(prefix.length) : null
+  } catch {
+    return null
+  }
+}
+
+/** The commit this clone last saw at the remote branch, which is the lease the delete is made under. */
+async function lastSeenRemoteSha(
+  runGit: GitCommandRunner,
+  remoteName: string,
+  branchName: string
+): Promise<string | null> {
+  try {
+    const { stdout } = await runGit([
+      'rev-parse',
+      '--verify',
+      '--quiet',
+      `refs/remotes/${remoteName}/${branchName}`
+    ])
+    const sha = stdout.trim()
+    return /^[0-9a-f]{40,64}$/i.test(sha) ? sha : null
+  } catch {
+    return null
   }
 }
 
@@ -101,13 +159,41 @@ export async function deleteRemoteBranchAfterLocalBranchRemoval(args: {
   }
   const { remoteName, branchName } = args.target.target
   const target = { remoteName, branchName }
+  // Why a name check and not just the upstream: `git push --delete` is unconditional on the server,
+  // and an upstream routinely names a branch nobody here authored — a branch cut with
+  // `git checkout -b feat origin/develop` tracks `develop`, and a review worktree can track a
+  // contributor's fork. Deleting on that evidence would remove someone else's branch.
+  if (branchName !== args.branchName) {
+    return { status: 'skipped-foreign-branch', ...target }
+  }
+  if ((await remoteDefaultBranch(args.runGit, remoteName)) === branchName) {
+    return { status: 'skipped-default-branch', ...target }
+  }
+  // Why the lease: `branch -d` refused anything unmerged locally, but the remote has no equivalent
+  // refusal — without a lease this deletes commits pushed since the last fetch, which nobody here
+  // has ever seen.
+  //
+  // Why an empty expectation when nothing was last seen: that is also the state a merged PR with
+  // GitHub's auto-delete leaves behind, once `fetch --prune` has dropped the tracking ref — the
+  // branch is gone, not unverifiable. `--force-with-lease=<ref>:` succeeds only if the ref does not
+  // exist, so the gone case reports `already-absent` and a branch that reappeared while we looked
+  // reports `stale info`. Refusing outright instead reported "tracks no remote branch" for both.
+  const lastSeen = await lastSeenRemoteSha(args.runGit, remoteName, branchName)
   try {
-    await args.runGit(['push', '--delete', remoteName, branchName])
+    await args.runGit([
+      'push',
+      `--force-with-lease=refs/heads/${branchName}:${lastSeen ?? ''}`,
+      remoteName,
+      `:refs/heads/${branchName}`
+    ])
     return { status: 'deleted', ...target }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     if (REMOTE_REF_ABSENT_RE.test(message)) {
       return { status: 'already-absent', ...target }
+    }
+    if (REMOTE_REF_STALE_RE.test(message)) {
+      return { status: 'skipped-changed-on-remote', ...target }
     }
     return { status: 'failed', ...target, message }
   }

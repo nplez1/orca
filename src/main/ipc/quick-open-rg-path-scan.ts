@@ -114,10 +114,12 @@ export function scanRipgrepPaths(args: {
       } else if (
         shouldIncludeQuickOpenPath(relPath) &&
         !shouldExcludeQuickOpenRelPath(relPath, args.excludePathPrefixes) &&
-        args.onPath &&
-        !args.onPath(relPath)
+        args.onPath
       ) {
-        stopRequested = true
+        noteProgress()
+        if (!args.onPath(relPath)) {
+          stopRequested = true
+        }
       }
     }
     const cleanup = (): void => {
@@ -173,9 +175,10 @@ export function scanRipgrepPaths(args: {
             batchFlush = null
           }
           if (!done && !stopRequested) {
-            if (args.timeoutMilliseconds !== undefined) {
-              armTimeout()
-            }
+            // Why always: a flushed batch is proof the walk is still making progress, so the deadline
+            // measures a stall rather than a big tree. Re-arming only when a caller passed a timeout
+            // made the default 10s a whole-walk budget, which dropped a large subtree mid-scan.
+            armTimeout()
             child.stdout!.resume()
           }
         })
@@ -289,13 +292,24 @@ export function scanRipgrepPaths(args: {
     child.once('error', handleError)
     child.once('close', handleClose)
     args.signal?.addEventListener('abort', handleAbort, { once: true })
+    let armedAt = Date.now()
     const armTimeout = (): void => {
+      armedAt = Date.now()
       clearTimeout(timer)
       timer = setTimeout(() => {
         pathAccumulator.clear()
         killSpawnedRipgrepProcess(child)
         finish(new Error('rg file-path search timed out'))
       }, timeoutMilliseconds)
+    }
+    // Why a streaming path re-arms too: the query-scoped search delivers through `onPath`, so a
+    // deadline that only a flushed batch re-armed made the default a whole-walk budget there and
+    // dropped a large subtree mid-scan. Throttled because a reset per path is two timer ops per file
+    // on a walk that can emit a million.
+    const noteProgress = (): void => {
+      if (Date.now() - armedAt >= 1000) {
+        armTimeout()
+      }
     }
     armTimeout()
     if (args.signal?.aborted) {

@@ -1,6 +1,6 @@
 // A repository bound to the App gets its bound identity in git too: Orca's own pushes and a bot's terminal
 // both reach GitHub as `slug[bot]`. A repository bound to a user keeps the ambient git login untouched.
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { delimiter, dirname, join } from 'node:path'
 import {
@@ -127,11 +127,18 @@ export async function appBoundRepoGitLaunchEnv(input: {
   return { GIT_CONFIG_GLOBAL: path }
 }
 
-/** A stable filename per repository, so a relaunch rewrites one file instead of filling a directory. */
+/**
+ * A stable filename per repository, so a relaunch rewrites one file instead of filling a directory.
+ *
+ * Why a hash of the whole path and not a tail: the readable part is the last sixty characters, so two
+ * checkouts whose paths differ only earlier (`.../ws1/src/app` and `.../ws2/src/app`) produced one
+ * file between them — the second silently rewrote the first's identity for a session already running.
+ */
 function repoFolderKey(repoFolder: string): string {
   const readable = repoFolder
     .replace(/[^a-zA-Z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
-    .slice(-60)
-  return `${readable || 'repo'}-${Buffer.from(repoFolder).toString('base64url').slice(-12)}`
+    .slice(-40)
+  const digest = createHash('sha256').update(repoFolder).digest('hex').slice(0, 16)
+  return `${readable || 'repo'}-${digest}`
 }

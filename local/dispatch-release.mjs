@@ -13,10 +13,15 @@
  *   1. the review of this exact revision is COMPLETE (`local/release-review-gate.mjs`) — every slice
  *      reported, no unresolved blocking finding;
  *   2. the tree is clean, so the tag names a commit and not a commit plus edits;
- *   3. HEAD is `origin/main`, because the workflow refuses any other ref and finding that out after
- *      the gate run wastes the run;
+ *   3. HEAD is the remote's `main` tip as `git ls-remote` reads it now, because the workflow refuses
+ *      any other ref and the local `origin/main` may be behind a merge that landed since a fetch;
  *   4. the Actions fleet is swept, because a workflow that came back enabled during a sync starts its
  *      own run on the release push (`RELEASE-RUNBOOK.md` step 0.5).
+ *
+ * Why the tip is read from the remote and not from `origin/main`: the review is of a commit, and the
+ * build runs on whatever `main` is when the run starts. A stale tracking ref passes the gate on the
+ * reviewed commit while CI publishes a newer tip. The same SHA is passed to the workflow as
+ * `expected_sha`, so the run itself refuses if `main` moves again between the dispatch and the build.
  *
  *   node local/dispatch-release.mjs                          gate, then dispatch
  *   node local/dispatch-release.mjs --dry-run                 report the preconditions, dispatch nothing
@@ -24,8 +29,9 @@
  *   node local/dispatch-release.mjs --waive-review "<reason>"  dispatch with the review gate waived
  *
  * Why `--waive-review` records rather than silently passes: the same reason as `open-pr.mjs`'s
- * `--waive-gate` — a waiver a reader cannot find is not recorded. It prints the reason and exits
- * non-zero on a dry run so the decision is inspectable before it is spent.
+ * `--waive-gate` — a waiver a reader cannot find is not recorded. It prints the reason, writes it to
+ * the dispatch line it reports, and exits non-zero on a dry run so the decision is inspectable before
+ * it is spent.
  *
  * Exit: 0 dispatched (or dry-run clean), 1 refused, 2 usage.
  */
@@ -34,6 +40,7 @@ import { join } from 'node:path'
 
 const repoRoot = join(import.meta.dirname, '..')
 const WORKFLOW = 'fork-release.yml'
+const DEFAULT_REPO = 'nplez1/orca'
 
 function run(command, args, { capture = true } = {}) {
   return execFileSync(command, args, {
@@ -52,7 +59,7 @@ function tryRun(command, args) {
 }
 
 function parse(argv) {
-  const options = { dryRun: false, waiver: '', suffix: '', repo: 'nplez1/orca' }
+  const options = { dryRun: false, waiver: '', suffix: '', repo: DEFAULT_REPO }
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i]
     if (arg === '--dry-run') {
@@ -87,12 +94,19 @@ function preconditions(options) {
   }
 
   if (head.ok) {
-    const remote = tryRun('git', ['rev-parse', 'origin/main'])
-    if (!remote.ok) {
-      problems.push(`cannot resolve origin/main: ${remote.out}`)
-    } else if (remote.out !== head.out) {
+    // Why the remote and not `origin/main`: the tracking ref is only as fresh as the last fetch, and
+    // this gate exists to be right about what CI will build. Why the repo, not `origin`: `--repo=`
+    // dispatches to that repository, so its `main` is the branch CI will check out. `origin` is the
+    // right remote for the default only because it names the same repository.
+    const remote =
+      options.repo === DEFAULT_REPO ? 'origin' : `https://github.com/${options.repo}.git`
+    const tip = tryRun('git', ['ls-remote', remote, 'refs/heads/main'])
+    const tipSha = tip.ok ? (tip.out.split(/\s+/)[0] ?? '') : ''
+    if (!tip.ok || !/^[0-9a-f]{40,64}$/i.test(tipSha)) {
+      problems.push(`cannot read the remote's main tip: ${tip.out || 'no sha returned'}`)
+    } else if (tipSha !== head.out) {
       problems.push(
-        `HEAD ${head.out.slice(0, 12)} is not origin/main ${remote.out.slice(0, 12)}; push the sync first`
+        `HEAD ${head.out.slice(0, 12)} is not the remote's main ${tipSha.slice(0, 12)}; push or pull first`
       )
     }
   }
@@ -144,12 +158,25 @@ function main(argv) {
   }
 
   const args = ['workflow', 'run', WORKFLOW, '--repo', options.repo, '--ref', 'main']
+  // Why: the run refuses unless `main` is still this commit, so a merge that lands between the
+  // dispatch and the build cannot publish a tip nobody reviewed.
+  if (head) {
+    args.push('-f', `expected_sha=${head}`)
+  }
   if (options.suffix) {
     args.push('-f', `version_suffix=${options.suffix}`)
   }
-  const command = `gh ${args.join(' ')}`
+  const command = `gh ${args.join(' ')}${options.waiver.trim() ? ` # review WAIVED: ${options.waiver.trim()}` : ''}`
   if (options.dryRun) {
     console.log(`  would run: ${command}`)
+    // Why 1 for a waived dry run: the review was not checked, and a green dry run would read as one
+    // that was. The decision is meant to be inspected before it is spent.
+    if (options.waiver.trim()) {
+      console.error(
+        'dispatch-release: dry run with --waive-review — the review gate was not run; nothing was dispatched'
+      )
+      return 1
+    }
     console.log(`dispatch-release: dry run — ${head?.slice(0, 12)} clears every precondition`)
     return 0
   }
@@ -160,6 +187,10 @@ function main(argv) {
     return 1
   }
   console.log(`dispatch-release: dispatched ${WORKFLOW} at ${head?.slice(0, 12)}`)
+  if (options.waiver.trim()) {
+    // Why again after the dispatch: the line above is what a reader of a release run finds first.
+    console.log(`  review WAIVED: ${options.waiver.trim()}`)
+  }
   const listed = tryRun('gh', [
     'run',
     'list',

@@ -193,8 +193,10 @@ function credentialFailure(readResult: CursorAuthReadResult): ProviderRateLimits
     })
   }
   if (readResult.status === 'error') {
+    // fork-comment-ok: `missing-credentials` clears the last reading; a failed read is not a dead key.
+    // Reporting one as the other blanked the bars until the next poll succeeded.
     return result('error', readResult.error, {
-      usageMetadata: { failureKind: 'missing-credentials' }
+      usageMetadata: { failureKind: 'keychain-unavailable' }
     })
   }
   // Orca reads tokens only; report expiry and let cursor-agent refresh on next use.

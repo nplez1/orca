@@ -8,6 +8,7 @@ import type {
   SessionSummaryStatus
 } from '../../shared/session-summary-types'
 import { runSessionSummaryFold } from './session-summary-fold-runner'
+import { emptySessionSummaryLedger } from './session-summary-ledger'
 import { SessionSummaryStore } from './session-summary-store'
 import type { SessionFoldBrain, SessionSummarySourceEvent } from './session-summary-fold'
 import type { SessionSummaryEventRead } from './session-summary-transcript-source'
@@ -119,6 +120,39 @@ describe('runSessionSummaryFold', () => {
     await resumed.run(new AbortController().signal)
     expect(resumed.chunkPrompts.length).toBeLessThan(4)
     resumed.cleanup()
+    test.cleanup()
+  })
+
+  it('starts fresh rather than resuming the ledger of a different conversation', async () => {
+    // A fold can wait for a process-wide slot long enough for the pane's session to change, and the
+    // store still answers with whatever session it holds. Resuming that ledger folds this transcript
+    // at the other conversation's cursor and builds on its facts — the merge this cache must never do.
+    const test = harness({ count: 60 })
+    test.store.set('tab:leaf', {
+      identity: { providerSessionId: 'sess-other', transcriptPath: '/tmp/other.jsonl' },
+      ledger: { ...emptySessionSummaryLedger(), foldedThrough: 1_000 },
+      chunkCache: {},
+      messageCount: 1_000,
+      seenThrough: 0,
+      updatedAt: 1
+    })
+    const fromIndexes: number[] = []
+
+    await test.run(new AbortController().signal, async (fromEventIndex) => {
+      fromIndexes.push(fromEventIndex)
+      return {
+        events: events(60),
+        totalEvents: 60,
+        retainedBytes: 0,
+        overRetainedBudget: false,
+        gaps: []
+      }
+    })
+
+    expect(fromIndexes).toEqual([0])
+    const stored = test.store.get('tab:leaf')
+    expect(stored?.identity.providerSessionId).toBe('sess-1')
+    expect(stored?.ledger.foldedThrough).toBe(60)
     test.cleanup()
   })
 

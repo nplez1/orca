@@ -1,6 +1,7 @@
 import { getMainHttpClient } from '../network/http-client'
 import { ensureElectronProxyFromEnvironment } from '../network/proxy-settings'
 import type { JenkinsBuildDetailsFailureReason } from '../../shared/jenkins-check-details'
+import { isJenkinsUrlUnderBase } from '../../shared/jenkins-urls'
 import {
   classifyJenkinsHttpStatus,
   isKnownJenkins,
@@ -185,6 +186,101 @@ export function jenkinsSignal(signal: AbortSignal | undefined): AbortSignal {
 /** A redirect status; only the class matters, and only to the refusal below. */
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308])
 
+/**
+ * Hops a configured Jenkins may redirect through.
+ *
+ * A build permalink legitimately redirects to the build it names, so one refusal is too strict; five
+ * is more than any real chain needs and still bounded.
+ */
+const MAX_JENKINS_REDIRECTS = 5
+
+/** The request asked for a URL outside the server the credentials belong to, so none were sent. */
+export function jenkinsScopeRefusal(url: string, serverBaseUrl: string | null): string | null {
+  if (serverBaseUrl === null) {
+    return null
+  }
+  return isJenkinsUrlUnderBase(serverBaseUrl, url)
+    ? null
+    : `${url} is outside the Jenkins server configured at ${serverBaseUrl}`
+}
+
+/**
+ * Whether the next hop may receive the token.
+ *
+ * Why per hop and not after the fact: the Fetch standard strips `Authorization` on a cross-origin
+ * hop but keeps it on a same-origin one, so a server configured at `https://host/jenkins` answering
+ * `302 /other-service` takes the token with it. Checking the landing URL can then only refuse to
+ * read an answer the token already fetched. A scheme change is a different origin and so is refused
+ * by the same rule.
+ */
+function vettedRedirectTarget(
+  from: string,
+  location: string,
+  serverBaseUrl: string | null,
+  requestUrl: string
+): string | null {
+  let target: URL
+  try {
+    target = new URL(location, from)
+  } catch {
+    return null
+  }
+  const beyond = isResponseBeyondCredentialScope({
+    requestUrl,
+    responseUrl: target.href,
+    serverBaseUrl
+  })
+  return beyond ? null : target.href
+}
+
+/** A hop the credentials may not follow; reported rather than sent. */
+class JenkinsRedirectScopeError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'JenkinsRedirectScopeError'
+  }
+}
+
+/**
+ * One authenticated read, following only the redirects the credentials are allowed to reach.
+ *
+ * Why a manual loop rather than `redirect: 'follow'`: see `vettedRedirectTarget`. An unconfigured
+ * host is never followed at all (see `refuseRedirects`), and a host whose transport cannot expose
+ * hops falls back to `follow` plus the post-hoc check, which is what it had before.
+ */
+async function fetchJenkinsReadRefusingForeignHops(
+  args: JenkinsCredentialArgs & { url: string },
+  init: RequestInit
+): Promise<Response> {
+  const httpClient = getMainHttpClient()
+  const hopFetch = httpClient.fetchManualRedirects
+  if (args.refuseRedirects === true || !hopFetch) {
+    return httpClient.fetch(args.url, {
+      ...init,
+      redirect: args.refuseRedirects === true ? 'manual' : 'follow'
+    })
+  }
+  let url = args.url
+  for (let hop = 0; ; hop += 1) {
+    const response = await hopFetch(url, init)
+    if (!REDIRECT_STATUSES.has(response.status)) {
+      return response
+    }
+    const location = response.headers.get('location')
+    await releaseBody(response)
+    const target =
+      location && hop < MAX_JENKINS_REDIRECTS
+        ? vettedRedirectTarget(url, location, args.serverBaseUrl ?? null, args.url)
+        : null
+    if (target === null) {
+      throw new JenkinsRedirectScopeError(
+        `Jenkins redirected outside its configured URL to ${location ?? 'an unknown location'}`
+      )
+    }
+    url = target
+  }
+}
+
 function redirectFailure(): JenkinsRequestFailure {
   return {
     reason: 'not-configured',
@@ -207,18 +303,27 @@ function isCancelledRedirect(error: unknown): boolean {
 export async function jenkinsGetJson(
   args: JenkinsCredentialArgs & { url: string }
 ): Promise<JenkinsRequestResult> {
-  const httpClient = getMainHttpClient()
   await applyJenkinsProxy(args.url)
+  // Why before the request: `api/json` on a build whose URL came from a commit status will carry the
+  // token wherever that URL points, and the post-response check can only refuse an answer the token
+  // already fetched.
+  const outsideScope = jenkinsScopeRefusal(args.url, args.serverBaseUrl ?? null)
+  if (outsideScope !== null) {
+    return failure(args.configured === true ? 'not-jenkins' : 'not-configured', outsideScope)
+  }
 
+  const init: RequestInit = {
+    method: 'GET',
+    headers: { Accept: 'application/json', ...jenkinsAuthHeaders(args) },
+    signal: jenkinsSignal(args.signal)
+  }
   let response: Response
   try {
-    response = await httpClient.fetch(args.url, {
-      method: 'GET',
-      redirect: args.refuseRedirects ? 'manual' : 'follow',
-      headers: { Accept: 'application/json', ...jenkinsAuthHeaders(args) },
-      signal: jenkinsSignal(args.signal)
-    })
+    response = await fetchJenkinsReadRefusingForeignHops(args, init)
   } catch (error) {
+    if (error instanceof JenkinsRedirectScopeError) {
+      return failure(args.configured === true ? 'unauthorized' : 'not-configured', error.message)
+    }
     if (args.refuseRedirects && isCancelledRedirect(error)) {
       return { ok: false, failure: redirectFailure() }
     }

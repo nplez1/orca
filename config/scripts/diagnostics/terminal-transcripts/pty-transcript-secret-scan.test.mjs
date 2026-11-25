@@ -4,6 +4,8 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   formatFindings,
+  identifierPattern,
+  isDistinctiveIdentifier,
   redactTranscript,
   scanTranscriptForSecrets
 } from './pty-transcript-secret-scan.mjs'
@@ -27,6 +29,25 @@ describe('pty transcript secret scan', () => {
     )
     expect(findings).toHaveLength(1)
     expect(findings[0].kind).toBe('uuid')
+  })
+})
+
+// fork-comment-ok: the bound is what keeps the scan about this transcript, not about who ran it.
+// Unbounded, a runner called `unknown` or `worker` red-flagged five committed fixtures.
+describe('operator identifiers', () => {
+  it('matches the name only at a word edge', () => {
+    expect(identifierPattern('nathanp').test('/Users/nathanp/Code')).toBe(true)
+    expect(identifierPattern('nathanp').test('/Users/xnathanp/Code')).toBe(false)
+    expect(identifierPattern('nathanp').test('/Users/nathanp2/Code')).toBe(false)
+  })
+
+  it('skips names that are ordinary words in a transcript', () => {
+    for (const common of ['unknown', 'worker', 'root', 'admin']) {
+      expect(isDistinctiveIdentifier(common)).toBe(false)
+    }
+    expect(isDistinctiveIdentifier('nathanp')).toBe(true)
+    // fork-comment-ok: three letters still leaks when the name is nobody's ordinary word.
+    expect(isDistinctiveIdentifier('bob')).toBe(true)
   })
 })
 

@@ -181,4 +181,21 @@ describe('listGithubAppInstallations', () => {
     expect(granted).toMatchObject({ contentsWrite: true, workflowsWrite: true })
     expect(readOnly).toMatchObject({ contentsWrite: false, workflowsWrite: false })
   })
+
+  it('refuses a next page that leaves the API, so the App key only ever signs requests to GitHub', async () => {
+    const calls: string[] = []
+    const fetch: GithubAppFetch = async (url) => {
+      calls.push(url)
+      return new Response(JSON.stringify([]), {
+        status: 200,
+        headers: { link: '<http://elsewhere.example/app/installations?page=2>; rel="next"' }
+      })
+    }
+
+    await expect(
+      listGithubAppInstallations({ ...keyPair, fetch, nowMs: 1_700_000_000_000 })
+    ).rejects.toThrow(/outside its API/)
+    // The signed JWT never left api.github.com, and the list is refused rather than truncated.
+    expect(calls).toEqual(['https://api.github.com/app/installations?per_page=100'])
+  })
 })

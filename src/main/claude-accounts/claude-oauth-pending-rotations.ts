@@ -39,6 +39,11 @@ const ROTATION_RETRY_DELAYS_MS = [500, 2_000, 8_000] as const
 
 const waiting = new Map<string, Omit<PendingClaudeOAuthRotation, 'key'>>()
 const retryAttempts = new Map<string, number>()
+/** Keys whose retry chain is armed, so a restart cannot arm a second one for the same rotation. */
+const retryArmed = new Set<string>()
+/** Consecutive retries that stood down for a running exchange, so that loop has a ceiling. */
+const retryStandDowns = new Map<string, number>()
+const ROTATION_MAX_STAND_DOWNS = 3
 /** Whether the file's contents are known, so a write cannot drop another account's rotation. */
 let complete = false
 let overridePath: string | null = null
@@ -73,6 +78,8 @@ export function setPendingRotationRetryScheduler(
 export function resetPendingRotationsForTests(): void {
   waiting.clear()
   retryAttempts.clear()
+  retryArmed.clear()
+  retryStandDowns.clear()
   complete = false
   isExchangeInFlight = () => false
 }
@@ -252,6 +259,9 @@ export function rememberPendingRotation(
 export function forgetPendingRotation(key: string): void {
   queue().delete(key)
   retryAttempts.delete(key)
+  retryStandDowns.delete(key)
+  // Why `retryArmed` stays: its timer is still pending, and it clears the flag when it fires. Clearing
+  // here would let a `remember` inside that delay arm a second chain for the same key.
   persist()
 }
 
@@ -299,21 +309,48 @@ async function flushPendingRotation(key: string): Promise<boolean> {
  *
  * Why not wait for the next 401: the store that refused (a locked Keychain, a read-only disk) is
  * often transient, and the next 401 may be hours away or never come — the user is signed out until
- * then. Bounded, because a store that keeps refusing needs the quit flush and the next 401 instead.
+ * then. Bounded twice over: `ROTATION_RETRY_DELAYS_MS` rungs, and `ROTATION_MAX_STAND_DOWNS`
+ * consecutive give-backs to an exchange that is still running — which, with the rung given back, is
+ * otherwise a 500 ms loop for as long as a keychain prompt stays open.
  */
 function scheduleUpcomingRetry(key: string): void {
+  // Why armed: one chain per rotation, or a re-arm doubles every retry after it.
+  if (retryArmed.has(key)) {
+    return
+  }
   const attempts = retryAttempts.get(key) ?? 0
   if (attempts >= ROTATION_RETRY_DELAYS_MS.length) {
     return
   }
   retryAttempts.set(key, attempts + 1)
+  retryArmed.add(key)
   scheduleRetry(() => {
+    retryArmed.delete(key)
     // Why chain the next step from here: a single 500 ms retry would make the longer delays dead code,
     // and a store that stays locked for a minute would never be retried again.
     void flushPendingRotation(key).then((written) => {
-      if (!written && pendingRotation(key) !== undefined) {
-        scheduleUpcomingRetry(key)
+      if (written || pendingRotation(key) === undefined) {
+        retryStandDowns.delete(key)
+        return
       }
+      // Why the rung is given back: a flush that stood down for the in-flight exchange did not fail,
+      // so it must not spend the budget the real failures need — a keychain prompt that holds the
+      // write for seconds used to eat two of the three retries. Why only so often: giving the rung
+      // back makes each stand-down free, which without a ceiling is a loop, not a backoff.
+      if (isExchangeInFlight(key)) {
+        const standDowns = (retryStandDowns.get(key) ?? 0) + 1
+        retryStandDowns.set(key, standDowns)
+        // Why it stops rather than loops: the exchange owns this key, so what happens next is its
+        // answer — a write that lands forgets this rotation, and one that fails leaves it for the
+        // quit flush and the next 401. A free rung with no ceiling is a 500 ms loop, not a backoff.
+        if (standDowns > ROTATION_MAX_STAND_DOWNS) {
+          return
+        }
+        retryAttempts.set(key, Math.max(0, (retryAttempts.get(key) ?? 0) - 1))
+      } else {
+        retryStandDowns.delete(key)
+      }
+      scheduleUpcomingRetry(key)
     })
   }, ROTATION_RETRY_DELAYS_MS[attempts])
 }

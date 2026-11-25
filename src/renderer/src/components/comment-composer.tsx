@@ -129,6 +129,8 @@ export function CommentComposer({
   const spellcheckEnabled = useAppStore((s) => s.settings?.richMarkdownSpellcheckEnabled ?? true)
   const applyingExternalValueRef = useRef(false)
   const lastSyncedMarkdownRef = useRef(value)
+  /** The `value` prop as of the previous render, so "became empty" is distinguishable from "is empty". */
+  const previousValueRef = useRef(value)
   // Why: the editor captures these once, so the handlers read the current prop
   // through a ref instead of a closure that goes stale on the next render.
   const onValueChangeRef = useRef(onValueChange)
@@ -215,10 +217,17 @@ export function CommentComposer({
     if (!editor) {
       return
     }
+    const previousValue = previousValueRef.current
+    previousValueRef.current = value
     // Why: the parent clears to '' after a successful post; the editor has to be
     // reset explicitly or the posted draft would survive in the bubble.
     if (!value.trim()) {
-      if (editor.getMarkdown().trim()) {
+      // Why the transition, and not just an empty value: `- ` and `> ` clean to ''
+      // because an empty marker contributes no text, so an empty value also describes
+      // a list item or quote the person is still typing. Clearing there deleted the
+      // marker and reset the caret. Only a value that *became* empty is the parent
+      // dropping the draft, and the editor then still holds the text it posted.
+      if (previousValue.trim().length > 0 && editor.getMarkdown().trim()) {
         applyExternalValue(applyingExternalValueRef, () => {
           editor.commands.clearContent(true)
           lastSyncedMarkdownRef.current = ''
