@@ -50,6 +50,10 @@ type FakeHost = {
   environments: Map<string, string>
   labels: Map<string, string>
   settings: HostMeshSettings
+  /** A machine still on a build without the mesh: it answers, but not these methods. */
+  oldBuild: boolean
+  /** Offers this host has minted, which is what an unreachable peer would make it waste. */
+  minted: number
 }
 
 const cleanups: string[] = []
@@ -83,7 +87,9 @@ class Mesh {
       rpc: null as unknown as HostMeshRpcService,
       environments: new Map(),
       labels: new Map(),
-      settings: { ...DEFAULT_HOST_MESH_SETTINGS, allowJoins: true }
+      settings: { ...DEFAULT_HOST_MESH_SETTINGS, allowJoins: true },
+      oldBuild: false,
+      minted: 0
     }
     const deps = this.depsFor(host, userDataPath)
     host.driver = createHostMeshDriver(deps)
@@ -121,10 +127,13 @@ class Mesh {
         secretKey: host.secretKey,
         publicKeyB64: host.publicKeyB64
       }),
-      mintRuntimeOffer: async () => ({
-        offerUrl: `orca://pair?h=${host.hostKey}&pk=${host.publicKeyB64}`,
-        deviceId: `device-${host.name}-${host.environments.size}`
-      }),
+      mintRuntimeOffer: async () => {
+        host.minted += 1
+        return {
+          offerUrl: `orca://pair?h=${host.hostKey}&pk=${host.publicKeyB64}`,
+          deviceId: `device-${host.name}-${host.minted}`
+        }
+      },
       redeemOffer: async (offerUrl, expectedHostKey) => {
         const offer = parseFakeOffer(offerUrl)
         if (offer.hostKey !== expectedHostKey) {
@@ -165,7 +174,9 @@ class Mesh {
       listPairedHostKeys: () =>
         [...host.environments.values()].flatMap((target) => {
           const peer = [...this.hosts.values()].find((entry) => entry.hostKey === target)
-          return peer === undefined ? [] : [{ hostKey: peer.hostKey, label: peer.name }]
+          return peer === undefined
+            ? []
+            : [{ hostKey: peer.hostKey, label: peer.name, publicKeyB64: peer.publicKeyB64 }]
         }),
       send: <T>(environmentId: string, method: string, params: unknown): Promise<T> =>
         this.dispatch<T>(host, environmentId, method, params),
@@ -186,6 +197,10 @@ class Mesh {
     const target = targetKey === undefined ? undefined : this.hosts.get(targetKey)
     if (target === undefined) {
       throw new Error(`${from.name} cannot reach ${environmentId}`)
+    }
+    // The real transport answers an unknown method with this code, and the driver reads it as such.
+    if (target.oldBuild) {
+      throw new Error('method_not_found')
     }
     const caller = { fingerprint: from.publicKeyB64 }
 
@@ -486,6 +501,91 @@ describe('an existing fleet upgrading to this build', () => {
     expect((await laptop.driver.snapshot()).members.map((member) => member.hostKey).sort()).toEqual(
       [studio.hostKey, vm.hostKey].sort()
     )
+  })
+})
+
+describe('a fleet that updates one machine at a time', () => {
+  it('upgrades first without minting anything at the machines that have not updated', async () => {
+    const mesh = new Mesh()
+    const studio = mesh.add('studio')
+    const laptop = mesh.add('laptop')
+    const vm = mesh.add('vm')
+    laptop.oldBuild = true
+    vm.oldBuild = true
+    mesh.seedPairing(laptop, studio)
+    mesh.seedPairing(vm, studio)
+
+    expect(studio.driver.migrateFromPairings()).toEqual({ kind: 'grouped', peerCount: 2 })
+    await studio.driver.sync()
+
+    const view = await studio.driver.snapshot()
+    // Says "that one needs updating", not "the network is broken", and mints nothing for it.
+    expect(view.members.map((member) => member.status)).toEqual(['needsUpdate', 'needsUpdate'])
+    expect(studio.minted).toBe(0)
+  })
+
+  it('picks up a machine the moment it updates, with no action from the owner', async () => {
+    const mesh = new Mesh()
+    const studio = mesh.add('studio')
+    const laptop = mesh.add('laptop')
+    const vm = mesh.add('vm')
+    laptop.oldBuild = true
+    vm.oldBuild = true
+    mesh.seedPairing(laptop, studio)
+    mesh.seedPairing(vm, studio)
+    studio.driver.migrateFromPairings()
+    await studio.driver.sync()
+
+    // The laptop finishes updating and runs its own migration, which can only see the studio.
+    laptop.oldBuild = false
+    expect(laptop.driver.migrateFromPairings()).toEqual({ kind: 'grouped', peerCount: 1 })
+    for (let pass = 0; pass < 2; pass += 1) {
+      await studio.driver.sync()
+      await laptop.driver.sync()
+    }
+
+    // It converges on the studio's group rather than keeping its own, and learns the member it never met.
+    expect((await laptop.driver.snapshot()).groupId).toBe((await studio.driver.snapshot()).groupId)
+    expect((await laptop.driver.snapshot()).members.map((member) => member.hostKey).sort()).toEqual(
+      [studio.hostKey, vm.hostKey].sort()
+    )
+    // The laptop has no way to reach the machine that has not updated, and says so rather than claiming a
+    // pair; the studio, which is paired with it, is the one that can say why.
+    expect(statusOf(await laptop.driver.snapshot(), vm.hostKey)).toBe('missing')
+    expect(statusOf(await studio.driver.snapshot(), vm.hostKey)).toBe('needsUpdate')
+    expect(studio.minted).toBe(0)
+  })
+
+  it('completes the fleet when the last machine updates', async () => {
+    const mesh = new Mesh()
+    const studio = mesh.add('studio')
+    const laptop = mesh.add('laptop')
+    const vm = mesh.add('vm')
+    laptop.oldBuild = true
+    vm.oldBuild = true
+    mesh.seedPairing(laptop, studio)
+    mesh.seedPairing(vm, studio)
+    studio.driver.migrateFromPairings()
+
+    laptop.oldBuild = false
+    laptop.driver.migrateFromPairings()
+    vm.oldBuild = false
+    vm.driver.migrateFromPairings()
+    for (let pass = 0; pass < 3; pass += 1) {
+      for (const host of [studio, laptop, vm]) {
+        await host.driver.sync()
+      }
+    }
+
+    const groups = await Promise.all(
+      [studio, laptop, vm].map(async (host) => (await host.driver.snapshot()).groupId)
+    )
+    expect(new Set(groups).size).toBe(1)
+    for (const host of [studio, laptop, vm]) {
+      const view = await host.driver.snapshot()
+      expect(view.members).toHaveLength(2)
+      expect(view.summary.completePairs).toBe(2)
+    }
   })
 })
 

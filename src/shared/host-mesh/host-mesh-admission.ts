@@ -209,7 +209,12 @@ export function membersAwaitingNewcomerOffer(
 ): string[] {
   return state.members
     .filter((member) => member.hostKey !== joinerHostKey)
-    .filter((member) => state.links.outbound[member.hostKey]?.kind !== 'ok')
+    .filter((member) => {
+      const link = state.links.outbound[member.hostKey]?.kind
+      // Why the two dead kinds are excluded: an offer minted for a machine that cannot answer is a live
+      // device row nobody will ever redeem, and the repair would mint another one on every pass.
+      return link !== 'ok' && link !== 'unreachable' && link !== 'unsupported'
+    })
     .map((member) => member.hostKey)
 }
 

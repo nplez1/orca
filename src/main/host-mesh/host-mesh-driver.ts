@@ -533,6 +533,11 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
           hostKey: selfKey()
         } satisfies HostMeshPendingRequest)
         if (confirmKey(payload.selfKey, payload.publicKeyB64)) {
+          // Why a reply proves the outbound link: the peer authenticated this host and answered on a
+          // credential this host holds, which is exactly what `ok` claims. Leaving it at `awaitingOffer`
+          // would also mean a migrated group can never start repairing itself — the repair needs one member
+          // that already works to carry the others' offers, and nothing else would ever mark one.
+          state = setHostMeshOutboundLink(state, { hostKey: member.hostKey, link: { kind: 'ok' } })
           // Why adoption precedes the merge: two hosts upgraded from the same fleet derive their own group
           // ids, and the merge refuses a payload from a group it is not in — so without this the fleet
           // would stay split with each half convinced the other is a stranger.
@@ -556,10 +561,15 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
           }
           state = applyHostMeshSync(state, payload)
         }
-      } catch {
+      } catch (error) {
+        // A peer from before this feature answers `method_not_found`: it is not a broken network, it is a
+        // machine that has not updated yet, and during a staggered rollout that is the normal state.
+        const unsupported = error instanceof Error && error.message === 'method_not_found'
         state = setHostMeshOutboundLink(state, {
           hostKey: member.hostKey,
-          link: { kind: 'unreachable', since: deps.now() }
+          link: unsupported
+            ? { kind: 'unsupported', since: deps.now() }
+            : { kind: 'unreachable', since: deps.now() }
         })
       }
     }

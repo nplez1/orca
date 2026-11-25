@@ -122,9 +122,17 @@ function depsFromApp(server: HostMeshRuntimeServer): HostMeshDriverDeps {
             return []
           }
           const publicKey = getPreferredPairedRuntimeConnection(environment).hostPublicKeyB64
+          // The public key travels with the host key: a group member with no key cannot be sealed a box,
+          // and the repair would skip it forever without saying so.
           return publicKey === undefined
             ? []
-            : [{ hostKey: orcaHostKeyOf(publicKey), label: environment.name }]
+            : [
+                {
+                  hostKey: orcaHostKeyOf(publicKey),
+                  label: environment.name,
+                  publicKeyB64: publicKey
+                }
+              ]
         })
       } catch {
         // An unreadable table migrates nothing: a group invented from a failed read would be worse than

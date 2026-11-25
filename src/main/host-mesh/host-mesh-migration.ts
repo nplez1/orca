@@ -48,7 +48,11 @@ export type HostMeshMigrationPlan = {
  */
 export function planHostMeshMigration(args: {
   selfKey: string
-  peers: readonly { hostKey: string; label: string }[]
+  /**
+   * `publicKeyB64` is not optional in practice even though the type allows its absence: without it nothing can
+   * be sealed to that member, so the repair silently skips it and the fleet never repairs itself.
+   */
+  peers: readonly { hostKey: string; label: string; publicKeyB64?: string }[]
 }): HostMeshMigrationPlan | null {
   const seen = new Set<string>()
   const peers = args.peers.filter((peer) => {
@@ -68,7 +72,12 @@ export function planHostMeshMigration(args: {
     epoch: 1
   })
   for (const peer of capped) {
-    state = addHostMeshMember(state, { hostKey: peer.hostKey, label: peer.label, epoch: 1 }).state
+    state = addHostMeshMember(state, {
+      hostKey: peer.hostKey,
+      label: peer.label,
+      ...(peer.publicKeyB64 === undefined ? {} : { publicKeyB64: peer.publicKeyB64 }),
+      epoch: 1
+    }).state
   }
   return { state, peerCount: capped.length }
 }

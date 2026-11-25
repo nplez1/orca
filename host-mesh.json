@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "state": {
+    "groupId": "group-1",
+    "epoch": 7,
+    "selfKey": "key-self",
+    "members": [
+      { "hostKey": "key-a", "label": "Studio", "addedAtEpoch": 3 },
+      { "hostKey": "key-b", "label": "Laptop", "introducedBy": "key-a", "addedAtEpoch": 5 }
+    ],
+    "tombstones": [{ "hostKey": "key-gone", "epoch": 6, "removedBy": "key-a" }],
+    "links": {
+      "outbound": {
+        "key-ok": { "kind": "ok" },
+        "key-awaiting": { "kind": "awaitingOffer", "requestedAtEpoch": 5, "expiresAt": 900 },
+        "key-failed": {
+          "kind": "redeemFailed",
+          "reason": "offer-expired",
+          "attempts": 2,
+          "retryAt": 90
+        },
+        "key-unreachable": { "kind": "unreachable", "since": 12 },
+        "key-unsupported": { "kind": "unsupported", "since": 13 }
+      },
+      "inbound": {
+        "key-active": { "kind": "active" },
+        "key-redeem": { "kind": "awaitingRedeem", "expiresAt": 900 },
+        "key-absent": { "kind": "absent" }
+      }
+    }
+  },
+  "peerIndex": {},
+  "pendingBoxes": {},
+  "admissions": {},
+  "spentNonces": {},
+  "migration": null,
+  "settings": null
+}

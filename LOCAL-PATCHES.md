@@ -6216,3 +6216,27 @@ membership now decides that rather than the id, and a non-member still learns no
 
 Verified by a three-host simulation of the upgrade itself: three machines that only ever knew the hub each
 migrate to their own group, and after two syncs each they hold one group and know all three members.
+
+**A fleet that updates one machine at a time.** The normal case is the machine holding every pairing
+upgrading first, while the others are still on a build with no mesh in it. Handled explicitly:
+
+- An old-build peer answers `method_not_found`, and that is recorded as `unsupported` rather than
+  `unreachable`, because it is not a network fault. The panel says _Needs update_ for it, and the group
+  listing otherwise stays honest: the upgraded host knows all members, the members know only themselves
+  until they update.
+- No offer is minted for a member known to be unreachable or unsupported. `membersAwaitingNewcomerOffer`
+  returns every member whose link is not `ok`, so without that exclusion the repair would have minted a live
+  device row at a machine that cannot redeem it, on every sync.
+- A successful sync now proves the outbound link (`ok`). That is what lets a migrated group repair itself:
+  the repair needs one member that already works to carry the others' offers, and nothing else would ever
+  mark one.
+- Migration carries each peer's public key from the pairing record. Without it nothing can be sealed to that
+  member, the repair skips it silently, and the fleet never completes.
+- The store's link schema is now tested against every kind the driver can write. Adding `unsupported` to the
+  union without teaching the store made the store refuse the file its own driver had just written — which
+  reads to the owner as "move it aside to start over", in the middle of an upgrade.
+
+Verified by three simulations of exactly this rollout: the hub upgrading first mints nothing and reports both
+peers as needing an update; a leaf picked up the moment it updates converges on the hub's group and learns
+the member it had never met; and when the last machine updates, all three hold one group with every pair
+complete.

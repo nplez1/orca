@@ -57,7 +57,10 @@ const outboundLinkSchema = z.discriminatedUnion('kind', [
     attempts: z.number(),
     retryAt: z.number()
   }),
-  z.looseObject({ kind: z.literal('unreachable'), since: z.number() })
+  z.looseObject({ kind: z.literal('unreachable'), since: z.number() }),
+  // A peer on a build that predates the group answers `method_not_found`, which is a state worth keeping:
+  // it is what stops the repair minting offers at a machine that cannot redeem them.
+  z.looseObject({ kind: z.literal('unsupported'), since: z.number() })
 ])
 
 const inboundLinkSchema = z.discriminatedUnion('kind', [

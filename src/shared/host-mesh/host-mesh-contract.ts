@@ -107,6 +107,13 @@ export type HostMeshOutboundLink =
   | { kind: 'awaitingOffer'; requestedAtEpoch: number; expiresAt: number }
   | { kind: 'redeemFailed'; reason: string; attempts: number; retryAt: number }
   | { kind: 'unreachable'; since: number }
+  /**
+   * The machine answers, but not this: it is running a build that predates the group.
+   *
+   * Why this is not `unreachable`: during a staggered upgrade the other computer is perfectly reachable, and
+   * reporting a network fault for it sends the owner looking in the wrong place. This says "update that one".
+   */
+  | { kind: 'unsupported'; since: number }
 
 /** The link a member owns back to this host, as that member last reported it. */
 export type HostMeshInboundLink =
@@ -144,11 +151,15 @@ export type HostMeshSyncPayload = {
 }
 
 /** Whether a pair is joined at both ends, at one, or not at all. */
-export type HostMeshPairStatus = 'complete' | 'half' | 'missing'
+export type HostMeshPairStatus = 'complete' | 'half' | 'missing' | 'needsUpdate'
 
 export function hostMeshPairStatus(hostKey: string, links: HostMeshLinkMatrix): HostMeshPairStatus {
   const outbound = links.outbound[hostKey]
   const inbound = links.inbound[hostKey] ?? { kind: 'absent' }
+  // Asked before `half`: a machine that cannot answer is not a pair this host can finish repairing itself.
+  if (outbound?.kind === 'unsupported') {
+    return 'needsUpdate'
+  }
   const outboundOk = outbound?.kind === 'ok'
   const inboundOk = inbound.kind === 'active'
   if (outboundOk && inboundOk) {

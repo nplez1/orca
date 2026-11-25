@@ -87,7 +87,7 @@ export type HostMeshDriverDeps = {
    * Why the environment table rather than the group: the point of migration is to read the trust the owner
    * already declared, and on the first run of a new build the group is empty by definition.
    */
-  listPairedHostKeys: () => { hostKey: string; label: string }[]
+  listPairedHostKeys: () => { hostKey: string; label: string; publicKeyB64?: string }[]
   labelForHostKey: (hostKey: string) => string | null
   /** One call to a peer this host is paired with. Rejects only on transport failure. */
   send: <T>(environmentId: string, method: string, params: unknown) => Promise<T>

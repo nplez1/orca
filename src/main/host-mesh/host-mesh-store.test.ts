@@ -54,6 +54,33 @@ function nestedRecord(parent: Record<string, unknown>, key: string): Record<stri
   return value !== null && typeof value === 'object' ? Object.assign(record, value) : record
 }
 
+describe('every link a driver can write is a link the store can read back', () => {
+  it('round-trips each outbound and inbound kind, so a new one cannot make the file unreadable', () => {
+    // Why this exists: adding a link kind without teaching this schema made the store refuse the file its own
+    // driver had just written, which reads to the owner as "move it aside to start over" — mid-upgrade.
+    const allKinds: HostMeshState = {
+      ...groupState(),
+      links: {
+        outbound: {
+          'key-ok': { kind: 'ok' },
+          'key-awaiting': { kind: 'awaitingOffer', requestedAtEpoch: 5, expiresAt: 900 },
+          'key-failed': { kind: 'redeemFailed', reason: 'offer-expired', attempts: 2, retryAt: 90 },
+          'key-unreachable': { kind: 'unreachable', since: 12 },
+          'key-unsupported': { kind: 'unsupported', since: 13 }
+        },
+        inbound: {
+          'key-active': { kind: 'active' },
+          'key-redeem': { kind: 'awaitingRedeem', expiresAt: 900 },
+          'key-absent': { kind: 'absent' }
+        }
+      }
+    }
+    store().write(allKinds)
+
+    expect(store().read()).toEqual(allKinds)
+  })
+})
+
 describe('the group on disk', () => {
   beforeEach(() => {
     testState.dir = mkdtempSync(join(tmpdir(), 'orca-host-mesh-'))

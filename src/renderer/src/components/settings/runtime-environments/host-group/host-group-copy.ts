@@ -34,6 +34,15 @@ export function hostGroupMemberStatus(
         label: t('auto.components.settings.hostGroup.pairedBothWays', 'Paired both ways'),
         detail: null
       }
+    case 'needsUpdate':
+      return {
+        tone: 'statusWarning',
+        label: t('auto.components.settings.hostGroup.needsUpdate', 'Needs update'),
+        detail: t(
+          'auto.components.settings.hostGroup.needsUpdateDetail',
+          'This computer answers, but it is running a version without the group. It joins as soon as it updates.'
+        )
+      }
     case 'half':
       return {
         tone: 'statusWarning',
