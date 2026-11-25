@@ -160,10 +160,28 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
     return { payload, reason }
   }
 
+  /**
+   * Cuts both directions to a machine: the device row first, because it is the credential that lets that
+   * machine reach this host, then the environment, which is how this host reaches it.
+   */
+  function tearDownPeer(hostKey: string): void {
+    const environmentId = deps.environmentIdForHostKey(hostKey)
+    deps.forgetDevice(hostKey)
+    deps.forgetEnvironment(environmentId ?? hostKey)
+    store.forgetPeer(hostKey)
+  }
+
+  /** Mints an offer for one recipient and records the device row it created, which is what removal revokes. */
+  async function mintFor(recipientHostKey: string): Promise<string> {
+    const minted = await deps.mintRuntimeOffer()
+    store.recordPeer(recipientHostKey, { deviceRowId: minted.deviceId })
+    return minted.offerUrl
+  }
+
   /** Redeems one box from a peer: the only place this host gains an outbound credential. */
   async function redeem(payload: HostMeshOfferPayload): Promise<RedeemedPeer | null> {
     try {
-      const peer = await deps.redeemOffer(payload.offerUrl)
+      const peer = await deps.redeemOffer(payload.offerUrl, payload.minterHostKey)
       store.recordPeer(peer.hostKey, { environmentId: peer.environmentId })
       return peer
     } catch (error) {
@@ -236,7 +254,7 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
 
     let sealedForIntroducer: HostMeshSealedOffer | null = null
     try {
-      const offerUrl = await deps.mintRuntimeOffer()
+      const offerUrl = await mintFor(hello.selfKey)
       sealedForIntroducer = sealTo({
         recipientHostKey: hello.selfKey,
         recipientPublicKeyB64: hello.publicKeyB64,
@@ -315,13 +333,25 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
     }
     saveState(state)
 
-    const muted = await relayToMembers({ state, environmentId, groupId, epoch, label, selfPk })
+    const muted = await relayToMembers({
+      state,
+      environmentId,
+      carrierHostKey: hello.selfKey,
+      groupId,
+      epoch,
+      label,
+      selfPk
+    })
     state = loadState()
     const collected = await collectPending({ state, environmentId, groupId })
     state = collected.state
     saveState(state)
 
-    lastError = null
+    // Why one more pass: a join leaves this host holding credentials whose counterparts only exist as the
+    // members' own records, and a sync is what turns those into a truthful per-pair status.
+    await sync()
+    // Why not cleared: a join that reached the introducer but not every member is a half-join, and the
+    // surface has to be able to say so rather than reporting a clean group.
     return { kind: 'joined', snapshot: await snapshot(), muted }
   }
 
@@ -329,6 +359,8 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
   async function relayToMembers(args: {
     state: HostMeshState
     environmentId: string
+    /** The host that will carry this batch, and therefore the one each box names as its voucher. */
+    carrierHostKey: string
     groupId: string
     epoch: number
     label: string
@@ -349,7 +381,7 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
       }
       let offerUrl: string
       try {
-        offerUrl = await deps.mintRuntimeOffer()
+        offerUrl = await mintFor(hostKey)
       } catch {
         continue
       }
@@ -358,7 +390,7 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
         recipientPublicKeyB64: member.publicKeyB64,
         groupId: args.groupId,
         epoch: args.epoch,
-        introducedBy: member.introducedBy ?? selfKey(),
+        introducedBy: args.carrierHostKey,
         offerUrl
       })
       if (box !== null) {
@@ -426,11 +458,12 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
     return { state }
   }
 
-  async function sync(): Promise<HostMeshSnapshot> {
-    let state = loadState()
-    if (state.groupId === '') {
-      return snapshot()
-    }
+  /**
+   * Asks every reachable member what it holds, which is the only way this host learns the direction a
+   * member owns TO it — no amount of local bookkeeping can establish that.
+   */
+  async function pullMemberViews(start: HostMeshState): Promise<HostMeshState> {
+    let state = start
     for (const member of state.members) {
       const environmentId = deps.environmentIdForHostKey(member.hostKey)
       if (environmentId === null) {
@@ -452,10 +485,28 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
         })
       }
     }
+    return state
+  }
+
+  async function sync(): Promise<HostMeshSnapshot> {
+    let state = loadState()
+    if (state.groupId === '') {
+      return snapshot()
+    }
+    const membersBefore = new Set(state.members.map((member) => member.hostKey))
+    state = await pullMemberViews(state)
+    // Why a tombstone learned from a member tears down: this is the only path a member that was asleep ever
+    // takes, and dropping the row without revoking would leave it holding a live credential.
+    for (const hostKey of membersBefore) {
+      if (!state.members.some((member) => member.hostKey === hostKey)) {
+        tearDownPeer(hostKey)
+      }
+    }
+
     // Why a sync repairs: a member that refused an introduction once is the ordinary way a pair stalls, and
     // making the owner re-run the join by hand would leave the group half-joined until they noticed.
     const awaiting = membersAwaitingNewcomerOffer(state, selfKey())
-    if (awaiting.length > 0 && state.groupId !== '') {
+    if (awaiting.length > 0) {
       const introducer = state.members.find(
         (member) =>
           !awaiting.includes(member.hostKey) &&
@@ -467,6 +518,7 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
         await relayToMembers({
           state,
           environmentId: introducerEnvironment,
+          carrierHostKey: introducer?.hostKey ?? selfKey(),
           groupId: state.groupId,
           epoch: epochAfter(state.epoch),
           label: deps.labelForHostKey(selfKey()) ?? 'this host',
@@ -474,14 +526,22 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
         })
       }
     }
+
     if (state.tombstones.some((tombstone) => tombstone.hostKey === selfKey())) {
       // Why the whole group goes: a group that removed this host is not a group this host is in, and
       // keeping the row would let the sidebar offer actions that can no longer reach anything.
+      // Why every peer is torn down first: being ejected is a removal of this host by the group, so the
+      // credentials on both sides go too — leaving them would keep a live device row for a group this host
+      // is no longer in.
+      for (const member of state.members) {
+        tearDownPeer(member.hostKey)
+      }
       state = leaveHostMeshGroup(state, { epoch: epochAfter(state.epoch) })
       saveState(state)
       return snapshot()
     }
     saveState(state)
+
     for (const member of state.members) {
       const environmentId = deps.environmentIdForHostKey(member.hostKey)
       if (environmentId === null) {
@@ -491,6 +551,13 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
       state = collected.state
     }
     saveState(state)
+
+    // Why twice: the repair above changes what members hold, and a status read before it settles would call
+    // a pair one-way that is now joined both ways.
+    if (awaiting.length > 0) {
+      state = await pullMemberViews(state)
+      saveState(state)
+    }
     return snapshot()
   }
 
@@ -516,11 +583,7 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
     if (member !== undefined && environmentId !== null) {
       await deps.send(environmentId, HOST_MESH_REMOVE_METHOD, removal).catch(() => undefined)
     }
-    // Why the device row goes first here: it is the credential that lets the member reach this host, so
-    // cutting it closes the inbound direction before the outbound record disappears.
-    deps.forgetDevice(hostKey)
-    deps.forgetEnvironment(environmentId ?? hostKey)
-    store.forgetPeer(hostKey)
+    tearDownPeer(hostKey)
     saveState(state)
 
     // Best effort for the rest: a member that is asleep learns at its next sync, and tombstones win there.
@@ -536,6 +599,20 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
 
   async function leave(): Promise<HostMeshSnapshot> {
     const current = loadState()
+    const removal = {
+      version: HOST_MESH_PAYLOAD_VERSION,
+      groupId: current.groupId,
+      hostKey: selfKey(),
+      removedBy: selfKey(),
+      epoch: epochAfter(current.epoch)
+    } satisfies HostMeshRemoveRequest
+    for (const member of current.members) {
+      const environmentId = deps.environmentIdForHostKey(member.hostKey)
+      if (environmentId !== null) {
+        await deps.send(environmentId, HOST_MESH_REMOVE_METHOD, removal).catch(() => undefined)
+      }
+      tearDownPeer(member.hostKey)
+    }
     const state = leaveHostMeshGroup(current, { epoch: epochAfter(current.epoch) })
     saveState(state)
     return snapshot()

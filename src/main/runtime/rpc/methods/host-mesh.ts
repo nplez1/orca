@@ -99,8 +99,9 @@ export const HOST_MESH_METHODS = [
     handler: async (params, ctx) => await meshService(ctx).remove(params, meshCaller(ctx))
   }),
   // The local surface: what an owner's CLI or the settings pane drives, as opposed to what a peer calls.
-  // Why these are `host-admin` and not `workspace`: joining, syncing and ejecting change who may reach this
-  // machine, and a paired desktop holds neither this tier nor the ability to widen itself.
+  // Why `host-admin`: joining, syncing and ejecting change who may reach this machine. Note a paired desktop
+  // also holds `host-admin` (rpc-caller-scope.ts RUNTIME_PAIRED_STANDARD), so this tier is not a barrier to
+  // it — the barrier is `allowJoins`, which no caller can set and only this host's owner can turn on.
   defineMethod({
     name: 'hostMesh.snapshot',
     permission: 'workspace',

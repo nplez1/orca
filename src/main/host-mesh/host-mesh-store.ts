@@ -104,6 +104,8 @@ const storedFileSchema = z.looseObject({
   peerIndex: z.record(z.string().min(1), z.unknown()).default({}),
   /** Boxes a member asked this host to hold for a newcomer, keyed by the machine they are addressed to. */
   pendingBoxes: z.record(z.string().min(1), z.array(z.unknown())).default({}),
+  /** Admission timestamps per group, kept so the introduction limit survives a restart. */
+  admissions: z.record(z.string().min(1), z.array(z.number())).default({}),
   /** The group's own admission rules, which belong with the group rather than with this install's settings. */
   settings: z.unknown().default(null)
 })
@@ -115,6 +117,7 @@ const emptyFile = (): StoredFile => ({
   state: null,
   peerIndex: {},
   pendingBoxes: {},
+  admissions: {},
   settings: null
 })
 
@@ -219,6 +222,9 @@ export type HostMeshStore = {
   readPeerIndex(): ReadonlyMap<string, HostMeshPeerIndexEntry>
   readSettings(): HostMeshSettings
   writeSettings(settings: HostMeshSettings): void
+  /** Admissions inside the last hour for a group, which is what the introduction limit counts. */
+  readAdmissions(groupId: string, now: number): number[]
+  recordAdmission(groupId: string, at: number): void
   /** Boxes this host is holding for a machine that has not collected them yet. */
   readPendingBoxes(recipientHostKey: string): HostMeshSealedOffer[]
   /** Returns and removes them: a box is collected once, so a re-read cannot re-redeem it. */
@@ -304,6 +310,22 @@ export function createHostMeshStore({ userDataPath }: { userDataPath: string }):
       const file = readOrRefuse(path) ?? emptyFile()
       file.settings = settings
       writeStoredFile(path, file)
+    },
+
+    readAdmissions: (groupId, now) => {
+      const file = readOrRefuse(path)
+      const window = 60 * 60_000
+      return (file?.admissions[groupId] ?? []).filter((at) => now - at < window)
+    },
+
+    recordAdmission: (groupId, at) => {
+      const file = readOrRefuse(path) ?? emptyFile()
+      const window = 60 * 60_000
+      const kept = (file.admissions[groupId] ?? []).filter((entry) => at - entry < window)
+      writeStoredFile(path, {
+        ...file,
+        admissions: { ...file.admissions, [groupId]: [...kept, at] }
+      })
     },
 
     readPendingBoxes: (recipientHostKey) => {

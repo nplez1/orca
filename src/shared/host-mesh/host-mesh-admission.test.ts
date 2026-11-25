@@ -61,7 +61,8 @@ function inviteOf(overrides: Partial<InboundIntroduce> = {}): InboundIntroduce {
 }
 
 function settingsOf(overrides: Partial<HostMeshSettings> = {}): HostMeshSettings {
-  return { ...DEFAULT_HOST_MESH_SETTINGS, ...overrides }
+  // Joins are opt-in per host, so every case that expects a join to be considered turns them on.
+  return { ...DEFAULT_HOST_MESH_SETTINGS, allowJoins: true, ...overrides }
 }
 
 describe('admitting an introduced machine', () => {
@@ -265,6 +266,12 @@ describe('admitting a join', () => {
       kind: 'refuse',
       reason: 'at-cap'
     })
+  })
+
+  it('refuses any join when this host has not opted in, which is the default', () => {
+    const decision = decideJoin(groupOf(['key-a']), DEFAULT_HOST_MESH_SETTINGS, joinOf())
+
+    expect(decision).toEqual({ kind: 'refuse', reason: 'joins-not-allowed' })
   })
 
   it('refuses a join when this host does not relay for its group', () => {

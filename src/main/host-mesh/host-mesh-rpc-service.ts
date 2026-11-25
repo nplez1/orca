@@ -22,7 +22,6 @@ import {
   addHostMeshMember,
   createHostMeshState,
   removeHostMeshMember,
-  setHostMeshInboundLink,
   setHostMeshOutboundLink
 } from '../../shared/host-mesh/host-mesh-membership'
 import { orcaHostKeyOf } from '../host-graph/host-graph-self-identity'
@@ -100,6 +99,13 @@ export function createHostMeshRpcService(deps: HostMeshDriverDeps): HostMeshRpcS
   }
 
   // The peer index is what removal later keys on, so every commit re-states it from the environment table.
+  /** Mints for one recipient, recording the device row so removal has something to revoke. */
+  async function mintFor(recipientHostKey: string): Promise<string> {
+    const minted = await deps.mintRuntimeOffer()
+    store.recordPeer(recipientHostKey, { deviceRowId: minted.deviceId })
+    return minted.offerUrl
+  }
+
   function commit(state: HostMeshState): void {
     store.write(state)
     for (const member of state.members) {
@@ -136,7 +142,7 @@ export function createHostMeshRpcService(deps: HostMeshDriverDeps): HostMeshRpcS
       const epoch = Math.max(state.epoch, params.epoch) + 1
       let peer: RedeemedPeer
       try {
-        peer = await deps.redeemOffer(decision.payload.offerUrl)
+        peer = await deps.redeemOffer(decision.payload.offerUrl, decision.payload.minterHostKey)
       } catch {
         return { kind: 'refused', reason: 'redeem-failed' }
       }
@@ -171,7 +177,7 @@ export function createHostMeshRpcService(deps: HostMeshDriverDeps): HostMeshRpcS
           groupId,
           epoch,
           introducedBy: selfKey(),
-          offerUrl: await deps.mintRuntimeOffer()
+          offerUrl: await mintFor(params.joiner.hostKey)
         })
       } catch {
         sealedForJoiner = null
@@ -240,7 +246,7 @@ export function createHostMeshRpcService(deps: HostMeshDriverDeps): HostMeshRpcS
         newcomer: { hostKey: params.newcomer.hostKey, label: params.newcomer.label },
         openedPayload: opened.payload,
         ...(opened.reason === undefined ? {} : { openReason: opened.reason }),
-        introductionsThisHour: 0,
+        introductionsThisHour: store.readAdmissions(params.groupId, deps.now()).length,
         now: deps.now()
       })
       if (decision.kind === 'refuse') {
@@ -251,7 +257,7 @@ export function createHostMeshRpcService(deps: HostMeshDriverDeps): HostMeshRpcS
       }
       let peer: RedeemedPeer
       try {
-        peer = await deps.redeemOffer(decision.payload.offerUrl)
+        peer = await deps.redeemOffer(decision.payload.offerUrl, decision.payload.minterHostKey)
       } catch {
         return { kind: 'refused', reason: 'redeem-failed' }
       }
@@ -272,11 +278,10 @@ export function createHostMeshRpcService(deps: HostMeshDriverDeps): HostMeshRpcS
         hostKey: params.newcomer.hostKey,
         link: { kind: 'ok' }
       })
-      state = setHostMeshInboundLink(state, {
-        hostKey: params.newcomer.hostKey,
-        link: { kind: 'active' }
-      })
+      // Why the inbound direction is NOT marked here: this host minted a box, which proves nothing about
+      // whether the newcomer collected it. Only receiving a box proves the other half, so it stays absent.
       state = { ...state, epoch }
+      store.recordAdmission(params.groupId, deps.now())
       commit(state)
 
       const newcomerPublicKey = params.newcomer.publicKeyB64
@@ -291,7 +296,7 @@ export function createHostMeshRpcService(deps: HostMeshDriverDeps): HostMeshRpcS
           groupId: state.groupId,
           epoch,
           introducedBy: selfKey(),
-          offerUrl: await deps.mintRuntimeOffer()
+          offerUrl: await mintFor(params.newcomer.hostKey)
         })
         return { kind: 'accepted', sealedForNewcomer }
       } catch {

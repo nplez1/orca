@@ -223,11 +223,13 @@ describe('summarising the group', () => {
 })
 
 describe('leaving a group', () => {
-  it('forgets the members and leaves a tombstone for this host', () => {
+  it('forgets the members and writes no tombstone that would block rejoining', () => {
     const left = leaveHostMeshGroup(withMembers(['key-a']), { epoch: 5 })
 
     expect(left.groupId).toBe('')
     expect(left.members).toHaveLength(0)
-    expect(left.tombstones).toEqual([{ hostKey: 'key-self', removedBy: 'key-self', epoch: 5 }])
+    // A tombstone naming this host reads as "ejected", so writing one on the way out would make every
+    // later rejoin look like that to itself.
+    expect(left.tombstones).toEqual([])
   })
 })

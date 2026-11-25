@@ -71,10 +71,15 @@ function depsFromApp(server: HostMeshRuntimeServer): HostMeshDriverDeps {
       if (!offer.available) {
         throw new Error(offer.reason)
       }
-      return offer.pairingUrl
+      return { offerUrl: offer.pairingUrl, deviceId: offer.deviceId }
     },
-    redeemOffer: async (offerUrl) => {
+    redeemOffer: async (offerUrl, expectedHostKey) => {
       const offer = await parseRemotePairingCode(userDataPath, offerUrl)
+      // Refused before any environment record exists for it: a box names the machine it should have come
+      // from, and an offer minted by any other machine is not the box this host was promised.
+      if (orcaHostKeyOf(offer.publicKeyB64) !== expectedHostKey) {
+        throw new Error('offer-not-from-expected-minter')
+      }
       const outcome = await addOrUpdateEnvironmentFromPairingCode(userDataPath, {
         // Nobody is present to type a name, and the host key is the one identifier two hosts cannot share.
         name: `Mesh host ${orcaHostKeyOf(offer.publicKeyB64).slice(0, 8)}`,

@@ -150,10 +150,9 @@ export function leaveHostMeshGroup(state: HostMeshState, args: { epoch: number }
     epoch: args.epoch,
     selfKey: state.selfKey,
     members: [],
-    tombstones: [
-      ...state.tombstones,
-      { hostKey: state.selfKey, removedBy: state.selfKey, epoch: args.epoch }
-    ],
+    // Why no self-tombstone: a tombstone naming this host is read as "this host was ejected", and one
+    // written on the way out would make every future rejoin look like that. The members keep their own.
+    tombstones: [],
     links: { outbound: {}, inbound: {} }
   }
 }

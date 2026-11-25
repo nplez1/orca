@@ -22,7 +22,9 @@ const CIPHERTEXT_MAX_CHARS = 16_384
 const GROUP_ID_MAX_CHARS = 256
 
 const keyB64 = z.string().min(1).max(KEY_B64_MAX_CHARS)
-const groupId = z.string().min(1).max(GROUP_ID_MAX_CHARS)
+// Why empty is allowed: the first call a newcomer makes asks which group the member is in, and carries
+// no group of its own yet.
+const groupId = z.string().max(GROUP_ID_MAX_CHARS)
 const epoch = z.number().int().nonnegative()
 const hostLabel = z.string().min(1).max(HOST_MESH_MAX_LABEL_CHARS)
 const joiner = z.object({ hostKey: keyB64, label: hostLabel }).strict()

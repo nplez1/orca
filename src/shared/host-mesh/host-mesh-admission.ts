@@ -22,13 +22,22 @@ export type HostMeshSettings = {
   acceptIntroductions: boolean
   /** Forward a newcomer's offers to other members on its behalf. */
   relayIntroductions: boolean
+  /**
+   * Whether a paired machine may put this host into a group at all.
+   *
+   * Why off by default: a join is what makes this host mint offers and dial endpoints, and a join is
+   * `workspace`-tier, so a paired desktop could otherwise bootstrap this host into a group without its
+   * owner acting. Turning it on is one action per machine — the same count the feature promises.
+   */
+  allowJoins: boolean
 }
 
 /** Why the default is on: asking per introduction on every machine is the n(n−1) problem in another form. */
 export const DEFAULT_HOST_MESH_SETTINGS: HostMeshSettings = {
   autoAcceptIntroducedMembers: true,
   acceptIntroductions: true,
-  relayIntroductions: true
+  relayIntroductions: true,
+  allowJoins: false
 }
 
 export type IntroduceRefusal =
@@ -130,6 +139,7 @@ export function decideIntroduce(
 
 export type JoinRefusal =
   | 'joins-disabled'
+  | 'joins-not-allowed'
   | 'tombstoned'
   | 'at-cap'
   | 'offer-not-addressed-here'
@@ -159,6 +169,9 @@ export function decideJoin(
   settings: HostMeshSettings,
   join: InboundJoin
 ): JoinDecision {
+  if (!settings.allowJoins) {
+    return { kind: 'refuse', reason: 'joins-not-allowed' }
+  }
   if (!settings.relayIntroductions) {
     return { kind: 'refuse', reason: 'joins-disabled' }
   }

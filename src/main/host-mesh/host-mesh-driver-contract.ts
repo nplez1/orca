@@ -54,10 +54,21 @@ export type HostMeshDriverDeps = {
   now: () => number
   /** This profile's own X25519 host keypair; the same one pairing and push authentication use. */
   ownKeypair: () => { publicKey: Uint8Array; secretKey: Uint8Array; publicKeyB64: string }
-  /** Mints a runtime offer on THIS host with no grants, so the newcomer gets `workspace` and nothing more. */
-  mintRuntimeOffer: () => Promise<string>
-  /** Redeems an offer minted by a peer; returns what the store now holds for it. */
-  redeemOffer: (offerUrl: string) => Promise<RedeemedPeer>
+  /**
+   * Mints a runtime offer on THIS host with no grants, so the newcomer gets `workspace` and nothing more.
+   *
+   * Why the device id comes back with it: minting creates the device row the redeemer will use, and that
+   * row is the only thing removal can revoke. Discarding it leaves a removed member still able to run
+   * commands here.
+   */
+  mintRuntimeOffer: () => Promise<{ offerUrl: string; deviceId: string }>
+  /**
+   * Redeems an offer minted by a peer; returns what the store now holds for it.
+   *
+   * Why the expected key is an argument: an offer URL is what a peer supplied, so it must be checked against
+   * the machine the caller believes minted it *before* this host saves an environment record for it.
+   */
+  redeemOffer: (offerUrl: string, expectedHostKey: string) => Promise<RedeemedPeer>
   /** Cuts outbound reach to a member: the environment record, not the device row. */
   forgetEnvironment: (selector: string) => void
   /** Cuts inbound reach: the device row the member's credential belongs to. */

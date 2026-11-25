@@ -83,7 +83,7 @@ class Mesh {
       rpc: null as unknown as HostMeshRpcService,
       environments: new Map(),
       labels: new Map(),
-      settings: { ...DEFAULT_HOST_MESH_SETTINGS }
+      settings: { ...DEFAULT_HOST_MESH_SETTINGS, allowJoins: true }
     }
     const deps = this.depsFor(host, userDataPath)
     host.driver = createHostMeshDriver(deps)
@@ -121,9 +121,15 @@ class Mesh {
         secretKey: host.secretKey,
         publicKeyB64: host.publicKeyB64
       }),
-      mintRuntimeOffer: async () => `orca://pair?h=${host.hostKey}&pk=${host.publicKeyB64}`,
-      redeemOffer: async (offerUrl) => {
+      mintRuntimeOffer: async () => ({
+        offerUrl: `orca://pair?h=${host.hostKey}&pk=${host.publicKeyB64}`,
+        deviceId: `device-${host.name}-${host.environments.size}`
+      }),
+      redeemOffer: async (offerUrl, expectedHostKey) => {
         const offer = parseFakeOffer(offerUrl)
+        if (offer.hostKey !== expectedHostKey) {
+          throw new Error('offer-not-from-expected-minter')
+        }
         const peer = this.hosts.get(offer.hostKey)
         // Upsert, like the real add-or-update path: a peer this host already holds keeps ONE environment.
         const existing = [...host.environments].find(([, target]) => target === offer.hostKey)?.[0]
@@ -271,6 +277,9 @@ describe('one join pairs a machine with every member', () => {
     mesh.seedPairing(vm, studio)
     await vm.driver.join(mesh.environmentFor(vm, studio))
 
+    // Both sides learn the other's direction by asking, so each host syncs once after the join.
+    await vm.driver.sync()
+    await laptop.driver.sync()
     const laptopView = await laptop.driver.snapshot()
     const vmView = await vm.driver.snapshot()
 
@@ -278,7 +287,7 @@ describe('one join pairs a machine with every member', () => {
     expect(statusOf(vmView, laptop.hostKey)).toBe('complete')
   })
 
-  it('reports a member it could not reach instead of pretending the pair is complete', async () => {
+  it('reports a gap it has not closed yet, then closes it on the next sync', async () => {
     const mesh = new Mesh()
     const studio = mesh.add('studio')
     const laptop = mesh.add('laptop')
@@ -286,36 +295,24 @@ describe('one join pairs a machine with every member', () => {
     mesh.seedPairing(laptop, studio)
     await laptop.driver.join(mesh.environmentFor(laptop, studio))
 
-    // The laptop refuses transitive members, so the VM's introduction to it must leave a visible gap.
-    laptop.settings = { ...DEFAULT_HOST_MESH_SETTINGS, acceptIntroductions: false }
+    // The laptop refuses the introduction, so the VM's arrival leaves it holding no credential for the VM.
+    laptop.settings = {
+      ...DEFAULT_HOST_MESH_SETTINGS,
+      allowJoins: true,
+      acceptIntroductions: false
+    }
     mesh.seedPairing(vm, studio)
     await vm.driver.join(mesh.environmentFor(vm, studio))
 
-    await laptop.driver.sync()
-    const laptopView = await laptop.driver.snapshot()
-    expect(memberKeys(laptopView)).toContain(vm.hostKey)
-    expect(statusOf(laptopView, vm.hostKey)).not.toBe('complete')
-  })
-
-  it('completes the gap once the refusing host allows introductions and a sync runs', async () => {
-    const mesh = new Mesh()
-    const studio = mesh.add('studio')
-    const laptop = mesh.add('laptop')
-    const vm = mesh.add('vm')
-    mesh.seedPairing(laptop, studio)
-    await laptop.driver.join(mesh.environmentFor(laptop, studio))
-
-    laptop.settings = { ...DEFAULT_HOST_MESH_SETTINGS, acceptIntroductions: false }
-    mesh.seedPairing(vm, studio)
-    await vm.driver.join(mesh.environmentFor(vm, studio))
+    // The honest state right after: not paired, and not claimed as paired either.
     expect(statusOf(await laptop.driver.snapshot(), vm.hostKey)).not.toBe('complete')
 
-    laptop.settings = { ...DEFAULT_HOST_MESH_SETTINGS }
+    // One sync both learns the VM exists and repairs the pair, because the repair relays through a member.
+    laptop.settings = { ...DEFAULT_HOST_MESH_SETTINGS, allowJoins: true }
     await laptop.driver.sync()
     await vm.driver.sync()
 
     expect(statusOf(await laptop.driver.snapshot(), vm.hostKey)).toBe('complete')
-    expect(statusOf(await vm.driver.snapshot(), laptop.hostKey)).toBe('complete')
   })
 })
 
@@ -336,7 +333,11 @@ describe('removing a member', () => {
     const laptopView = await laptop.driver.snapshot()
     expect(laptopView.members.map((member) => member.hostKey)).not.toContain(studio.hostKey)
 
-    // A removed machine cannot come back by asking, because the tombstone outlives it.
+    // Being ejected cuts the credential, so the removed machine cannot even reach the group any more.
+    expect(laptop.environments.size).toBe(0)
+
+    // And even re-paired by hand it cannot come back by asking, because the tombstone outlives it.
+    mesh.seedPairing(laptop, studio)
     const again = await laptop.driver.join(mesh.environmentFor(laptop, studio))
     expect(again.kind).toBe('refused')
     if (again.kind === 'refused') {
@@ -354,6 +355,45 @@ describe('removing a member', () => {
     await studio.driver.removeMember(laptop.hostKey)
 
     expect([...studio.environments.values()]).not.toContain(laptop.hostKey)
+  })
+})
+
+describe('a removal that arrives by sync', () => {
+  it('revokes the credential as well as the row, which is how a sleeping member is removed', async () => {
+    const mesh = new Mesh()
+    const studio = mesh.add('studio')
+    const laptop = mesh.add('laptop')
+    mesh.seedPairing(laptop, studio)
+    await laptop.driver.join(mesh.environmentFor(laptop, studio))
+
+    // The member is removed on the laptop's side and learns only by syncing, as an offline member would.
+    await studio.driver.removeMember(laptop.hostKey)
+    await laptop.driver.sync()
+
+    expect(laptop.environments.size).toBe(0)
+    expect(laptop.labels.size).toBe(0)
+    expect((await laptop.driver.snapshot()).inGroup).toBe(false)
+  })
+})
+
+describe('consent: a peer cannot put this host in a group', () => {
+  it('refuses a join on a host whose owner never allowed being joined', async () => {
+    const mesh = new Mesh()
+    const studio = mesh.add('studio')
+    const laptop = mesh.add('laptop')
+    mesh.seedPairing(laptop, studio)
+    // The default: a paired machine may not bootstrap this host into a group by asking.
+    studio.settings = { ...DEFAULT_HOST_MESH_SETTINGS }
+
+    const joined = await laptop.driver.join(mesh.environmentFor(laptop, studio))
+
+    expect(joined.kind).toBe('refused')
+    if (joined.kind === 'refused') {
+      expect(joined.reason).toBe('joins-not-allowed')
+    }
+    expect((await studio.driver.snapshot()).inGroup).toBe(false)
+    // Nothing was minted or dialled on the studio's behalf.
+    expect(studio.environments.size).toBe(1)
   })
 })
 
