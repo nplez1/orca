@@ -42,16 +42,33 @@ function refusal(status: number): string {
 /** A list is capped rather than followed forever if GitHub keeps naming a next page. */
 const MAX_LIST_PAGES = 20
 
-/** GitHub's `Link` header names the next page; nothing else does, so it is how a list past 100 is read. */
+/**
+ * The next page, but only on the API this request is already talking to.
+ *
+ * Why: the `Link` header is the server's own text, and following it blindly sends the App's signed JWT
+ * — which can list installations and mint tokens — wherever it names. A header that points elsewhere
+ * is not a continuation, so it is refused rather than silently ending the list, which would under-report
+ * installations.
+ */
 function nextPageUrl(link: string | null): string | null {
   if (!link) {
     return null
   }
   for (const part of link.split(',')) {
     const match = /<([^>]+)>\s*;\s*rel="?next"?/.exec(part)
-    if (match?.[1]) {
-      return match[1]
+    if (!match?.[1]) {
+      continue
     }
+    let target: URL
+    try {
+      target = new URL(match[1], API_ROOT)
+    } catch {
+      throw new Error('github-app: GitHub named an unreadable next page')
+    }
+    if (target.protocol !== 'https:' || target.origin !== API_ROOT) {
+      throw new Error('github-app: GitHub pointed the next page outside its API')
+    }
+    return target.href
   }
   return null
 }

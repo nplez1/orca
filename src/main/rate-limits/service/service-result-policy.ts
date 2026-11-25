@@ -57,8 +57,15 @@ export abstract class RateLimitServiceResultPolicy extends RateLimitServiceFetch
       }
     }
 
-    // Unavailability and a rejected Codex login clear the prior reading and its provenance.
-    if (fresh.status === 'unavailable' || isCodexUsageSignInRequired(fresh)) {
+    // Unavailability, a rejected Codex login and a credential the provider now refuses all clear the
+    // prior reading and its provenance: those numbers describe a key that no longer answers, so
+    // showing them beside "check the key in Settings" claims a balance nothing verified.
+    const failureKind = fresh.usageMetadata?.failureKind
+    if (
+      fresh.status === 'unavailable' ||
+      isCodexUsageSignInRequired(fresh) ||
+      failureKind === 'missing-credentials'
+    ) {
       return fresh
     }
 
@@ -66,7 +73,6 @@ export abstract class RateLimitServiceResultPolicy extends RateLimitServiceFetch
       return fresh
     }
 
-    const failureKind = fresh.usageMetadata?.failureKind
     // Only Claude's lapsed token renews itself when its CLI next runs; others may be a real expiry.
     const staleThresholdMs =
       failureKind === 'rate-limited' ||

@@ -23,6 +23,16 @@ import { scanRipgrepPaths } from '../../quick-open-rg-path-scan'
 import { parseWslPath } from '../../../wsl/filesystem/unc-path-access'
 
 const DELTA_BATCH_PATHS = 256
+
+/**
+ * How long one directory subtree may go without a batch before the rescan is abandoned.
+ *
+ * Sized like discovery's walk, not like a query: this scan re-reads a whole subtree that a watcher
+ * event touched, the deadline re-arms on every flushed batch, and the cost of giving up is that the
+ * paths stay missing from the index until a full rebuild.
+ */
+const RECONCILE_SCAN_TIMEOUT_MS = 10 * 60_000
+
 let reconciliationSequence = 0
 
 export async function reconcileLocalWorkspacePathIndexEvents(
@@ -111,7 +121,8 @@ export async function reconcileLocalWorkspacePathIndexEvents(
             )
             return applyMutationBatch(rootPath, batch, correlationId, false)
           },
-          batchSize: DELTA_BATCH_PATHS
+          batchSize: DELTA_BATCH_PATHS,
+          timeoutMilliseconds: RECONCILE_SCAN_TIMEOUT_MS
         })
       }
     }

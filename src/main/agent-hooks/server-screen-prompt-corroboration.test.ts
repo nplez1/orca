@@ -570,6 +570,26 @@ describe('the corroboration loop', () => {
     expect(published.map((entry) => entry.payload.state)).toEqual(['waiting'])
   })
 
+  it('keeps a live dialog when the release path itself goes blind', () => {
+    // The release path went blind, and a blind read must not be read as "the dialog is gone": the
+    // pane's title still claims one, and widening the pane makes it readable again with no new hook.
+    // Counting those against the limit released a live dialog to Working after about twenty reads.
+    const loop = corroboration()
+    loop.arm(current)
+    vi.advanceTimersByTime(250)
+    expect(published.map((entry) => entry.payload.state)).toEqual(['waiting'])
+
+    screen = undefined
+    dialogClaimed = true
+    vi.advanceTimersByTime(200_000)
+
+    expect(published.map((entry) => entry.payload.state)).toEqual(['waiting'])
+    // Still watching, so the dialog is reported the moment the pane can be read again.
+    screen = { reason: 'agent-approval-prompt', since: 1_200 }
+    vi.advanceTimersByTime(60_000)
+    expect(published.at(-1)?.payload.state).toBe('waiting')
+  })
+
   it('stops reading a pane whose screen never becomes readable', () => {
     // Why a bound: a restored row whose terminal never reconnects would otherwise be re-read every
     // 5 s for the life of the process. The release path already bounds itself this way.

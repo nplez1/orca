@@ -11,13 +11,26 @@ import type {
 } from './session-summary-fold'
 import type { SessionSummaryStoreEntry } from './session-summary-store'
 import type { SessionSummaryFoldRunnerDeps } from './session-summary-fold-runner'
+import { sessionSummaryIdentityChanged } from './session-summary-session-ref'
 
+/**
+ * The entry a fold resumes from, or a fresh one when the pane's session has changed.
+ *
+ * Why re-check here and not only in `open()`: a fold can wait for a process-wide slot long enough for
+ * the pane's session to change, and `get(paneKey)` answers for whatever session was stored last. Folding
+ * this transcript onto that ledger resumes at another conversation's `foldedThrough` and builds on its
+ * facts, which is the merge this store is supposed to make impossible.
+ */
 export function storedEntry(
   deps: SessionSummaryFoldRunnerDeps,
   paneKey: string,
   identity: SessionSummaryStoreEntry['identity']
 ): SessionSummaryStoreEntry {
-  return deps.store.get(paneKey) ?? freshStoreEntry(identity, deps.now())
+  const stored = deps.store.get(paneKey)
+  if (!stored || sessionSummaryIdentityChanged(stored.identity, identity)) {
+    return freshStoreEntry(identity, deps.now())
+  }
+  return stored
 }
 
 /**
