@@ -2,12 +2,12 @@ import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { realpath } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
-import { applyEdits, modify, parse as parseJsonc, type ParseError } from 'jsonc-parser'
 import { runKeyedSerializedOperation } from '../../../shared/concurrency/keyed-serialized-operations'
 import { writeFileAtomically } from '../../filesystem/atomic-file-publication'
 import { grantCodexProjectTrustOffMain } from '../../codex/trust/project-trust/codex-project-trust-worker-client'
 import { runExclusivelyForCodexTrustConfig } from '../../codex/trust/toml/codex-trust-config-mutation-queue'
 import { recordOrcaCreatedAntigravityTrust } from './antigravity-workspace-trust-ownership'
+import { editAgentTrustConfig, parseAgentTrustConfig } from './agent-trust-config-jsonc'
 import type { TuiAgentConfig } from '../../../shared/agent-launch/catalog/tui-agent-config-types'
 
 export type AgentTrustPreset = NonNullable<TuiAgentConfig['preflightTrust']>
@@ -127,32 +127,28 @@ function readTrustedConfig(configPath: string): TrustedConfigSource | null {
   }
   try {
     const text = readFileSync(configPath, 'utf-8')
-    const errors: ParseError[] = []
-    const parsed: unknown = parseJsonc(text, errors)
     // Why null and not `{}`: a top level that is not an object is not a config this path can extend,
     // and writing over it would drop whatever the agent keeps there. A corrupted config is the
     // user's to fix; the agent rewrites the file itself after the user accepts the prompt.
-    return errors.length === 0 && parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? { text, config: Object.fromEntries(Object.entries(parsed)) }
-      : null
+    const config = parseAgentTrustConfig(text)
+    return config ? { text, config } : null
   } catch {
     return null
   }
 }
 
-/** Edit only the key, so the agent's comments and other keys survive the write. */
-function withTrustedEntries(
+/** Append only the entry, so the agent's comments, keys and other array items survive the write. */
+function withTrustedEntry(
   source: TrustedConfigSource,
   key: TrustedEntryConfig['key'],
-  entries: string[]
+  entry: string
 ): string {
   if (source.text === null) {
-    return `${JSON.stringify({ ...source.config, [key]: entries }, null, 2)}\n`
+    return `${JSON.stringify({ [key]: [entry] }, null, 2)}\n`
   }
-  const edits = modify(source.text, [key], entries, {
-    formattingOptions: { insertSpaces: true, tabSize: 2, eol: '\n' }
-  })
-  return applyEdits(source.text, edits)
+  return Array.isArray(source.config[key])
+    ? editAgentTrustConfig(source.text, [key, -1], entry)
+    : editAgentTrustConfig(source.text, [key], [entry])
 }
 
 function trustedEntries(config: Record<string, unknown>, key: TrustedEntryConfig['key']): string[] {
@@ -198,7 +194,7 @@ async function appendTrustedConfigEntry(args: TrustedEntryConfig): Promise<void>
     }
     writeFileAtomically(
       args.configPath,
-      withTrustedEntries(source, args.key, [...existing, absPath]),
+      withTrustedEntry(source, args.key, absPath),
       args.mode === undefined ? undefined : { mode: args.mode }
     )
     // Why gated: the ownership ledger is Antigravity's; a Copilot trustedFolders write must not land in it.
