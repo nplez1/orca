@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { getAgentStatusEpochNow } from '@/lib/agent-status/evidence/agent-status-epoch-clock'
 import {
@@ -64,15 +65,15 @@ export function useTabGroupWorkspaceModel({
   const { closeItem, closeMany } = useTabGroupTabCloseCommands({ worktreeId })
 
   // Why: closing a workspace's last tab keeps it selected and lands on the empty-tabs surface
-  // instead of the landing page, so the pane has to know it has nothing left to show (#96). The
-  // close record is what separates that from an empty workspace whose first tab is still arriving
-  // — a fresh worktree, a host-owned list still mirroring, a chat launch waiting on its host —
-  // which must not flash the surface. Read as one selector so the pane re-renders only when this
-  // workspace's verdict changes, not on every close anywhere. The row check matters: a workspace
-  // this build never initialized has no terminal row, the same absence the seeder reads.
-  const showsEmptyWorkspaceState = useAppStore(
+  // instead of the landing page, so the pane has to know it has nothing left to show (#96). It must
+  // not flash for a workspace whose first tab is still arriving — a fresh worktree, a host-owned
+  // list still mirroring, a chat launch waiting on its host. Two things rule that out: a close
+  // record (which survives restart and re-activation; the row check matches the seeder, since a
+  // workspace this build never initialized has no terminal row), or this pane having shown content
+  // already, which covers a last chat, browser or editor close that writes no record.
+  const hasNoContent = useAppStore((state) => hasNoRenderableWorkspaceContent(state, worktreeId))
+  const emptiedByRecordedClose = useAppStore(
     (state) =>
-      hasNoRenderableWorkspaceContent(state, worktreeId) &&
       Object.hasOwn(state.tabsByWorktree, worktreeId) &&
       hasFreshClosedTabRecord(
         state.closedTerminalTabTombstonesByTabId,
@@ -80,6 +81,11 @@ export function useTabGroupWorkspaceModel({
         getAgentStatusEpochNow(state.agentStatusEpoch ?? 0)
       )
   )
+  const [hasShownContent, setHasShownContent] = useState(!hasNoContent)
+  if (!hasNoContent && !hasShownContent) {
+    setHasShownContent(true)
+  }
+  const showsEmptyWorkspaceState = hasNoContent && (emptiedByRecordedClose || hasShownContent)
 
   const { closeGroup, closeAllEditorTabsInGroup, closeOthers, closeToRight, closeToLeft } =
     useTabGroupCloseScopeCommands({
