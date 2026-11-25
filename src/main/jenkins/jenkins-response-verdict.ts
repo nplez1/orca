@@ -25,7 +25,7 @@ export function isKnownJenkins(evidence: JenkinsIdentityEvidence): boolean {
 }
 
 /**
- * Whether the response arrived from somewhere our credentials were not meant for.
+ * Whether a response arrived from somewhere our credentials were not meant for.
  *
  * Why refuse it rather than read it: a Jenkins that redirects away from its own URL is an SSO
  * interstitial or a proxy, and that response is no longer evidence about this Jenkins. The Fetch
@@ -33,6 +33,11 @@ export function isKnownJenkins(evidence: JenkinsIdentityEvidence): boolean {
  * configured path prefix — not just the origin — is the boundary that matters here: a server
  * configured at `https://host/jenkins` redirecting to `https://host/other-service` is still the
  * same origin and would otherwise take the token with it.
+ *
+ * This is the boundary, not the enforcement. A read enforces it before each hop (`jenkinsScopeRefusal`
+ * and the vetted redirect loop in `jenkins-request.ts`), because refusing after the fact only refuses
+ * to read an answer the token already fetched; a write, whose transport cannot expose its hops, is
+ * checked before it posts and then again here.
  *
  * An unconfigured host has no prefix to compare against, so its own origin is the boundary.
  */

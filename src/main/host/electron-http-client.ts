@@ -4,6 +4,7 @@ import { hasElectronProxyCredentialsForSession } from '../network/electron-proxy
 import { getProxySessionApplicationReadiness } from '../network/proxy-settings'
 import { waitForPromiseWithSignal } from '../../shared/concurrency/abort-signal-reason'
 import { fetchWithProxyLogin } from './electron-proxy-login-fetch'
+import { fetchWithElectronManualRedirects } from './electron-manual-redirect-fetch'
 
 function isHttpUrl(url: string): boolean {
   try {
@@ -40,6 +41,14 @@ async function fetchFromDefaultSession(url: string, init?: RequestInit): Promise
 /** Chromium honors session/proxy state; read defaultSession per call because it throws before app readiness. */
 export const electronHttpClient: MainHttpClient = {
   fetch: fetchFromDefaultSession,
+  // Why the wait: a cold request must not overtake the proxy policy being applied to the session, or
+  // it leaves on a bare route. `hasConfiguredProxyCredentials` is what waits; whether credentials
+  // exist is `fetchWithElectronManualRedirects`' own `login` listener to answer.
+  fetchManualRedirects: async (url, init) => {
+    const proxySession = session.defaultSession
+    await hasConfiguredProxyCredentials(proxySession, init?.signal ?? undefined)
+    return fetchWithElectronManualRedirects(url, init, proxySession)
+  },
   proxySession: () => session.defaultSession,
   partitionSession: (partition) => session.fromPartition(partition)
 }

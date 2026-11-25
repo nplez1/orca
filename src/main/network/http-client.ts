@@ -5,12 +5,19 @@ import type { Session } from 'electron'
 
 export type MainHttpClient = {
   fetch(url: string, init?: RequestInit): Promise<Response>
+  /**
+   * One hop, with a 3xx handed back instead of followed, so a caller can vet the destination before
+   * the next request carries its credentials there. Absent only on a host whose transport cannot do
+   * it, where a caller that must vet hops has to refuse instead.
+   */
+  fetchManualRedirects?(url: string, init?: RequestInit): Promise<Response>
   proxySession(): Session | null
   partitionSession?(partition: string): Session
 }
 
 const nodeHttpClient: MainHttpClient = {
   fetch: (url, init) => globalThis.fetch(url, init),
+  fetchManualRedirects: (url, init) => globalThis.fetch(url, { ...init, redirect: 'manual' }),
   proxySession: () => null
 }
 
