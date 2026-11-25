@@ -130,7 +130,12 @@ export function measureSurface(base) {
   const touched = []
   for (const entry of changed) {
     // `local/` and the fork's own ledgers are this fork's files, whether or not a fork commit put them there.
-    if (entry.path.startsWith('local/') || NOT_UPSTREAM.has(entry.path)) {
+    // A `.fork.txt` overlay is this fork's own baseline row, wherever it sits.
+    if (
+      entry.path.startsWith('local/') ||
+      entry.path.endsWith('.fork.txt') ||
+      NOT_UPSTREAM.has(entry.path)
+    ) {
       continue
     }
     // A file upstream does not have is fork-owned by construction: nothing there can conflict.

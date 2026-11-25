@@ -21,7 +21,7 @@
 1 src/main/host-mesh/host-mesh-rpc-service.ts
 3 src/main/host-mesh/host-mesh-runtime-deps.ts
 1 src/main/host-mesh/host-mesh-startup.ts
-20 src/main/host-mesh/host-mesh-store.ts
+18 src/main/host-mesh/host-mesh-store.ts
 # This is a RATCHET: counts may only go DOWN. Prune: node config/scripts/static-analysis/ratchets/runtime-lifecycle/check-main-blocking-helper-ratchet.mjs --prune
 1 src/main/agent-hooks/first-work/first-work-folder-rename.ts
 1 src/main/agent-hooks/installation/commands/managed-hook-command-matching.ts
