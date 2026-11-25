@@ -6065,3 +6065,44 @@ prove two entries are one machine. And once this client knows its own pairing ke
 SSH key is never treated as "us": VM images cloned from one template share `/etc/ssh` host keys, so a clone
 shows as its own row. That is the safer direction — a spare row, instead of a peer being able to hide a
 machine from the count by claiming our host key.
+
+### `local(hosts)`: mesh groups, so one join pairs a machine with every member
+
+The design, the three rejected mechanisms and the security reasoning are `local/design/host-mesh.md`; this
+records what shipped and, more importantly, what did not. Orca pairing is directional — the caller holds the
+environment record — so a fully connected group of n machines needs n(n−1) records and n(n−1) user actions.
+Three machines is six links, four is twelve. A group makes it n actions.
+
+**The decision that shapes it: no host mints a pairing offer for another.** `pairing.createOffer` is
+`pairing-admin` and that tier is owner-only (`runtime/rpc/methods/pairing/pairing.ts`, _"paired clients and
+phones never hold pairing-admin"_). Minting on a peer's behalf would turn every pairing into a grant to widen
+that peer's access — the escalation `host-graph.md` §4 refuses. So each host mints its own offer, sealed to
+the one machine allowed to redeem it, and the introducer is a courier for a box it cannot open.
+
+**Shipped, all of it fork-owned and inert:**
+
+| File                                           | What it fixes in place                                                                                                                                                        |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/shared/host-mesh/host-mesh-contract.ts`   | capability `host.mesh.v1`, the sealed-offer and sync payloads, the bounds, `hostMeshPairStatus` so a half-join is representable                                               |
+| `src/shared/host-mesh/host-mesh-membership.ts` | the group's rules as a pure reducer: union of members, union of tombstones, the cap, removal-wins-forever, link states                                                        |
+| `src/main/host-mesh/host-mesh-sealed-offer.ts` | `nacl.box` static-static over a domain prefix, refusing rather than throwing on every untrusted path; the box is bound to the sender it names, so a courier cannot relabel it |
+| `src/main/host-mesh/host-mesh-store.ts`        | the on-disk group plus a peer index, because a build that rewrites the device registry must not strand a removal                                                              |
+
+**No upstream anchors.** Every file above is new and fork-owned, so this patch currently costs a sync
+nothing. That changes the moment the pairing side lands: minting an offer, tagging a device row, tagging an
+environment and the six `hostMesh.*` methods all touch files upstream owns, and each will need an anchor here.
+
+**Not built, and deliberately not half-wired:** offer minting with `grants: []` and `ticket: true`, the
+device-row and environment tags, the `hostMesh.*` methods and the `mesh-member` permission tier, the
+introduction and removal outboxes, the Settings surface, and `orca group`. Nothing in a running app can join a
+group today — the layers above are unreachable from the UI, which is what makes them safe to land first.
+
+**Why the rest needs three real machines.** Two real Electron main processes are needed for a real offer
+exchange, a real ticket redemption and the network widening that goes with them; loopback is refused outside
+tests. The transitive join itself, endpoint reachability across LAN and Tailscale — the likeliest cause of a
+half-join — and removal while a member sleeps all need Studio, laptop and VM.
+
+**One honest cost of auto-accept.** With introductions accepted automatically, one compromised member can add
+a machine it controls to every member of the group, and every member gains a shell on every other. That is
+inherent in what the group is for. The bounds are attribution on every row, a notification on each host, a
+cap of 12, four introductions per introducer per hour, and any member able to eject.
