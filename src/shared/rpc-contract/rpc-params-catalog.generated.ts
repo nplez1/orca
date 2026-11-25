@@ -571,6 +571,7 @@ import {
   GmailModifyParams,
   GmailSendParams
 } from './google-write-params'
+import { HostGraphExchangeParams } from './host-graph-params'
 import {
   AgentCliUpdateCheckParams,
   AgentCliUpdateRunParams
@@ -1816,6 +1817,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'host.pwsh.isAvailable': null,
   'host.wsl.isAvailable': null,
   'host.wsl.listDistros': null,
+  'hostGraph.exchange': HostGraphExchangeParams,
   'hostSettings.applyReplication': ApplyHostSettingsReplicationParams,
   'hostSettings.replicationState': null,
   'hostedReview.create': HostedReviewCreate,

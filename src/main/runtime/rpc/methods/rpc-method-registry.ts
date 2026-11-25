@@ -71,6 +71,7 @@ import { SKILL_METHODS } from './skills/skills'
 import { CLIPBOARD_METHODS } from './clipboard/clipboard'
 import { HOST_CAPABILITY_METHODS } from './host-management/host-capabilities'
 import { HOST_SETTINGS_METHODS } from './host-settings'
+import { HOST_GRAPH_METHODS } from './host-graph'
 import { MOBILE_WEB_BUNDLE_METHODS } from './mobile-delivery/mobile-web-bundle'
 import { RUNTIME_CLIENT_CAPABILITY_METHODS } from './client-events/runtime-client-capabilities'
 import { EMULATOR_METHODS } from './emulator/emulator'
@@ -253,6 +254,7 @@ const SERVICE_RPC_METHODS = [
   ...CLIPBOARD_METHODS,
   ...HOST_CAPABILITY_METHODS,
   ...HOST_SETTINGS_METHODS,
+  ...HOST_GRAPH_METHODS,
   ...MOBILE_WEB_BUNDLE_METHODS,
   ...RUNTIME_CLIENT_CAPABILITY_METHODS,
   ...CLIENT_EVENT_METHODS,
