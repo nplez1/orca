@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { realpath } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
+import { applyEdits, modify, parse as parseJsonc, type ParseError } from 'jsonc-parser'
 import { runKeyedSerializedOperation } from '../../../shared/concurrency/keyed-serialized-operations'
 import { writeFileAtomically } from '../../filesystem/atomic-file-publication'
 import { grantCodexProjectTrustOffMain } from '../../codex/trust/project-trust/codex-project-trust-worker-client'
@@ -51,7 +52,8 @@ export async function markCursorWorkspaceTrusted(
  * ~/.copilot/config.json under `trustedFolders` (verified against the
  * @github/copilot 1.0.32 bundle: `addTrustedFolder` and `isFolderTrusted`
  * both read/write this exact key, and folder comparison is done after a
- * realpath() resolution).
+ * realpath() resolution). Copilot 1.0.105 writes the file as JSONC, headed
+ * by `//` comment lines, so it is parsed and edited as JSONC (#165).
  *
  * We append to the array in-place so unrelated config keys (loggedInUsers,
  * copilotTokens, etc.) survive untouched.
@@ -116,23 +118,41 @@ type TrustedEntryConfig = {
 
 const trustedConfigWriteQueue = new Map<string, Promise<void>>()
 
-/** The config as a plain object, `{}` when absent, or null when it cannot be extended as one. */
-function readTrustedConfig(configPath: string): Record<string, unknown> | null {
+type TrustedConfigSource = { text: string | null; config: Record<string, unknown> }
+
+/** The config and its text (null when absent), or null when it cannot be extended as an object. */
+function readTrustedConfig(configPath: string): TrustedConfigSource | null {
   if (!existsSync(configPath)) {
-    return {}
+    return { text: null, config: {} }
   }
   try {
-    const parsed: unknown = JSON.parse(readFileSync(configPath, 'utf-8'))
+    const text = readFileSync(configPath, 'utf-8')
+    const errors: ParseError[] = []
+    const parsed: unknown = parseJsonc(text, errors)
     // Why null and not `{}`: a top level that is not an object is not a config this path can extend,
-    // and writing over it would drop whatever the agent keeps there.
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? Object.fromEntries(Object.entries(parsed))
+    // and writing over it would drop whatever the agent keeps there. A corrupted config is the
+    // user's to fix; the agent rewrites the file itself after the user accepts the prompt.
+    return errors.length === 0 && parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? { text, config: Object.fromEntries(Object.entries(parsed)) }
       : null
   } catch {
-    // Why: a corrupted config is the user's to fix — refuse to overwrite it from this
-    // side-effect path. The agent rewrites the file itself after the user accepts the prompt.
     return null
   }
+}
+
+/** Edit only the key, so the agent's comments and other keys survive the write. */
+function withTrustedEntries(
+  source: TrustedConfigSource,
+  key: TrustedEntryConfig['key'],
+  entries: string[]
+): string {
+  if (source.text === null) {
+    return `${JSON.stringify({ ...source.config, [key]: entries }, null, 2)}\n`
+  }
+  const edits = modify(source.text, [key], entries, {
+    formattingOptions: { insertSpaces: true, tabSize: 2, eol: '\n' }
+  })
+  return applyEdits(source.text, edits)
 }
 
 function trustedEntries(config: Record<string, unknown>, key: TrustedEntryConfig['key']): string[] {
@@ -159,27 +179,26 @@ async function appendTrustedConfigEntry(args: TrustedEntryConfig): Promise<void>
     return
   }
   // Why one at a time: entries on a dead mount would otherwise pin every libuv fs thread at once.
-  for (const entry of trustedEntries(initial, args.key)) {
+  for (const entry of trustedEntries(initial.config, args.key)) {
     if ((await canonicalize(entry)) === absPath) {
       return
     }
   }
   await runKeyedSerializedOperation(trustedConfigWriteQueue, args.configPath, async () => {
-    const config = readTrustedConfig(args.configPath)
-    if (!config) {
+    const source = readTrustedConfig(args.configPath)
+    if (!source) {
       return
     }
-    const existing = trustedEntries(config, args.key)
+    const existing = trustedEntries(source.config, args.key)
     if (existing.includes(absPath)) {
       return
     }
-    config[args.key] = [...existing, absPath]
     if (!existsSync(args.configDir)) {
       mkdirSync(args.configDir, { recursive: true })
     }
     writeFileAtomically(
       args.configPath,
-      `${JSON.stringify(config, null, 2)}\n`,
+      withTrustedEntries(source, args.key, [...existing, absPath]),
       args.mode === undefined ? undefined : { mode: args.mode }
     )
     // Why gated: the ownership ledger is Antigravity's; a Copilot trustedFolders write must not land in it.
