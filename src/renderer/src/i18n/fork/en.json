@@ -962,6 +962,9 @@
                 "hostDidNotReport": "The connected host did not report deleting the remote branch. Check the branch on its remote before assuming it is gone.",
                 "keptTitle": "Remote branch kept for {{value0}}",
                 "noUpstream": "This branch tracks no remote branch, so nothing was deleted there.",
+                "skippedChangedOnRemote": "{{value0}} moved on the remote since the last fetch, so Orca left it in place rather than discard commits nobody here has seen.",
+                "skippedDefaultBranch": "{{value0}} is the remote default branch, so Orca left it in place.",
+                "skippedForeignBranch": "This branch tracks {{value0}}, a differently named branch Orca did not create, so it left it in place.",
                 "skippedPreserved": "Orca kept the local branch, so it left the remote branch in place too."
               }
             }
@@ -1102,6 +1105,15 @@
         "SkillsPage": {
           "closeSkills": null,
           "closeTooltip": null
+        }
+      },
+      "diff": {
+        "comments": {
+          "diffCommentZoneCard": {
+            "repliesUnavailable": "Replies are unavailable here.",
+            "resolveFailed": "Could not update review thread. Check the GitHub API budget.",
+            "resolveUnavailable": "Resolving is unavailable here."
+          }
         }
       }
     },
