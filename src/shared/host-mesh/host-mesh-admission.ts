@@ -172,9 +172,6 @@ export function decideJoin(
   if (!settings.allowJoins) {
     return { kind: 'refuse', reason: 'joins-not-allowed' }
   }
-  if (!settings.relayIntroductions) {
-    return { kind: 'refuse', reason: 'joins-disabled' }
-  }
   if (join.joiner.hostKey === state.selfKey) {
     return { kind: 'refuse', reason: 'offer-not-from-joiner' }
   }

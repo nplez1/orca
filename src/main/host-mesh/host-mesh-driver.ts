@@ -556,6 +556,12 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
     // a pair one-way that is now joined both ways.
     if (awaiting.length > 0) {
       state = await pullMemberViews(state)
+      // A tombstone can arrive in either pass, and the set compared above is already behind by then.
+      for (const hostKey of membersBefore) {
+        if (!state.members.some((member) => member.hostKey === hostKey)) {
+          tearDownPeer(hostKey)
+        }
+      }
       saveState(state)
     }
     return snapshot()

@@ -86,7 +86,8 @@ const peerEntrySchema = z.looseObject({
 const settingsSchema = z.looseObject({
   autoAcceptIntroducedMembers: z.boolean(),
   acceptIntroductions: z.boolean(),
-  relayIntroductions: z.boolean()
+  relayIntroductions: z.boolean(),
+  allowJoins: z.boolean()
 })
 
 export type HostMeshPeerIndexEntry = {

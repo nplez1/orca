@@ -274,10 +274,10 @@ describe('admitting a join', () => {
     expect(decision).toEqual({ kind: 'refuse', reason: 'joins-not-allowed' })
   })
 
-  it('refuses a join when this host does not relay for its group', () => {
+  it('still admits a join when this host does not relay, because joining is not relaying', () => {
     expect(
-      decideJoin(groupOf(['key-a']), settingsOf({ relayIntroductions: false }), joinOf())
-    ).toEqual({ kind: 'refuse', reason: 'joins-disabled' })
+      decideJoin(groupOf(['key-a']), settingsOf({ relayIntroductions: false }), joinOf()).kind
+    ).toBe('accept')
   })
 })
 

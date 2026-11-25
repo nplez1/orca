@@ -106,6 +106,8 @@ export const HostMeshSettingsPatchParamsSchema = z
   .object({
     autoAcceptIntroducedMembers: z.boolean().optional(),
     acceptIntroductions: z.boolean().optional(),
-    relayIntroductions: z.boolean().optional()
+    relayIntroductions: z.boolean().optional(),
+    // Off until this host's owner turns it on; without it every join is refused.
+    allowJoins: z.boolean().optional()
   })
   .strict()

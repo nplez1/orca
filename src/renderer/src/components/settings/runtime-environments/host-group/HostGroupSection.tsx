@@ -147,6 +147,19 @@ export function HostGroupSection(): React.JSX.Element | null {
       >
         <SettingsSwitchRow
           label={t(
+            'auto.components.settings.hostGroup.allowJoins',
+            'Allow this computer to be added to a group'
+          )}
+          description={t(
+            'auto.components.settings.hostGroup.allowJoinsDescription',
+            'Off, another computer cannot put this one into a group at all, even one you have paired with. Turn it on for each computer you want to join.'
+          )}
+          checked={settings.allowJoins}
+          disabled={snapshot === null || busy !== null}
+          onChange={() => updateSetting({ allowJoins: !settings.allowJoins })}
+        />
+        <SettingsSwitchRow
+          label={t(
             'auto.components.settings.hostGroup.autoAccept',
             'Auto-accept introduced members'
           )}
