@@ -32,9 +32,16 @@ import {
 } from '../../../host-mesh/host-mesh-runtime'
 import { defineMethod, type RpcContext } from '../core'
 
-/** Throws rather than answering an empty group, which would read as "you have no members". */
-function meshService(ctx: RpcContext): HostMeshRpcService {
-  const service = ctx.hostMesh ?? hostMeshRpcServiceIfAvailable()
+/**
+ * The configured service, or a refusal.
+ *
+ * Why it is resolved here rather than threaded through `RpcContext`: the mesh is one configured singleton for
+ * the whole process, so a context field would be a per-call copy of a constant — and it would put this feature
+ * into four upstream files (`core`, the admission prologue, the mobile pairing subclass, the stream options)
+ * that a fork otherwise need not touch at all.
+ */
+function meshService(): HostMeshRpcService {
+  const service = hostMeshRpcServiceIfAvailable()
   if (!service) {
     throw new Error('host_mesh_runtime_unavailable')
   }
@@ -64,39 +71,38 @@ export const HOST_MESH_METHODS = [
     // admitting anyone still needs a box only the joining machine's key could have minted.
     permission: 'workspace',
     params: HostMeshJoinParamsSchema,
-    handler: async (params, ctx) => await meshService(ctx).join(params, meshCaller(ctx))
+    handler: async (params, ctx) => await meshService().join(params, meshCaller(ctx))
   }),
   defineMethod({
     name: HOST_MESH_RELAY_METHOD,
     permission: 'workspace',
     params: HostMeshRelayParamsSchema,
-    handler: async (params, ctx) =>
-      await meshService(ctx).relayIntroductions(params, meshCaller(ctx))
+    handler: async (params, ctx) => await meshService().relayIntroductions(params, meshCaller(ctx))
   }),
   defineMethod({
     name: HOST_MESH_INTRODUCE_METHOD,
     permission: 'workspace',
     params: HostMeshIntroduceParamsSchema,
-    handler: async (params, ctx) => await meshService(ctx).introduce(params, meshCaller(ctx))
+    handler: async (params, ctx) => await meshService().introduce(params, meshCaller(ctx))
   }),
   defineMethod({
     name: HOST_MESH_PENDING_METHOD,
     permission: 'workspace',
     params: HostMeshPendingParamsSchema,
-    handler: async (params, ctx) => await meshService(ctx).pending(params, meshCaller(ctx))
+    handler: async (params, ctx) => await meshService().pending(params, meshCaller(ctx))
   }),
   defineMethod({
     name: HOST_MESH_SYNC_METHOD,
     permission: 'workspace',
     params: HostMeshPendingParamsSchema,
-    handler: async (params, ctx) => await meshService(ctx).sync(params, meshCaller(ctx))
+    handler: async (params, ctx) => await meshService().sync(params, meshCaller(ctx))
   }),
   defineMethod({
     name: HOST_MESH_REMOVE_METHOD,
     // Removal changes who may connect to this host, so it stays administrative.
     permission: 'host-admin',
     params: HostMeshRemoveParamsSchema,
-    handler: async (params, ctx) => await meshService(ctx).remove(params, meshCaller(ctx))
+    handler: async (params, ctx) => await meshService().remove(params, meshCaller(ctx))
   }),
   // The local surface: what an owner's CLI or the settings pane drives, as opposed to what a peer calls.
   // Why `host-admin`: joining, syncing and ejecting change who may reach this machine. Note a paired desktop

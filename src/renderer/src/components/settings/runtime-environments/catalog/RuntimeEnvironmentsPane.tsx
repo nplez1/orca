@@ -237,6 +237,7 @@ export function RuntimeEnvironmentsPane({
         />
       </div>
 
+      {/* local(hosts): the group. See LOCAL-PATCHES.md. */}
       <HostGroupSection />
 
       {managedCatalog.loadFailed ? (

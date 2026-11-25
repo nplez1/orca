@@ -44,7 +44,6 @@ import type {
   ExchangePairingTicketParams,
   ExchangePairingTicketResult
 } from '../../../shared/remote-runtime/pairing/ticket-exchange-contract'
-import type { HostMeshRpcService } from '../../host-mesh/host-mesh-driver-contract'
 
 // Bind key rotation to the authenticated socket so callers can re-key only themselves.
 export type DeviceSelfRpcContext = {
@@ -187,8 +186,6 @@ export type RpcContext = {
   authenticatedCallerFingerprint?: string
   pairing?: PairingRpcContext
   pairingOffers?: PairingOffersRpcContext
-  // Peers call these six; absent in tests and non-mesh builds, where the handler throws instead.
-  hostMesh?: HostMeshRpcService
   deviceSelf?: DeviceSelfRpcContext
   // Available only on a desktop relay for its configured servers.
   mobileRelayHosts?: {

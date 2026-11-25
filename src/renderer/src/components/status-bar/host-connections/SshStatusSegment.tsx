@@ -25,14 +25,8 @@ import {
   runtimePairingRepairRoute
 } from '../../../../../shared/remote-runtime/host-catalog/runtime-environments'
 import { RuntimeHostStatusRow } from './RuntimeHostStatusRow'
-import {
-  connectedHostCountLabel,
-  hostGraphOlderPeerLabel,
-  hostGraphPartialLabel,
-  moreSshHostsLabel,
-  viaOtherHostsLabel
-} from './ssh-status-segment-copy'
-import { RelayedHostStatusRow } from './RelayedHostStatusRow'
+import { connectedHostCountLabel, moreSshHostsLabel } from './ssh-status-segment-copy'
+import { RelayedFleetStatusItems } from './RelayedFleetStatusItems' // local(hosts)
 import { useRelayedFleetHosts } from './use-relayed-fleet-hosts'
 import { SshHostFindPopover } from './SshHostFindPopover'
 import { splitSshStatusMenuRows } from './ssh-status-menu-rows'
@@ -74,6 +68,7 @@ export function SshStatusSegment(): React.JSX.Element | null {
   const [findOpen, setFindOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const [repairTarget, setRepairTarget] = useState<{ id: string; label: string } | null>(null)
+  // local(hosts): see LOCAL-PATCHES.md — the fleet this host can only see through another.
   const {
     relayed,
     unavailablePeerCount,
@@ -192,6 +187,7 @@ export function SshStatusSegment(): React.JSX.Element | null {
   )
 
   if (targets.length === 0 && runtimeHosts.length === 0 && relayed.length === 0) {
+    // local(hosts): added `relayed.length === 0`, so a group-only fleet still renders.
     return null
   }
 
@@ -199,6 +195,7 @@ export function SshStatusSegment(): React.JSX.Element | null {
     ...targets.map((target) => sshStatusForOverall(target.status)),
     ...runtimeHostRows.map((host) => runtimeHostStatusForOverall(host.state, host.blockedReason))
   ]
+  // local(hosts): relayed hosts count toward the badge too.
   const connectedHostCount =
     statuses.filter((status) => status === 'connected').length +
     relayed.filter((host) => host.live).length
@@ -318,33 +315,13 @@ export function SshStatusSegment(): React.JSX.Element | null {
             {moreSshHostsLabel(hiddenIdleCount, t)}
           </DropdownMenuItem>
         ) : null}
-        {relayed.length > 0 || unavailablePeerCount > 0 || unsupportedPeerCount > 0 ? (
-          <>
-            <DropdownMenuSeparator />
-            <div className="px-2 pt-1.5 pb-1 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-              {viaOtherHostsLabel(t)}
-            </div>
-            {relayed.map((host) => (
-              <RelayedHostStatusRow
-                key={host.key}
-                label={host.label}
-                via={host.via}
-                live={host.live}
-                staleMinutes={host.staleMinutes}
-              />
-            ))}
-            {unavailablePeerCount > 0 ? (
-              <div className="px-2 py-1 text-[10px] text-muted-foreground">
-                {hostGraphPartialLabel(unavailablePeerCount, t)}
-              </div>
-            ) : null}
-            {unsupportedPeerCount > 0 ? (
-              <div className="px-2 py-1 text-[10px] text-muted-foreground">
-                {hostGraphOlderPeerLabel(unsupportedPeerCount, t)}
-              </div>
-            ) : null}
-          </>
-        ) : null}
+        {/* local(hosts): the machines seen through another host. See LOCAL-PATCHES.md. */}
+        <RelayedFleetStatusItems
+          relayed={relayed}
+          unavailablePeerCount={unavailablePeerCount}
+          unsupportedPeerCount={unsupportedPeerCount}
+          t={t}
+        />
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onSelect={() => {

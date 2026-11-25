@@ -8,40 +8,6 @@ export function connectedHostCountLabel(count: number, t: Translate = translate)
   })
 }
 
-export function relayedHostViaLabel(reporter: string, t: Translate = translate): string {
-  return t('auto.components.status.bar.SshStatusSegment.relayedHostVia', 'via {{reporter}}', {
-    reporter
-  })
-}
-
-export function relayedHostStaleLabel(minutes: number, t: Translate = translate): string {
-  return t(
-    'auto.components.status.bar.SshStatusSegment.relayedHostStale',
-    'not confirmed for {{minutes}} min',
-    { minutes }
-  )
-}
-
-export function viaOtherHostsLabel(t: Translate = translate): string {
-  return t('auto.components.status.bar.SshStatusSegment.viaOtherHosts', 'Via other hosts')
-}
-
-export function hostGraphPartialLabel(count: number, t: Translate = translate): string {
-  return t(
-    'auto.components.status.bar.SshStatusSegment.hostGraphPartial',
-    "{{count}} hosts didn't answer",
-    { count, defaultValue_one: "{{count}} host didn't answer" }
-  )
-}
-
-export function hostGraphOlderPeerLabel(count: number, t: Translate = translate): string {
-  return t(
-    'auto.components.status.bar.SshStatusSegment.hostGraphOlderPeer',
-    "{{count}} hosts can't share their host list yet",
-    { count, defaultValue_one: "{{count}} host can't share its host list yet" }
-  )
-}
-
 export function moreSshHostsLabel(count: number, t: Translate = translate): string {
   return t(
     'auto.components.status.bar.SshStatusSegment.moreSshHosts',

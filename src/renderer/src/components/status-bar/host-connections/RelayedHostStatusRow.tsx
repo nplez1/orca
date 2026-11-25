@@ -1,6 +1,6 @@
 import { useTranslate } from '@/i18n/use-translate'
 import { statusColor } from '../../settings/ssh/targets/SshTargetCard'
-import { relayedHostViaLabel, relayedHostStaleLabel } from './ssh-status-segment-copy'
+import { relayedHostStaleLabel, relayedHostViaLabel } from './relayed-fleet-copy'
 
 /**
  * A host this client can see but cannot talk to.

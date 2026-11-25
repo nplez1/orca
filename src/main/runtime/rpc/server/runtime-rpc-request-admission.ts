@@ -2,7 +2,6 @@ import type { RuntimeMetadata } from '../../../../shared/remote-runtime/bootstra
 import { writeRuntimeMetadata } from './runtime-metadata'
 import type { RpcMessageContext } from '../transport'
 import type { PairingOffersRpcContext, RpcRequest, RpcResponse } from '../core'
-import type { HostMeshRpcService } from '../../../host-mesh/host-mesh-driver-contract'
 import { errorResponse } from '../responses/rpc-response'
 import { RuntimeRpcBinaryRouting } from './runtime-rpc-binary-routing'
 import { classifyRuntimeLongPoll, type RuntimeLongPollClass } from './runtime-rpc-long-poll'
@@ -58,9 +57,7 @@ export class RuntimeRpcRequestAdmission extends RuntimeRpcBinaryRouting {
         connectionSignal: context?.signal,
         caller: LOCAL_CLI_RPC_CALLER,
         callerScope,
-        pairingOffers: callerScope.kind === 'owner' ? this.ownerPairingOffers() : undefined,
-        // A peer at `workspace` tier calls these, so it is not owner-gated.
-        hostMesh: this.hostMeshService() ?? undefined
+        pairingOffers: callerScope.kind === 'owner' ? this.ownerPairingOffers() : undefined
       })
     } finally {
       this.releaseLongPoll(longPoll)
@@ -70,11 +67,6 @@ export class RuntimeRpcRequestAdmission extends RuntimeRpcBinaryRouting {
   // Pairing lives above this class in the server chain; RuntimeRpcMobilePairing provides it.
   protected ownerPairingOffers(): PairingOffersRpcContext | undefined {
     return undefined
-  }
-
-  // The mesh lives there too; null means nothing configured it, which the handler refuses.
-  protected hostMeshService(): HostMeshRpcService | null {
-    return null
   }
 
   // Share total/ask fences across transports: preserve short-RPC slots and reserve wait/check capacity from slow asks.

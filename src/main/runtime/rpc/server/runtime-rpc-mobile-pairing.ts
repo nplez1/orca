@@ -8,8 +8,6 @@ import { PAIRING_OFFER_VERSION } from '../../../../shared/remote-runtime/pairing
 import { NETWORK_EXPOSURE_FAILED_GUIDANCE } from './pairing/network/network-exposure-guidance'
 import { createOwnerPairingOffer } from './pairing/pairing-offer-requests'
 import type { PairingOffersRpcContext } from '../core'
-import type { HostMeshRpcService } from '../../../host-mesh/host-mesh-driver-contract'
-import { hostMeshRpcServiceIfAvailable } from '../../../host-mesh/host-mesh-runtime'
 import { RuntimeRpcPairing } from './runtime-rpc-pairing'
 import { withTimeout } from '../../../../shared/concurrency/promise-timeout-fallback'
 import {
@@ -34,10 +32,6 @@ export class RuntimeRpcMobilePairing extends RuntimeRpcPairing {
         return offer
       }
     }
-  }
-
-  protected override hostMeshService(): HostMeshRpcService | null {
-    return hostMeshRpcServiceIfAvailable()
   }
 
   async createMobilePairingOffer(args: {

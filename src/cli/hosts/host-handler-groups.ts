@@ -2,6 +2,10 @@ import type { HandlerGroup } from '../dispatch/handler-group-manifest'
 
 // The machines Orca reaches: saved hosts and paired environments, the Orca servers it manages on
 // them, and recipe VMs.
+
+// local(hosts): this fork's group commands, kept in its own file so this manifest gains one line.
+import { HOST_MESH_HANDLER_GROUP } from './host-mesh-handler-group.js'
+
 export const HOST_HANDLER_GROUPS: readonly HandlerGroup[] = [
   {
     name: 'environment',
@@ -39,9 +43,5 @@ export const HOST_HANDLER_GROUPS: readonly HandlerGroup[] = [
     keys: ['vm env doctor'],
     load: async () => (await import('./vm-env.js')).VM_ENV_HANDLERS
   },
-  {
-    name: 'host-mesh',
-    keys: ['group status', 'group join', 'group sync', 'group remove', 'group leave'],
-    load: async () => (await import('./host-mesh.js')).HOST_MESH_HANDLERS
-  }
+  HOST_MESH_HANDLER_GROUP // local(hosts): see LOCAL-PATCHES.md
 ]

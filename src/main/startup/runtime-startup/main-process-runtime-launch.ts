@@ -1,4 +1,5 @@
-/* eslint-disable max-lines -- Why: one linear launch script whose order is the contract, and the host group must be configured on it, after the server exists and before anything can call it. */
+/* eslint-disable max-lines -- local(hosts): upstream's launcher sits exactly at 300 lines, and the group needs two
+   lines on it (see LOCAL-PATCHES.md). Resolving a sync here means keeping those two lines and this one. */
 import { settleDesktopActivation } from './runtime-launch-activation'
 import { app, type BrowserWindow } from 'electron'
 import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../shared/workspace-layout/layout-owner-switch'
@@ -8,8 +9,7 @@ import {
   migrateMobilePairingDataToCanonicalUserDataPath
 } from '../../persistence/loading-store/user-data-path'
 import { OrcaRuntimeRpcServer } from '../../runtime/rpc/server/runtime-rpc'
-import { configureHostMeshRuntimeFromApp } from '../../host-mesh/host-mesh-runtime-deps'
-import { migrateHostMeshFromPairings } from '../../host-mesh/host-mesh-runtime'
+import { installHostMeshRuntime } from '../../host-mesh/host-mesh-startup'
 import { resolveServePinnedBindHost } from '../serve-launch/serve-pinned-bind-host'
 import { isOrcadSidecarLaunch } from '../../window/activation/foreground-activation-policy'
 import type { MainWindowOpenOptions } from '../../window/main-window/main-window-contracts'
@@ -116,10 +116,8 @@ function installRuntimeRpc(
     webClientRoot: getBundledWebClientRoot()
   })
   state.core.runtimeRpc = runtimeRpc
-  configureHostMeshRuntimeFromApp(runtimeRpc) // Offers mint lazily, so the server need only exist.
-  // The upgrade step: a build with the mesh in it groups the machines this install was already paired with,
-  // once. It reads the pairing table, so it must run after the runtime's own paths are resolved.
-  migrateHostMeshFromPairings()
+  // local(hosts): the group, and the one-shot upgrade from existing pairings. See LOCAL-PATCHES.md.
+  installHostMeshRuntime(runtimeRpc)
   runtime.setAgentSenderPeerKey(() => runtimeRpc.getE2EEPublicKey())
   runtimeRpc.setMobileDesktopRelayHosts(createRuntimeEnvironmentMobileRelayHosts())
   registerMobileHandlers(runtimeRpc, {

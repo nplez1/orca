@@ -71,12 +71,11 @@ import { SKILL_METHODS } from './skills/skills'
 import { CLIPBOARD_METHODS } from './clipboard/clipboard'
 import { HOST_CAPABILITY_METHODS } from './host-management/host-capabilities'
 import { HOST_SETTINGS_METHODS } from './host-settings'
-import { HOST_GRAPH_METHODS } from './host-graph'
 import { MOBILE_WEB_BUNDLE_METHODS } from './mobile-delivery/mobile-web-bundle'
 import { RUNTIME_CLIENT_CAPABILITY_METHODS } from './client-events/runtime-client-capabilities'
 import { EMULATOR_METHODS } from './emulator/emulator'
 import { PAIRING_METHODS } from './pairing/pairing'
-import { HOST_MESH_METHODS } from './host-mesh'
+import { FORK_RPC_METHODS } from '../../../host-mesh/fork-rpc-methods' // local(hosts)
 import { MOBILE_RELAY_HOSTS_METHODS } from './pairing/mobile-relay-hosts'
 import { MOBILE_PROJECT_SECTIONS_METHODS } from './mobile-delivery/mobile-project-sections'
 import { UPDATER_METHODS } from './updater/updater'
@@ -255,14 +254,13 @@ const SERVICE_RPC_METHODS = [
   ...CLIPBOARD_METHODS,
   ...HOST_CAPABILITY_METHODS,
   ...HOST_SETTINGS_METHODS,
-  ...HOST_GRAPH_METHODS,
   ...MOBILE_WEB_BUNDLE_METHODS,
   ...RUNTIME_CLIENT_CAPABILITY_METHODS,
   ...CLIENT_EVENT_METHODS,
   ...CLIENT_UI_METHODS,
   ...EMULATOR_METHODS,
   ...PAIRING_METHODS,
-  ...HOST_MESH_METHODS,
+  ...FORK_RPC_METHODS,
   ...MOBILE_RELAY_HOSTS_METHODS,
   ...MOBILE_PROJECT_SECTIONS_METHODS,
   // Switch point: a window-fed build publishes no sidebar input.

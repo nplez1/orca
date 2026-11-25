@@ -8,6 +8,7 @@ import type {
 
 const PAIR_STATUS_WORDS: Readonly<Record<HostMeshMemberRow['status'], string>> = {
   complete: 'complete',
+  needsUpdate: 'needs update',
   half: 'half',
   missing: 'missing'
 }

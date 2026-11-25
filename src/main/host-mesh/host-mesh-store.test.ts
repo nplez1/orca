@@ -55,6 +55,15 @@ function nestedRecord(parent: Record<string, unknown>, key: string): Record<stri
 }
 
 describe('every link a driver can write is a link the store can read back', () => {
+  // Why its own temp dir: a test that forgot one wrote `host-mesh.json` into the repository root, and it
+  // reached a commit. The store path is derived from the user data directory, so the test must supply one.
+  beforeEach(() => {
+    testState.dir = mkdtempSync(join(tmpdir(), 'orca-mesh-store-kinds-'))
+  })
+  afterEach(() => {
+    rmSync(testState.dir, { recursive: true, force: true })
+  })
+
   it('round-trips each outbound and inbound kind, so a new one cannot make the file unreadable', () => {
     // Why this exists: adding a link kind without teaching this schema made the store refuse the file its own
     // driver had just written, which reads to the owner as "move it aside to start over" — mid-upgrade.
