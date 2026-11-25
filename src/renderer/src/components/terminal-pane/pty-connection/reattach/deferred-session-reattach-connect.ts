@@ -135,7 +135,6 @@ function connectDeferredSessionReattach(
   )
   session.beginReattachLiveDataDeferral(outputCallbacks.generation)
   session.transportConnectInFlightSince = Date.now()
-  // A daemon-off restart reuses this PTY id for a resumed conversation; the empty launch no longer holds (#95).
   forgetPromptFreeAgentTabLaunch(session.deps.tabId)
   const reattachPromise = session.transport.connect({
     url: '',

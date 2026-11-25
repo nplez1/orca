@@ -205,7 +205,6 @@ export function useTerminalPaneCloseActions(controller: TerminalPaneBindingContr
             const leafId = managerRef.current?.getLeafId(paneId)
             if (
               probe?.verdict === 'exited' ||
-              // Same never-tasked verdict as the tab close; unverifiable and timed-out probes still ask (#95).
               (probe !== undefined && leafId && isProbeOfEmptyAgentSession(tabId, probe, leafId)) ||
               settings?.skipCloseTerminalWithRunningProcessConfirm
             ) {

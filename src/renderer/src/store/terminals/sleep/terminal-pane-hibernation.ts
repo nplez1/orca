@@ -34,7 +34,6 @@ export function createTerminalPaneHibernationActions(
         opts.expectedRuntimePtyId ? [opts.expectedRuntimePtyId] : []
       )
       const rendererShutdownPtyIds = [opts.ptyId]
-      // The resumed pane is a real conversation; forgetting early only keeps the close prompt (#95).
       forgetPromptFreeAgentTabLaunch(opts.tabId)
       const state = get()
       const worktreeOwner = resolveTerminalPtyOwner(state, worktreeId)

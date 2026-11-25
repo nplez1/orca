@@ -122,7 +122,6 @@ export function guardRunningTerminalClose(params: {
       const busyPtyIds = probes
         .filter(
           (probe) =>
-            // A never-tasked agent stops nothing; unverifiable and timed-out probes still ask (#95).
             (probe.verdict === 'live' && !isProbeOfEmptyAgentSession(terminalTabId, probe)) ||
             (probe.verdict === 'unverifiable' && boundPtyIds.has(probe.ptyId))
         )

@@ -8,7 +8,6 @@ import { isPromptFreeAgentLaunchProcess } from '@/lib/agent-session/launch/new-t
 import type { PtyRunningWorkProbe } from '../../../../../shared/terminal/pty/lifecycle/pty-running-work-probe'
 import { isNeverTaskedAgentSession } from './never-tasked-agent-session'
 
-// Legacy/mid-attach leaf IDs may fail makePaneKey; confirmation must not break close.
 function leafPaneKey(tabId: string, leafId: string | null | undefined): string | null {
   if (!leafId || !isTerminalLeafId(leafId) || !tabId || tabId.includes(':')) {
     return null
@@ -21,19 +20,15 @@ export function resolveLeafCloseCopyKind(
   tabId: string,
   leafId: string | null | undefined
 ): CloseTerminalDialogCopyKind {
-  const paneKey = leafPaneKey(tabId, leafId)
-  if (!paneKey) {
+  // Legacy/mid-attach leaf IDs may fail makePaneKey; confirmation must not break close.
+  if (!leafId || !isTerminalLeafId(leafId) || !tabId || tabId.includes(':')) {
     return 'command'
   }
-  const agentType = useAppStore.getState().agentStatusByPaneKey.get(paneKey)?.agentType
+  const agentStatusByPaneKey = useAppStore.getState().agentStatusByPaneKey
+  const agentType = agentStatusByPaneKey.get(makePaneKey(tabId, leafId))?.agentType
   return agentType && agentType !== 'unknown' ? 'agent' : 'command'
 }
 
-/**
- * One emptiness verdict for tab and pane closes, so the two prompts cannot drift (#95). Only an
- * answered live probe of the very process a prompt-free launch spawned qualifies; `leafId` narrows
- * a pane close to its own leaf. Any throw asks, because the tab guard's catch closes silently.
- */
 export function isProbeOfEmptyAgentSession(
   tabId: string,
   probe: Pick<PtyRunningWorkProbe, 'ptyId' | 'verdict' | 'timedOut'>,

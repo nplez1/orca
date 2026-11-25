@@ -43,7 +43,6 @@ export function commitTerminalShutdownState({
   tabs: readonly TerminalTab[]
   worktreeId: string
 }): void {
-  // A woken tab resumes a real conversation; the prompt-free launch no longer describes it (#95).
   for (const tab of tabs) {
     forgetPromptFreeAgentTabLaunch(tab.id)
   }

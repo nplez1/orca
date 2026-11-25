@@ -278,7 +278,6 @@ function openAgentInNewTab(
       }
     }
   })
-  // Argv drafts and resume/fork args leave nothing the status row can see, so only a bare launch counts.
   if (isPromptFreeAgentTabLaunch(args, store.settings)) {
     notePromptFreeAgentTabLaunch(tab.id)
   }

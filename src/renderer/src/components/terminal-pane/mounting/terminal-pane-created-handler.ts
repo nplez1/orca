@@ -174,7 +174,6 @@ export function createTerminalPaneCreatedHandler(
       startup,
       (ptyId) => {
         useAppStore.getState().consumeTabStartupCommand(deps.tabId)
-        // The prompt-free launch vouches for this spawned process only (#95).
         bindPromptFreeAgentTabLaunch(deps.tabId, pane.leafId, ptyId)
       },
       () => useAppStore.getState().pendingStartupByTabId[deps.tabId] === startup
