@@ -120,6 +120,14 @@ describe('isPromptFreeAgentTabLaunch', () => {
     const resumeByDefault = { agentDefaultArgs: { claude: '--continue' } }
     expect(isPromptFreeAgentTabLaunch({ agent, agentArgs: null }, resumeByDefault)).toBe(true)
     expect(isPromptFreeAgentTabLaunch({ agent }, resumeByDefault)).toBe(false)
+    // Settings' Yolo/Auto presets are permission flags only, not a resumed conversation.
+    for (const preset of ['--dangerously-skip-permissions', '--permission-mode auto']) {
+      expect(isPromptFreeAgentTabLaunch({ agent }, { agentDefaultArgs: { claude: preset } })).toBe(
+        true
+      )
+    }
+    const presetPlusResume = { agentDefaultArgs: { claude: '--dangerously-skip-permissions -c' } }
+    expect(isPromptFreeAgentTabLaunch({ agent }, presetPlusResume)).toBe(false)
     expect(isPromptFreeAgentTabLaunch({ agent }, { agentCmdOverrides: { claude: 'wrap' } })).toBe(
       false
     )

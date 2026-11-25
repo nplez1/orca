@@ -1,5 +1,9 @@
 import type { TuiAgent } from '../../../../../../shared/agent-launch/catalog/tui-agent'
 import type { AgentStartupSettings } from '../../../../../../shared/agent-launch/startup/agent-startup-plan-inputs'
+import {
+  AUTO_TUI_AGENT_ARGS,
+  YOLO_TUI_AGENT_ARGS
+} from '../../../../../../shared/agent-launch/permissions/tui-agent-permissions'
 
 /**
  * Session-only: the one PTY this window spawned for a tab launched with no prompt, draft, args or
@@ -16,12 +20,17 @@ export function isPromptFreeAgentTabLaunch(
   launch: { agent: TuiAgent; prompt?: string; agentArgs?: string | null; actionAgentArgs?: string },
   settings: Pick<AgentStartupSettings, 'agentDefaultArgs' | 'agentCmdOverrides'> | null | undefined
 ): boolean {
-  const effectiveArgs =
+  const effectiveArgs = (
     launch.actionAgentArgs ??
     (launch.agentArgs === undefined ? settings?.agentDefaultArgs?.[launch.agent] : launch.agentArgs)
+  )?.trim()
+  // Settings' Yolo/Auto presets write exactly these flags; they change approvals, not the conversation.
+  const permissionPresetOnly =
+    effectiveArgs === YOLO_TUI_AGENT_ARGS[launch.agent] ||
+    effectiveArgs === AUTO_TUI_AGENT_ARGS[launch.agent]
   return (
     !launch.prompt?.trim() &&
-    !effectiveArgs?.trim() &&
+    (!effectiveArgs || permissionPresetOnly) &&
     !settings?.agentCmdOverrides?.[launch.agent]?.trim()
   )
 }
