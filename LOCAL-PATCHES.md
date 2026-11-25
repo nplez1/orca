@@ -6267,3 +6267,17 @@ Fork extension points are used as designed: `register-fork-handlers.ts`, `fork-p
 **Not upstream-ready, and not proposed upstream:** the mesh assumes every member holds `host-admin` (the
 paired-desktop standard), and a group's membership list is not authenticated — the conceded premise of
 auto-pairing. Both are in the design note.
+
+**What the fork's own gates made this patch change.** Three ratchets are worth naming, because each one
+made this feature better rather than merely compliant:
+
+- `check:recurring-timer-ratchet` refused the renderer's own interval for staleness. It now uses upstream's
+  shared clock (`lib/window-activity/use-now`), so the fork adds no timer and staleness still ages.
+- `check:main-sync-fs-ratchet` refused two direct `node:fs` probes in the store: an existence check and an
+  unused `clear`. Both are gone — a missing file is the reader's ENOENT now, which is also the honest
+  reading — and the machine-identity ssh read is async, as its only caller already was.
+- `check:main-blocking-helper-ratchet` still counts the store, because it reads and writes one small JSON
+  file through **upstream's own** bounded reader and secure writer. Those rows are in
+  `config/main-blocking-helper-baseline.fork.txt` with the reason, beside the fork's other data-path rows,
+  rather than in upstream's baseline. The store stays synchronous on purpose: a snapshot renders from it and
+  the file is a few hundred bytes.
