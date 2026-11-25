@@ -1,5 +1,4 @@
 /* eslint-disable max-lines -- Why: one on-disk record and its fields (state, peer index, pending boxes, admissions, spent nonces) — every field is a view of the same file, and splitting them would give each its own read-modify-write over the same bytes. */
-import { existsSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { z } from 'zod'
 import { readNodeFileSyncWithinLimit } from '../../shared/file-content/node-bounded-file-reader'
@@ -165,9 +164,6 @@ type StoredFileRead =
   | { kind: 'parsed'; file: StoredFile }
 
 function readStoredFile(path: string): StoredFileRead {
-  if (!existsSync(path)) {
-    return { kind: 'missing' }
-  }
   let text: string
   try {
     hardenExistingSecureFile(path)
@@ -175,6 +171,11 @@ function readStoredFile(path: string): StoredFileRead {
   } catch (error) {
     // A file past the cap is refused rather than read: nothing this store writes reaches it, so its
     // size is itself evidence that this build does not understand the file.
+    // Why ENOENT is "missing" rather than "unreadable": a first run has no file, and that is not a fault
+    // the owner should be told about — but a probe for existence is a sync fs call this process must not make.
+    if ((error as { code?: string } | null)?.code === 'ENOENT') {
+      return { kind: 'missing' }
+    }
     return {
       kind: 'unreadable',
       reason: error instanceof Error ? error.message : 'it could not be read'
@@ -261,7 +262,6 @@ export type HostMeshStore = {
   /** Returns and removes them: a box is collected once, so a re-read cannot re-redeem it. */
   takePendingBoxes(recipientHostKey: string): HostMeshSealedOffer[]
   addPendingBox(recipientHostKey: string, sealed: HostMeshSealedOffer): void
-  clear(): void
 }
 
 export function createHostMeshStore({ userDataPath }: { userDataPath: string }): HostMeshStore {
@@ -283,8 +283,8 @@ export function createHostMeshStore({ userDataPath }: { userDataPath: string }):
       return state.data
     },
 
-    // Why this refuses an unreadable file instead of replacing it: `clear` is how a caller starts over,
-    // so an accidental write here cannot be the thing that forgot the group.
+    // Why this refuses an unreadable file instead of replacing it: moving the file aside is how a caller
+    // starts over, so an accidental write here cannot be the thing that forgot the group.
     write: (state) => {
       const file = readOrRefuse(path) ?? emptyFile()
       file.state = state
@@ -416,10 +416,6 @@ export function createHostMeshStore({ userDataPath }: { userDataPath: string }):
           [recipientHostKey]: [...held, sealed]
         }
       })
-    },
-
-    clear: () => {
-      rmSync(path, { force: true })
     }
   }
 }

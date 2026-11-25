@@ -129,7 +129,8 @@ export function measureSurface(base) {
   })
   const touched = []
   for (const entry of changed) {
-    if (NOT_UPSTREAM.has(entry.path)) {
+    // `local/` and the fork's own ledgers are this fork's files, whether or not a fork commit put them there.
+    if (entry.path.startsWith('local/') || NOT_UPSTREAM.has(entry.path)) {
       continue
     }
     // A file upstream does not have is fork-owned by construction: nothing there can conflict.

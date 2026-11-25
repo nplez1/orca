@@ -39,7 +39,7 @@ export async function readLocalAdjacency(): Promise<HostGraphAdjacency> {
     now: Date.now(),
     // Why the host's own keys: a peer names this machine by the pairing key it recorded, so without
     // them this host cannot recognise its own row in the fleet it asks about.
-    self: { label: selfLabel(), ...readSelfMachineRef(root) },
+    self: { label: selfLabel(), ...(await readSelfMachineRef(root)) },
     environments,
     sshTargets,
     trustedHostKeys,

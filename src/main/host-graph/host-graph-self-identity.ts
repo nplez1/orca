@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { readdirSync, readFileSync } from 'node:fs'
+import { readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { hostname } from 'node:os'
 import { loadOrCreateE2EEKeypair } from '../runtime/rpc/server/pairing/e2ee-keypair'
@@ -53,10 +53,10 @@ export function machineRefOf(sources: {
  * Why every read is guarded separately: a Windows box has no sshd keys and a locked keyring has no
  * pairing key, and either must leave this machine describable by whatever it does have.
  */
-export function readSelfMachineRef(userDataPath: string): HostGraphMachineRef {
+export async function readSelfMachineRef(userDataPath: string): Promise<HostGraphMachineRef> {
   return machineRefOf({
     orcaPublicKeyB64: readPairedPublicKey(userDataPath),
-    sshPublicKeyLines: readOwnSshPublicKeys()
+    sshPublicKeyLines: await readOwnSshPublicKeys()
   })
 }
 
@@ -72,11 +72,13 @@ function readPairedPublicKey(userDataPath: string): string | undefined {
   }
 }
 
-function readOwnSshPublicKeys(): string[] {
+async function readOwnSshPublicKeys(): Promise<string[]> {
   try {
-    return readdirSync('/etc/ssh')
+    const names = await readdir('/etc/ssh')
+    const reads = names
       .filter((name) => /^ssh_host_.+_key\.pub$/.test(name))
-      .map((name) => readFileSync(join('/etc/ssh', name), 'utf-8'))
+      .map((name) => readFile(join('/etc/ssh', name), 'utf-8'))
+    return await Promise.all(reads)
   } catch {
     return []
   }

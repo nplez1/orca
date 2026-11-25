@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNow } from '@/lib/window-activity/use-now'
 import { HOST_GRAPH_NODE_TTL_MS } from '../../../../../shared/host-graph/host-graph-contract'
 import type { HostGraphSnapshot } from '../../../../../shared/host-graph/host-graph-snapshot'
 
@@ -33,7 +34,9 @@ const TICK_MS = 60_000
 
 export function useRelayedFleetHosts(): RelayedFleet {
   const [snapshot, setSnapshot] = useState<HostGraphSnapshot | null>(null)
-  const [nowMs, setNowMs] = useState(() => Date.now())
+  // Why upstream's shared clock rather than our own interval: staleness is a function of time passing, and a
+  // second interval in the renderer is a timer this fork would have to declare and justify.
+  const nowMs = useNow(TICK_MS)
   const mountedRef = useRef(true)
   const inFlightRef = useRef(false)
 
@@ -49,7 +52,6 @@ export function useRelayedFleetHosts(): RelayedFleet {
         return
       }
       setSnapshot(next)
-      setNowMs(Date.now())
     } catch {
       // Why silent: a fleet read that fails is a fleet this client cannot see, and the direct hosts it
       // does know about are still a correct answer.
@@ -61,10 +63,8 @@ export function useRelayedFleetHosts(): RelayedFleet {
   useEffect(() => {
     mountedRef.current = true
     void load()
-    const tick = setInterval(() => setNowMs(Date.now()), TICK_MS)
     return () => {
       mountedRef.current = false
-      clearInterval(tick)
     }
   }, [load])
 
