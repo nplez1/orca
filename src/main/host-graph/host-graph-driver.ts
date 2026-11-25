@@ -45,12 +45,15 @@ const UNSUPPORTED_RETRY_MS = 10 * 60_000
 export type HostGraphPeerEnvironment = Pick<KnownRuntimeEnvironment, 'id' | 'name'> &
   Partial<Pick<KnownRuntimeEnvironment, 'source'>>
 
+/** A paired host as the fan-out needs it: the id it is known by here, and how to reach it. */
+export type HostGraphResolvedPeer = { environmentId: string; offer: PairingOffer }
+
 export type HostGraphDriverDeps = {
   listEnvironments: () => Promise<readonly HostGraphPeerEnvironment[]>
   /** Resolves a paired host's offer, or throws when the environment is gone. */
-  resolvePairing: (environmentId: string) => Promise<PairingOffer>
+  resolvePairing: (environmentId: string) => Promise<HostGraphResolvedPeer>
   sendRequest: (
-    pairing: PairingOffer,
+    peer: HostGraphResolvedPeer,
     method: string,
     params: unknown,
     timeoutMs: number
@@ -171,9 +174,9 @@ async function askPeer(
   if (remaining <= 0) {
     return { kind: 'failure', code: 'host_unavailable' }
   }
-  let pairing: PairingOffer
+  let peer: HostGraphResolvedPeer
   try {
-    pairing = await deps.resolvePairing(environment.id)
+    peer = await deps.resolvePairing(environment.id)
   } catch (error) {
     return { kind: 'failure', code: failureCodeOf(error) }
   }
@@ -181,7 +184,7 @@ async function askPeer(
   let response: RuntimeRpcResponse<HostGraphExchangeResult>
   try {
     response = await deps.sendRequest(
-      pairing,
+      peer,
       HOST_GRAPH_EXCHANGE_METHOD,
       { self: context.own, knownRevision: state.revisions.get(environment.id) },
       Math.min(FLEET_HOST_TIMEOUT_MS, remaining)
@@ -272,11 +275,13 @@ function defaultDeps(): HostGraphDriverDeps {
   const userDataPath = (): string => getAppEnvironment().getPath('userData')
   return {
     listEnvironments: () => listEnvironments(userDataPath()),
-    resolvePairing: (environmentId) =>
-      resolveEnvironmentPairingOffer(userDataPath(), environmentId),
-    sendRequest: (pairing, method, params, timeoutMs) =>
+    resolvePairing: async (environmentId) => ({
+      environmentId,
+      offer: await resolveEnvironmentPairingOffer(userDataPath(), environmentId)
+    }),
+    sendRequest: (peer, method, params, timeoutMs) =>
       sendRemoteRuntimeRequestOnSocket<HostGraphExchangeResult>(
-        pairedRuntimeConnectionFromOffer(pairing),
+        pairedRuntimeConnectionFromOffer(peer.offer),
         method,
         params,
         timeoutMs

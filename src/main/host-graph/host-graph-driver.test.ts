@@ -57,19 +57,21 @@ function refusal(code: string): RuntimeRpcResponse<HostGraphExchangeResult> {
   return { id: 'rpc-1', ok: false, error: { code, message: code } }
 }
 
+// Every field the schema requires, and nothing else: the fan-out never reads it in these tests.
+const PEER_OFFER: PairingOffer = {
+  v: 2,
+  endpoint: 'ws://127.0.0.1:1/graph',
+  deviceToken: 'device-token',
+  publicKeyB64: 'a2V5'
+}
+
 function harness(peers: readonly HostGraphPeerEnvironment[], send: Send) {
   const clock = { now: BASE }
   const deps: HostGraphDriverDeps = {
     listEnvironments: async () => peers,
-    // The fake pairing carries only which environment it came from; sendRequest is injected too.
-    resolvePairing: async (environmentId) => ({ environmentId }) as unknown as PairingOffer,
-    sendRequest: (pairing, method, params, timeoutMs) =>
-      send(
-        (pairing as unknown as { environmentId: string }).environmentId,
-        method,
-        params,
-        timeoutMs
-      ),
+    resolvePairing: async (environmentId) => ({ environmentId, offer: PEER_OFFER }),
+    sendRequest: (peer, method, params, timeoutMs) =>
+      send(peer.environmentId, method, params, timeoutMs),
     readOwn: async () => adjacency('viewer'),
     now: () => clock.now
   }

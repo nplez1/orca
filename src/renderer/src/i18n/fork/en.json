@@ -998,6 +998,15 @@
             "288a4dd177": null
           },
           "StatusBar": {},
+          "SshStatusSegment": {
+            "hostGraphOlderPeer_one": "{{count}} host can't share its host list yet",
+            "hostGraphOlderPeer_other": "{{count}} hosts can't share their host list yet",
+            "hostGraphPartial_one": "{{count}} host didn't answer",
+            "hostGraphPartial_other": "{{count}} hosts didn't answer",
+            "relayedHostStale": "not confirmed for {{minutes}} min",
+            "relayedHostVia": "via {{reporter}}",
+            "viaOtherHosts": "Via other hosts"
+          },
           "providerAllowance": {
             "unit": {
               "credit": "credits"

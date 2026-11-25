@@ -25,7 +25,15 @@ import {
   runtimePairingRepairRoute
 } from '../../../../../shared/remote-runtime/host-catalog/runtime-environments'
 import { RuntimeHostStatusRow } from './RuntimeHostStatusRow'
-import { connectedHostCountLabel, moreSshHostsLabel } from './ssh-status-segment-copy'
+import {
+  connectedHostCountLabel,
+  hostGraphOlderPeerLabel,
+  hostGraphPartialLabel,
+  moreSshHostsLabel,
+  viaOtherHostsLabel
+} from './ssh-status-segment-copy'
+import { RelayedHostStatusRow } from './RelayedHostStatusRow'
+import { useRelayedFleetHosts } from './use-relayed-fleet-hosts'
 import { SshHostFindPopover } from './SshHostFindPopover'
 import { splitSshStatusMenuRows } from './ssh-status-menu-rows'
 import { SshTargetStatusRow } from './SshTargetStatusRow'
@@ -66,6 +74,12 @@ export function SshStatusSegment(): React.JSX.Element | null {
   const [findOpen, setFindOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const [repairTarget, setRepairTarget] = useState<{ id: string; label: string } | null>(null)
+  const {
+    relayed,
+    unavailablePeerCount,
+    unsupportedPeerCount,
+    refresh: refreshRelayed
+  } = useRelayedFleetHosts()
 
   const projectHostIds = useMemo(
     () => new Set(repos.flatMap((repo) => (repo.connectionId ? [repo.connectionId] : []))),
@@ -177,7 +191,7 @@ export function SshStatusSegment(): React.JSX.Element | null {
     [recordFeatureInteraction, readRuntimeHostStatusSnapshots]
   )
 
-  if (targets.length === 0 && runtimeHosts.length === 0) {
+  if (targets.length === 0 && runtimeHosts.length === 0 && relayed.length === 0) {
     return null
   }
 
@@ -185,7 +199,11 @@ export function SshStatusSegment(): React.JSX.Element | null {
     ...targets.map((target) => sshStatusForOverall(target.status)),
     ...runtimeHostRows.map((host) => runtimeHostStatusForOverall(host.state, host.blockedReason))
   ]
-  const connectedHostCount = statuses.filter((status) => status === 'connected').length
+  // Why the relayed count is added: a machine reached through a peer is a host this instance knows
+  // about, and on a mesh of diameter two every instance then reports the same fleet size.
+  const connectedHostCount =
+    statuses.filter((status) => status === 'connected').length +
+    relayed.filter((host) => host.live).length
   const openRecovery = (host: {
     id: string
     label: string
@@ -209,6 +227,7 @@ export function SshStatusSegment(): React.JSX.Element | null {
         if (open) {
           void hydrateRuntimeEnvironmentStatuses()
           void syncSshConfigTargetsPassively()
+          refreshRelayed()
           recordFeatureInteraction('ssh')
         }
       }}
@@ -300,6 +319,34 @@ export function SshStatusSegment(): React.JSX.Element | null {
           <DropdownMenuItem onSelect={() => setFindOpen(true)}>
             {moreSshHostsLabel(hiddenIdleCount, t)}
           </DropdownMenuItem>
+        ) : null}
+        {relayed.length > 0 ? (
+          <>
+            <DropdownMenuSeparator />
+            <div className="px-2 pt-1.5 pb-1 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+              {viaOtherHostsLabel(t)}
+            </div>
+            {relayed.map((host) => (
+              <RelayedHostStatusRow
+                key={host.key}
+                label={host.label}
+                via={host.via}
+                live={host.live}
+                staleMinutes={host.staleMinutes}
+              />
+            ))}
+            {/* Why read out loud: a short fleet must be readable as a short fleet, not as hosts lost. */}
+            {unavailablePeerCount > 0 ? (
+              <div className="px-2 py-1 text-[10px] text-muted-foreground">
+                {hostGraphPartialLabel(unavailablePeerCount, t)}
+              </div>
+            ) : null}
+            {unsupportedPeerCount > 0 ? (
+              <div className="px-2 py-1 text-[10px] text-muted-foreground">
+                {hostGraphOlderPeerLabel(unsupportedPeerCount, t)}
+              </div>
+            ) : null}
+          </>
         ) : null}
         <DropdownMenuSeparator />
         <DropdownMenuItem
