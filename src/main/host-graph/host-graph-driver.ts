@@ -251,8 +251,16 @@ async function askPeer(
   if (isUnchanged(result)) {
     const previous = state.answers.get(environment.id)
     if (previous !== undefined) {
+      // Why re-stamped: the revision ignores arrival times, so a host that keeps confirming the same
+      // answer would otherwise let its hearsay age out here while it is still fresh there. The host only
+      // serves reports inside its own TTL, so this mirrors its clock and cannot outlive it.
+      const refreshed: FullAnswer = {
+        ...previous,
+        heard: previous.heard.map((report) => ({ ...report, receivedAt: deps.now() }))
+      }
+      state.answers.set(environment.id, refreshed)
       state.answerAt.set(environment.id, deps.now())
-      return { kind: 'answer', answer: answerOf(previous, deps.now()) }
+      return { kind: 'answer', answer: answerOf(refreshed, deps.now()) }
     }
     return { kind: 'failure', code: 'host_unavailable' }
   }
@@ -291,10 +299,20 @@ function staleAnswer(environmentId: string): HostGraphAnswer | null {
 }
 
 function pruneCachesFor(listed: ReadonlySet<string>): void {
+  const stale = new Set<string>()
   for (const environmentId of state.answers.keys()) {
-    if (listed.has(environmentId)) {
-      continue
+    if (!listed.has(environmentId)) {
+      stale.add(environmentId)
     }
+  }
+  // Why both maps: a host that only ever answered `capability_unsupported` has no answer to prune, but
+  // its ten-minute window outlives the pairing and would keep it out of a re-added environment's fleet.
+  for (const environmentId of state.unsupportedUntil.keys()) {
+    if (!listed.has(environmentId)) {
+      stale.add(environmentId)
+    }
+  }
+  for (const environmentId of stale) {
     state.answers.delete(environmentId)
     state.answerAt.delete(environmentId)
     state.revisions.delete(environmentId)

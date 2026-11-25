@@ -6108,7 +6108,10 @@ it holds as well, which makes a machine that only ever calls this one a direct p
 direction. Three corrections came with it: an answer's `revision` covers the hearsay as well as the
 adjacency, or a new caller stayed invisible to everyone else for as long as the caller kept asking; a failed
 host replays what it last said at its original age instead of vanishing on one bad round trip; and a
-pairing's liveness comes from its own transport rather than from an SSH tunnel it may not use.
+pairing's liveness comes from its own transport rather than from an SSH tunnel it may not use. The second
+review round caught the consequence of the revision fix: because the revision ignores arrival times, a host
+that kept confirming the same answer let the hearsay inside it age out here while it was still current there,
+so an unchanged answer now re-stamps the reports it carries.
 
 **Known limits, accepted deliberately.** A machine reached both directly and through a relay whose stored
 SSH key is filed under a different hostname spelling can be counted twice, because only a pairing key can

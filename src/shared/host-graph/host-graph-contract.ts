@@ -23,10 +23,11 @@ export const HOST_GRAPH_PAYLOAD_VERSION = 1
 /**
  * Graph distance a composed node may sit at.
  *
- * Why 2 is enough: a host answers with its own pairings plus the machines that reported themselves to
- * it, and a client composes both. That covers a hub of any diameter one refresh period after the peers
- * have talked to each other, because a machine is never more than one hop from a host this client can
- * reach. Anything deeper would be a report of a report, which the payload shape does not carry.
+ * Why 2: a host answers with its own pairings plus the machines that reported themselves to it, and a
+ * client composes both, so any fleet whose members reach the hub in either direction is seen whole. A
+ * chain in which every host only ever calls outward is not: the last machine there is two hops from the
+ * host that knows it, and a client three hops away sees neither. Anything deeper would be a report of a
+ * report, which the payload shape does not carry.
  */
 export const HOST_GRAPH_HOP_CAP = 2
 

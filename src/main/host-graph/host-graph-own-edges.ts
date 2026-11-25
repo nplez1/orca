@@ -138,10 +138,9 @@ function sshHostKeysOfTarget(
   }
   const host = normalizeHost(target.host)
   const forHost = deps.trustedHostKeys.filter((record) => normalizeHost(record.host) === host)
-  // Why exact when a port is known: a different port on the same hostname is a different sshd, and a
-  // never-connected target borrowing another one's key invents a machine that does not exist.
-  const matches =
-    target.port === undefined ? forHost : forHost.filter((record) => record.port === target.port)
+  // Why exact even without a port: an SSH target with none uses 22 by default, so falling back to any
+  // port on that host would let a never-connected target borrow another sshd's key.
+  const matches = forHost.filter((record) => record.port === (target.port ?? 22))
   return [...new Set(matches.map((record) => record.fingerprint))].slice(0, HOST_GRAPH_MAX_SSH_KEYS)
 }
 
