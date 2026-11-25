@@ -5,11 +5,22 @@ import {
   SESSION_SUMMARY_HOST_OUTDATED_MESSAGE,
   type SessionSummaryFact,
   type SessionSummaryLedger,
+  type SessionSummaryQuestion,
   type SessionSummarySnapshot,
   type SessionSummaryTimelineEntry
 } from '../../../../shared/session-summary-types'
 import { ReportBody, reportTitleOf, sinceReportView } from './session-summary-report-view'
 import { LedgerFacts, TimelineRow, type LedgerWindowFacts } from './session-summary-evidence-view'
+import {
+  SessionSummaryQuestionList,
+  sessionSummaryQuestionsDetail
+} from './session-summary-questions-view'
+
+/** The reader's questions and how to re-ask a failed one; absent where the pane cannot ask. */
+export type SessionSummaryQuestionsProps = {
+  questions: readonly SessionSummaryQuestion[]
+  onRetryQuestion?: (question: SessionSummaryQuestion) => void
+}
 
 /**
  * Timeline rows rendered at a time.
@@ -19,6 +30,8 @@ import { LedgerFacts, TimelineRow, type LedgerWindowFacts } from './session-summ
  * and one click reaches further back.
  */
 const TIMELINE_PAGE_SIZE = 100
+
+const NO_QUESTIONS: readonly SessionSummaryQuestion[] = []
 
 /** Facts and a timeline entry, windowed to what the reader has not seen. */
 type LedgerWindow = {
@@ -129,8 +142,14 @@ function Disclosure({
  * is written by the fold alongside the windowed one, and the facts carry the index that places
  * them in either window.
  */
-function LedgerContent({ ledger }: { ledger: SessionSummaryLedger }): React.JSX.Element {
+function LedgerContent({
+  ledger,
+  questions = NO_QUESTIONS,
+  onRetryQuestion
+}: { ledger: SessionSummaryLedger } & Partial<SessionSummaryQuestionsProps>): React.JSX.Element {
   const t = useTranslate()
+  // Why open by default: the questions are the reader's own, and one just sent must be visible.
+  const [questionsOpen, setQuestionsOpen] = React.useState(true)
   const [showFullSession, setShowFullSession] = React.useState(false)
   const [ledgerOpen, setLedgerOpen] = React.useState(false)
   const [timelineOpen, setTimelineOpen] = React.useState(false)
@@ -157,11 +176,29 @@ function LedgerContent({ ledger }: { ledger: SessionSummaryLedger }): React.JSX.
     ledger.blockers.length === 0 &&
     ledger.decisions.length === 0 &&
     ledger.timeline.length === 0
+  // Absent until something is asked: the pane must not grow an empty box by default.
+  const questionsSection =
+    questions.length > 0 ? (
+      <Disclosure
+        label={t('activity.sessionSummary.askSection', 'Questions')}
+        detail={sessionSummaryQuestionsDetail(questions)}
+        open={questionsOpen}
+        onToggle={() => setQuestionsOpen((open) => !open)}
+      >
+        <SessionSummaryQuestionList
+          questions={questions}
+          {...(onRetryQuestion ? { onRetry: onRetryQuestion } : {})}
+        />
+      </Disclosure>
+    ) : null
   if (ledgerEmpty) {
     return (
-      <p className="text-xs text-muted-foreground">
-        {t('activity.sessionSummary.nothingYet', 'Nothing notable in this session yet.')}
-      </p>
+      <div className="space-y-3">
+        <p className="text-xs text-muted-foreground">
+          {t('activity.sessionSummary.nothingYet', 'Nothing notable in this session yet.')}
+        </p>
+        {questionsSection}
+      </div>
     )
   }
   // Why the reader-message guard: with one interaction the only "earlier" facts came from the
@@ -237,6 +274,7 @@ function LedgerContent({ ledger }: { ledger: SessionSummaryLedger }): React.JSX.
           ))}
         </Disclosure>
       ) : null}
+      {questionsSection}
       {hasFullAlternative || showFullSession ? (
         <button
           type="button"
@@ -297,10 +335,12 @@ function timelineDetail(
  *  Host-agnostic: no scroll container, padding, or header — the activity strip and
  *  the right-sidebar pane each own their own chrome around it. */
 export function SessionSummaryLedgerView({
-  snapshot
+  snapshot,
+  questions,
+  onRetryQuestion
 }: {
   snapshot: SessionSummarySnapshot | null
-}): React.JSX.Element {
+} & Partial<SessionSummaryQuestionsProps>): React.JSX.Element {
   const t = useTranslate()
   if (snapshot?.ledger) {
     return (
@@ -317,7 +357,11 @@ export function SessionSummaryLedgerView({
               : t('activity.sessionSummary.stale', "Couldn't refresh — showing the last summary.")}
           </p>
         ) : null}
-        <LedgerContent ledger={snapshot.ledger} />
+        <LedgerContent
+          ledger={snapshot.ledger}
+          questions={questions ?? snapshot.questions ?? NO_QUESTIONS}
+          {...(onRetryQuestion ? { onRetryQuestion } : {})}
+        />
       </>
     )
   }

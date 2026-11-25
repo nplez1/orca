@@ -11,6 +11,7 @@ import type { ResolvedSourceControlAiGenerationParams } from '../../shared/sourc
 import {
   failedSessionSummarySnapshot,
   parseSessionSummarySessionRef,
+  type SessionSummaryAskRequest,
   type SessionSummaryCloseRequest,
   type SessionSummaryOpenRequest,
   type SessionSummarySessionRef,
@@ -21,7 +22,6 @@ import {
   mergeSessionRef,
   hasSessionRef,
   runSessionSummaryFold,
-  sessionSummaryIdentityChanged,
   sessionSummaryIdentityOf,
   type SessionSummaryFoldRunnerDeps
 } from './session-summary-fold-runner'
@@ -36,6 +36,11 @@ import {
 } from './session-summary-snapshot'
 import { isStoredBriefReusable, attributableStoredLedger } from './session-summary-brief-freshness'
 import { recordSessionSummarySeenCursor } from './session-summary-seen-cursor'
+import {
+  askSessionSummaryQuestion,
+  resetStaleSessionSummaryRecords,
+  withSessionSummaryQuestions
+} from './session-summary-question-ask'
 import {
   resolveSessionSummaryTranscriptHost,
   type SessionSummaryTranscriptHost
@@ -106,12 +111,14 @@ export class SessionSummaryService {
     // A host-owned pane's ledger, cursor and progress belong to that host: relaying its
     // snapshot keeps one source of truth instead of a second copy that can drift.
     if (runtime?.hostSnapshot) {
-      return runtime.hostSnapshot
+      // Why never askable here: the question has to be answered where the session folds, and this
+      // build has no host method to carry it there yet.
+      return { ...runtime.hostSnapshot, canAsk: false }
     }
     const stored = this.deps.store.get(paneKey)
     const entry = this.deps.getAgentStatusEntry(paneKey)
     const ledger = attributableStoredLedger(stored, entry, runtime?.identity)
-    return buildLocalSessionSummarySnapshot({
+    const built = buildLocalSessionSummarySnapshot({
       paneKey,
       entry,
       ledger,
@@ -123,6 +130,7 @@ export class SessionSummaryService {
       fold: runtime?.fold ?? IDLE_FOLD,
       ...(runtime?.error ? { error: runtime.error } : {})
     })
+    return withSessionSummaryQuestions(this.deps.store, built, stored?.identity)
   }
 
   private emit(paneKey: string, progressOnly = false): void {
@@ -130,7 +138,9 @@ export class SessionSummaryService {
     // Why strip the ledger: a fold reports once per completed chunk, and shipping a thousand-entry
     // ledger each time is a structured clone per chunk to every window. The pane merges the counts
     // into the snapshot it already holds.
-    const update = progressOnly ? { ...snapshot, ledger: null, progressOnly: true } : snapshot
+    const update = progressOnly
+      ? { ...snapshot, ledger: null, questions: undefined, progressOnly: true }
+      : snapshot
     this.listeners.forEach((listener) => listener(update))
   }
 
@@ -173,7 +183,7 @@ export class SessionSummaryService {
     }
     // Why before the freshness check: a ledger that belongs to a different conversation must be
     // dropped before anything decides it is fresh enough to show.
-    this.resetStaleLedger(paneKey, host, identity)
+    resetStaleSessionSummaryRecords(this.deps.store, paneKey, host, identity)
     runtime.status = initialSessionSummaryStatus(host, hasSource)
     this.runtimes.set(paneKey, runtime)
 
@@ -212,26 +222,22 @@ export class SessionSummaryService {
   }
 
   /**
-   * Drops a ledger that describes a different conversation. A host-owned pane's ledger is
-   * that host's cache, so this store never describes it at all.
+   * Records a question (or re-asks a failed one) and starts its answer; the answer arrives
+   * through `onUpdate`. Never touches the ledger, so the brief's window does not move.
    */
-  private resetStaleLedger(
-    paneKey: string,
-    host: SessionSummaryTranscriptHost,
-    identity: SessionSummarySessionRef
-  ): void {
-    if (host.kind === 'runtime') {
-      return
+  ask(request: SessionSummaryAskRequest): SessionSummarySnapshot {
+    const runtime = this.runtimes.get(request.paneKey)
+    if (runtime?.host.kind === 'runtime') {
+      throw new Error('Questions about a session on a paired host are not available yet.')
     }
-    const stored = this.deps.store.get(paneKey)
-    // Why require an identity: this client clears status rows on reconnect, and an absent
-    // one yields a null identity that differs from every stored one — deleting a good ledger.
-    if (!stored || !identity.providerSession?.id) {
-      return
-    }
-    if (sessionSummaryIdentityChanged(stored.identity, sessionSummaryIdentityOf(identity))) {
-      this.deps.store.delete(paneKey)
-    }
+    const ledgerFor = (paneKey: string) => this.snapshot(paneKey).ledger
+    const emit = (paneKey: string) => this.emit(paneKey)
+    askSessionSummaryQuestion(
+      { ...this.deps, ledgerFor, emit },
+      request,
+      runtime?.foldParams ?? null
+    )
+    return this.snapshot(request.paneKey)
   }
 
   /** Cancels in-flight fold work and advances the last-seen cursor to what was viewed. */

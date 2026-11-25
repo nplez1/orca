@@ -4,6 +4,7 @@ import { getAppEnvironment } from '../../shared/app-lifecycle/app-environment'
 import { agentHookServer } from '../agent-hooks/server/agent-hook-server'
 import type { SessionSummarySnapshot } from '../../shared/session-summary-types'
 import {
+  isSessionSummaryAskRequest,
   isSessionSummaryCloseRequest,
   isSessionSummaryOpenRequest
 } from '../../shared/session-summary-types'
@@ -104,6 +105,7 @@ export function registerSessionSummaryHandlers(
   registerHostSessionSummaryService(service)
   ipcMain.removeHandler('sessionSummary:open')
   ipcMain.removeHandler('sessionSummary:close')
+  ipcMain.removeHandler('sessionSummary:ask')
   service.onUpdate((snapshot: SessionSummarySnapshot) => {
     for (const win of BrowserWindow.getAllWindows()) {
       if (!win.isDestroyed()) {
@@ -116,6 +118,12 @@ export function registerSessionSummaryHandlers(
       throw new Error('invalid session summary request')
     }
     return service.open(request)
+  })
+  ipcMain.handle('sessionSummary:ask', (_event, request: unknown): SessionSummarySnapshot => {
+    if (!isSessionSummaryAskRequest(request)) {
+      throw new Error('invalid session summary question')
+    }
+    return service.ask(request)
   })
   ipcMain.on('sessionSummary:close', (_event, request: unknown): void => {
     if (isSessionSummaryCloseRequest(request)) {

@@ -2,6 +2,16 @@
   "activity": {
     "sessionSummary": {
       "asOf": "(as of #{{index}})",
+      "askDetail": "{{count}} questions · last asked {{time}}",
+      "askFailed": "Could not answer this question.",
+      "askNeedsBrief": "Questions open once this session has a summary.",
+      "askPending": "Answering…",
+      "askPlaceholder": "Ask about this session…",
+      "askRetry": "Retry",
+      "askSection": "Questions",
+      "askSubmit": "Ask",
+      "askTooLong": "Questions are limited to {{max}} characters.",
+      "askUnavailableHost": "Questions are not available for sessions on a paired host yet.",
       "backlogHint": "{{count}} events to catch up on",
       "blockers": "Blockers",
       "decisions": "Decisions",

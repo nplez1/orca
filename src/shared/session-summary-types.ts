@@ -205,6 +205,16 @@ export type SessionSummarySnapshot = {
   fold: SessionSummaryFoldProgress
   error?: string
   /**
+   * The reader's questions about this session, oldest first. Absent from a host that predates
+   * them, which is not the same as a pane with none asked.
+   */
+  questions?: SessionSummaryQuestion[]
+  /**
+   * Whether this process can answer a question about the pane now: it holds a brief to answer
+   * from, and the session folds here rather than on a paired host.
+   */
+  canAsk?: boolean
+  /**
    * A progress tick: merge these fields into the snapshot already on screen, keeping its ledger.
    *
    * Why: a fold reports once per completed chunk, and shipping the whole ledger each time is a
@@ -259,6 +269,44 @@ export type SessionSummarySessionRef = {
   agentType?: AgentType
   providerSession?: AgentProviderSessionMetadata
 }
+
+export type SessionSummaryQuestionStatus = 'pending' | 'answered' | 'failed'
+
+/**
+ * A question the reader typed into the summary pane, and its answer.
+ *
+ * Why not on the ledger: the ledger is a rebuildable cache, while a question is the reader's own
+ * words and its answer cost a model call — neither may be discarded by a cache reset.
+ */
+export type SessionSummaryQuestion = {
+  id: string
+  /** What the reader typed, verbatim, bounded by `SESSION_SUMMARY_QUESTION_MAX_LENGTH`. */
+  text: string
+  /** When the reader submitted it — the timestamp the pane shows. */
+  askedAt: number
+  status: SessionSummaryQuestionStatus
+  answer?: string
+  answeredAt?: number
+  /** `foldedThrough` at ask time: which version of the brief the answer was written against. */
+  through?: number
+  error?: string
+}
+
+/**
+ * Ask a question, or re-ask a failed one: the id is chosen by the viewer so the row it shows
+ * before the call resolves is the row the answer lands on.
+ */
+export type SessionSummaryAskRequest = {
+  paneKey: string
+  questionId: string
+  text: string
+}
+
+export const SESSION_SUMMARY_QUESTION_MAX_LENGTH = 1_000
+export const SESSION_SUMMARY_ANSWER_MAX_LENGTH = 4_000
+/** Questions kept per pane, newest first, so one session cannot grow the store without bound. */
+export const SESSION_SUMMARY_QUESTIONS_PER_PANE = 50
+export const SESSION_SUMMARY_QUESTION_ID_MAX_LENGTH = 128
 
 export type SessionSummaryCloseRequest = {
   paneKey: string
@@ -335,6 +383,24 @@ export function isSessionSummaryOpenRequest(value: unknown): value is SessionSum
   }
   // Optional, so a request from a client that predates host-aware folding stays valid.
   return value.executionHostId === undefined || typeof value.executionHostId === 'string'
+}
+
+export function isSessionSummaryAskRequest(value: unknown): value is SessionSummaryAskRequest {
+  if (
+    !isRecord(value) ||
+    typeof value.paneKey !== 'string' ||
+    typeof value.questionId !== 'string' ||
+    typeof value.text !== 'string'
+  ) {
+    return false
+  }
+  const text = value.text.trim()
+  return (
+    value.questionId.length > 0 &&
+    value.questionId.length <= SESSION_SUMMARY_QUESTION_ID_MAX_LENGTH &&
+    text.length > 0 &&
+    text.length <= SESSION_SUMMARY_QUESTION_MAX_LENGTH
+  )
 }
 
 export function isSessionSummaryCloseRequest(value: unknown): value is SessionSummaryCloseRequest {

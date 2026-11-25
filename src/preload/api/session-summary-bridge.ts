@@ -1,5 +1,6 @@
 import { ipcRenderer } from 'electron'
 import type {
+  SessionSummaryAskRequest,
   SessionSummaryCloseRequest,
   SessionSummaryOpenRequest,
   SessionSummarySnapshot
@@ -12,6 +13,8 @@ export const sessionSummaryApi = {
   close: (request: SessionSummaryCloseRequest): void => {
     ipcRenderer.send('sessionSummary:close', request)
   },
+  ask: (request: SessionSummaryAskRequest): Promise<SessionSummarySnapshot> =>
+    ipcRenderer.invoke('sessionSummary:ask', request),
   onUpdate: (callback: (snapshot: SessionSummarySnapshot) => void): (() => void) => {
     const listener = (_event: Electron.IpcRendererEvent, snapshot: SessionSummarySnapshot) =>
       callback(snapshot)

@@ -153,3 +153,103 @@ describe('SessionSummaryStore', () => {
     expect(new SessionSummaryStore(filePath()).get('pane')).toBeNull()
   })
 })
+
+// Questions are the reader's own words and a paid answer, so unlike the ledger they are not a
+// rebuildable cache: a version bump, a bad row or a quit mid-answer must not cost them (#280).
+describe('SessionSummaryStore questions', () => {
+  let directory: string
+  const filePath = (): string => join(directory, 'session-summaries.json')
+  const IDENTITY = { providerSessionId: 'p1', transcriptPath: '/tmp/p1.jsonl' }
+
+  beforeEach(() => {
+    directory = mkdtempSync(join(tmpdir(), 'orca-summary-questions-'))
+  })
+
+  afterEach(() => {
+    rmSync(directory, { recursive: true, force: true })
+  })
+
+  it('round-trips questions across a ledger version bump, and a pending one reads back retryable', () => {
+    const store = new SessionSummaryStore(filePath())
+    store.setQuestions('pane', {
+      identity: IDENTITY,
+      updatedAt: 10,
+      questions: [
+        { id: 'q1', text: 'Why?', askedAt: 1, status: 'answered', answer: 'Because.', through: 4 },
+        { id: 'q2', text: 'And then?', askedAt: 2, status: 'pending', through: 4 }
+      ]
+    })
+    store.flush()
+    // A later build bumps the ledger version: the ledgers go, the questions must not.
+    const file = JSON.parse(readFileSync(filePath(), 'utf8'))
+    writeFileSync(filePath(), JSON.stringify({ ...file, version: 999 }))
+
+    const reopened = new SessionSummaryStore(filePath())
+
+    expect(reopened.getQuestions('pane')).toEqual({
+      identity: IDENTITY,
+      updatedAt: 10,
+      questions: [
+        { id: 'q1', text: 'Why?', askedAt: 1, status: 'answered', answer: 'Because.', through: 4 },
+        {
+          id: 'q2',
+          text: 'And then?',
+          askedAt: 2,
+          status: 'failed',
+          through: 4,
+          error: 'Orca quit before this question was answered.'
+        }
+      ]
+    })
+  })
+
+  it('keeps only the newest questions of a pane', () => {
+    const store = new SessionSummaryStore(filePath())
+    const questions = Array.from({ length: 60 }, (_, index) => ({
+      id: `q${index}`,
+      text: `question ${index}`,
+      askedAt: index,
+      status: 'failed' as const,
+      error: 'x'
+    }))
+    store.setQuestions('pane', { identity: IDENTITY, updatedAt: 1, questions })
+    store.flush()
+
+    const kept = new SessionSummaryStore(filePath()).getQuestions('pane')?.questions ?? []
+    expect(kept).toHaveLength(50)
+    expect(kept[0]?.id).toBe('q10')
+    expect(kept.at(-1)?.id).toBe('q59')
+  })
+
+  it('drops a malformed row without losing the rest of the file', () => {
+    writeFileSync(
+      filePath(),
+      JSON.stringify({
+        version: 4,
+        entries: {},
+        questions: {
+          good: {
+            identity: IDENTITY,
+            updatedAt: 5,
+            questions: [
+              { id: 'ok', text: 'Kept?', askedAt: 3, status: 'answered', answer: 'Yes.' },
+              { id: 'no-text', text: '', askedAt: 3, status: 'answered', answer: 'x' },
+              { id: 'bad-status', text: 'x', askedAt: 3, status: 'thinking' },
+              'not a question'
+            ]
+          },
+          noIdentity: { updatedAt: 5, questions: [{ id: 'q', text: 'x', askedAt: 1 }] },
+          notAnEntry: 42
+        }
+      })
+    )
+
+    const store = new SessionSummaryStore(filePath())
+
+    expect(store.getQuestions('good')?.questions).toEqual([
+      { id: 'ok', text: 'Kept?', askedAt: 3, status: 'answered', answer: 'Yes.' }
+    ])
+    expect(store.getQuestions('noIdentity')).toBeNull()
+    expect(store.getQuestions('notAnEntry')).toBeNull()
+  })
+})
