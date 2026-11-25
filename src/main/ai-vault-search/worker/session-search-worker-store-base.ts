@@ -40,7 +40,6 @@ export class SessionSearchWorkerStoreBase extends SessionSearchCursorSnapshot {
     protected readonly path: string,
     protected readonly onError: (error: unknown) => void,
     private readonly onInvalidated: () => void = () => undefined,
-    /** The content tier the writer records for this index; absent leaves the rows' consent. */
     private readonly contentEnabled?: boolean
   ) {
     super()

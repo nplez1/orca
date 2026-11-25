@@ -26,7 +26,6 @@ export class SessionSearchReaders {
   query(request: AiVaultSearchRequest, scope?: SessionSearchHostScope, signal?: AbortSignal) {
     return this.execute({ op: 'query', request, scope }, signal)
   }
-  /** Agent Session History pages off the caller's loop; one request, so they share a worker turn. */
   async list(lists: IndexedSessionListArgs[], signal?: AbortSignal): Promise<IndexedSessionList[]> {
     const response = await this.execute({ op: 'list', lists }, signal)
     if (!response.lists || response.lists.length !== lists.length) {

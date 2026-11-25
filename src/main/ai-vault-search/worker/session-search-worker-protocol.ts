@@ -29,7 +29,6 @@ export type SearchWorkerCommand =
       path: string
       reader: boolean
       cutoff: number | null
-      /** Writer only: the consent the owning instance decided, recorded before readers open. */
       contentEnabled?: boolean
     }
   | {
@@ -53,7 +52,6 @@ export type SearchWorkerCommand =
   | { op: 'purge'; cutoff: number | null }
   | { op: 'sync' }
   | { op: 'query'; request: AiVaultSearchRequest; scope?: SessionSearchHostScope }
-  /** Reader only: Agent Session History pages, read in one worker turn. */
   | { op: 'list'; lists: IndexedSessionListArgs[] }
 export type SearchWorkerRequest = { id: number; command: SearchWorkerCommand }
 export type SearchWorkerResponse = {

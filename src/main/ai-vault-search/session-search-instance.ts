@@ -71,7 +71,6 @@ export class SessionSearchInstance {
       if (clear) {
         await removeSessionSearchDatabaseAsync(this.options.databasePath)
       }
-      // The writer thread records consent as it opens the index, before any reader opens it.
       const indexer = new SessionSearchIndexer({
         ...this.options,
         historyDays: settings.historyDays,
@@ -147,16 +146,16 @@ export class SessionSearchInstance {
    * has. The gate is the completed sweep and not `filesIndexed > 0`, because a
    * host with no sessions never indexes a file and would otherwise be stranded on
    * the scanner for good.
-   *
-   * Each args entry is one page; all of them are read in one reader-thread turn,
-   * so the warm-up gate and the pages it admits are one decision.
    */
   async listSessions(lists: IndexedSessionListArgs[]): Promise<IndexedSessionList[] | null> {
     const live = this.live
     if (!live || live.indexer.status().lastSweepCompletedAt === null) {
       return null
     }
-    return live.readers.list(lists)
+    return live.readers.list(lists).catch((error: unknown) => {
+      this.onError(error)
+      return null
+    })
   }
 
   /**

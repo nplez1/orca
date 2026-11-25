@@ -8,4 +8,4 @@
 # This is a RATCHET: counts may only go DOWN. Prune: node config/scripts/static-analysis/ratchets/runtime-lifecycle/check-main-blocking-api-ratchet.mjs --prune
 0 src/main/ai-vault-search/storage/session-search-schema.ts # orcad's SessionSearchInstance now imports only the async unlink (storage/session-search-database-removal.ts), so the opener's SQL left the event-loop graph
 27 src/main/ai-vault/parse-cache/session-parse-cache-database.ts # worker-only: +7 is the fork's parser-version stamp (#238); the database opens only in the scanner child (initSessionParseCachePersistence), main imports its sibling for the options
-1 src/main/runtime/orchestration/db/schema/migrate.ts # one-shot: the fork's pre-DDL user_version read at orchestration DB open (#238, refuse a newer build's schema); the DB itself is on main by upstream's design
+1 src/main/runtime/orchestration/db/schema/migrate.ts # runs on main, adopted as pre-ratchet fork code: #238's pre-DDL user_version read (refuse a newer build's schema), once per orchestration DB open; upstream's own migrate() reads the same pragma, uncounted
