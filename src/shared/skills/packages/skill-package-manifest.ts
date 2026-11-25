@@ -1,5 +1,12 @@
 import { createHash } from 'node:crypto'
 import { z } from 'zod'
+import {
+  SKILL_NAME_PATTERN,
+  validateSkillPackageName,
+  WINDOWS_RESERVED_SEGMENT
+} from './skill-package-name'
+
+export { validateSkillPackageName }
 
 export const SKILL_PACKAGE_SCHEMA_VERSION = 1 as const
 export const SKILL_PACKAGE_CONTENT_TYPE = 'application/vnd.orca.skill+tar+gzip'
@@ -8,8 +15,6 @@ export const SKILL_PACKAGE_MAX_MANIFEST_BYTES = 1024 * 1024
 
 const SHA256_PATTERN = /^[a-f0-9]{64}$/
 const ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/
-const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/
-const WINDOWS_RESERVED_SEGMENT = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i
 
 export const SkillPackageFileSchema = z
   .object({
@@ -42,12 +47,6 @@ export const SkillPackageManifestV1Schema = z
   .strict()
 
 export type SkillPackageManifestV1 = z.infer<typeof SkillPackageManifestV1Schema>
-
-export function validateSkillPackageName(name: string): void {
-  if (!SKILL_NAME_PATTERN.test(name) || WINDOWS_RESERVED_SEGMENT.test(name)) {
-    throw new Error('skill-package-skill-name-invalid')
-  }
-}
 
 export function validateSkillPackagePath(path: string): void {
   if (path !== path.normalize('NFC') || Buffer.byteLength(path, 'utf8') > 1024) {
