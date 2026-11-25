@@ -6281,3 +6281,18 @@ made this feature better rather than merely compliant:
   `config/main-blocking-helper-baseline.fork.txt` with the reason, beside the fork's other data-path rows,
   rather than in upstream's baseline. The store stays synchronous on purpose: a snapshot renders from it and
   the file is a few hundred bytes.
+
+**The max-lines split, and what is left of it.** The fork's `check:max-lines-ratchet` refuses a new
+`max-lines` exemption, so the store was split along its real seam — the pending-box mailbox is now
+`host-mesh-store-pending-boxes.ts` with the box reader in `host-mesh-store-boxes.ts` — and the store needs no
+exemption at all. Two files still carry one, and both are **fork-owned**, so neither can conflict with an
+upstream sync:
+
+- `host-mesh-driver.ts` — the local lifecycle of one protocol step: snapshot, join, sync, repair, removal.
+  Splitting it means threading the state accessors and the store through a context object into a transfer
+  module; that is a refactor of a tested protocol, and it is follow-up work rather than a sync risk.
+- `host-mesh-rpc-service.ts` — the peer-facing half: six methods that each run a whole pass on the same store.
+
+Both are declared in `local/lint-known-red.json` with that reason, in the same commit, which is what that file
+is for. The debt is named rather than hidden: `local/checks/host-mesh-upstream-seams.mjs` will keep the
+upstream surface small either way, and the next person to touch these files should take the split first.

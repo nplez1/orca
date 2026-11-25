@@ -39,5 +39,27 @@
     "2026-11-20 sync (upstream 0c6207e3d7): one whole-step entry for `check:code-quality:changed`, which cannot pass before `main` is pushed \u2014 E2BIG on the 2000-commit diff, see LOCAL-PATCHES.md \u00a7 `local(lint)`: the 2026-11-20 sync's lint gate. It goes stale on the first run after `git push origin main`; prune it then. The three ratchets that arrived with this sync were closed in the tree and in two new `.fork.txt` overlays, not here."
   ],
   "recordedAt": "2026-11-20",
-  "entries": []
+  "entries": [
+    {
+      "step": "check:max-lines-ratchet",
+      "match": "runtime-startup/main-process-runtime-launch\\.ts",
+      "class": "foreign: upstream file at its cap",
+      "owner": "local(hosts)",
+      "evidence": "LOCAL-PATCHES.md \u00a7 local(hosts): upstream's launch script is exactly 300 effective lines, so the group's two lines (installHostMeshRuntime + its import) cannot be added without the directive. Splitting upstream's file is not the fork's call; the seam is recorded in local/checks/host-mesh-upstream-seams.mjs at 3 lines."
+    },
+    {
+      "step": "check:max-lines-ratchet",
+      "match": "src/main/host-mesh/host-mesh-driver\\.ts",
+      "class": "fork-owned file, split pending",
+      "owner": "local(hosts)",
+      "evidence": "LOCAL-PATCHES.md \u00a7 local(hosts) \u2014 the max-lines split. Fork-owned, so no upstream conflict rides on it; the store was already split along its mailbox seam, and these two are the remainder."
+    },
+    {
+      "step": "check:max-lines-ratchet",
+      "match": "src/main/host-mesh/host-mesh-rpc-service\\.ts",
+      "class": "fork-owned file, split pending",
+      "owner": "local(hosts)",
+      "evidence": "LOCAL-PATCHES.md \u00a7 local(hosts) \u2014 the max-lines split. Fork-owned, so no upstream conflict rides on it; the store was already split along its mailbox seam, and these two are the remainder."
+    }
+  ]
 }

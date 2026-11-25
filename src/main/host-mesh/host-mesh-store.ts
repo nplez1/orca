@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- Why: one on-disk record and its fields (state, peer index, pending boxes, admissions, spent nonces) — every field is a view of the same file, and splitting them would give each its own read-modify-write over the same bytes. */
 import { join } from 'node:path'
 import { z } from 'zod'
 import { readNodeFileSyncWithinLimit } from '../../shared/file-content/node-bounded-file-reader'
@@ -9,6 +8,7 @@ import {
 import type { HostMeshSealedOffer, HostMeshState } from '../../shared/host-mesh/host-mesh-contract'
 import { writeSecureJsonFileWithinLimit } from '../../shared/secure-storage/bounded-secure-json-file'
 import { hardenExistingSecureFile } from '../../shared/secure-storage/secure-file'
+import { createPendingBoxStore } from './host-mesh-store-pending-boxes'
 
 /**
  * A group's state on this host: the reducer's output, plus the index removal needs.
@@ -124,8 +124,9 @@ const storedFileSchema = z.looseObject({
   /** What an upgrade found and grouped, so the panel can say where this group came from. */
   migration: z.unknown().default(null)
 })
-
 type StoredFile = z.infer<typeof storedFileSchema>
+
+export type { StoredFile }
 
 const emptyFile = (): StoredFile => ({
   version: 1,
@@ -221,24 +222,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-const sealedOfferSchema = z.looseObject({
-  version: z.literal(1),
-  recipientHostKey: z.string().min(1),
-  senderHostKey: z.string().min(1),
-  nonceB64: z.string().min(1),
-  ciphertextB64: z.string().min(1)
-})
-
 /** A box this build cannot parse is dropped rather than carried: it can never be opened, and it is bounded. */
-function readBoxes(raw: unknown): HostMeshSealedOffer[] {
-  if (!Array.isArray(raw)) {
-    return []
-  }
-  return raw.flatMap((entry) => {
-    const box = sealedOfferSchema.safeParse(entry)
-    return box.success ? [box.data] : []
-  })
-}
 
 export type HostMeshStore = {
   read(): HostMeshState | null
@@ -385,37 +369,10 @@ export function createHostMeshStore({ userDataPath }: { userDataPath: string }):
       })
     },
 
-    readPendingBoxes: (recipientHostKey) => {
-      const file = readOrRefuse(path)
-      return readBoxes(file?.pendingBoxes[recipientHostKey])
-    },
-
-    takePendingBoxes: (recipientHostKey) => {
-      const file = readOrRefuse(path) ?? emptyFile()
-      const boxes = readBoxes(file.pendingBoxes[recipientHostKey])
-      if (boxes.length === 0) {
-        return []
-      }
-      const { [recipientHostKey]: _taken, ...pendingBoxes } = file.pendingBoxes
-      writeStoredFile(path, { ...file, pendingBoxes })
-      return boxes
-    },
-
-    addPendingBox: (recipientHostKey, sealed) => {
-      const file = readOrRefuse(path) ?? emptyFile()
-      const held = readBoxes(file.pendingBoxes[recipientHostKey])
-      // Why keyed on the nonce: a relay retried after a timeout must not queue the same box twice, or the
-      // newcomer would redeem one and hold a second dead credential for the same member.
-      if (held.some((box) => box.nonceB64 === sealed.nonceB64)) {
-        return
-      }
-      writeStoredFile(path, {
-        ...file,
-        pendingBoxes: {
-          ...file.pendingBoxes,
-          [recipientHostKey]: [...held, sealed]
-        }
-      })
-    }
+    ...createPendingBoxStore({
+      read: () => readOrRefuse(path),
+      write: (file) => writeStoredFile(path, file),
+      empty: emptyFile
+    })
   }
 }
