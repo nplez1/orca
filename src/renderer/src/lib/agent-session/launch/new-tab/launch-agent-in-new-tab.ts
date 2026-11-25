@@ -17,6 +17,7 @@ import '@/diagnostics/telemetry/telemetry'
 import { tuiAgentToAgentKind } from '../../../../../../shared/agent-status/identity/agent-kind'
 import { seedNativeChatLaunchDraftForAgentTab } from '@/lib/agent-session/launch/prompt/agent-launch-prompt-delivery'
 import { pasteAgentLaunchPromptOnceReady } from '@/lib/agent-session/launch/prompt/launch-agent-tab-prompt-paste'
+import { notePromptFreeAgentTabLaunch } from '@/lib/agent-session/launch/new-tab/agent-tab-prompt-free-launch'
 import { runtimeEnvironmentIdOrLocalUnlessTwin } from '@/lib/workspace/ownership/worktree-runtime-owner'
 import { snapshotAgentTabLaunchArgs } from '@/lib/agent-session/launch/new-tab/launch-agent-in-new-tab-args'
 import { isWebRuntimeSessionActive } from '@/runtime/web-session-tabs-sync/identity/web-runtime-session-environment'
@@ -274,6 +275,10 @@ function openAgentInNewTab(
       }
     }
   })
+  // Argv drafts and resume/fork args leave nothing the status row can see, so only a bare launch counts.
+  if (!hasPrompt && agentArgs == null && args.actionAgentArgs === undefined) {
+    notePromptFreeAgentTabLaunch(tab.id)
+  }
   // Safe for native-prefill agents: delivery skips paste when their draft already arrived at launch.
   if (hasPrompt && promptDelivery === 'draft' && pasteDraftAfterLaunch === null) {
     // Native argv prefill skips the paste callback, so seed the chat composer here.

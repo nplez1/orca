@@ -6,7 +6,10 @@ import { useAppStore } from '../../../../store/index'
 import { retireUnboundRuntimeTerminalPane } from './retire-unbound-runtime-terminal-pane'
 import { makePaneKey } from '../../../../../../shared/workspace-layout/stable-pane-id'
 import { closeWebRuntimeTerminal } from '@/runtime/hosted-terminals/actions/web-runtime-terminal-close'
-import { resolveLeafCloseCopyKind } from '../../../terminal/tab-lifecycle/terminal-close-copy-kind'
+import {
+  isLeafAgentSessionEmpty,
+  resolveLeafCloseCopyKind
+} from '../../../terminal/tab-lifecycle/terminal-close-copy-kind'
 import { RUNNING_CLOSE_PROBE_TIMEOUT_MS } from '../../../terminal/tab-lifecycle/running-terminal-close-guard'
 import { probePtyRunningWork } from '../../../terminal/tab-lifecycle/pty-running-work-probe'
 import { clearPaneTerminalError } from '../../errors/terminal-error-accumulation'
@@ -198,8 +201,12 @@ export function useTerminalPaneCloseActions(controller: TerminalPaneBindingContr
         .then((probes) => {
           clearTimeout(probeTimeout)
           decide(() => {
+            const verdict = probes[0]?.verdict
             if (
-              probes[0]?.verdict === 'exited' ||
+              verdict === 'exited' ||
+              // Same never-tasked verdict as the tab close; unverifiable and timed-out probes still ask (#95).
+              (verdict === 'live' &&
+                isLeafAgentSessionEmpty(tabId, managerRef.current?.getLeafId(paneId))) ||
               settings?.skipCloseTerminalWithRunningProcessConfirm
             ) {
               close()
