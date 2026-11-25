@@ -110,10 +110,14 @@ describe('SessionSummaryQuestionStore', () => {
     expect(kept.at(-1)?.id).toBe('q59')
   })
 
-  it('evicts the oldest panes once the file would pass its byte ceiling', async () => {
+  // Why a multibyte answer too: the ceiling is on disk bytes, and CJK text is three per character.
+  it.each([
+    ['ASCII', 'a'],
+    ['multibyte', '界']
+  ])('evicts the oldest panes once the file would pass its byte ceiling (%s)', async (_, char) => {
     const store = new SessionSummaryQuestionStore(filePath())
     await store.ready
-    const answer = 'a'.repeat(4_000)
+    const answer = char.repeat(4_000)
     for (let pane = 0; pane < 20; pane++) {
       store.set(`pane-${pane}`, {
         identity: IDENTITY,
@@ -129,7 +133,7 @@ describe('SessionSummaryQuestionStore', () => {
     }
     await store.flush()
 
-    expect(readFileSync(filePath(), 'utf8').length).toBeLessThanOrEqual(2_000_000)
+    expect(readFileSync(filePath()).byteLength).toBeLessThanOrEqual(2_000_000)
     expect(store.get('pane-0')).toBeNull()
     expect(store.get('pane-19')).not.toBeNull()
   })

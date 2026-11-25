@@ -72,7 +72,10 @@ export class SessionSummaryQuestionStore {
   /** Oldest panes first, until both the pane count and the file size fit. */
   private evict(keep: string): void {
     const sizes = new Map(
-      Object.entries(this.entries).map(([key, entry]) => [key, JSON.stringify(entry).length])
+      Object.entries(this.entries).map(([key, entry]) => [
+        key,
+        Buffer.byteLength(JSON.stringify(entry))
+      ])
     )
     let total = [...sizes.values()].reduce((sum, size) => sum + size, 0)
     const oldestFirst = [...sizes.keys()]

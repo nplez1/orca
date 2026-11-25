@@ -94,3 +94,25 @@ describe('useSessionSummaryQuestions', () => {
     await waitFor(() => expect(result.current.questions).toEqual([]))
   })
 })
+
+describe('useSessionSummaryQuestions retry', () => {
+  it('shows why a retry was refused instead of the row it retried', async () => {
+    const failed: SessionSummaryQuestion = {
+      id: 'q1',
+      text: 'Why?',
+      askedAt: 1,
+      status: 'failed',
+      error: 'brain down'
+    }
+    const ask = vi.fn(async () => {
+      throw new Error("Error invoking remote method 'sessionSummary:ask': Error: ask-busy")
+    })
+    vi.stubGlobal('api', { sessionSummary: { ask } })
+    const { result } = renderHook(() => useSessionSummaryQuestions(PANE, snapshot([failed])))
+
+    act(() => result.current.retry(failed))
+
+    await waitFor(() => expect(result.current.questions[0]?.error).toContain('ask-busy'))
+    expect(result.current.questions).toHaveLength(1)
+  })
+})

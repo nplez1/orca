@@ -95,7 +95,10 @@ export function useSessionSummaryQuestions(
     // a local row kept past that point would hide the answer when it arrives.
     const shown = fromSnapshot.map((question) => {
       const entry = local[question.id]
-      return entry && !entry.settled ? entry.question : question
+      // A refused retry is the newer fact about a row the snapshot still shows as failed; once
+      // another window gets it answered, the snapshot wins again.
+      const refusedRetry = entry?.refused === true && question.status === 'failed'
+      return entry && (!entry.settled || refusedRetry) ? entry.question : question
     })
     // Why an accepted row the snapshot no longer has is not kept: the snapshot dropped it (a new
     // conversation, or the per-pane ceiling), and showing it here would contradict every window.

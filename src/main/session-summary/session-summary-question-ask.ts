@@ -15,7 +15,10 @@ import {
   type SessionSummarySessionRef,
   type SessionSummarySnapshot
 } from '../../shared/session-summary-types'
-import { SESSION_SUMMARY_FOLD_TIMED_OUT_MESSAGE } from './session-summary-agent-cli-fold-brain'
+import {
+  SESSION_SUMMARY_FOLD_CANCELED_MESSAGE,
+  SESSION_SUMMARY_FOLD_TIMED_OUT_MESSAGE
+} from './session-summary-agent-cli-fold-brain'
 import type { SessionFoldBrain } from './session-summary-fold'
 import { answerSessionSummaryQuestion } from './session-summary-question-answer'
 import type { SessionSummaryQuestionStore } from './session-summary-question-store'
@@ -154,9 +157,14 @@ export function askSessionSummaryQuestion(
 
 function failureOf(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error)
-  return message === SESSION_SUMMARY_FOLD_TIMED_OUT_MESSAGE
-    ? SESSION_SUMMARY_ASK_ERRORS.timedOut
-    : message.slice(0, SESSION_SUMMARY_TEXT_MAX_LENGTH)
+  if (message === SESSION_SUMMARY_FOLD_TIMED_OUT_MESSAGE) {
+    return SESSION_SUMMARY_ASK_ERRORS.timedOut
+  }
+  // Only a quit aborts an answer, so its cancellation is the same story as a quit mid-write.
+  if (message === SESSION_SUMMARY_FOLD_CANCELED_MESSAGE) {
+    return SESSION_SUMMARY_ASK_ERRORS.interrupted
+  }
+  return message.slice(0, SESSION_SUMMARY_TEXT_MAX_LENGTH)
 }
 
 async function answer(

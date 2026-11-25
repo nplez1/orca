@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SessionSummarySnapshot } from '../../shared/session-summary-types'
+import { SESSION_SUMMARY_FOLD_CANCELED_MESSAGE } from './session-summary-agent-cli-fold-brain'
 import type { SessionFoldBrain } from './session-summary-fold'
 import { resetSessionSummaryFoldSlotsForTests } from './session-summary-fold-slots'
 import { SessionSummaryQuestionStore } from './session-summary-question-store'
@@ -210,7 +211,7 @@ describe('SessionSummaryService.ask', () => {
         new Promise<string>((_resolve, reject) =>
           signal.addEventListener('abort', () => {
             aborted = true
-            reject(new Error('canceled'))
+            reject(new Error(SESSION_SUMMARY_FOLD_CANCELED_MESSAGE))
           })
         )
     )
@@ -219,6 +220,7 @@ describe('SessionSummaryService.ask', () => {
     h.service.dispose()
 
     await vi.waitFor(() => expect(aborted).toBe(true))
+    await vi.waitFor(() => expect(question(h.service, 'q2')?.error).toBe('ask-interrupted'))
   })
 
   it('refuses a pane that folds on a paired host', () => {
