@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { writeFileAtomically } from '../../filesystem/atomic-file-publication'
 import { createAgentTrustOwnershipLedger } from './agent-trust-ownership-ledger'
-import { editAgentTrustConfig, parseAgentTrustConfig } from './agent-trust-config-jsonc'
+import { removeAgentTrustEntry } from './agent-trust-config-jsonc'
 
 /**
  * Worker-only: removes the `trustedWorkspaces` entries Orca appended for `workspacePath`, keeping
@@ -31,18 +31,8 @@ export function removeOrcaCreatedAntigravityTrust(ledgerPath: string, workspaceP
 
 function removeEntry(settingsPath: string, entry: string): void {
   const text = readFileSync(settingsPath, 'utf-8')
-  const config = parseAgentTrustConfig(text)
-  if (!config) {
-    return
-  }
-  const trusted: unknown[] = Array.isArray(config.trustedWorkspaces) ? config.trustedWorkspaces : []
-  let next = text
-  // Remove items last to first so earlier indexes stay valid; comments elsewhere survive.
-  for (let index = trusted.length - 1; index >= 0; index -= 1) {
-    if (trusted[index] === entry) {
-      next = editAgentTrustConfig(next, ['trustedWorkspaces', index], undefined)
-    }
-  }
+  // Throws on a file it cannot edit safely, so the caller keeps the record for a later retry.
+  const next = removeAgentTrustEntry(text, 'trustedWorkspaces', entry)
   if (next !== text) {
     writeFileAtomically(settingsPath, next)
   }

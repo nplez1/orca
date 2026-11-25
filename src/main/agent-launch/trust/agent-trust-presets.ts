@@ -7,7 +7,7 @@ import { writeFileAtomically } from '../../filesystem/atomic-file-publication'
 import { grantCodexProjectTrustOffMain } from '../../codex/trust/project-trust/codex-project-trust-worker-client'
 import { runExclusivelyForCodexTrustConfig } from '../../codex/trust/toml/codex-trust-config-mutation-queue'
 import { recordOrcaCreatedAntigravityTrust } from './antigravity-workspace-trust-ownership'
-import { editAgentTrustConfig, parseAgentTrustConfig } from './agent-trust-config-jsonc'
+import { appendAgentTrustEntry, parseAgentTrustConfig } from './agent-trust-config-jsonc'
 import type { TuiAgentConfig } from '../../../shared/agent-launch/catalog/tui-agent-config-types'
 
 export type AgentTrustPreset = NonNullable<TuiAgentConfig['preflightTrust']>
@@ -137,18 +137,15 @@ function readTrustedConfig(configPath: string): TrustedConfigSource | null {
   }
 }
 
-/** Append only the entry, so the agent's comments, keys and other array items survive the write. */
+/** The config text with `entry` appended, or null when the edit could not be verified. */
 function withTrustedEntry(
   source: TrustedConfigSource,
   key: TrustedEntryConfig['key'],
   entry: string
-): string {
-  if (source.text === null) {
-    return `${JSON.stringify({ [key]: [entry] }, null, 2)}\n`
-  }
-  return Array.isArray(source.config[key])
-    ? editAgentTrustConfig(source.text, [key, -1], entry)
-    : editAgentTrustConfig(source.text, [key], [entry])
+): string | null {
+  return source.text === null
+    ? `${JSON.stringify({ [key]: [entry] }, null, 2)}\n`
+    : appendAgentTrustEntry(source.text, key, entry)
 }
 
 function trustedEntries(config: Record<string, unknown>, key: TrustedEntryConfig['key']): string[] {
@@ -186,7 +183,8 @@ async function appendTrustedConfigEntry(args: TrustedEntryConfig): Promise<void>
       return
     }
     const existing = trustedEntries(source.config, args.key)
-    if (existing.includes(absPath)) {
+    const nextText = existing.includes(absPath) ? null : withTrustedEntry(source, args.key, absPath)
+    if (nextText === null) {
       return
     }
     if (!existsSync(args.configDir)) {
@@ -194,7 +192,7 @@ async function appendTrustedConfigEntry(args: TrustedEntryConfig): Promise<void>
     }
     writeFileAtomically(
       args.configPath,
-      withTrustedEntry(source, args.key, absPath),
+      nextText,
       args.mode === undefined ? undefined : { mode: args.mode }
     )
     // Why gated: the ownership ledger is Antigravity's; a Copilot trustedFolders write must not land in it.
