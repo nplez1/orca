@@ -102,6 +102,10 @@ describe.each(LANES)('a child-held pi turn on $name', (lane) => {
     const held = pane.deliveries.at(-1)?.accepted
     expect(held?.state).toBe('working')
     expect(held?.subagents?.map((child) => child.id)).toEqual(['child-1'])
+    const lastHeld = pane.deliveries.at(-1)!
+    expect(
+      isFreshNonDoneAgentStatus({ state: 'working', updatedAt: lastHeld.at }, Date.now())
+    ).toBe(true)
 
     pane.harness.emitPiEvent(lane.settle.channel, lane.settle.payload)
     await vi.advanceTimersByTimeAsync(0)
@@ -124,6 +128,9 @@ describe.each(LANES)('a child-held pi turn on $name', (lane) => {
     expect(pane.reposts()).toHaveLength(1)
     await vi.advanceTimersByTimeAsync(2 * REPOST_INTERVAL_MS)
     expect(pane.reposts()).toHaveLength(3)
+    const afterReload = pane.reposts().at(-1)?.accepted
+    expect(afterReload?.state).toBe('working')
+    expect(afterReload?.subagents?.map((child) => child.id)).toEqual(['child-1'])
   })
 
   it('stops re-posting after a day without child lifecycle events, so host freshness decays the pane', async () => {
@@ -144,4 +151,18 @@ describe.each(LANES)('a child-held pi turn on $name', (lane) => {
       false
     )
   })
+})
+
+it('measures the one-day cap from the last child lifecycle event, not from the hold', async () => {
+  vi.useFakeTimers()
+  const pane = createPane()
+  await holdTurnOnChild(pane, LANES[0])
+
+  await vi.advanceTimersByTimeAsync(DAY_MS / 2)
+  pane.harness.emitPiEvent('task:subagent:lifecycle', { id: 'child-1', status: 'running' })
+  await vi.advanceTimersByTimeAsync(DAY_MS)
+  expect(pane.reposts()).toHaveLength(215)
+  const capped = pane.deliveries.length
+  await vi.advanceTimersByTimeAsync(AGENT_STATUS_STALE_AFTER_MS)
+  expect(pane.deliveries).toHaveLength(capped)
 })
