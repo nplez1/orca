@@ -65,6 +65,12 @@ export function createHostMeshRpcService(deps: HostMeshDriverDeps): HostMeshRpcS
         reason = why
       }
     })
+    if (payload !== null) {
+      if (store.hasSpentNonce(payload.nonce, deps.now())) {
+        return { payload: null, reason: 'offer-replayed' }
+      }
+      store.spendNonce(payload.nonce, deps.now())
+    }
     return { payload, reason }
   }
 

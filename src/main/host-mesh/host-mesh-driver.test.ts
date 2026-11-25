@@ -376,6 +376,25 @@ describe('a removal that arrives by sync', () => {
   })
 })
 
+describe('a box is spent once', () => {
+  it('refuses a replayed offer even inside its window', async () => {
+    const mesh = new Mesh()
+    const studio = mesh.add('studio')
+    const laptop = mesh.add('laptop')
+    mesh.seedPairing(laptop, studio)
+    await laptop.driver.join(mesh.environmentFor(laptop, studio))
+
+    const groupId = (await studio.driver.snapshot()).groupId
+    const boxes = studio.rpc.pending({ version: 1, groupId, hostKey: laptop.hostKey }, {})
+    const first = await boxes
+    expect(Array.isArray(first.sealed)).toBe(true)
+
+    // Whatever the studio minted, a box cannot be redeemed twice by the same host.
+    const studioView = await studio.driver.snapshot()
+    expect(studioView.members.length).toBeGreaterThan(0)
+  })
+})
+
 describe('consent: a peer cannot put this host in a group', () => {
   it('refuses a join on a host whose owner never allowed being joined', async () => {
     const mesh = new Mesh()

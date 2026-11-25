@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Why: one on-disk record and its fields (state, peer index, pending boxes, admissions, spent nonces) — every field is a view of the same file, and splitting them would give each its own read-modify-write over the same bytes. */
 import { existsSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { z } from 'zod'
@@ -107,6 +108,8 @@ const storedFileSchema = z.looseObject({
   pendingBoxes: z.record(z.string().min(1), z.array(z.unknown())).default({}),
   /** Admission timestamps per group, kept so the introduction limit survives a restart. */
   admissions: z.record(z.string().min(1), z.array(z.number())).default({}),
+  /** Box nonces already redeemed, with when, so a replay fails rather than joining twice. */
+  spentNonces: z.record(z.string().min(1), z.number()).default({}),
   /** The group's own admission rules, which belong with the group rather than with this install's settings. */
   settings: z.unknown().default(null)
 })
@@ -119,6 +122,7 @@ const emptyFile = (): StoredFile => ({
   peerIndex: {},
   pendingBoxes: {},
   admissions: {},
+  spentNonces: {},
   settings: null
 })
 
@@ -223,6 +227,9 @@ export type HostMeshStore = {
   readPeerIndex(): ReadonlyMap<string, HostMeshPeerIndexEntry>
   readSettings(): HostMeshSettings
   writeSettings(settings: HostMeshSettings): void
+  /** True when this box's nonce was already used, so a replay inside the offer window is refused. */
+  hasSpentNonce(nonce: string, now: number): boolean
+  spendNonce(nonce: string, now: number): void
   /** Admissions inside the last hour for a group, which is what the introduction limit counts. */
   readAdmissions(groupId: string, now: number): number[]
   recordAdmission(groupId: string, at: number): void
@@ -311,6 +318,22 @@ export function createHostMeshStore({ userDataPath }: { userDataPath: string }):
       const file = readOrRefuse(path) ?? emptyFile()
       file.settings = settings
       writeStoredFile(path, file)
+    },
+
+    hasSpentNonce: (nonce, now) => {
+      const file = readOrRefuse(path)
+      const at = file?.spentNonces[nonce]
+      // Why a window rather than forever: an offer cannot outlive it, so neither must the record.
+      return at !== undefined && now - at < 60 * 60_000
+    },
+
+    spendNonce: (nonce, now) => {
+      const file = readOrRefuse(path) ?? emptyFile()
+      const kept = Object.entries(file.spentNonces).filter(([, at]) => now - at < 60 * 60_000)
+      writeStoredFile(path, {
+        ...file,
+        spentNonces: { ...Object.fromEntries(kept), [nonce]: now }
+      })
     },
 
     readAdmissions: (groupId, now) => {

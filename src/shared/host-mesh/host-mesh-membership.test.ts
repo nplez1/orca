@@ -168,6 +168,24 @@ describe('merging another member’s view', () => {
     expect(afterBoth.members).toHaveLength(0)
   })
 
+  it('ignores a third member’s link when a peer claims it', () => {
+    const group = withMembers(['key-a', 'key-b'])
+    const merged = applyHostMeshSync(group, {
+      version: 1,
+      groupId: 'group-1',
+      epoch: 5,
+      selfKey: 'key-a',
+      publicKeyB64: 'pk-a',
+      members: [],
+      tombstones: [],
+      // A claim about key-b, made by key-a: it has no standing to state it.
+      links: { 'key-b': { outbound: { 'key-self': { kind: 'ok' } }, inbound: {} } }
+    })
+
+    // Still the "absent" a freshly added member carries, not the "active" the peer tried to assert.
+    expect(merged.links.inbound['key-b']).toEqual({ kind: 'absent' })
+  })
+
   it('never lets a peer write the link this host owns, but does read the peer’s own', () => {
     const group = withMembers(['key-a'])
     const merged = applyHostMeshSync(

@@ -198,7 +198,11 @@ export function applyHostMeshSync(
     outbound: { ...state.links.outbound },
     inbound: { ...state.links.inbound }
   }
-  for (const [hostKey, matrix] of Object.entries(payload.links)) {
+  // Why only the sender's own matrix: a member can say what it holds about this host, but a claim about
+  // some third member's link is one it has no standing to make, and believing it would misdraw that row.
+  for (const [hostKey, matrix] of Object.entries(payload.links).filter(
+    ([key]) => key === payload.selfKey
+  )) {
     // Why the sender's view of our own outbound link is ignored: a link this host owns is only ever
     // written by this host, or a peer could claim a pairing that does not exist.
     if (hostKey === state.selfKey) {
