@@ -974,7 +974,8 @@ Anchors, both on upstream-owned files and marked `LOCAL(nplez1)`:
   (`agent-hook-cancel-verdict-latch.test.ts`, with the snapshot rule marked LOCAL(nplez1) above). The
   held-turn repost suite (#48146) is the `fork-refactor` deletion in
   `local/sync/expected-deletions.json`, because it drives the two `subagent:async-*` bindings this fork
-  removed; the cancel invariant is also pinned by
+  removed, and its cases are re-homed on the fork's lanes in
+  `src/main/pi/agent-status-held-turn-repost-lanes.test.ts` (#464); the cancel invariant is also pinned by
   `src/shared/agent-hook-listener-descendant-lifecycle.test.ts` › "starts a background child right
   after a cancel, instead of holding it as late work". The
   helper-settlement badge has no owner at HEAD, so re-homing that case is owed. The

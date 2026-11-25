@@ -527,12 +527,16 @@ that drive them. They did not get the same answer, because only one of them was 
   `agent-hook-listener-descendant-lifecycle.test.ts` gained the end-to-end companion, which drives the
   same start through `normalizeAndAccept` rather than the latch directly.
 - `agent-status-extension-held-turn-repost.test.ts` **is retired**, as a `fork-refactor` deletion in
-  `expected-deletions.json`. Every case in it needs the two bindings re-added, and porting upstream's
-  repost into the fork's lane is a feature, not a sync repair. **Coverage owed (#464):** the fork's roster
-  lane still reposts a child-held turn, and nothing on this tree pins the cadence, the single timer
-  across a Pi reload, the one-day cap, or whether a pi pane held by an async child past
-  `AGENT_STATUS_STALE_AFTER_MS` goes stale. Port those cases onto the `task:subagent:lifecycle` lane
-  the fork does run; do not read the deletion as "the fork does not repost".
+  `expected-deletions.json`. At the deletion every case in it needed the two bindings re-added, and
+  porting upstream's repost into the fork's lane is a feature, not a sync repair. **Coverage re-homed
+  (#464)** in `src/main/pi/agent-status-held-turn-repost-lanes.test.ts`: the cadence, the single timer
+  across a Pi reload, the one-day cap, and that a pi pane held by a child past
+  `AGENT_STATUS_STALE_AFTER_MS` stays fresh (and decays once the cap stops the reposts), driven
+  through the real listener on the `task:subagent:lifecycle` lane and on the descendant bus's hand-off
+  of a child spawned inside the lead's turn. That hand-off (0ddf9485840) also means upstream's suite now
+  passes unchanged here. **Not covered, because nothing reposts them:** a `subagent:async-*` child
+  spawned between turns and any `subagents:*` child never reach the roster, so their pane posts nothing
+  after the start and goes stale at the window, while the descendant lane quiet-reaps the child.
 
 ---
 
