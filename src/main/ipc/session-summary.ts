@@ -1,4 +1,4 @@
-import { BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'node:path'
 import { getAppEnvironment } from '../../shared/app-lifecycle/app-environment'
 import { agentHookServer } from '../agent-hooks/server/agent-hook-server'
@@ -26,6 +26,7 @@ import {
 import { canReadAgentTranscript } from '../session-summary/session-summary-transcript-source'
 import { SessionSummaryService } from '../session-summary/session-summary-service'
 import { SessionSummaryStore } from '../session-summary/session-summary-store'
+import { SessionSummaryQuestionStore } from '../session-summary/session-summary-question-store'
 import type { SessionSummaryEventReaderDeps } from '../session-summary/session-summary-event-reader'
 
 export type SessionSummaryServiceOverrides = {
@@ -45,6 +46,9 @@ export function createSessionSummaryService(
   sweepStaleSessionSummaryScratchDirsOnce()
   return new SessionSummaryService({
     store: new SessionSummaryStore(join(userDataPath, 'session-summaries.json')),
+    questions: new SessionSummaryQuestionStore(
+      join(userDataPath, 'session-summary-questions.json')
+    ),
     readEvents: createSessionSummaryEventReader({
       fetchSshTranscript: overrides.sshTranscript ?? sshTranscriptFetcher()
     }),
@@ -106,6 +110,8 @@ export function registerSessionSummaryHandlers(
   ipcMain.removeHandler('sessionSummary:open')
   ipcMain.removeHandler('sessionSummary:close')
   ipcMain.removeHandler('sessionSummary:ask')
+  // An answer in flight is an agent CLI this process spawned; quitting must not orphan it.
+  app.once('will-quit', () => service.dispose())
   service.onUpdate((snapshot: SessionSummarySnapshot) => {
     for (const win of BrowserWindow.getAllWindows()) {
       if (!win.isDestroyed()) {

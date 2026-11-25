@@ -5,6 +5,7 @@
 // Transcript-grounded answers need a transcript re-read and are a deliberate later step (#280).
 import {
   SESSION_SUMMARY_ANSWER_MAX_LENGTH,
+  SESSION_SUMMARY_ASK_ERRORS,
   type SessionSummaryFact,
   type SessionSummaryLedger
 } from '../../shared/session-summary-types'
@@ -84,7 +85,7 @@ export async function answerSessionSummaryQuestion(args: {
   )
   const answer = raw.trim()
   if (!answer) {
-    throw new Error('The summary agent returned an empty answer.')
+    throw new Error(SESSION_SUMMARY_ASK_ERRORS.emptyAnswer)
   }
   return answer.length > SESSION_SUMMARY_ANSWER_MAX_LENGTH
     ? `${answer.slice(0, SESSION_SUMMARY_ANSWER_MAX_LENGTH - 1)}…`

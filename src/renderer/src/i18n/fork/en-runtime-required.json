@@ -1,4 +1,10 @@
 {
+  "activity": {
+    "sessionSummary": {
+      "askDetail_one": "{{count}} question · last asked {{time}}",
+      "askDetail_other": "{{count}} questions · last asked {{time}}"
+    }
+  },
   "auto": {
     "components": {
       "right": {

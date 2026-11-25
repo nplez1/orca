@@ -307,6 +307,26 @@ export const SESSION_SUMMARY_ANSWER_MAX_LENGTH = 4_000
 /** Questions kept per pane, newest first, so one session cannot grow the store without bound. */
 export const SESSION_SUMMARY_QUESTIONS_PER_PANE = 50
 export const SESSION_SUMMARY_QUESTION_ID_MAX_LENGTH = 128
+/**
+ * Unanswered questions a pane may hold at once. Each one holds a process-wide fold slot while it
+ * runs, so a burst would queue every pane's fold behind it.
+ */
+export const SESSION_SUMMARY_PENDING_QUESTIONS_PER_PANE = 2
+
+/**
+ * Why a question could not be asked or answered, as codes rather than sentences: main writes them
+ * and the pane translates them. A question's `error` holds one of these, or the agent's own text.
+ */
+export const SESSION_SUMMARY_ASK_ERRORS = {
+  interrupted: 'ask-interrupted',
+  emptyAnswer: 'ask-empty-answer',
+  timedOut: 'ask-timed-out',
+  busy: 'ask-busy',
+  noSummary: 'ask-no-summary',
+  pairedHost: 'ask-paired-host'
+} as const
+export type SessionSummaryAskError =
+  (typeof SESSION_SUMMARY_ASK_ERRORS)[keyof typeof SESSION_SUMMARY_ASK_ERRORS]
 
 export type SessionSummaryCloseRequest = {
   paneKey: string

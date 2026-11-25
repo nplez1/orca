@@ -47,7 +47,7 @@ const QUESTIONS: SessionSummaryQuestion[] = [
     text: 'Did it touch the fold persist module?',
     askedAt: ASKED - 60_000,
     status: 'failed',
-    error: 'session summary fold timed out'
+    error: 'ask-timed-out'
   },
   { id: 'q3', text: 'What is left?', askedAt: ASKED, status: 'pending' }
 ]

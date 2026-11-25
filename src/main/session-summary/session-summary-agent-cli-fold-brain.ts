@@ -22,6 +22,9 @@ import {
 } from '../text-generation/execution/source-control-generation-limits'
 import type { SessionFoldBrain } from './session-summary-fold'
 
+/** Matched by the question path, which names a timeout to the reader rather than relaying this. */
+export const SESSION_SUMMARY_FOLD_TIMED_OUT_MESSAGE = 'session summary fold timed out'
+
 export type AgentCliFoldBrainDeps = {
   /** The configured fold agent; null means nothing usable is selected, which fails the
    *  fold rather than substituting an agent the user did not choose. */
@@ -105,7 +108,7 @@ async function runAgent(args: {
       })
     }
     const timer = setTimeout(
-      () => fail('session summary fold timed out'),
+      () => fail(SESSION_SUMMARY_FOLD_TIMED_OUT_MESSAGE),
       SOURCE_CONTROL_GENERATION_TIMEOUT_MS
     )
     const onAbort = (): void => fail('session summary fold canceled')

@@ -5,8 +5,11 @@ import type {
   SessionSummarySnapshot
 } from '../../../../shared/session-summary-types'
 
-/** A row this window is showing ahead of the snapshot that will carry it. */
-type LocalQuestion = { question: SessionSummaryQuestion; settled: boolean }
+/**
+ * A row this window is showing ahead of the snapshot that will carry it. `refused` marks a call main
+ * turned down, which no snapshot will ever carry.
+ */
+type LocalQuestion = { question: SessionSummaryQuestion; settled: boolean; refused?: boolean }
 
 export type SessionSummaryQuestionsView = {
   questions: SessionSummaryQuestion[]
@@ -53,6 +56,7 @@ export function useSessionSummaryQuestions(
             ...current,
             [question.id]: {
               settled: true,
+              refused: true,
               question: {
                 ...question,
                 status: 'failed',
@@ -93,8 +97,10 @@ export function useSessionSummaryQuestions(
       const entry = local[question.id]
       return entry && !entry.settled ? entry.question : question
     })
+    // Why an accepted row the snapshot no longer has is not kept: the snapshot dropped it (a new
+    // conversation, or the per-pane ceiling), and showing it here would contradict every window.
     for (const entry of Object.values(local)) {
-      if (!known.has(entry.question.id)) {
+      if (!known.has(entry.question.id) && (!entry.settled || entry.refused)) {
         shown.push(entry.question)
       }
     }

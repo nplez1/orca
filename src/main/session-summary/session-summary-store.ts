@@ -2,9 +2,6 @@
 // rebuild. One JSON file keyed by paneKey, written on fold completion / view
 // close only — never on the status path (docs/reference/agent-status-store.md).
 //
-// The reader's questions are the exception and live beside the cache, not in it: they are the
-// reader's own words and a paid answer, so no version bump discards them (#280).
-//
 // Electron-free: a paired Orca host serves this store too, so the path is always
 // passed in rather than resolved from `app`.
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
@@ -15,12 +12,6 @@ import type {
   SessionSummaryLedger,
   SessionSummaryLedgerDelta
 } from '../../shared/session-summary-types'
-import {
-  boundSessionSummaryQuestions,
-  parseStoredSessionSummaryQuestions,
-  SESSION_SUMMARY_QUESTION_PANES_MAX,
-  type SessionSummaryQuestionsEntry
-} from './session-summary-question-records'
 
 export type SessionSummaryStoreEntry = {
   /** Transcript identity this ledger folds; a change resets the ledger. */
@@ -86,8 +77,6 @@ const STORE_VERSION = 4
 type SessionSummaryStoreFile = {
   version?: number
   entries: Record<string, SessionSummaryStoreEntry>
-  /** Outside `version` on purpose: a ledger shape change must not cost the reader's questions. */
-  questions?: Record<string, SessionSummaryQuestionsEntry>
 }
 
 // Values are unvalidated on purpose: this is a rebuildable cache, and a bad
@@ -104,7 +93,6 @@ function isSessionSummaryStoreFile(value: unknown): value is SessionSummaryStore
 
 export class SessionSummaryStore {
   private entries: Record<string, SessionSummaryStoreEntry> = {}
-  private questions: Record<string, SessionSummaryQuestionsEntry> = {}
   private saveTimer: NodeJS.Timeout | null = null
   private queued = false
 
@@ -139,33 +127,6 @@ export class SessionSummaryStore {
       return
     }
     delete this.entries[paneKey]
-    this.scheduleSave()
-  }
-
-  getQuestions(paneKey: string): SessionSummaryQuestionsEntry | null {
-    return this.questions[paneKey] ?? null
-  }
-
-  setQuestions(paneKey: string, entry: SessionSummaryQuestionsEntry): void {
-    this.questions[paneKey] = { ...entry, questions: boundSessionSummaryQuestions(entry.questions) }
-    const keys = Object.keys(this.questions)
-    if (keys.length > SESSION_SUMMARY_QUESTION_PANES_MAX) {
-      const evictable = keys
-        .filter((key) => key !== paneKey)
-        .sort((a, b) => this.questions[a].updatedAt - this.questions[b].updatedAt)
-      for (const key of evictable.slice(0, keys.length - SESSION_SUMMARY_QUESTION_PANES_MAX)) {
-        delete this.questions[key]
-      }
-    }
-    this.scheduleSave()
-  }
-
-  /** Drops a pane's questions — only when a different conversation took the pane. */
-  deleteQuestions(paneKey: string): void {
-    if (!(paneKey in this.questions)) {
-      return
-    }
-    delete this.questions[paneKey]
     this.scheduleSave()
   }
 
@@ -205,12 +166,6 @@ export class SessionSummaryStore {
   private load(): void {
     try {
       const parsed: unknown = JSON.parse(readFileSync(this.filePath, 'utf8'))
-      // Read whatever the ledger half says: a cache from another version still holds questions.
-      this.questions = parseStoredSessionSummaryQuestions(
-        typeof parsed === 'object' && parsed !== null && 'questions' in parsed
-          ? parsed.questions
-          : undefined
-      )
       if (!isSessionSummaryStoreFile(parsed)) {
         this.entries = {}
         return
@@ -221,7 +176,6 @@ export class SessionSummaryStore {
     } catch {
       // Missing or corrupt cache: start empty; the ledger is rebuildable.
       this.entries = {}
-      this.questions = {}
     }
   }
 
@@ -240,8 +194,7 @@ export class SessionSummaryStore {
         this.filePath,
         JSON.stringify({
           version: STORE_VERSION,
-          entries: this.entries,
-          questions: this.questions
+          entries: this.entries
         } satisfies SessionSummaryStoreFile)
       )
     } catch (error) {

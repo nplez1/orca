@@ -11,6 +11,7 @@ import type { ResolvedSourceControlAiGenerationParams } from '../../shared/sourc
 import {
   failedSessionSummarySnapshot,
   parseSessionSummarySessionRef,
+  SESSION_SUMMARY_ASK_ERRORS,
   type SessionSummaryAskRequest,
   type SessionSummaryCloseRequest,
   type SessionSummaryOpenRequest,
@@ -41,6 +42,7 @@ import {
   resetStaleSessionSummaryRecords,
   withSessionSummaryQuestions
 } from './session-summary-question-ask'
+import type { SessionSummaryQuestionStore } from './session-summary-question-store'
 import {
   resolveSessionSummaryTranscriptHost,
   type SessionSummaryTranscriptHost
@@ -59,6 +61,8 @@ export type SessionSummaryServiceDeps = SessionSummaryFoldRunnerDeps & {
   resolveFoldParams?: () => ResolvedSourceControlAiGenerationParams | null
   /** How often a host-owned fold is polled, in ms. Injected so tests need not wait. */
   hostPollIntervalMs?: number
+  /** The reader's questions; absent on a host, which has no viewer of its own to ask. */
+  questions?: SessionSummaryQuestionStore
 }
 
 type PaneRuntime = {
@@ -80,6 +84,7 @@ export class SessionSummaryService {
   private readonly leases = new SessionSummaryPaneLeases()
   private readonly listeners = new Set<(snapshot: SessionSummarySnapshot) => void>()
   private readonly hostFolds: SessionSummaryHostFoldSubscription | null
+  private readonly answers = new Set<AbortController>()
 
   constructor(private readonly deps: SessionSummaryServiceDeps) {
     this.hostFolds = deps.hostFold
@@ -92,6 +97,14 @@ export class SessionSummaryService {
           onError: (paneKey, error, snapshot) => this.failHostFold(paneKey, error, snapshot)
         })
       : null
+    // Read asynchronously: a pane opened before the read settled is shown again once it has.
+    void deps.questions?.ready.then(() => this.runtimes.forEach((_, paneKey) => this.emit(paneKey)))
+  }
+
+  /** Stops every answer in flight, so a quit does not leave their agent CLIs running. */
+  dispose(): void {
+    this.answers.forEach((controller) => controller.abort())
+    this.answers.clear()
   }
 
   onUpdate(listener: (snapshot: SessionSummarySnapshot) => void): () => void {
@@ -130,7 +143,7 @@ export class SessionSummaryService {
       fold: runtime?.fold ?? IDLE_FOLD,
       ...(runtime?.error ? { error: runtime.error } : {})
     })
-    return withSessionSummaryQuestions(this.deps.store, built, stored?.identity)
+    return withSessionSummaryQuestions(this.deps.questions, built, stored?.identity)
   }
 
   private emit(paneKey: string, progressOnly = false): void {
@@ -183,7 +196,7 @@ export class SessionSummaryService {
     }
     // Why before the freshness check: a ledger that belongs to a different conversation must be
     // dropped before anything decides it is fresh enough to show.
-    resetStaleSessionSummaryRecords(this.deps.store, paneKey, host, identity)
+    resetStaleSessionSummaryRecords(this.deps.store, this.deps.questions, paneKey, host, identity)
     runtime.status = initialSessionSummaryStatus(host, hasSource)
     this.runtimes.set(paneKey, runtime)
 
@@ -227,16 +240,14 @@ export class SessionSummaryService {
    */
   ask(request: SessionSummaryAskRequest): SessionSummarySnapshot {
     const runtime = this.runtimes.get(request.paneKey)
-    if (runtime?.host.kind === 'runtime') {
-      throw new Error('Questions about a session on a paired host are not available yet.')
+    const questions = this.deps.questions
+    if (runtime?.host.kind === 'runtime' || !questions) {
+      throw new Error(SESSION_SUMMARY_ASK_ERRORS.pairedHost)
     }
     const ledgerFor = (paneKey: string) => this.snapshot(paneKey).ledger
     const emit = (paneKey: string) => this.emit(paneKey)
-    askSessionSummaryQuestion(
-      { ...this.deps, ledgerFor, emit },
-      request,
-      runtime?.foldParams ?? null
-    )
+    const deps = { ...this.deps, questions, ledgerFor, emit, inFlight: this.answers }
+    askSessionSummaryQuestion(deps, request, runtime?.foldParams ?? null)
     return this.snapshot(request.paneKey)
   }
 

@@ -6,6 +6,8 @@
 // `lastUserMessageIndex` would silently relabel the brief's "since your last message" window.
 import type { ResolvedSourceControlAiGenerationParams } from '../../shared/source-control/ai/source-control-ai-operation-resolution'
 import {
+  SESSION_SUMMARY_ASK_ERRORS,
+  SESSION_SUMMARY_PENDING_QUESTIONS_PER_PANE,
   SESSION_SUMMARY_TEXT_MAX_LENGTH,
   type SessionSummaryAskRequest,
   type SessionSummaryLedger,
@@ -13,8 +15,10 @@ import {
   type SessionSummarySessionRef,
   type SessionSummarySnapshot
 } from '../../shared/session-summary-types'
+import { SESSION_SUMMARY_FOLD_TIMED_OUT_MESSAGE } from './session-summary-agent-cli-fold-brain'
 import type { SessionFoldBrain } from './session-summary-fold'
 import { answerSessionSummaryQuestion } from './session-summary-question-answer'
+import type { SessionSummaryQuestionStore } from './session-summary-question-store'
 import {
   sessionSummaryIdentityChanged,
   sessionSummaryIdentityOf
@@ -26,34 +30,41 @@ type Identity = SessionSummaryStoreEntry['identity']
 
 export type SessionSummaryQuestionDeps = {
   store: SessionSummaryStore
+  questions: SessionSummaryQuestionStore
   createBrain: (params: ResolvedSourceControlAiGenerationParams | null) => SessionFoldBrain
   now: () => number
   /** The brief the reader sees for the pane, which is what an answer is written from. */
   ledgerFor: (paneKey: string) => SessionSummaryLedger | null
   emit: (paneKey: string) => void
+  /** Answers in flight, held so a quit can stop their agent CLIs instead of orphaning them. */
+  inFlight: Set<AbortController>
 }
 
 /** The pane's questions, when they were asked about the conversation `identity` names. */
 export function sessionSummaryQuestionsFor(
-  store: SessionSummaryStore,
+  questions: SessionSummaryQuestionStore,
   paneKey: string,
   identity: Identity
 ): SessionSummaryQuestion[] {
-  const entry = store.getQuestions(paneKey)
+  const entry = questions.get(paneKey)
   return entry && !sessionSummaryIdentityChanged(entry.identity, identity) ? entry.questions : []
 }
 
 /** A local snapshot with its questions, and whether one can be asked from it. */
 export function withSessionSummaryQuestions(
-  store: SessionSummaryStore,
+  questions: SessionSummaryQuestionStore | undefined,
   snapshot: SessionSummarySnapshot,
   identity: Identity | undefined
 ): SessionSummarySnapshot {
+  // Why only beside a brief: a withheld ledger belongs to another conversation, and so would they.
+  const shown = Boolean(questions && identity && snapshot.ledger)
   return {
     ...snapshot,
-    questions: identity ? sessionSummaryQuestionsFor(store, snapshot.paneKey, identity) : [],
-    // Why the snapshot's ledger: it is the one the reader sees, and an answer must come from it.
-    canAsk: snapshot.ledger !== null
+    questions:
+      shown && questions && identity
+        ? sessionSummaryQuestionsFor(questions, snapshot.paneKey, identity)
+        : [],
+    canAsk: shown
   }
 }
 
@@ -64,6 +75,7 @@ export function withSessionSummaryQuestions(
  */
 export function resetStaleSessionSummaryRecords(
   store: SessionSummaryStore,
+  questions: SessionSummaryQuestionStore | undefined,
   paneKey: string,
   host: SessionSummaryTranscriptHost,
   session: SessionSummarySessionRef
@@ -79,9 +91,9 @@ export function resetStaleSessionSummaryRecords(
     store.delete(paneKey)
   }
   // A new conversation in the pane must not inherit the previous one's questions.
-  const questions = store.getQuestions(paneKey)
-  if (questions && sessionSummaryIdentityChanged(questions.identity, current)) {
-    store.deleteQuestions(paneKey)
+  const asked = questions?.get(paneKey)
+  if (asked && sessionSummaryIdentityChanged(asked.identity, current)) {
+    questions?.delete(paneKey)
   }
 }
 
@@ -91,16 +103,16 @@ function writeQuestion(
   identity: Identity,
   question: SessionSummaryQuestion
 ): void {
-  const rows = sessionSummaryQuestionsFor(deps.store, paneKey, identity)
+  const rows = sessionSummaryQuestionsFor(deps.questions, paneKey, identity)
   const index = rows.findIndex((row) => row.id === question.id)
   const questions =
     index === -1 ? [...rows, question] : rows.map((row, at) => (at === index ? question : row))
-  deps.store.setQuestions(paneKey, { identity, questions, updatedAt: deps.now() })
+  deps.questions.set(paneKey, { identity, questions, updatedAt: deps.now() })
 }
 
 /**
  * Records a question (or re-asks a failed one) and starts its answer, which is announced through
- * `emit` when it lands.
+ * `emit` when it lands. Throws a `SESSION_SUMMARY_ASK_ERRORS` code when it cannot be asked.
  *
  * Why the answer has its own signal and not the fold's: the last close aborts the fold, and a paid
  * answer must not be thrown away because the reader switched tabs.
@@ -114,14 +126,19 @@ export function askSessionSummaryQuestion(
   const stored = deps.store.get(paneKey)
   const ledger = deps.ledgerFor(paneKey)
   if (!stored || !ledger) {
-    throw new Error('There is no summary of this session to ask about yet.')
+    throw new Error(SESSION_SUMMARY_ASK_ERRORS.noSummary)
   }
-  const previous = sessionSummaryQuestionsFor(deps.store, paneKey, stored.identity).find(
-    (question) => question.id === request.questionId
-  )
+  const rows = sessionSummaryQuestionsFor(deps.questions, paneKey, stored.identity)
+  const previous = rows.find((question) => question.id === request.questionId)
   // Idempotent: a second send of the same id must not spend a second model call.
   if (previous && previous.status !== 'failed') {
     return
+  }
+  if (
+    rows.filter((row) => row.status === 'pending').length >=
+    SESSION_SUMMARY_PENDING_QUESTIONS_PER_PANE
+  ) {
+    throw new Error(SESSION_SUMMARY_ASK_ERRORS.busy)
   }
   const question: SessionSummaryQuestion = {
     id: request.questionId,
@@ -135,6 +152,13 @@ export function askSessionSummaryQuestion(
   void answer(deps, paneKey, stored.identity, question, ledger, foldParams)
 }
 
+function failureOf(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error)
+  return message === SESSION_SUMMARY_FOLD_TIMED_OUT_MESSAGE
+    ? SESSION_SUMMARY_ASK_ERRORS.timedOut
+    : message.slice(0, SESSION_SUMMARY_TEXT_MAX_LENGTH)
+}
+
 async function answer(
   deps: SessionSummaryQuestionDeps,
   paneKey: string,
@@ -143,26 +167,25 @@ async function answer(
   ledger: SessionSummaryLedger,
   foldParams: ResolvedSourceControlAiGenerationParams | null
 ): Promise<void> {
+  const controller = new AbortController()
+  deps.inFlight.add(controller)
   let settled: SessionSummaryQuestion
   try {
     const text = await answerSessionSummaryQuestion({
       brain: deps.createBrain(foldParams),
       ledger,
       question: question.text,
-      signal: new AbortController().signal
+      signal: controller.signal
     })
     settled = { ...question, status: 'answered', answer: text, answeredAt: deps.now() }
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    settled = {
-      ...question,
-      status: 'failed',
-      error: message.slice(0, SESSION_SUMMARY_TEXT_MAX_LENGTH)
-    }
+    settled = { ...question, status: 'failed', error: failureOf(error) }
+  } finally {
+    deps.inFlight.delete(controller)
   }
   // Why only while the row is still there: a new conversation in the pane dropped it, and an answer
   // about the previous one must not reappear under the next.
-  const rows = sessionSummaryQuestionsFor(deps.store, paneKey, identity)
+  const rows = sessionSummaryQuestionsFor(deps.questions, paneKey, identity)
   if (!rows.some((row) => row.id === question.id)) {
     return
   }

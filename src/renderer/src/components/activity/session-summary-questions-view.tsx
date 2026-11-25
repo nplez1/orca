@@ -4,10 +4,12 @@ import { Button } from '@/components/ui/button'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { CommentComposer } from '@/components/comment-composer'
 import { translate } from '@/i18n/i18n'
-import { useTranslate } from '@/i18n/use-translate'
+import { useTranslate, type Translate } from '@/i18n/use-translate'
+import CommentMarkdown from '@/components/comment-markdown/CommentMarkdown'
 import { uiDateTimeFormat } from '@/i18n/ui-intl-formatters'
 import { motionSafeScrollBehavior } from '@/hooks/theme/usePrefersReducedMotion'
 import {
+  SESSION_SUMMARY_ASK_ERRORS,
   SESSION_SUMMARY_QUESTION_MAX_LENGTH,
   type SessionSummaryQuestion
 } from '../../../../shared/session-summary-types'
@@ -26,7 +28,121 @@ export function sessionSummaryQuestionsDetail(
   return translate(
     'activity.sessionSummary.askDetail',
     '{{count}} questions · last asked {{time}}',
-    { count: questions.length, time: last ? askedAtLabel(last.askedAt) : '' }
+    {
+      count: questions.length,
+      time: last ? askedAtLabel(last.askedAt) : '',
+      defaultValue_one: '{{count}} question · last asked {{time}}'
+    }
+  )
+}
+
+/** Electron's wrapper around an error a main-process handler threw. */
+const REMOTE_METHOD_PREFIX = /^Error invoking remote method '[^']+': (?:Error: )?/
+
+/**
+ * What a failed row says. Main writes codes, not sentences, so they are translated here; anything
+ * else is the agent's own message, shown under a translated lead rather than as the whole text.
+ */
+export function sessionSummaryAskErrorText(
+  t: Translate,
+  error: string | undefined
+): { message: string; detail?: string } {
+  const code = (error ?? '').replace(REMOTE_METHOD_PREFIX, '')
+  switch (code) {
+    case SESSION_SUMMARY_ASK_ERRORS.interrupted:
+      return {
+        message: t(
+          'activity.sessionSummary.askInterrupted',
+          'Orca quit before this question was answered.'
+        )
+      }
+    case SESSION_SUMMARY_ASK_ERRORS.emptyAnswer:
+      return {
+        message: t('activity.sessionSummary.askEmptyAnswer', 'The summary agent gave no answer.')
+      }
+    case SESSION_SUMMARY_ASK_ERRORS.timedOut:
+      return {
+        message: t(
+          'activity.sessionSummary.askTimedOut',
+          'The summary agent took too long to answer.'
+        )
+      }
+    case SESSION_SUMMARY_ASK_ERRORS.busy:
+      return {
+        message: t(
+          'activity.sessionSummary.askBusy',
+          'Two questions are still being answered. Ask again once one finishes.'
+        )
+      }
+    case SESSION_SUMMARY_ASK_ERRORS.noSummary:
+      return { message: askNeedsBriefText(t) }
+    case SESSION_SUMMARY_ASK_ERRORS.pairedHost:
+      return { message: askUnavailableHostText(t) }
+    default:
+      return {
+        message: t('activity.sessionSummary.askFailed', 'Could not answer this question.'),
+        ...(code ? { detail: code } : {})
+      }
+  }
+}
+
+function askNeedsBriefText(t: Translate): string {
+  return t(
+    'activity.sessionSummary.askNeedsBrief',
+    'Questions open once this session has a summary.'
+  )
+}
+
+function askUnavailableHostText(t: Translate): string {
+  return t(
+    'activity.sessionSummary.askUnavailableHost',
+    'Questions are not available for sessions on a paired host yet.'
+  )
+}
+
+function QuestionStatus({
+  question,
+  onRetry
+}: {
+  question: SessionSummaryQuestion
+  onRetry?: (question: SessionSummaryQuestion) => void
+}): React.JSX.Element {
+  const t = useTranslate()
+  if (question.status === 'pending') {
+    return (
+      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <LoadingSpinner className="size-3" />
+        {t('activity.sessionSummary.askPending', 'Answering…')}
+      </p>
+    )
+  }
+  if (question.status === 'answered') {
+    return (
+      <p className="whitespace-pre-line break-words text-xs leading-relaxed text-foreground">
+        {question.answer}
+      </p>
+    )
+  }
+  const failure = sessionSummaryAskErrorText(t, question.error)
+  return (
+    <div className="flex items-start gap-2">
+      <div className="min-w-0 flex-1 break-words text-xs">
+        <p className="text-destructive">{failure.message}</p>
+        {failure.detail ? <p className="mt-0.5 text-muted-foreground">{failure.detail}</p> : null}
+      </div>
+      {onRetry ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="xs"
+          className="shrink-0"
+          onClick={() => onRetry(question)}
+        >
+          <RotateCw aria-hidden="true" />
+          {t('activity.sessionSummary.askRetry', 'Retry')}
+        </Button>
+      ) : null}
+    </div>
   )
 }
 
@@ -37,13 +153,14 @@ function QuestionRow({
   question: SessionSummaryQuestion
   onRetry?: (question: SessionSummaryQuestion) => void
 }): React.JSX.Element {
-  const t = useTranslate()
   return (
     <li className="space-y-1">
       <div className="flex items-baseline gap-2">
-        <p className="min-w-0 flex-1 whitespace-pre-line break-words text-xs font-medium text-foreground">
-          {question.text}
-        </p>
+        {/* Markdown, because the composer it was typed into formats as Markdown. */}
+        <CommentMarkdown
+          content={question.text}
+          className="min-w-0 flex-1 break-words text-xs font-medium leading-relaxed text-foreground [&_pre]:max-w-full"
+        />
         <time
           dateTime={new Date(question.askedAt).toISOString()}
           className="shrink-0 text-2xs text-muted-foreground"
@@ -51,35 +168,10 @@ function QuestionRow({
           {askedAtLabel(question.askedAt)}
         </time>
       </div>
-      {question.status === 'pending' ? (
-        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <LoadingSpinner className="size-3" />
-          {t('activity.sessionSummary.askPending', 'Answering…')}
-        </p>
-      ) : question.status === 'answered' ? (
-        <p className="whitespace-pre-line break-words text-xs leading-relaxed text-foreground">
-          {question.answer}
-        </p>
-      ) : (
-        <div className="flex items-start gap-2">
-          <p className="min-w-0 flex-1 break-words text-xs text-destructive">
-            {question.error ||
-              t('activity.sessionSummary.askFailed', 'Could not answer this question.')}
-          </p>
-          {onRetry ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="xs"
-              className="shrink-0"
-              onClick={() => onRetry(question)}
-            >
-              <RotateCw aria-hidden="true" />
-              {t('activity.sessionSummary.askRetry', 'Retry')}
-            </Button>
-          ) : null}
-        </div>
-      )}
+      {/* Polite: the answer lands long after the reader moved on, and must not interrupt them. */}
+      <div aria-live="polite">
+        <QuestionStatus question={question} {...(onRetry ? { onRetry } : {})} />
+      </div>
     </li>
   )
 }
@@ -146,14 +238,8 @@ export function SessionSummaryQuestionComposer({
   const disabledReason = canAsk
     ? undefined
     : hasBrief
-      ? t(
-          'activity.sessionSummary.askUnavailableHost',
-          'Questions are not available for sessions on a paired host yet.'
-        )
-      : t(
-          'activity.sessionSummary.askNeedsBrief',
-          'Questions open once this session has a summary.'
-        )
+      ? askUnavailableHostText(t)
+      : askNeedsBriefText(t)
   return (
     <div className="shrink-0 border-t border-border bg-background px-3 py-3">
       <CommentComposer

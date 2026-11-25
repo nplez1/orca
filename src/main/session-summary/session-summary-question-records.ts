@@ -1,10 +1,11 @@
-// The reader's questions as the summary store keeps them: bounded on write, validated on read.
+// The reader's questions as their store keeps them: bounded on write, validated on read.
 //
 // Why validated when the ledger is not: the ledger is a cache whose bad entry costs a re-fold,
 // while a question is the reader's own words and its answer a paid model call — one malformed row
 // must cost that row, never the rest of the file.
 import {
   SESSION_SUMMARY_ANSWER_MAX_LENGTH,
+  SESSION_SUMMARY_ASK_ERRORS,
   SESSION_SUMMARY_QUESTION_ID_MAX_LENGTH,
   SESSION_SUMMARY_QUESTION_MAX_LENGTH,
   SESSION_SUMMARY_QUESTIONS_PER_PANE,
@@ -22,8 +23,11 @@ export type SessionSummaryQuestionsEntry = {
 /** Panes with questions kept at once, oldest evicted first — the same ceiling as the ledgers. */
 export const SESSION_SUMMARY_QUESTION_PANES_MAX = 200
 
-/** What a question left pending by a quit reads as on the next launch. */
-export const SESSION_SUMMARY_QUESTION_INTERRUPTED = 'Orca quit before this question was answered.'
+/**
+ * The whole file's ceiling. Every row is written on each change, and fifty full answers in each of
+ * two hundred panes would be a 50 MB rewrite per question.
+ */
+export const SESSION_SUMMARY_QUESTION_FILE_MAX_BYTES = 2_000_000
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -37,11 +41,19 @@ function finiteNumber(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined
 }
 
-/** The newest questions only, oldest first, so the pane reads them in the order they were asked. */
+/**
+ * At most the per-pane ceiling, oldest first. Settled rows go first: a pending row is an answer
+ * already being paid for, and evicting it would throw that answer away when it lands.
+ */
 export function boundSessionSummaryQuestions(
   questions: readonly SessionSummaryQuestion[]
 ): SessionSummaryQuestion[] {
-  return questions.slice(-SESSION_SUMMARY_QUESTIONS_PER_PANE)
+  const kept = [...questions]
+  while (kept.length > SESSION_SUMMARY_QUESTIONS_PER_PANE) {
+    const settled = kept.findIndex((question) => question.status !== 'pending')
+    kept.splice(settled === -1 ? 0 : settled, 1)
+  }
+  return kept
 }
 
 function parseQuestion(value: unknown): SessionSummaryQuestion | null {
@@ -85,7 +97,7 @@ function parseQuestion(value: unknown): SessionSummaryQuestion | null {
     ...base,
     status: 'failed',
     error: clamp(
-      status === 'failed' && error ? error : SESSION_SUMMARY_QUESTION_INTERRUPTED,
+      status === 'failed' && error ? error : SESSION_SUMMARY_ASK_ERRORS.interrupted,
       SESSION_SUMMARY_TEXT_MAX_LENGTH
     )
   }
