@@ -52,8 +52,7 @@ export async function markCursorWorkspaceTrusted(
  * ~/.copilot/config.json under `trustedFolders` (verified against the
  * @github/copilot 1.0.32 bundle: `addTrustedFolder` and `isFolderTrusted`
  * both read/write this exact key, and folder comparison is done after a
- * realpath() resolution). Copilot 1.0.105 writes the file as JSONC, headed
- * by `//` comment lines, so it is parsed and edited as JSONC (#165).
+ * realpath() resolution).
  *
  * We append to the array in-place so unrelated config keys (loggedInUsers,
  * copilotTokens, etc.) survive untouched.
@@ -137,7 +136,6 @@ function readTrustedConfig(configPath: string): TrustedConfigSource | null {
   }
 }
 
-/** The config text with `entry` appended, or null when the edit could not be verified. */
 function withTrustedEntry(
   source: TrustedConfigSource,
   key: TrustedEntryConfig['key'],

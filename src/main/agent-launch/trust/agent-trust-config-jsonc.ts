@@ -105,36 +105,54 @@ function removeArrayItem(text: string, array: Node, index: number): string {
   if (items.length === 1) {
     return `${text.slice(0, array.offset)}[]${text.slice(array.offset + array.length)}`
   }
-  if (index === 0) {
-    return text.slice(0, item.offset) + text.slice(items[1].offset)
+  const next = items[index + 1]
+  if (next) {
+    // Cut the item, its trailing comma and the whitespace up to the next token; the gap before it,
+    // which can end in the previous item's `//` comment, stays as it is.
+    const gap = scanGap(text, itemEnd, next.offset)
+    return text.slice(0, item.offset) + text.slice(itemEnd + gap.firstSolidAfterComma)
   }
-  const previous = items[index - 1]
-  const previousEnd = previous.offset + previous.length
-  // Between the neighbours sit the comma, comments and whitespace: drop the comma and the
-  // whitespace that leads into the item, so a comment after `"/a",` stays with `"/a"`.
-  const gap = text.slice(previousEnd, item.offset)
+  // The last item: drop the previous item's comma and the whitespace leading into the item, so a
+  // comment after `"/a",` stays with `"/a"`.
+  const previousEnd = items[index - 1].offset + items[index - 1].length
+  const gap = scanGap(text, previousEnd, item.offset)
+  return (
+    text.slice(0, previousEnd + gap.comma.start) +
+    text.slice(previousEnd + gap.comma.end, previousEnd + gap.lastSolidEnd) +
+    text.slice(itemEnd)
+  )
+}
+
+/** Offsets, relative to `from`, of the comma between two items and of the solid tokens around it. */
+function scanGap(
+  text: string,
+  from: number,
+  to: number
+): { comma: { start: number; end: number }; lastSolidEnd: number; firstSolidAfterComma: number } {
+  const gap = text.slice(from, to)
   const scanner = createScanner(gap, false)
   let comma: { start: number; end: number } | null = null
   let lastSolidEnd = 0
+  let firstSolidAfterComma = gap.length
   // An empty token is the end of the gap (SyntaxKind is a const enum isolatedModules cannot read).
   for (scanner.scan(); scanner.getTokenLength() > 0; scanner.scan()) {
     const start = scanner.getTokenOffset()
     const token = gap.slice(start, start + scanner.getTokenLength())
-    if (token === ',') {
+    if (token.trim() === '') {
+      continue
+    }
+    if (comma && firstSolidAfterComma === gap.length) {
+      firstSolidAfterComma = start
+    }
+    if (token === ',' && !comma) {
       comma = { start, end: start + 1 }
     }
-    if (token.trim() !== '') {
-      lastSolidEnd = start + token.length
-    }
+    lastSolidEnd = start + token.length
   }
   if (!comma) {
     throw new Error('Array items are not separated by a comma')
   }
-  return (
-    text.slice(0, previousEnd + comma.start) +
-    text.slice(previousEnd + comma.end, previousEnd + lastSolidEnd) +
-    text.slice(itemEnd)
-  )
+  return { comma, lastSolidEnd, firstSolidAfterComma }
 }
 
 function trustArrayEquals(text: string, key: AgentTrustConfigKey, expected: unknown[]): boolean {

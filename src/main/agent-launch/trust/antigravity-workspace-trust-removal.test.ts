@@ -87,6 +87,16 @@ describe('removeOrcaCreatedAntigravityTrust', () => {
       '{\n  "trustedWorkspaces": [\n    "/a" // mine\n  ]\n}\n'
     ],
     [
+      'a middle item after a commented neighbour',
+      '{"trustedWorkspaces": [\n  "/a", // mine\n  "WS",\n  "/b"\n]}',
+      '{"trustedWorkspaces": [\n  "/a", // mine\n  "/b"\n]}'
+    ],
+    [
+      'the first item and keeps comments before the second',
+      '{"trustedWorkspaces": [\n  "WS",\n  // keep\n  "/b"\n]}',
+      '{"trustedWorkspaces": [\n  // keep\n  "/b"\n]}'
+    ],
+    [
       'the array a duplicate key resolves to',
       '{"trustedWorkspaces":["WS"],"trustedWorkspaces":["/a","WS"]}',
       '{"trustedWorkspaces":["WS"],"trustedWorkspaces":["/a"]}'
