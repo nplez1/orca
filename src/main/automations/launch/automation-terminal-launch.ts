@@ -55,7 +55,6 @@ export async function launchAutomationTerminalAgent(
   const selectedWorkspace = selectedTarget?.managedWorktree
   // The startup plan trims the prompt for every agent; a blank one launches the agent bare.
   const text = automation.prompt?.trim()
-  // A reused session's environment is fixed, so a run with script handoff needs a fresh terminal.
   if (automation.reuseSession && automation.workspaceMode === 'existing' && text && !stepEnv) {
     const reused = await sendToReusableSession(
       runtime,

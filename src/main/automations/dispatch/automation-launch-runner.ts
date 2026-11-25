@@ -38,7 +38,6 @@ export type AutomationLaunchContext<Target extends RunTarget = RunTarget> = {
     run: Promise<AutomationRun>
   }
   runPrecheck: () => Promise<AutomationPrecheckResult | null>
-  /** Null when the automation has no script steps. */
   runScriptSteps: () => Promise<AutomationScriptStepsOutcome | null>
   markDispatchResult: (result: AutomationDispatchResult) => Promise<AutomationRun>
   watchRun: (run: AutomationRun) => void
@@ -77,7 +76,6 @@ export async function runAutomationLaunch<Target extends RunTarget>(
   }
   const scripts = await ctx.runScriptSteps()
   if (scripts) {
-    // Recorded before the agent launches, so a launch that crashes keeps what the scripts did.
     const settled = settleScriptSteps(ctx, scripts, precheckResult)
     if (settled) {
       return settled
@@ -88,7 +86,6 @@ export async function runAutomationLaunch<Target extends RunTarget>(
   const dispatchedAt = Date.now()
   try {
     launch = await ctx.dispatcher({
-      // Launchers read `prompt`; with steps the record's is the stand-down text, not the agent step's.
       automation: { ...automation, prompt: getAutomationAgentPrompt(automation) },
       run,
       target,
@@ -186,10 +183,6 @@ export async function runAutomationLaunch<Target extends RunTarget>(
   return updated.run
 }
 
-/**
- * A stopping step fails the run; a script-only automation completes on the last exit, with no
- * agent evidence to wait for. Null hands the run to its agent step.
- */
 function settleScriptSteps<Target extends RunTarget>(
   ctx: AutomationLaunchContext<Target>,
   scripts: AutomationScriptStepsOutcome,

@@ -39,7 +39,6 @@ function readScriptStep(value: unknown): ScriptStepInvocation | null {
     : null
 }
 
-/** What a step runs, beside its content: the approval covers this path and these arguments. */
 function AutomationScriptStepInvocation({
   step
 }: {
@@ -181,11 +180,15 @@ const OrcaYamlTrustDialog = React.memo(function OrcaYamlTrustDialog() {
         )}
 
         <DialogFooter>
-          <Button variant="ghost" onClick={() => resolveAndClose('skip')}>
+          <Button
+            variant="ghost"
+            autoFocus={scriptStep !== null}
+            onClick={() => resolveAndClose('skip')}
+          >
             {t('auto.components.sidebar.OrcaYamlTrustDialog.43b7bec4cd', "Don't run")}
           </Button>
           {scriptStep ? (
-            <Button autoFocus onClick={() => resolveAndClose('run')}>
+            <Button onClick={() => resolveAndClose('run')}>
               {t('automations.scriptSteps.approve', 'Approve')}
             </Button>
           ) : null}

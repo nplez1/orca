@@ -1,4 +1,16 @@
-import { chmod, mkdir, mkdtemp, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises'
+import { execFileSync } from 'node:child_process'
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  readdir,
+  realpath,
+  rm,
+  stat,
+  symlink,
+  utimes,
+  writeFile
+} from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -19,7 +31,8 @@ describe.skipIf(process.platform === 'win32')('automation script steps on this h
     // Exits 0 on SIGTERM: a stopped step must still be cut off, never succeeded (#19334).
     'trap.sh': "#!/bin/sh\ntrap 'exit 0' TERM\nsleep 30 &\nwait\n",
     'where.sh': '#!/bin/sh\ndirname "$0"\necho "$ORCA_AUTOMATION_STEP_SCRIPT"\n',
-    'locked/run.sh': '#!/bin/sh\necho locked\n'
+    'locked/run.sh': '#!/bin/sh\necho locked\n',
+    'status.sh': '#!/bin/sh\ngit status --porcelain --untracked-files=all\necho ---\nls -a\n'
   }
   const repo: { path: string; kind: 'git' } = { path: '', kind: 'git' }
 
@@ -31,6 +44,11 @@ describe.skipIf(process.platform === 'win32')('automation script steps on this h
       await writeFile(join(cwd, name), content)
       await chmod(join(cwd, name), 0o755)
     }
+    // A repository with everything committed, so any copy Orca leaves visible shows in status.
+    const git = (...args: string[]) => execFileSync('git', args, { cwd, stdio: 'ignore' })
+    git('init', '-q')
+    git('-c', 'user.email=t@t', '-c', 'user.name=t', 'add', '-A')
+    git('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'scripts')
   })
   afterAll(async () => {
     await rm(cwd, { recursive: true, force: true })
@@ -162,6 +180,27 @@ describe.skipIf(process.platform === 'win32')('automation script steps on this h
       }
     }
   )
+
+  it('keeps its copy out of git status while the step runs', async () => {
+    const outcome = await run([step('first', 'status.sh')])
+    const [status, listing] = outcome.results[0]!.output.split('---')
+    // The copy exists (ls shows it) yet git status does not list it.
+    expect(listing).toMatch(/\.orca-step-[0-9a-f]{12}-status\.sh/)
+    expect(status).not.toContain('.orca-step')
+  })
+
+  it('sweeps a stale copy left by a crash, but not one a running step may own', async () => {
+    const stale = join(cwd, '.orca-step-aaaaaaaaaaaa-ok.sh')
+    const fresh = join(cwd, '.orca-step-bbbbbbbbbbbb-ok.sh')
+    await writeFile(stale, 'old')
+    await writeFile(fresh, 'new')
+    const longAgo = new Date('2020-01-01T00:00:00Z')
+    await utimes(stale, longAgo, longAgo)
+    await run([step('first', 'ok.sh')])
+    await expect(stat(stale)).rejects.toThrow()
+    await expect(stat(fresh)).resolves.toBeTruthy()
+    await rm(fresh)
+  })
 
   it('persists results without the handoff stdout', async () => {
     const outcome = await run([step('first', 'ok.sh')])

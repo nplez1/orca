@@ -25,7 +25,6 @@ export function buildAutomationEditDraft(automation: Automation): AutomationDraf
   const hasCustomSchedule = scheduled && !schedule && isRunnableAutomationSchedule(automation.rrule)
   return {
     name: automation.name,
-    // With steps the record's prompt is an older host's stand-down text; the user's is the agent step's.
     prompt: getAutomationAgentPrompt(automation),
     agentId: automation.agentId,
     surface: automation.launchSetup?.surface ?? automation.surface ?? 'terminal',

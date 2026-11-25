@@ -252,7 +252,6 @@ export function updateAutomationRun(
     precheckResult: Object.hasOwn(result, 'precheckResult')
       ? normalizeAutomationPrecheckResult(result.precheckResult)
       : normalizeAutomationPrecheckResult(current.precheckResult),
-    // Later writes (completion) keep the steps the dispatch recorded.
     ...stepResultsField(result.stepResults ?? current.stepResults),
     usage: Object.hasOwn(result, 'usage') ? (result.usage ?? null) : (current.usage ?? null),
     error: result.error ?? null,

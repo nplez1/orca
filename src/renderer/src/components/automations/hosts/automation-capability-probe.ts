@@ -192,7 +192,6 @@ export async function assertEnvironmentSupportsExtraAgentArgs(
   }
 }
 
-/** Older hosts strip steps and would launch the agent without its gating scripts. */
 export async function assertScriptStepsSupported(
   authority: AutomationAuthorityRef,
   steps: AutomationCreateInput['steps']

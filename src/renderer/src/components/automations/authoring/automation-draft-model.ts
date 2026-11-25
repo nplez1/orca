@@ -115,10 +115,6 @@ type StepsDraft = {
   runAgentStep?: boolean
 }
 
-/**
- * The prompt and steps a save writes: `update` holds what the edit changed, `base` what a create
- * or a move starts from. A script-only save sends the prompt an older host would stand down on.
- */
 export function draftStepsSave(
   draft: StepsDraft,
   edited: (key: 'prompt' | 'scriptSteps' | 'runAgentStep') => boolean,

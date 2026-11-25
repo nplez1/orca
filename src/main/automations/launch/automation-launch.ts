@@ -37,7 +37,6 @@ export type AutomationMainLauncher<Target> = (request: {
   automation: Automation
   run: AutomationRun
   target: Target
-  /** Script steps' handoff (`ORCA_STEP_<ID>_*`) for the agent step's fresh terminal. */
   stepEnv?: Readonly<Record<string, string>>
 }) => Promise<AutomationLaunch>
 

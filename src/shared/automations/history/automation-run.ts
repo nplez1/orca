@@ -132,7 +132,6 @@ export type AutomationRun = {
   terminalPtyId: string | null
   outputSnapshot: AutomationRunOutputSnapshot | null
   precheckResult: AutomationPrecheckResult | null
-  /** Script steps that ran, in order, with the path and content hash of what ran. Absent on agent-only runs. */
   stepResults?: AutomationStepResult[]
   usage: AutomationRunUsage | null
   error: string | null

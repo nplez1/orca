@@ -20,7 +20,6 @@ export const AUTOMATION_SURFACE_RUNTIME_CAPABILITY = 'automations.surface.v1' as
 
 export const AUTOMATION_LAUNCH_SETUP_RUNTIME_CAPABILITY = 'automations.launch-setup.v1' as const
 
-// Older hosts strip steps and would launch the agent without the scripts that gate it.
 export const AUTOMATION_SCRIPT_STEPS_RUNTIME_CAPABILITY = 'automations.script-steps.v1' as const
 export const AUTOMATION_SCRIPT_STEPS_UPDATE_REQUIRED_MESSAGE =
   'Script steps require a newer Orca on the host this automation runs on. Update it and try again.'

@@ -1,4 +1,5 @@
 import type { TuiAgent } from '../../agent-launch/catalog/tui-agent'
+import { isCmdUnsafe } from './automation-script-step-command'
 
 export type AutomationScriptStepFailurePolicy = 'stop' | 'continue'
 
@@ -53,21 +54,21 @@ export const AUTOMATION_STEPS_STAND_DOWN_PROMPT =
 const STEP_ID_PATTERN = /^[a-z][a-z0-9_]{0,31}$/
 // Why: a portable path charset needs no quoting in bash or cmd.exe and cannot carry a shell body.
 const SCRIPT_PATH_PATTERN = /^[A-Za-z0-9._@+=,/-]+$/
-/** Characters cmd.exe expands or cannot escape inside quotes (%, !, "), and control characters. */
-function isCmdUnsafe(char: string): boolean {
-  return char === '"' || char === '%' || char === '!' || char < ' ' || char === '\u007f'
+/** Format, line/paragraph separators and C1 controls can make an argument read differently from what runs. */
+const INVISIBLE_CHAR = /[\p{Cf}\p{Zl}\p{Zp}]/u
+
+function isInvisible(char: string): boolean {
+  const code = char.codePointAt(0) ?? 0
+  return (code >= 0x80 && code <= 0x9f) || INVISIBLE_CHAR.test(char)
 }
 
 function isPassableArg(arg: unknown): arg is string {
   return (
     typeof arg === 'string' &&
     arg.length <= MAX_AUTOMATION_SCRIPT_STEP_ARG_CHARS &&
-    ![...arg].some(isCmdUnsafe)
+    ![...arg].some((char) => isCmdUnsafe(char) || isInvisible(char))
   )
 }
-
-/** cmd.exe resolves an extensionless name through PATHEXT to a file Orca never hashed. */
-const CMD_RUNNABLE_EXTENSIONS = ['.cmd', '.bat', '.exe', '.com'] as const
 
 export type AutomationStepsErrorCode =
   | 'steps_invalid'
@@ -144,7 +145,7 @@ function validateScriptStep(value: Record<string, unknown>, id: string, keepAppr
   ) {
     return refuse(
       'script_step_args_invalid',
-      `Script step "${id}" has an argument Orca cannot pass safely on every platform (quotes, %, !, or control characters).`
+      `Script step "${id}" has an argument Orca cannot pass safely on every platform (quotes, %, !, control or invisible characters).`
     )
   }
   const timeout = value.timeoutSeconds ?? DEFAULT_AUTOMATION_SCRIPT_STEP_TIMEOUT_SECONDS
@@ -319,38 +320,4 @@ export function automationRunsAgentStep(automation: { steps?: unknown }): boolea
     return true
   }
   return automation.steps.some((step) => isRecord(step) && step.kind === 'agent')
-}
-
-function quotePosixArg(value: string): string {
-  return `'${value.replaceAll("'", `'\\''`)}'`
-}
-
-export type AutomationScriptStepCommand =
-  | { ok: true; command: string }
-  | { ok: false; error: string }
-
-/**
- * The command line the hook executor's shell runs for the verified copy at `executable` (an
- * absolute path). cmd.exe gets the exact file, never a name it could resolve through PATHEXT.
- */
-export function automationScriptStepCommand(
-  executable: string,
-  args: readonly string[] | undefined,
-  shell: 'posix' | 'cmd'
-): AutomationScriptStepCommand {
-  const argv = args ?? []
-  if (shell === 'posix') {
-    return { ok: true, command: [executable, ...argv].map(quotePosixArg).join(' ') }
-  }
-  const lower = executable.toLowerCase()
-  if (!CMD_RUNNABLE_EXTENSIONS.some((extension) => lower.endsWith(extension))) {
-    return {
-      ok: false,
-      error: `on Windows a script step must name a ${CMD_RUNNABLE_EXTENSIONS.join(', ')} file.`
-    }
-  }
-  if ([...executable].some(isCmdUnsafe)) {
-    return { ok: false, error: 'the script path has characters cmd.exe would expand.' }
-  }
-  return { ok: true, command: [executable, ...argv].map((part) => `"${part}"`).join(' ') }
 }

@@ -98,7 +98,6 @@ export function createAutomationManagementActions({
     runId: string,
     result: AutomationStepResult
   ): void => {
-    // Approval is desktop-local IPC; a paired host's user approves there.
     if (
       getAutomationOwnerTarget(row.automation, automationHostTargetFor(row)).kind === 'environment'
     ) {

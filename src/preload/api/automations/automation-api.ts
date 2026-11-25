@@ -26,7 +26,6 @@ export type AutomationsApi = {
     hostId: ExecutionHostId
     displayName: string
   }) => Promise<number>
-  /** Pins the content a run refused; the host derives the pin from that run's record. */
   approveScriptStep: (request: {
     automationId: string
     runId: string

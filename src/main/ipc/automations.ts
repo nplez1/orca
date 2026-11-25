@@ -80,11 +80,9 @@ export function registerAutomationHandlers(store: Store, service: AutomationServ
       probeScheduler.retainScopes((request?.owners ?? []).map(ownerKey))
     }
   )
-  // Desktop-only by design: script approval must come from this app's user, never a runtime RPC caller.
   ipcMain.handle(
     'automations:approveScriptStep',
     (event, request: AutomationScriptStepApproval): void => {
-      // Only the main window's own document, never a subframe, guest page or other window.
       if (!isTrustedUIRenderer(event.sender) || event.senderFrame !== event.sender.mainFrame) {
         throw new Error('Script approval is only accepted from the Orca window.')
       }

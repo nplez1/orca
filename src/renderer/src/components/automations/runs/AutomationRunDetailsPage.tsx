@@ -78,7 +78,6 @@ export function AutomationRunDetailsPage({
   /** Reconnects the host that needed credentials; absent when nothing can sign in. */
   onSignIn?: () => void
   onReviewSetup: (content: SetupTrustMismatch) => void
-  /** Absent where nothing can approve a refused script step. */
   onReviewScriptStep?: (result: AutomationStepResult) => void
   onSelectRun: (run: AutomationRun) => void
 }): React.JSX.Element {

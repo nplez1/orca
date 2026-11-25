@@ -87,7 +87,6 @@ export type RuntimeManagedWorktreeCreateArgs = {
   startupAgentArgs?: string | null
   /** Main-internal: an automation's saved extras, merged over the startup agent's arguments. */
   startupExtraAgentArgs?: string
-  /** Main-internal: an automation's script-step handoff, merged into the startup agent's env. */
   startupAgentEnv?: Record<string, string>
   /** Main-internal: Orca, not a user, types into the startup agent once it starts. */
   startupSuppressUpdatePrompt?: boolean

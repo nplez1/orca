@@ -1,5 +1,15 @@
 import { randomBytes } from 'node:crypto'
-import { chmod, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
+import {
+  appendFile,
+  chmod,
+  mkdir,
+  readdir,
+  readFile,
+  realpath,
+  rm,
+  stat,
+  writeFile
+} from 'node:fs/promises'
 import { basename, dirname, isAbsolute, join, relative } from 'node:path'
 import type { Repo } from '../../../shared/repository/repo-types'
 import type { AutomationScriptStep } from '../../../shared/automations/steps/automation-steps'
@@ -10,7 +20,8 @@ import {
   type AutomationStepOutcome,
   type AutomationStepResult
 } from '../../../shared/automations/steps/automation-step-results'
-import { automationScriptStepCommand } from '../../../shared/automations/steps/automation-steps'
+import { MAX_AUTOMATION_SCRIPT_STEP_TIMEOUT_SECONDS } from '../../../shared/automations/steps/automation-steps'
+import { automationScriptStepCommand } from '../../../shared/automations/steps/automation-script-step-command'
 import { getHookCommandShellKind, runHookCommand } from '../../workspace-hooks/hooks'
 import {
   getHookWslContext,
@@ -18,7 +29,8 @@ import {
 } from '../../workspace-hooks/hook-runtime-target'
 import { getSetupEnvVars } from '../../workspace-hooks/setup-hook-env-vars'
 import { windowsFsPath } from '../../wsl/filesystem/wsl-unc-drive-fs-path'
-import { toLinuxPath } from '../../../shared/file-access/wsl-paths'
+import { toLinuxPath, wslDistroForCommand } from '../../../shared/file-access/wsl-paths'
+import { readableGitCommonDir } from '../../git/worktrees/removal/worktree-prune-guard'
 import { errorMessage } from '../../../shared/errors/error-message'
 import { automationScriptContentHash, automationScriptStepPin } from './script-step-pin'
 
@@ -104,6 +116,49 @@ async function readScriptFile(
   }
 }
 
+export const AUTOMATION_STEP_COPY_PATTERN = '.orca-step-*'
+const COPY_NAME = /^\.orca-step-[0-9a-f]{12}-/
+// Older than any step could still be running: left by a crash, or a file Windows held at cut-off.
+const STALE_COPY_MS = (MAX_AUTOMATION_SCRIPT_STEP_TIMEOUT_SECONDS + 300) * 1000
+
+/**
+ * Keeps Orca's copies out of `git status` and `git add -A` (a step that commits must not commit
+ * one), once per repository. A folder workspace has no repository and nothing to exclude.
+ */
+async function excludeCopiesFromGit(dir: string, wslDistro: string | undefined): Promise<void> {
+  let commonDir: string
+  try {
+    commonDir = await readableGitCommonDir(
+      { cwd: dir, ...(wslDistro ? { wslDistro } : {}) },
+      wslDistroForCommand(dir, wslDistro) ?? null
+    )
+  } catch {
+    return
+  }
+  const exclude = windowsFsPath(join(commonDir, 'info', 'exclude'))
+  const current = await readFile(exclude, 'utf8').catch(() => '')
+  if (current.split(/\r?\n/).includes(AUTOMATION_STEP_COPY_PATTERN)) {
+    return
+  }
+  await mkdir(dirname(exclude), { recursive: true })
+  const separator = current && !current.endsWith('\n') ? '\n' : ''
+  await appendFile(
+    exclude,
+    `${separator}# Orca automation script step copies\n${AUTOMATION_STEP_COPY_PATTERN}\n`
+  )
+}
+
+async function sweepStaleCopies(dir: string, now: number): Promise<void> {
+  const names = await readdir(dir).catch((): string[] => [])
+  for (const name of names.filter((entry) => COPY_NAME.test(entry))) {
+    const path = join(dir, name)
+    const info = await stat(path).catch(() => null)
+    if (info && now - info.mtimeMs > STALE_COPY_MS) {
+      await rm(path, { force: true }).catch(() => {})
+    }
+  }
+}
+
 /**
  * Runs a copy of the verified bytes beside the original, so a write between check and exec cannot
  * swap them while `$0` / `%~dp0` still name the script's own directory. Exclusive and randomly
@@ -111,17 +166,24 @@ async function readScriptFile(
  */
 async function withVerifiedCopy<T>(
   file: ScriptFile,
+  wslDistro: string | undefined,
   run: (copy: string) => Promise<T>
 ): Promise<T | { copyError: string }> {
-  const copy = join(
-    dirname(file.path),
-    `.orca-step-${randomBytes(6).toString('hex')}-${basename(file.path)}`
-  )
+  const dir = dirname(file.path)
+  await excludeCopiesFromGit(dir, wslDistro).catch((error: unknown) => {
+    console.warn('[automations] could not exclude script step copies from Git:', error)
+  })
+  await sweepStaleCopies(dir, Date.now())
+  const copy = join(dir, `.orca-step-${randomBytes(6).toString('hex')}-${basename(file.path)}`)
+  let created = false
   try {
     await writeFile(copy, file.bytes, { flag: 'wx', mode: 0o700 })
+    created = true
     await chmod(copy, file.mode)
   } catch (error) {
-    await rm(copy, { force: true }).catch(() => {})
+    if (created) {
+      await rm(copy, { force: true }).catch(() => {})
+    }
     return {
       copyError: `Orca could not write its verified copy beside the script (${errorMessage(error)}).`
     }
@@ -129,7 +191,6 @@ async function withVerifiedCopy<T>(
   try {
     return await run(copy)
   } finally {
-    // A cut-off step on Windows can still hold the file; it is hidden and named as Orca's.
     await rm(copy, { force: true }).catch(() => {})
   }
 }
@@ -167,11 +228,13 @@ export function createAutomationScriptStepExecutor(
       })
     }
     const wsl = getHookWslContext(host.cwd, host.runtimeTarget)
-    const ran = await withVerifiedCopy(file, async (copy) => {
+    const ran = await withVerifiedCopy(file, wsl?.distro ?? undefined, async (copy) => {
       const command = automationScriptStepCommand(
         wsl ? toLinuxPath(copy) : copy,
         step.args,
-        getHookCommandShellKind(host.cwd, host.runtimeTarget)
+        getHookCommandShellKind(host.cwd, host.runtimeTarget),
+        // Windows cannot set the exec bit on a WSL share, so the guest copies it from the original.
+        wsl ? { modeFrom: toLinuxPath(file.path) } : {}
       )
       if (!command.ok) {
         return stepResult(step, timing, {

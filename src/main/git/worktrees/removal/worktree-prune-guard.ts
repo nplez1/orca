@@ -111,6 +111,13 @@ export function isForeignLink(link: string, runsInWsl: boolean): boolean {
 
 /** `<common dir>/worktrees` as this process can read it, also for bare or linked checkouts. */
 async function worktreeAdminRoot(options: GitExecOptions, distro: string | null): Promise<string> {
+  return join(await readableGitCommonDir(options, distro), 'worktrees')
+}
+
+export async function readableGitCommonDir(
+  options: GitExecOptions,
+  distro: string | null
+): Promise<string> {
   const { stdout } = await gitExecFileAsync(['rev-parse', '--git-common-dir'], options)
   const commonDir = stdout.trim()
   const readable = !commonDir.startsWith('/')
@@ -122,5 +129,5 @@ async function worktreeAdminRoot(options: GitExecOptions, distro: string | null)
       : distro
         ? toWindowsWslUncPath(commonDir, distro)
         : commonDir
-  return join(readable ?? commonDir, 'worktrees')
+  return readable ?? commonDir
 }

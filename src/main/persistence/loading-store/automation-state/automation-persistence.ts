@@ -213,7 +213,6 @@ export class AutomationPersistence {
     return foldAutomationEventOperation(getAutomationRunOperations(this), automationId, event)
   }
 
-  /** Desktop IPC only: the user approved a script a run refused. */
   approveAutomationScriptStep(request: AutomationScriptStepApproval): void {
     approveAutomationScriptStepOperation(getAutomationDefinitionOperations(this), request)
   }

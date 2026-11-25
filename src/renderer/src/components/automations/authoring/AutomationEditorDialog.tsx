@@ -70,9 +70,7 @@ export type AutomationDraft = {
   reuseSession: boolean
   precheckCommand: string
   precheckTimeoutSeconds: string
-  /** Script steps that run before the agent; absent or empty is the agent-only automation. */
   scriptSteps?: AutomationScriptStepDraft[]
-  /** False for a script-only automation; absent means the agent runs. */
   runAgentStep?: boolean
   preset: AutomationSchedulePreset
   time: string

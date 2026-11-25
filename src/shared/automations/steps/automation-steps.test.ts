@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { AutomationSteps } from '../../rpc-contract/automations/automation-steps-params'
+import { automationScriptStepCommand } from './automation-script-step-command'
 import {
   AutomationStepsError,
-  automationScriptStepCommand,
   parseAutomationStepsForWrite,
   resolveAutomationSteps,
   validateAutomationSteps
@@ -46,6 +46,21 @@ describe('automation step validation', () => {
     expect(refusal(step({ args: ['--label=bug', 'a/b.c', "it's"] }))).toBeNull()
   })
 
+  it('refuses arguments with characters that display differently from what runs', () => {
+    for (const arg of [
+      'a\u202eb',
+      'a\u2066b',
+      'a\u200bb',
+      'a\u2028b',
+      'a\u2029b',
+      'a\u0085b',
+      'a\u009bb'
+    ]) {
+      expect(refusal(step({ args: [arg] })), JSON.stringify(arg)).toBe('script_step_args_invalid')
+    }
+    expect(refusal(step({ args: ['café', '日本'] }))).toBeNull()
+  })
+
   it('never keeps a pin from a client write, only from this host’s own record', () => {
     const pinned = step({ approvedPin: 'forged' })
     expect(parseAutomationStepsForWrite(pinned)?.[0]).not.toHaveProperty('approvedPin')
@@ -70,6 +85,18 @@ describe('automationScriptStepCommand', () => {
     expect(automationScriptStepCommand('/tmp/o step/run.sh', ["it's", '$HOME'], 'posix')).toEqual({
       ok: true,
       command: `'/tmp/o step/run.sh' 'it'\\''s' '$HOME'`
+    })
+  })
+
+  it('has a WSL guest copy the original’s mode before running, since Windows cannot set it', () => {
+    expect(
+      automationScriptStepCommand('/home/u/r/.orca-step-1-run.sh', ['a b'], 'posix', {
+        modeFrom: '/home/u/r/run.sh'
+      })
+    ).toEqual({
+      ok: true,
+      command:
+        "{ chmod --reference='/home/u/r/run.sh' '/home/u/r/.orca-step-1-run.sh' 2>/dev/null || chmod u+x '/home/u/r/.orca-step-1-run.sh'; } && '/home/u/r/.orca-step-1-run.sh' 'a b'"
     })
   })
 
