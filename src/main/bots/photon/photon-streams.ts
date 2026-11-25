@@ -67,7 +67,9 @@ export class PhotonStreams {
       return running.status()
     }
     // A stream that stopped itself (a handler failure or a refused frame) is replaced rather than
-    // reused: returning the dead one early is what left a bot deaf until restart.
+    // reused: returning the dead one early is what left a bot deaf until restart. Its resume count
+    // comes along, so a repeatable failure keeps backing off instead of restarting at 1 s.
+    const spentResumes = running?.status().resumes ?? 0
     this.streams.delete(botId)
     const record = await this.deps.store.bot(botId)
     const credential = await this.deps.store.projectCredential(botId)
@@ -81,6 +83,7 @@ export class PhotonStreams {
       credential: credential.key,
       // Read fresh on every subscribe, so a reconnect resumes after what Orca checkpointed.
       readCursor: () => this.deps.cursors.read(record.projectId),
+      resumes: spentResumes,
       onFrame: (frame) =>
         this.deps.inbound
           .handle({ botId, projectId: record.projectId, seq: frame.seq, message: frame.message })
@@ -132,10 +135,25 @@ export class PhotonStreams {
     for (const [botId, stream] of Array.from(this.streams)) {
       const status = stream.status()
       if (status.state === 'stopped' && status.stoppedBy !== 'closed') {
-        // `stop()` rather than dropping the map entry: a stream that stopped on a handler failure has a
-        // resume timer armed, and deleting it from the map alone lets that timer reconnect a socket
-        // nothing references any more — unreachable by stop(), by stopAll() and by a release, and
-        // growing one per tick once the backoff passes the interval.
+        // Why not for a refused frame: the replay hands back the same bytes, so a reconnect cannot
+        // cure it — it only re-reads the poison every interval and logs a restart each time. The
+        // stream stays down and `assertLive` names why.
+        if (status.stoppedBy === 'contract') {
+          this.log(
+            '[photon] a stream is down on a frame Orca cannot parse; reconnecting would re-read it',
+            botId
+          )
+          continue
+        }
+        // Why not while a resume is armed: the stream's own timer is what grows the backoff, and a
+        // replacement here cancels it and reconnects on the tick instead — one socket a minute, for
+        // ever, against a provider that counts them.
+        if (status.resumeInMs !== undefined) {
+          continue
+        }
+        // `stop()` rather than dropping the map entry: a stopped stream may still hold a resume timer,
+        // and deleting it from the map alone lets that timer reconnect a socket nothing references any
+        // more — unreachable by stop(), by stopAll() and by a release.
         this.log('[photon] restarting a stream that stopped itself', botId, status.stoppedBy)
         this.stop(botId)
         await this.start(botId)

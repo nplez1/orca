@@ -90,11 +90,12 @@ const frame = (seq: number) => ({
 })
 
 describe('the health tick', () => {
-  it('cancels a self-stopped stream’s resume before starting its replacement', async () => {
-    // A handler failure leaves the stream stopped with a resume timer armed. Dropping the map entry and
-    // starting a replacement let that timer reconnect a socket nothing references any more: no stop(),
-    // no stopAll() and no release can reach it, and it grows one per tick once the backoff passes the
-    // interval — with the replacement starting at resumes = 0, so the backoff never grows either.
+  it('leaves a backing-off stream to its own resume timer', async () => {
+    // A handler failure leaves the stream stopped with a resume timer armed. Restarting it here
+    // cancelled that timer and reconnected on the tick instead, which is one socket a minute for
+    // ever against a provider that counts them — and the replacement used to start at resumes = 0,
+    // so the backoff never grew either. The timer is the mechanism that escalates; the tick must not
+    // reach past it, and the entry must stay in the map so stop()/stopAll()/release can still find it.
     const test = harness(async () => {
       throw new Error('the chat this thread points at is gone')
     })
@@ -111,7 +112,7 @@ describe('the health tick', () => {
     test.sockets[0]?.fire('message', frame(41))
     await new Promise((resolve) => setTimeout(resolve, 0))
 
-    // The stream stopped itself and armed a resume; that timer is the leak.
+    // The stream stopped itself and armed a resume; that timer is the schedule, not a leak.
     expect(test.streams.status('b1')).toMatchObject({
       state: 'stopped',
       stoppedBy: 'handler-failure'
@@ -122,12 +123,44 @@ describe('the health tick', () => {
 
     await test.streams.tick()
 
-    expect(resume?.cancelled).toBe(true)
-    // Firing the cancelled timer must not open a third socket: that is the leaked reconnect.
+    expect(resume?.cancelled).toBe(false)
+    expect(test.sockets).toHaveLength(1)
+    // Firing it is what brings the stream back, exactly once.
     if (resume) {
       test.runTimer(resume)
     }
     expect(test.sockets).toHaveLength(2)
+    // Why this pins escalation and not the carry-over: the resumed stream is the same object, and its
+    // own timer counts the attempt, so `resumes` grows either way. What it does prove is that the tick
+    // did not restart it a second time at zero.
+    expect(test.streams.status('b1')?.resumes).toBe(1)
+  })
+
+  it('does not restart a stream that stopped on a frame nobody can parse', async () => {
+    // The replay hands the same bytes back, so a reconnect re-reads the poison every interval and
+    // reports a restart each time: the bot is deaf either way, and pretending otherwise costs
+    // sockets and hides the reason.
+    const test = harness(async () => {})
+    await test.store.putBot({
+      botId: 'b1',
+      projectId: 'pho_prj_1',
+      slug: 'orca-bot-scout-7dc96f77',
+      organizationId: 'org_1'
+    })
+    await test.store.putProjectKey('b1', { keyId: 'k1', secret: 'pho_sk_1' })
+
+    await test.streams.start('b1')
+    test.sockets[0]?.fire('connect')
+    test.sockets[0]?.fire('subscribed', { projectId: 'pho_prj_1', startSeq: 0 })
+    // A frame that is not a frame at all.
+    test.sockets[0]?.fire('message', { nonsense: true })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(test.streams.status('b1')).toMatchObject({ stoppedBy: 'contract' })
+
+    await test.streams.tick()
+
+    expect(test.sockets).toHaveLength(1)
+    expect(test.streams.status('b1')).toMatchObject({ state: 'stopped', stoppedBy: 'contract' })
   })
 
   it('restarts a stream that is connected but never subscribed, rather than only calling it deaf', async () => {

@@ -24,6 +24,15 @@ import {
 /** The credential a call takes; a project key is never accepted where the account key is required. */
 export type PhotonCredential = { kind: 'account'; key: string } | { kind: 'project'; key: string }
 
+/**
+ * How long one call may take.
+ *
+ * Why a deadline at all: without one a half-open connection holds the promise for ever, and the call
+ * sites are a provisioning RPC, a send and the health tick's retry — all of which then wait on it
+ * instead of failing and being retried.
+ */
+const PHOTON_REQUEST_TIMEOUT_MS = 20_000
+
 export type PhotonFetch = (input: string, init: RequestInit) => Promise<Response>
 
 export type PhotonApiOptions = {
@@ -255,7 +264,8 @@ export class PhotonApi {
       response = await this.fetchImpl(`${this.baseUrl}${request.path}`, {
         method: request.method,
         headers,
-        ...(request.body === undefined ? {} : { body: JSON.stringify(request.body) })
+        ...(request.body === undefined ? {} : { body: JSON.stringify(request.body) }),
+        signal: AbortSignal.timeout(PHOTON_REQUEST_TIMEOUT_MS)
       })
     } catch (error) {
       throw new PhotonApiError(0, request.method, request.path, String(error))
