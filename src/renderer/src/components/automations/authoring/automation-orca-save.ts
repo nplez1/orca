@@ -23,7 +23,7 @@ import {
   dispatchAutomationReread,
   type AutomationDispatchResult
 } from '../hosts/automation-row-action-dispatch'
-import { buildDraftPrecheck, buildDraftSchedule } from './automation-draft-model'
+import { buildDraftPrecheck, buildDraftSchedule, draftStepsSave } from './automation-draft-model'
 import { buildAutomationRunContextForRepo } from './automation-run-context'
 import { resolveAutomationSetupDecisionForSave } from './automation-setup-decision'
 import { confirmAutomationSaveSetup } from './automation-setup-review'
@@ -189,7 +189,7 @@ export async function saveOrcaAutomation(
   )
   const updates: AutomationUpdateInput = {
     ...(edited('name') ? { name: draft.name } : {}),
-    ...(edited('prompt') ? { prompt: draft.prompt } : {}),
+    ...draftStepsSave(draft, edited, currentAutomation).update,
     ...(edited('precheckCommand') || edited('precheckTimeoutSeconds') ? { precheck } : {}),
     ...(edited('agentId') ? { agentId: draft.agentId } : {}),
     ...(!currentAutomation ||
@@ -222,7 +222,7 @@ export async function saveOrcaAutomation(
   }
   const createInput: AutomationCreateInput = automationCopyLaunchSetup(currentAutomation, updates, {
     name: currentAutomation ? currentAutomation.name : draft.name,
-    prompt: currentAutomation ? currentAutomation.prompt : draft.prompt,
+    ...draftStepsSave(draft, edited, currentAutomation).base,
     precheck: currentAutomation ? currentAutomation.precheck : precheck,
     agentId: currentAutomation ? currentAutomation.agentId : draft.agentId,
     ...launchSetup,

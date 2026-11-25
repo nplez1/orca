@@ -22,6 +22,7 @@ import {
   MAX_AUTOMATION_PRECHECK_TIMEOUT_SECONDS,
   normalizeAutomationPrecheckTimeoutSeconds
 } from '../../automations/launch/automation-precheck'
+import { AutomationSteps } from './automation-steps-params'
 
 export const TuiAgent = requiredString('Missing provider').refine(isTuiAgent, {
   message: 'Unknown provider'
@@ -266,6 +267,7 @@ export const AutomationCreate = z
     precheck: AutomationPrecheck,
     agentId: TuiAgent,
     extraAgentArgs: ExtraAgentArgs,
+    steps: AutomationSteps,
     launchSetupPatch: AutomationLaunchSetupPatch.optional(),
     runContext: WorkspaceRunContext,
     sourceContext: TaskSourceContext,
@@ -302,6 +304,7 @@ export const AutomationUpdateFields = z
     precheck: AutomationPrecheck,
     agentId: TuiAgent.optional(),
     extraAgentArgs: ExtraAgentArgs,
+    steps: AutomationSteps,
     launchSetupPatch: AutomationLaunchSetupPatch.optional(),
     runContext: WorkspaceRunContext,
     sourceContext: TaskSourceContext,

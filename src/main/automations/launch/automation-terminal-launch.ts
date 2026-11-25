@@ -41,9 +41,12 @@ export async function launchAutomationTerminalAgent(
     run: Pick<AutomationRun, 'id' | 'title' | 'scheduledFor' | 'trigger'>
     target: AutomationRepoRunTarget
     runs: readonly AutomationRun[]
+    stepEnv?: Readonly<Record<string, string>>
   }
 ): Promise<AutomationTerminalAgentLaunch> {
   const { automation, run, target } = request
+  const stepEnv =
+    request.stepEnv && Object.keys(request.stepEnv).length > 0 ? request.stepEnv : null
   const agent = automation.agentId
   const selectedTarget =
     automation.workspaceMode === 'existing'
@@ -52,7 +55,8 @@ export async function launchAutomationTerminalAgent(
   const selectedWorkspace = selectedTarget?.managedWorktree
   // The startup plan trims the prompt for every agent; a blank one launches the agent bare.
   const text = automation.prompt?.trim()
-  if (automation.reuseSession && automation.workspaceMode === 'existing' && text) {
+  // A reused session's environment is fixed, so a run with script handoff needs a fresh terminal.
+  if (automation.reuseSession && automation.workspaceMode === 'existing' && text && !stepEnv) {
     const reused = await sendToReusableSession(
       runtime,
       { ...request, text },
@@ -91,6 +95,7 @@ export async function launchAutomationTerminalAgent(
             startupTerminalCreation = terminal
           },
           ...create,
+          ...(stepEnv ? { startupAgentEnv: { ...stepEnv } } : {}),
           startupAgent,
           ...(startupPrompt ? { startupPrompt } : {})
         })
@@ -137,6 +142,7 @@ export async function launchAutomationTerminalAgent(
             title: run.title,
             suppressStartupUpdatePrompt: true,
             ...automationTerminalLaunchInputs(automation),
+            ...(stepEnv ? { env: { ...stepEnv } } : {}),
             // Run now is the user's act and may start a stopped WSL distro; a scheduled run never does.
             ...(run.trigger === 'scheduled' ? {} : { wslUserAct: true as const }),
             surfaceOwner: false

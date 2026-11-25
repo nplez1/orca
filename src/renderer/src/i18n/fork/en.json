@@ -1687,5 +1687,43 @@
       "unfinished": "Set up only as far as {{step}}, so it has no number yet. Repair finishes it.",
       "notReceiving": "Not receiving"
     }
+  },
+  "automations": {
+    "scriptSteps": {
+      "add": "Add step",
+      "approved": "Script approved. Later runs of this automation will run it.",
+      "args": "Arguments",
+      "argsPlaceholder": "Arguments",
+      "contentHash": "sha256 {{hash}}",
+      "duration": "{{seconds}}s",
+      "empty": "Run committed scripts on the host before the agent. A failing step stops the run.",
+      "handoff": "Later steps and the agent read each step’s result as ORCA_STEP_<ID>_STDOUT and ORCA_STEP_<ID>_EXIT. A new or changed script stops its run until you approve it from that run.",
+      "hostUpdateRequired": "Script steps require a newer Orca on the host this automation runs on. Update it and try again.",
+      "id": "Step id",
+      "moveDown": "Move down",
+      "moveUp": "Move up",
+      "onFailure": "If it fails",
+      "onFailureContinue": "Continue on failure",
+      "onFailureStop": "Stop on failure",
+      "outcomeCutOff": "Stopped at timeout",
+      "outcomeFailed": "Failed (exit {{code}})",
+      "outcomeSucceeded": "Succeeded",
+      "outcomeTerminated": "Failed (no exit code)",
+      "outcomeUnapproved": "Needs approval",
+      "outcomeUnverifiable": "Could not run on this host",
+      "remove": "Remove step",
+      "review": "Review script",
+      "runAgent": "Then run the agent with the prompt",
+      "runTitle": "Script steps",
+      "script": "Script path",
+      "scriptPlaceholder": "scripts/triage.sh",
+      "timeout": "Timeout",
+      "timeoutMinutes": "{{minutes}} min",
+      "timeoutSeconds": "{{seconds}} sec",
+      "title": "Script steps",
+      "trustBody": "An automation step runs this committed file on its host, unattended, on every run. Approving lets runs use this exact content; a change needs approval again. Only approve if you trust <repo/>.",
+      "trustHeading": "Script",
+      "trustTitle": "Approve this script from {{repo}}?"
+    }
   }
 }

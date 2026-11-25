@@ -1,4 +1,5 @@
 import type { AutomationAuthorityRef } from '../../../../../shared/automations/ownership/automation-owner-ref'
+import type { AutomationScriptStepDraft } from './automation-script-steps-draft'
 import React from 'react'
 import { useAppStoreWithHostStatuses } from '@/store/slices/runtime-status/views/use-runtime-status-view'
 import { selectAgentLaunchRouteView } from '@/lib/agent-session/launch/routing/agent-launch-route-input'
@@ -69,6 +70,10 @@ export type AutomationDraft = {
   reuseSession: boolean
   precheckCommand: string
   precheckTimeoutSeconds: string
+  /** Script steps that run before the agent; absent or empty is the agent-only automation. */
+  scriptSteps?: AutomationScriptStepDraft[]
+  /** False for a script-only automation; absent means the agent runs. */
+  runAgentStep?: boolean
   preset: AutomationSchedulePreset
   time: string
   dayOfWeek: string

@@ -27,6 +27,9 @@ import {
 } from '../automation-page-parts'
 import { AutomationRunStatusLabel } from './AutomationRunStatusDot'
 import { AutomationRunRerunButton } from './AutomationRunRerunButton'
+import { AutomationRunStepResults } from './AutomationRunStepResults'
+import { isReviewableAutomationStep } from '../authoring/automation-script-step-review'
+import type { AutomationStepResult } from '../../../../../shared/automations/steps/automation-step-results'
 import { formatAutomationCost, formatAutomationTokens } from './automation-usage-model'
 import {
   RUN_START_DRIFT_LABEL_MS,
@@ -54,6 +57,7 @@ export function AutomationRunDetailsPage({
   onOpenWorkspace,
   onSignIn,
   onReviewSetup,
+  onReviewScriptStep,
   onSelectRun
 }: {
   nav: React.ReactNode
@@ -74,6 +78,8 @@ export function AutomationRunDetailsPage({
   /** Reconnects the host that needed credentials; absent when nothing can sign in. */
   onSignIn?: () => void
   onReviewSetup: (content: SetupTrustMismatch) => void
+  /** Absent where nothing can approve a refused script step. */
+  onReviewScriptStep?: (result: AutomationStepResult) => void
   onSelectRun: (run: AutomationRun) => void
 }): React.JSX.Element {
   const t = useTranslate()
@@ -338,6 +344,14 @@ export function AutomationRunDetailsPage({
                 'This run did not start, and no reason was recorded.'
               )
             }
+          />
+        ) : null}
+
+        {run.stepResults?.length ? (
+          <AutomationRunStepResults
+            results={run.stepResults}
+            canReview={(result) => isReviewableAutomationStep(automation, result)}
+            onReview={onReviewScriptStep}
           />
         ) : null}
 

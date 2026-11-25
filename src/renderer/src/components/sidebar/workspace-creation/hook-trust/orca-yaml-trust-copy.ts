@@ -71,6 +71,8 @@ export function getTitle(
           "{{repo}}'s VM recipe changed — run the new version?",
           repo
         )
+      case 'automationScript':
+        return automationScriptTitle(repoName, t)
     }
   }
   switch (kind) {
@@ -98,6 +100,8 @@ export function getTitle(
         'Run VM recipe from {{repo}}?',
         repo
       )
+    case 'automationScript':
+      return automationScriptTitle(repoName, t)
   }
 }
 
@@ -129,6 +133,8 @@ export function getDescription(
           'auto.components.sidebar.OrcaYamlTrustDialog.vmRecipeChangedBody',
           '<code>orca.yaml</code> changed since you last approved. Re-review before it runs before provisioning a VM.'
         )
+      case 'automationScript':
+        return automationScriptDescription(t)
     }
   }
   switch (kind) {
@@ -152,6 +158,8 @@ export function getDescription(
         'auto.components.sidebar.OrcaYamlTrustDialog.vmRecipeRunBody',
         "This repository's <code>orca.yaml</code> runs on your machine before provisioning a VM. Only run if you trust <repo/>."
       )
+    case 'automationScript':
+      return automationScriptDescription(t)
   }
 }
 
@@ -177,5 +185,21 @@ export function getScriptHeading(
       return previouslyApproved
         ? t('auto.components.sidebar.OrcaYamlTrustDialog.newVmRecipe', 'New VM recipe')
         : t('auto.components.sidebar.OrcaYamlTrustDialog.vmRecipe', 'VM recipe')
+    case 'automationScript':
+      return t('automations.scriptSteps.trustHeading', 'Script')
   }
+}
+
+function automationScriptTitle(repoName: string, t: Translate): string {
+  return t('automations.scriptSteps.trustTitle', 'Approve this script from {{repo}}?', {
+    repo: repoName
+  })
+}
+
+// Same <code>/<repo/> slots as the orca.yaml templates; the file is not orca.yaml.
+function automationScriptDescription(t: Translate): string {
+  return t(
+    'automations.scriptSteps.trustBody',
+    'An automation step runs this committed file on its host, unattended, on every run. Approving lets runs use this exact content; a change needs approval again. Only approve if you trust <repo/>.'
+  )
 }

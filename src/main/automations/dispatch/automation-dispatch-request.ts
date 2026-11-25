@@ -34,6 +34,7 @@ import {
   ORCAD_FENCED_AUTOMATION
 } from '../ownership/orcad-fenced-automation'
 import { AutomationDispatchCancelledError } from './automation-dispatch-cancelled-error'
+import { runAutomationRequestScriptSteps } from './script-step-request'
 
 export { AutomationDispatchCancelledError }
 
@@ -181,6 +182,8 @@ export async function requestAutomationDispatch(
       automation,
       run,
       target: launchTarget,
+      runScriptSteps: () =>
+        runAutomationRequestScriptSteps(ctx.store, automation.id, ctx.resolveTarget),
       // The status check and the store write share one synchronous step, so a settled run stays settled.
       transition: (result) => {
         const current = readRun()

@@ -14,6 +14,7 @@ import type {
 import type { AutomationRun } from '../../../shared/automations/history/automation-run'
 import type { PersistedState } from '../../../shared/orca-profiles/persisted-state-types'
 import { normalizeAutomationPrecheck } from '../../../shared/automations/launch/automation-precheck'
+import { applyAutomationStepsWrite } from './automation-steps-write'
 import {
   assertAutomationExtraAgentArgs,
   storedExtraAgentArgs
@@ -143,6 +144,7 @@ export function createAutomation(
     updatedAt: now
   }
   applyAutomationSetupTrust(automation, input)
+  applyAutomationStepsWrite(automation, input)
   assertAutomationExtraAgentArgs(automation)
   settleAutomationTriggers(automation)
   operations.state.automations = [...(operations.state.automations ?? []), automation]

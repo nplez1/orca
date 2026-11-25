@@ -194,6 +194,7 @@ export abstract class OrcaRuntimeWithTerminalCreateDeduplication extends OrcaRun
       /** Run now is the user's act; a scheduled run is background and a stopped WSL distro holds it. */
       wslUserAct?: true
       surfaceOwner?: false
+      env?: Record<string, string>
     },
     resolvedTarget?: { worktree: ResolvedWorktree; repo: Repo; folderWorkspace?: FolderWorkspace }
   ): Promise<RuntimeTerminalCreate> {
@@ -217,6 +218,7 @@ export abstract class OrcaRuntimeWithTerminalCreateDeduplication extends OrcaRun
         ...(opts.agentArgs !== undefined ? { agentArgs: opts.agentArgs } : {}),
         ...(opts.sessionOptions !== undefined ? { sessionOptions: opts.sessionOptions } : {}),
         ...(opts.extraAgentArgs !== undefined ? { extraAgentArgs: opts.extraAgentArgs } : {}),
+        ...(opts.env ? { env: opts.env } : {}),
         ...(prompt && commandPrompt ? { startupPrompt: prompt } : {}),
         startupPromptCarry: 'force-line',
         startupPromptDelivery: 'auto-submit',

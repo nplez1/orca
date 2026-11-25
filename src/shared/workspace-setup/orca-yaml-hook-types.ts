@@ -98,6 +98,8 @@ export type PersistedTrustedOrcaHookRepo = {
   archive?: PersistedTrustedOrcaHookEntry
   issueCommand?: PersistedTrustedOrcaHookEntry
   vmRecipe?: PersistedTrustedOrcaHookEntry
+  /** A committed script an automation step runs; its approval is also pinned on the step. */
+  automationScript?: PersistedTrustedOrcaHookEntry
 }
 
 export type PersistedTrustedOrcaHooks = Record<string, PersistedTrustedOrcaHookRepo>

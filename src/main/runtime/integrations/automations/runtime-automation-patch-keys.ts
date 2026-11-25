@@ -5,6 +5,7 @@ export const RUNTIME_AUTOMATION_PATCH_KEYS = [
   'precheck',
   'agentId',
   'extraAgentArgs',
+  'steps',
   'launchSetupPatch',
   'runContext',
   'sourceContext',

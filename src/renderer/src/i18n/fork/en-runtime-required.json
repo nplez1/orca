@@ -31,6 +31,11 @@
       }
     }
   },
+  "automations": {
+    "scriptSteps": {
+      "hostUpdateRequired": "Script steps require a newer Orca on the host this automation runs on. Update it and try again."
+    }
+  },
   "jira": {
     "issue": {
       "assignableUsersError": "Failed to load the people assignable to this issue.",

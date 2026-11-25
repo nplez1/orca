@@ -1,7 +1,10 @@
 import { buildAutomationRrule } from '../../../../../shared/automations/scheduling/automation-schedule-occurrences'
 import { automationLaunchInputs } from '../../../../../shared/automations/launch/automation-launch-choices'
 import { getAgentCatalog } from '@/lib/agent-catalog/agent-catalog'
-import type { AutomationPrecheck } from '../../../../../shared/automations/automation-definition'
+import type {
+  Automation,
+  AutomationPrecheck
+} from '../../../../../shared/automations/automation-definition'
 import type { Worktree } from '../../../../../shared/worktree/types'
 import {
   hasExtraAgentArgs,
@@ -9,6 +12,11 @@ import {
 } from '../../../../../shared/agent-launch/startup/automation-extra-agent-args'
 import type { AutomationDraft } from './AutomationEditorDialog'
 import { extraAgentArgsErrorText } from './automation-extra-agent-args-error-copy'
+import { buildDraftSteps, type AutomationScriptStepDraft } from './automation-script-steps-draft'
+import {
+  AUTOMATION_SCRIPT_ONLY_FALLBACK_PROMPT,
+  type AutomationStepRecord
+} from '../../../../../shared/automations/steps/automation-steps'
 
 export const AUTOMATION_DEFAULT_TIME = '09:00'
 
@@ -99,4 +107,35 @@ export function draftExtraAgentArgsNeedFreshSession(
     (draft.surface !== 'chat' &&
       (draft.agentArgs !== undefined || hasExtraAgentArgs(draft.extraAgentArgs)))
   return consumed && draft.workspaceMode === 'existing' && draft.reuseSession
+}
+
+type StepsDraft = {
+  prompt: string
+  scriptSteps?: readonly AutomationScriptStepDraft[]
+  runAgentStep?: boolean
+}
+
+/**
+ * The prompt and steps a save writes: `update` holds what the edit changed, `base` what a create
+ * or a move starts from. A script-only save sends the prompt an older host would stand down on.
+ */
+export function draftStepsSave(
+  draft: StepsDraft,
+  edited: (key: 'prompt' | 'scriptSteps' | 'runAgentStep') => boolean,
+  current: Pick<Automation, 'prompt' | 'steps'> | null
+): {
+  update: { prompt?: string; steps?: AutomationStepRecord[] | null }
+  base: { prompt: string; steps?: AutomationStepRecord[] | null }
+} {
+  const steps = buildDraftSteps(draft)
+  const prompt =
+    steps && draft.runAgentStep === false ? AUTOMATION_SCRIPT_ONLY_FALLBACK_PROMPT : draft.prompt
+  const stepsEdited = edited('scriptSteps') || edited('runAgentStep')
+  return {
+    update: {
+      ...(edited('prompt') || stepsEdited ? { prompt } : {}),
+      ...(stepsEdited ? { steps } : {})
+    },
+    base: current ? { prompt: current.prompt, steps: current.steps } : { prompt, steps }
+  }
 }

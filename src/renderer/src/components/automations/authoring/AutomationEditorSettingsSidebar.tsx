@@ -12,6 +12,7 @@ import type { AgentCatalogEntry } from '@/lib/agent-catalog/agent-catalog'
 import { AUTOMATION_EDITOR_SECTION_LABEL_CLASS, Field } from '../automation-page-parts'
 import { AutomationMissedRunGraceField } from './AutomationMissedRunGraceField'
 import { AutomationPrecheckFields } from './AutomationPrecheckFields'
+import { AutomationScriptStepsFields } from './AutomationScriptStepsFields'
 import AutomationProjectCombobox from './AutomationProjectCombobox'
 import { AutomationSchedulePicker } from './AutomationSchedulePicker'
 import { AutomationSessionField } from './AutomationSessionField'
@@ -291,6 +292,14 @@ export function AutomationEditorSettingsSidebar({
               pickerTriggerClassName={pickerTriggerClassName}
               onDraftChange={onDraftChange}
             />
+            {draft.bot ? null : (
+              <AutomationScriptStepsFields
+                disabled={false}
+                draft={draft}
+                pickerTriggerClassName={pickerTriggerClassName}
+                onDraftChange={onDraftChange}
+              />
+            )}
           </div>
         </div>
         <AutomationSetupDecisionField

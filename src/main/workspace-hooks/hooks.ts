@@ -25,7 +25,15 @@ import { createOutputSink } from '@orca/process-host/bounded-output-sink'
 
 const HOOK_TIMEOUT = 120_000
 
-type HookProcessOutcome = { success: boolean; output: string; exitCode?: number }
+/** `timedOut` marks a cut-off run, which never carries an exit code. */
+export type HookProcessOutcome = {
+  success: boolean
+  output: string
+  exitCode?: number
+  timedOut?: true
+  /** The command's own stdout, without stderr or Orca's verdict line. */
+  stdout?: string
+}
 
 /** Timed-out hooks cannot prove completion, even if their SIGTERM handler exits 0 (#19334). */
 function classifyHookProcessResult(
@@ -36,7 +44,12 @@ function classifyHookProcessResult(
   if (result.timedOut) {
     const message = `Hook timed out after ${context.timeoutMs}ms.`
     console.error(`[hooks] ${context.hookName} hook failed in ${context.cwd}:`, message)
-    return { success: false, output: `${streams}\n${message}`.trim() }
+    return {
+      success: false,
+      output: `${streams}\n${message}`.trim(),
+      timedOut: true,
+      stdout: result.stdout
+    }
   }
   if (result.code !== 0) {
     // A signaled exit has no code for the removal gate to verify.
@@ -48,11 +61,12 @@ function classifyHookProcessResult(
     return {
       success: false,
       output: `${streams}\n${message}`.trim(),
+      stdout: result.stdout,
       ...(typeof result.code === 'number' ? { exitCode: result.code } : {})
     }
   }
   console.log(`[hooks] ${context.hookName} hook completed in ${context.cwd}`)
-  return { success: true, output: streams.trim() }
+  return { success: true, output: streams.trim(), stdout: result.stdout }
 }
 
 const SIGTERM_GRACE_MS = 2_000
@@ -169,7 +183,6 @@ export function runHook(
   options: { identity?: HookWorkspaceIdentity; timeoutMs?: number; hooks?: OrcaHooks } = {}
   // Failed hooks without an observed exit are unverifiable to the removal gate (#19334).
 ): Promise<{ success: boolean; output: string; exitCode?: number }> {
-  const timeoutMs = options.timeoutMs ?? HOOK_TIMEOUT
   // A caller that already resolved the hooks passes them, so orca.yaml is read once.
   const hooks = options.hooks ?? getEffectiveHooks(repo, hooksPath)
   const script = hooks?.scripts[hookName]
@@ -177,21 +190,52 @@ export function runHook(
   if (!script) {
     return Promise.resolve({ success: true, output: '' })
   }
+  return runHookCommand({
+    hookName,
+    script,
+    cwd,
+    pathEnv: getSetupEnvVars(repo, cwd, options.identity),
+    runtimeTarget: getHookRuntimeTarget(projectRuntime),
+    timeoutMs: options.timeoutMs ?? HOOK_TIMEOUT
+  })
+}
 
-  const runtimeTarget = getHookRuntimeTarget(projectRuntime)
-  const wslInfo = getHookWslContext(cwd, runtimeTarget)
+export type HookCommandRequest = {
+  /** Names the command in logs, e.g. the hook or an automation step. */
+  hookName: string
+  script: string
+  cwd: string
+  /** Path-valued variables (ORCA_ROOT_PATH...), rewritten to Linux paths inside WSL. */
+  pathEnv: Record<string, string>
+  /** Passed verbatim on every host, after pathEnv. */
+  env?: Record<string, string>
+  runtimeTarget?: HookRuntimeTarget
+  timeoutMs: number
+}
+
+/** Which shell the hook executor runs `cwd`'s commands in: WSL and POSIX use bash, Windows cmd.exe. */
+export function getHookCommandShellKind(
+  cwd: string,
+  runtimeTarget?: HookRuntimeTarget
+): 'posix' | 'cmd' {
+  return process.platform === 'win32' && !getHookWslContext(cwd, runtimeTarget) ? 'cmd' : 'posix'
+}
+
+/** The hook executor: shell resolution, WSL routing, prompt guard, bounded output, timeout-first verdict. */
+export function runHookCommand(request: HookCommandRequest): Promise<HookProcessOutcome> {
+  const { hookName, script, cwd, timeoutMs } = request
+  const wslInfo = getHookWslContext(cwd, request.runtimeTarget)
 
   if (wslInfo) {
     // WSL hooks need Linux paths for ORCA_* values, including Windows UNC paths.
-    const envVars = getSetupEnvVars(repo, cwd, options.identity)
     const wslEnv: Record<string, string> = {}
-    for (const [key, value] of Object.entries(envVars)) {
+    for (const [key, value] of Object.entries(request.pathEnv)) {
       wslEnv[key] = toLinuxPath(value)
     }
     // Forward unattended Git flags to WSL; keep host askpass out of the guest.
     const guardedEnv = promptGuardShellEnv(wslEnv)
     const wslCli = wslHookOrcaCliEnv()
-    const guestEnv: Record<string, string> = { ...wslCli.env, ...wslEnv }
+    const guestEnv: Record<string, string> = { ...wslCli.env, ...wslEnv, ...request.env }
     for (const [key, value] of Object.entries(guardedEnv)) {
       if (value !== undefined && (key === 'GIT_TERMINAL_PROMPT' || key === 'GCM_INTERACTIVE')) {
         guestEnv[key] = value
@@ -214,7 +258,7 @@ export function runHook(
 
   const shellHookEnv: NodeJS.ProcessEnv = { ...process.env }
   applyHostHookOrcaCliEnv(shellHookEnv)
-  Object.assign(shellHookEnv, getSetupEnvVars(repo, cwd, options.identity))
+  Object.assign(shellHookEnv, request.pathEnv, request.env)
   dropIncoherentCondaActivationEnv(shellHookEnv)
 
   return getHookShell().then(

@@ -16,6 +16,11 @@ import {
   type AutomationRunFailure
 } from '../../../shared/automations/history/automation-run-failure-copy'
 import { parseWslDistroHold } from '../../../shared/remote-runtime/wsl-hosts/wsl-distro-stopped-hold'
+import {
+  formatAutomationStepFailure,
+  type AutomationScriptStepsOutcome
+} from '../../../shared/automations/steps/automation-step-results'
+import { automationRunsAgentStep } from '../../../shared/automations/steps/automation-steps'
 
 type RunTarget = Extract<AutomationRunTargetResult, { ok: true }>
 
@@ -30,6 +35,8 @@ export type AutomationLaunchContext<Target extends RunTarget = RunTarget> = {
     run: Promise<AutomationRun>
   }
   runPrecheck: () => Promise<AutomationPrecheckResult | null>
+  /** Null when the automation has no script steps. */
+  runScriptSteps: () => Promise<AutomationScriptStepsOutcome | null>
   markDispatchResult: (result: AutomationDispatchResult) => Promise<AutomationRun>
   watchRun: (run: AutomationRun) => void
 }
@@ -65,11 +72,24 @@ export async function runAutomationLaunch<Target extends RunTarget>(
       error: formatAutomationPrecheckFailure(precheckResult)
     }).run
   }
+  const scripts = await ctx.runScriptSteps()
+  if (scripts) {
+    // Recorded before the agent launches, so a launch that crashes keeps what the scripts did.
+    const settled = settleScriptSteps(ctx, scripts, precheckResult)
+    if (settled) {
+      return settled
+    }
+  }
   let launch: AutomationLaunch
   // The agent can finish before launch returns.
   const dispatchedAt = Date.now()
   try {
-    launch = await ctx.dispatcher({ automation, run, target })
+    launch = await ctx.dispatcher({
+      automation,
+      run,
+      target,
+      ...(scripts ? { stepEnv: scripts.env } : {})
+    })
   } catch (error) {
     const refusal =
       error instanceof AutomationDispatchRefusedError
@@ -160,6 +180,41 @@ export async function runAutomationLaunch<Target extends RunTarget>(
       .catch((error) => console.error('[automations] Failed to persist run completion:', error))
   }
   return updated.run
+}
+
+/**
+ * A stopping step fails the run; a script-only automation completes on the last exit, with no
+ * agent evidence to wait for. Null hands the run to its agent step.
+ */
+function settleScriptSteps<Target extends RunTarget>(
+  ctx: AutomationLaunchContext<Target>,
+  scripts: AutomationScriptStepsOutcome,
+  precheckResult: AutomationPrecheckResult | null
+): Promise<AutomationRun> | null {
+  const { automation } = ctx
+  const recorded = {
+    workspaceId: automation.workspaceId,
+    stepResults: scripts.results,
+    ...(precheckResult ? { precheckResult } : {})
+  }
+  if (scripts.stoppedBy) {
+    return ctx.transition({
+      status: 'dispatch_failed',
+      ...recorded,
+      error: formatAutomationStepFailure(scripts.stoppedBy)
+    }).run
+  }
+  if (!automationRunsAgentStep(automation)) {
+    return ctx.transition({ status: 'completed', ...recorded, error: null }).run
+  }
+  const linked = ctx.transition({ status: 'dispatching', ...recorded, error: null })
+  if (!linked.applied) {
+    return linked.run
+  }
+  linked.run.catch((error: unknown) => {
+    console.warn('[automations] failed to record the script steps:', error)
+  })
+  return null
 }
 
 /** The launch got as far as producing the agent's terminal or chat session. */

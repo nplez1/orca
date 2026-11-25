@@ -9,6 +9,7 @@ import type {
 import type { AutomationEventTrigger } from '../automation-event-triggers'
 import type { AutomationBotTarget } from '../automation-bot-target'
 import type { AutomationOnce } from '../automation-once'
+import type { AutomationStepRecord } from './steps/automation-steps'
 
 export type {
   AutomationBotResultsTo,
@@ -56,6 +57,9 @@ export type Automation = {
   agentArgs?: string | null
   /** Saved text appended to the host's default agent Arguments on each fresh run; absent means none. */
   extraAgentArgs?: string
+  /** Script steps then the agent step; absent is the one-step agent case. Older hosts ignore it
+   *  and run the agent only, so a script-only record stores AUTOMATION_SCRIPT_ONLY_FALLBACK_PROMPT. */
+  steps?: AutomationStepRecord[]
   /** Why: runContext carries the logical project + host setup identity for
    *  multi-host projects; projectId remains only as the legacy repo-id storage
    *  field for pre-host-context automations.
@@ -114,6 +118,7 @@ export type AutomationCreateInput = {
   launchSetupPatch?: AutomationLaunchSetupPatch
   /** Empty or whitespace means no extras. */
   extraAgentArgs?: string
+  steps?: AutomationStepRecord[] | null
   runContext?: WorkspaceRunContext | null
   sourceContext?: TaskSourceContext | null
   bot?: AutomationBotTarget
@@ -137,7 +142,11 @@ export type AutomationCreateInput = {
   createdBy?: AutomationCreator
 }
 
-export type AutomationUpdateInput = { launchSetupPatch?: AutomationLaunchSetupPatch } & Partial<
+export type AutomationUpdateInput = {
+  launchSetupPatch?: AutomationLaunchSetupPatch
+  /** null clears the script steps, returning to the one-step agent case. */
+  steps?: AutomationStepRecord[] | null
+} & Partial<
   Pick<
     Automation,
     | 'name'

@@ -1,3 +1,4 @@
+import { getDraftScriptStepsError } from './automation-script-steps-draft'
 import { useAppStore } from '@/store/index'
 import {
   automationChatSupport,
@@ -47,11 +48,17 @@ export function createAutomationSaveAction(context: AutomationSaveContext) {
       toast.error(translate('automations.botTarget.promptMissing', 'Enter what it should do.'))
       return
     }
+    const scriptOnly = (draft.scriptSteps?.length ?? 0) > 0 && draft.runAgentStep === false
+    const stepsError = botTarget ? null : getDraftScriptStepsError(draft)
+    if (stepsError) {
+      toast.error(stepsError)
+      return
+    }
     if (
       !botTarget &&
       ((targetEdited &&
         (!draft.projectId || (draft.workspaceMode === 'existing' && !draft.workspaceId))) ||
-        !draft.prompt.trim())
+        (!scriptOnly && !draft.prompt.trim()))
     ) {
       toast.error(
         translate(

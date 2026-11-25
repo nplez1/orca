@@ -47,7 +47,9 @@ const OrcaYamlTrustDialog = React.memo(function OrcaYamlTrustDialog() {
         ? 'issueCommand'
         : modalData.scriptKind === 'vmRecipe'
           ? 'vmRecipe'
-          : 'setup'
+          : modalData.scriptKind === 'automationScript'
+            ? 'automationScript'
+            : 'setup'
   const scriptContent = typeof modalData.scriptContent === 'string' ? modalData.scriptContent : ''
   const contentHash = typeof modalData.contentHash === 'string' ? modalData.contentHash : ''
   const versionOnly = modalData.versionOnly === true

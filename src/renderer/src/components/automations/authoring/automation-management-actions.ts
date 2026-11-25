@@ -12,6 +12,8 @@ import type { AutomationListRow } from '../listing/automation-list-row-identity'
 import type { AutomationsPageActionContext } from '../automations-page-action-context'
 import type { SetupTrustMismatch } from '../../../../../shared/worktree/create-types'
 import { reviewAutomationSkippedSetup } from './automation-setup-review'
+import { reviewAutomationScriptStep } from './automation-script-step-review'
+import type { AutomationStepResult } from '../../../../../shared/automations/steps/automation-step-results'
 
 /** Fenced toggle/delete handlers and the confirmation preference flow. */
 export function createAutomationManagementActions({
@@ -88,6 +90,14 @@ export function createAutomationManagementActions({
     })
   }
 
+  const reviewScriptStep = (row: AutomationListRow, result: AutomationStepResult): void => {
+    void reviewAutomationScriptStep(row.automation, result, (steps) =>
+      updateAutomationRow(row, { steps })
+    ).catch((error: unknown) => {
+      console.error('Failed to approve the automation script:', error)
+    })
+  }
+
   const deleteAutomation = async (row: AutomationListRow): Promise<void> => {
     const result = await dispatchAutomationDelete(
       automationDispatchContext,
@@ -135,6 +145,7 @@ export function createAutomationManagementActions({
   return {
     toggleAutomation,
     reviewSkippedSetup,
+    reviewScriptStep,
     deleteAutomation,
     requestDeleteAutomation,
     confirmDeleteAutomation

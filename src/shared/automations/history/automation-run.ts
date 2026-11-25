@@ -2,6 +2,7 @@ import type { SetupTrustMismatch } from '../../worktree/create-types'
 import type { TaskSourceContext, WorkspaceRunContext } from '../../work-items/task-source-context'
 import type { AutomationRunEvent } from '../../automation-event-triggers'
 import type { AutomationTriggeredBy } from '../../bots/bot-acts-for'
+import type { AutomationStepResult } from '../steps/automation-step-results'
 
 export type AutomationRunStatus =
   | 'pending'
@@ -131,6 +132,8 @@ export type AutomationRun = {
   terminalPtyId: string | null
   outputSnapshot: AutomationRunOutputSnapshot | null
   precheckResult: AutomationPrecheckResult | null
+  /** Script steps that ran, in order, with the path and content hash of what ran. Absent on agent-only runs. */
+  stepResults?: AutomationStepResult[]
   usage: AutomationRunUsage | null
   error: string | null
   /** Localizes `error`; old records omit it and clients show `error` as stored. */
@@ -187,6 +190,7 @@ export type AutomationDispatchResult = Pick<AutomationRun, 'handledInTurn'> & {
   terminalPtyId?: string | null
   outputSnapshot?: AutomationRunOutputSnapshot | null
   precheckResult?: AutomationPrecheckResult | null
+  stepResults?: AutomationStepResult[]
   usage?: AutomationRunUsage | null
   error?: string | null
   errorCode?: string | null

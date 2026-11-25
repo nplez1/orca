@@ -1,3 +1,4 @@
+import { normalizeAutomationStepResults } from '../../../shared/automations/steps/automation-step-results'
 import { randomUUID } from 'node:crypto'
 import { isFinalAutomationRunStatus } from '../../../shared/automations/history/automation-run'
 import { normalizeSetupSkippedContent } from './automation-setup-skipped-content'
@@ -202,6 +203,11 @@ function resultErrorCodeFields(
   }
 }
 
+function stepResultsField(value: unknown): Pick<AutomationRun, 'stepResults'> {
+  const stepResults = normalizeAutomationStepResults(value)
+  return stepResults ? { stepResults } : {}
+}
+
 export function updateAutomationRun(
   operations: AutomationRunOperations,
   result: AutomationDispatchResult
@@ -246,6 +252,8 @@ export function updateAutomationRun(
     precheckResult: Object.hasOwn(result, 'precheckResult')
       ? normalizeAutomationPrecheckResult(result.precheckResult)
       : normalizeAutomationPrecheckResult(current.precheckResult),
+    // Later writes (completion) keep the steps the dispatch recorded.
+    ...stepResultsField(result.stepResults ?? current.stepResults),
     usage: Object.hasOwn(result, 'usage') ? (result.usage ?? null) : (current.usage ?? null),
     error: result.error ?? null,
     ...resultErrorCodeFields(result, previous),

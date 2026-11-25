@@ -8,8 +8,11 @@ import {
   AUTOMATION_OWNER_FENCING_RUNTIME_CAPABILITY,
   AUTOMATION_OWNER_FENCING_UPDATE_REQUIRED_MESSAGE,
   AUTOMATION_CREATE_IDEMPOTENCY_RUNTIME_CAPABILITY,
-  AUTOMATION_EXTRA_AGENT_ARGS_RUNTIME_CAPABILITY
+  AUTOMATION_EXTRA_AGENT_ARGS_RUNTIME_CAPABILITY,
+  AUTOMATION_SCRIPT_STEPS_RUNTIME_CAPABILITY,
+  AUTOMATION_SCRIPT_STEPS_UPDATE_REQUIRED_MESSAGE
 } from '../../../../../shared/automations/automation-runtime-capabilities'
+import { automationHasScriptSteps } from '../../../../../shared/automations/steps/automation-steps'
 import { getRuntimeEnvironmentStatus } from '@/runtime/rpc/compatibility/runtime-compatibility-probe'
 import type { AutomationAuthorityRef } from '../../../../../shared/automations/ownership/automation-owner-ref'
 import type { RuntimeCapability } from '../../../../../shared/remote-runtime/protocol/protocol-version'
@@ -189,6 +192,24 @@ export async function assertEnvironmentSupportsExtraAgentArgs(
   }
 }
 
+/** Older hosts strip steps and would launch the agent without its gating scripts. */
+export async function assertScriptStepsSupported(
+  authority: AutomationAuthorityRef,
+  steps: AutomationCreateInput['steps']
+): Promise<void> {
+  if (!automationHasScriptSteps({ steps: steps ?? undefined })) {
+    return
+  }
+  await assertAuthorityCapability(
+    authority,
+    AUTOMATION_SCRIPT_STEPS_RUNTIME_CAPABILITY,
+    translate(
+      'automations.scriptSteps.hostUpdateRequired',
+      AUTOMATION_SCRIPT_STEPS_UPDATE_REQUIRED_MESSAGE
+    )
+  )
+}
+
 /** Old hosts keep their terminal contract; an explicit chat must refuse before a move creates anything. */
 export async function prepareAutomationLaunchSetup<
   T extends AutomationCreateInput | AutomationUpdateInput
@@ -196,6 +217,7 @@ export async function prepareAutomationLaunchSetup<
   authority: AutomationAuthorityRef,
   input: T
 ): Promise<Omit<T, 'launchSetupPatch'> & Pick<AutomationCreateInput, 'launchSetupPatch'>> {
+  await assertScriptStepsSupported(authority, input.steps)
   const { launchSetupPatch, ...legacy } = input
   if (launchSetupPatch === undefined) {
     await assertExtraAgentArgsSupported(authority, input.extraAgentArgs)

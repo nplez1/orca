@@ -295,10 +295,13 @@ export async function resolveWorktreeCreateAgentStartup(
     ...(args.startupLaunchSource ? { launchSource: args.startupLaunchSource } : {}),
     ...(args.onStartupPromptCarry ? { onPromptCarry: args.onStartupPromptCarry } : {})
   })
-  return args.startupAccountEnv
+  return args.startupAccountEnv || args.startupAgentEnv
     ? {
         ...built,
-        startup: { ...built.startup, env: { ...built.startup.env, ...args.startupAccountEnv } }
+        startup: {
+          ...built.startup,
+          env: { ...built.startup.env, ...args.startupAgentEnv, ...args.startupAccountEnv }
+        }
       }
     : built
 }

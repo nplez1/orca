@@ -11,6 +11,10 @@ import {
 import type { AutomationDraft } from './AutomationEditorDialog'
 import { AUTOMATION_DEFAULT_TIME, formatTimeInput } from './automation-draft-model'
 import { getAutomationSetupDecisionDraftValue } from './automation-setup-decision'
+import {
+  runsAgentStepFromAutomation,
+  scriptStepDraftsFromAutomation
+} from './automation-script-steps-draft'
 
 export function buildAutomationEditDraft(automation: Automation): AutomationDraft {
   const setup = automationCanonicalLaunchSetup(automation)
@@ -20,7 +24,8 @@ export function buildAutomationEditDraft(automation: Automation): AutomationDraf
   const hasCustomSchedule = scheduled && !schedule && isRunnableAutomationSchedule(automation.rrule)
   return {
     name: automation.name,
-    prompt: automation.prompt,
+    // A script-only record stores an older host's stand-down prompt, which is not the user's.
+    prompt: runsAgentStepFromAutomation(automation) ? automation.prompt : '',
     agentId: automation.agentId,
     surface: automation.launchSetup?.surface ?? automation.surface ?? 'terminal',
     extraAgentArgs: setup.extraAgentArgs ?? '',
@@ -40,6 +45,12 @@ export function buildAutomationEditDraft(automation: Automation): AutomationDraf
     reuseSession: automation.workspaceMode === 'existing' && automation.reuseSession,
     precheckCommand: automation.precheck?.command ?? '',
     precheckTimeoutSeconds: String(automation.precheck?.timeoutSeconds ?? 60),
+    ...(automation.steps
+      ? {
+          scriptSteps: scriptStepDraftsFromAutomation(automation),
+          runAgentStep: runsAgentStepFromAutomation(automation)
+        }
+      : {}),
     preset: schedule?.preset ?? (hasCustomSchedule ? 'custom' : 'weekdays'),
     time: schedule ? formatTimeInput(schedule.hour, schedule.minute) : AUTOMATION_DEFAULT_TIME,
     dayOfWeek: String(schedule?.dayOfWeek ?? 1),

@@ -12,6 +12,7 @@ import type {
   AutomationUpdateInput
 } from '../../../shared/automations/automation-definition'
 import { normalizeAutomationPrecheck } from '../../../shared/automations/launch/automation-precheck'
+import { applyAutomationStepsWrite } from './automation-steps-write'
 import { assertAutomationExtraAgentArgs } from '../../../shared/automations/launch/automation-extra-agent-args-record'
 import { settleAutomationTriggers } from '../../webhooks/webhook-rule-check'
 import {
@@ -150,9 +151,10 @@ export function mergeAutomationUpdate(
     selectorMoveRequested && repo ? getAutomationSchedulerOwner(repo) : current.schedulerOwner
   const contexts = getAutomationContextsForRepo(repo, operations.state.projectHostSetups ?? [])
   const workspaceMode = updates.workspaceMode ?? current.workspaceMode
+  const { steps: _steps, ...definedFields } = definedUpdates
   const merged: Automation = {
     ...current,
-    ...definedUpdates,
+    ...definedFields,
     name: updates.name !== undefined ? updates.name.trim() || 'Untitled automation' : current.name,
     precheck: Object.hasOwn(definedUpdates, 'precheck')
       ? normalizeAutomationPrecheck(definedUpdates.precheck)
@@ -208,6 +210,7 @@ export function mergeAutomationUpdate(
     delete merged.sourceContext
   }
   applyAutomationSetupTrust(merged, definedUpdates, current)
+  applyAutomationStepsWrite(merged, definedUpdates, current)
   delete merged.launchSetup
   for (const key of ['surface', 'launchPreferences', 'agentArgs', 'extraAgentArgs'] as const) {
     delete merged[key]
