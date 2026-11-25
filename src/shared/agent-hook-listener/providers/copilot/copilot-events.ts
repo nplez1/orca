@@ -6,33 +6,38 @@ import {
   consumeCopilotBackgroundShells,
   consumeCopilotSubagent,
   createCopilotBackgroundWorkState,
+  endCopilotSubagent,
   pendingCopilotBackgroundWork,
+  readBackgroundAgentId,
+  readCopilotAgentNotificationAgentId,
   readCopilotShellCompletionShellId,
+  readCopilotWriteAgentTargets,
   readStartedShellId,
   readTerminatedShellIds,
+  reengageCopilotBackgroundAgents,
+  registerCopilotBackgroundAgent,
   registerCopilotBackgroundShell,
+  startCopilotSubagent,
   type CopilotBackgroundWorkState
 } from '../../copilot-background-work-state'
-import { extractToolResponseText, readFirstString } from '../../interactive-tool'
+import { readFirstString } from '../../interactive-tool'
 import type { HookListenerState } from '../../listener-state'
 import { resolvePrompt, resolveToolState } from '../../prompt-fields'
 import { extractToolFields, isNewTurnEvent } from '../../provider-event-routing'
 import {
+  isCopilotBackgroundShellLaunch,
+  isCopilotBackgroundSubagentLaunch,
+  isCopilotBackgroundWorkCompletionNotification,
+  readCopilotShellDescription,
+  readCopilotToolName,
+  readCopilotToolResultText
+} from './copilot-background-signals'
+import {
   isAskUserTool,
   normalizeCopilotEventName,
-  readCopilotToolCall,
   readCopilotToolInput,
   resolveCopilotEventName
 } from './copilot-tool-fields'
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null
-}
-
-function readCopilotToolName(hookPayload: Record<string, unknown>): string | undefined {
-  const toolCall = readCopilotToolCall(hookPayload)
-  return readFirstString(hookPayload, ['tool_name', 'toolName', 'name']) ?? toolCall.toolName
-}
 
 function readCopilotSessionId(hookPayload: Record<string, unknown>): string | undefined {
   return readFirstString(hookPayload, ['session_id', 'sessionId'])
@@ -57,62 +62,6 @@ function isCopilotChildSessionEvent(
   }
   const leadSessionId = state.lastToolByPaneKey.get(paneKey)?.leadSessionId
   return leadSessionId !== undefined && sessionId !== leadSessionId
-}
-
-// Why: Copilot's shell tool starts background work with `mode: 'async'` (a shell readable via
-// read_bash that reports `shell_completed`) or `detach: true` (a detached process reporting
-// `shell_detached_completed`). There is no `background`/`runInBackground` field, so matching those
-// names missed every real background shell.
-function isCopilotBackgroundShellLaunch(hookPayload: Record<string, unknown>): boolean {
-  const toolName = readCopilotToolName(hookPayload)
-  if (toolName?.toLowerCase() !== 'bash' && toolName?.toLowerCase() !== 'powershell') {
-    return false
-  }
-  const toolInput = readCopilotToolInput(hookPayload)
-  return isRecord(toolInput) && (toolInput.mode === 'async' || toolInput.detach === true)
-}
-
-// Why: the `task` tool runs an agent in `sync` or `background` mode. Only background mode outlives
-// the lead turn; a sync task completes with its PostToolUse, and counting it left the pane
-// working for the rest of the session (the general-purpose agent emits no subagentStart/subagentStop,
-// so nothing ever decremented it).
-function isCopilotBackgroundSubagentLaunch(hookPayload: Record<string, unknown>): boolean {
-  const toolName = readCopilotToolName(hookPayload)?.toLowerCase()
-  if (toolName !== 'agent' && toolName !== 'task') {
-    return false
-  }
-  const toolInput = readCopilotToolInput(hookPayload)
-  return isRecord(toolInput) && toolInput.mode === 'background'
-}
-
-function isCopilotBackgroundWorkCompletionNotification(
-  normalizedEventName: unknown,
-  notificationType: string | undefined
-): 'shell' | 'unidentified-subagent' | undefined {
-  if (normalizedEventName !== 'Notification') {
-    return undefined
-  }
-  if (notificationType === 'shell_completed' || notificationType === 'shell_detached_completed') {
-    return 'shell'
-  }
-  if (notificationType === 'agent_completed') {
-    return 'unidentified-subagent'
-  }
-  return undefined
-}
-
-function readCopilotShellDescription(hookPayload: Record<string, unknown>): string | undefined {
-  const toolInput = readCopilotToolInput(hookPayload)
-  return isRecord(toolInput) ? readFirstString(toolInput, ['description', 'command']) : undefined
-}
-
-function readCopilotToolResultText(hookPayload: Record<string, unknown>): string | undefined {
-  return (
-    extractToolResponseText(hookPayload.tool_result) ??
-    extractToolResponseText(hookPayload.toolResult) ??
-    extractToolResponseText(hookPayload.tool_response) ??
-    extractToolResponseText(hookPayload.toolResponse)
-  )
 }
 
 function isCopilotStopHookActive(hookPayload: Record<string, unknown>): boolean {
@@ -150,18 +99,29 @@ export function normalizeCopilotEvent(
   const isBlockingNotification =
     normalizedEventName === 'Notification' && notificationType === 'elicitation_dialog'
   const toolSnapshot = extractToolFields('copilot', normalizedEventName, hookPayload)
-  const backgroundShellResultText =
+  const postToolResultText =
     normalizedEventName === 'PostToolUse' ? readCopilotToolResultText(hookPayload) : undefined
   // Why: register only when the result proves the shell was actually backgrounded. An async shell
   // that finishes within `initial_wait` returns its output directly and would otherwise be tracked
   // as pending forever (no `shell_completed` notification ever comes for it).
   const startedShellId =
     normalizedEventName === 'PostToolUse' && isCopilotBackgroundShellLaunch(hookPayload)
-      ? readStartedShellId(backgroundShellResultText)
+      ? readStartedShellId(postToolResultText)
       : undefined
   // Why: an agent that reads a shell to completion with `read_bash` gets the completion in the tool
   // result and Copilot then suppresses `shell_completed`; without this the shell would stay pending.
-  const terminatedShellIds = readTerminatedShellIds(backgroundShellResultText)
+  const terminatedShellIds = readTerminatedShellIds(postToolResultText)
+  // Why: the launch result names the agent whatever tool, mode or "moved to background" path
+  // started it, so completions match it by id and a duplicate report cannot end another agent.
+  const backgroundAgentId = readBackgroundAgentId(postToolResultText)
+  const reengagedAgentIds =
+    normalizedEventName === 'PostToolUse'
+      ? readCopilotWriteAgentTargets(
+          readCopilotToolName(hookPayload),
+          readCopilotToolInput(hookPayload),
+          postToolResultText
+        )
+      : []
   const subagentToolStarted =
     normalizedEventName === 'PreToolUse' && isCopilotBackgroundSubagentLaunch(hookPayload)
   // Why: a background task launch that fails (e.g. the task tool rejects a missing agent name) never
@@ -206,6 +166,16 @@ export function normalizeCopilotEvent(
     } else {
       state.copilotBackgroundWorkByPaneKey.set(paneKey, backgroundWorkState)
     }
+  } else if (backgroundAgentId || reengagedAgentIds.length > 0) {
+    const base = backgroundWorkState ?? createCopilotBackgroundWorkState()
+    backgroundWorkState = {
+      ...reengageCopilotBackgroundAgents(
+        backgroundAgentId ? registerCopilotBackgroundAgent(base, backgroundAgentId) : base,
+        reengagedAgentIds
+      ),
+      leadStopped: preserveLeadStopped(backgroundWorkState)
+    }
+    state.copilotBackgroundWorkByPaneKey.set(paneKey, backgroundWorkState)
   } else if (subagentToolStarted) {
     const base = backgroundWorkState ?? createCopilotBackgroundWorkState()
     backgroundWorkState = {
@@ -215,12 +185,9 @@ export function normalizeCopilotEvent(
     }
     state.copilotBackgroundWorkByPaneKey.set(paneKey, backgroundWorkState)
   } else if (normalizedEventName === 'SubagentStart') {
-    const base = backgroundWorkState ?? createCopilotBackgroundWorkState()
-    backgroundWorkState = {
-      ...base,
-      pendingUnidentifiedSubagentCount: Math.max(0, base.pendingUnidentifiedSubagentCount - 1),
-      pendingSubagentLifecycleCount: base.pendingSubagentLifecycleCount + 1
-    }
+    backgroundWorkState = startCopilotSubagent(
+      backgroundWorkState ?? createCopilotBackgroundWorkState()
+    )
     state.copilotBackgroundWorkByPaneKey.set(paneKey, backgroundWorkState)
   } else if (failedBackgroundLaunch && backgroundWorkState) {
     const leadStopped = preserveLeadStopped(backgroundWorkState)
@@ -247,21 +214,24 @@ export function normalizeCopilotEvent(
   } else if (backgroundWorkCompletion && backgroundWorkState) {
     // Why: a detached shell reports `shell_detached_completed`, an async one `shell_completed`; a
     // completion is matched to the shell it names, so an unknown one cannot consume a different
-    // pending shell and settle the pane early. Either subagent completion consumes one subagent.
+    // pending shell and settle the pane early. An agent completion ends the agent it names.
     backgroundWorkState =
       backgroundWorkCompletion === 'shell'
         ? consumeCopilotBackgroundShells(
             backgroundWorkState,
             completionShellId ? [completionShellId] : []
           )
-        : consumeCopilotSubagent(backgroundWorkState)
+        : endCopilotSubagent(backgroundWorkState, readCopilotAgentNotificationAgentId(hookPayload))
     if (pendingCopilotBackgroundWork(backgroundWorkState) === 0) {
       state.copilotBackgroundWorkByPaneKey.delete(paneKey)
     } else {
       state.copilotBackgroundWorkByPaneKey.set(paneKey, backgroundWorkState)
     }
   } else if (normalizedEventName === 'SubagentStop' && backgroundWorkState) {
-    backgroundWorkState = consumeCopilotSubagent(backgroundWorkState)
+    backgroundWorkState = endCopilotSubagent(
+      backgroundWorkState,
+      readFirstString(hookPayload, ['agent_id', 'agentId'])
+    )
     if (pendingCopilotBackgroundWork(backgroundWorkState) === 0) {
       state.copilotBackgroundWorkByPaneKey.delete(paneKey)
     } else {
