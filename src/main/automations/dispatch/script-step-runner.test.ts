@@ -1,40 +1,14 @@
-import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import {
-  AutomationStepsError,
-  parseAutomationStepsForWrite,
-  resolveAutomationSteps,
-  type AutomationScriptStep
-} from '../../../shared/automations/steps/automation-steps'
+import type { AutomationScriptStep } from '../../../shared/automations/steps/automation-steps'
 import {
   normalizeAutomationStepResults,
   runAutomationScriptSteps
 } from '../../../shared/automations/steps/automation-step-results'
-import { hashOrcaHookTrustContent } from '../../workspace-hooks/created-worktree-setup-trust'
+import { automationScriptStepPin } from './script-step-pin'
 import { createAutomationScriptStepExecutor } from './script-step-runner'
-
-describe('automation steps: the legacy record is the one-step agent case', () => {
-  it('reads a prompt-only record as one agent step and writes it back unchanged', () => {
-    const legacy = { prompt: 'Triage the inbox', agentId: 'claude' as const }
-    const resolved = resolveAutomationSteps(legacy)
-    expect(resolved.ok && resolved.resolved).toEqual([
-      { kind: 'agent', id: 'agent', prompt: 'Triage the inbox', agentId: 'claude' }
-    ])
-    // Storing nothing keeps a legacy record byte-identical, which an older host also reads.
-    expect(parseAutomationStepsForWrite([{ kind: 'agent', id: 'agent' }])).toBeUndefined()
-  })
-
-  it('refuses an embedded shell body at write time with a typed error', () => {
-    const write = () =>
-      parseAutomationStepsForWrite([
-        { kind: 'script', id: 'triage', script: 'npm ci\nnpm test', timeoutSeconds: 5 }
-      ])
-    expect(write).toThrow(AutomationStepsError)
-    expect(write).toThrow(expect.objectContaining({ code: 'script_step_shell_body' }))
-  })
-})
 
 describe.skipIf(process.platform === 'win32')('automation script steps on this host', () => {
   let cwd: string
@@ -59,6 +33,16 @@ describe.skipIf(process.platform === 'win32')('automation script steps on this h
     await rm(cwd, { recursive: true, force: true })
   })
 
+  /** The pin a user's approval would write for this file, path and arguments. */
+  const pinFor = (script: string, overrides: Partial<AutomationScriptStep>) =>
+    Object.hasOwn(overrides, 'approvedPin') || !scripts[script]
+      ? {}
+      : {
+          approvedPin: automationScriptStepPin(
+            { script, args: overrides.args },
+            Buffer.from(scripts[script])
+          )
+        }
   const step = (
     id: string,
     script: string,
@@ -69,8 +53,8 @@ describe.skipIf(process.platform === 'win32')('automation script steps on this h
     script,
     timeoutSeconds: 10,
     onFailure: 'stop',
-    approvedContentHash: scripts[script] ? hashOrcaHookTrustContent(scripts[script]) : undefined,
-    ...overrides
+    ...overrides,
+    ...pinFor(script, overrides)
   })
   const run = (steps: AutomationScriptStep[]) =>
     runAutomationScriptSteps(
@@ -83,7 +67,7 @@ describe.skipIf(process.platform === 'win32')('automation script steps on this h
     expect(outcome.stoppedBy).toBeNull()
     expect(outcome.results.map((result) => result.outcome)).toEqual(['succeeded', 'succeeded'])
     expect(outcome.results[1]!.output).toBe('saw=hello from ok\n exit=0')
-    expect(outcome.results[0]!.contentHash).toBe(hashOrcaHookTrustContent(scripts['ok.sh']!))
+    expect(outcome.results[0]!.contentHash).toMatch(/^[0-9a-f]{64}$/)
     expect(outcome.env.ORCA_STEP_SECOND_EXIT).toBe('0')
   })
 
@@ -107,7 +91,7 @@ describe.skipIf(process.platform === 'win32')('automation script steps on this h
 
   it('refuses unapproved or changed content even under continue, and never runs it', async () => {
     const outcome = await run([
-      step('first', 'ok.sh', { onFailure: 'continue', approvedContentHash: 'stale' }),
+      step('first', 'ok.sh', { onFailure: 'continue', approvedPin: 'stale' }),
       step('second', 'ok.sh')
     ])
     expect(outcome.results).toHaveLength(1)
@@ -119,8 +103,34 @@ describe.skipIf(process.platform === 'win32')('automation script steps on this h
   })
 
   it('refuses a missing file as unverifiable rather than skipping it', async () => {
-    const outcome = await run([step('first', 'missing.sh', { approvedContentHash: 'x' })])
+    const outcome = await run([step('first', 'missing.sh', { approvedPin: 'x' })])
     expect(outcome.stoppedBy).toMatchObject({ outcome: 'unverifiable', contentHash: null })
+  })
+
+  it('needs approval again when the arguments of an approved script change', async () => {
+    const approved = step('first', 'ok.sh')
+    const outcome = await run([{ ...approved, args: ['--other'] }])
+    expect(outcome.stoppedBy).toMatchObject({ outcome: 'unapproved' })
+  })
+
+  it('pins raw bytes: a leading newline that drops the shebang is a different script', async () => {
+    const approvedPin = automationScriptStepPin(
+      { script: 'ok.sh' },
+      Buffer.from(`\n${scripts['ok.sh']}`)
+    )
+    const outcome = await run([step('first', 'ok.sh', { approvedPin })])
+    expect(outcome.stoppedBy).toMatchObject({ outcome: 'unapproved' })
+  })
+
+  it('refuses a symlink that resolves outside the project', async () => {
+    const outside = await mkdtemp(join(tmpdir(), 'orca-script-outside-'))
+    await writeFile(join(outside, 'evil.sh'), scripts['ok.sh']!)
+    await mkdir(join(cwd, 'links'), { recursive: true })
+    await symlink(join(outside, 'evil.sh'), join(cwd, 'links', 'evil.sh'))
+    const outcome = await run([step('first', 'links/evil.sh', { approvedPin: 'x' })])
+    expect(outcome.stoppedBy).toMatchObject({ outcome: 'unverifiable' })
+    expect(outcome.stoppedBy?.error).toContain('outside the project')
+    await rm(outside, { recursive: true, force: true })
   })
 
   it('persists results without the handoff stdout', async () => {

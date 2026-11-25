@@ -23,6 +23,11 @@ export const automationsApi = {
     hostId: ExecutionHostId
     displayName: string
   }): Promise<number> => ipcRenderer.invoke('automations:snapshotWorkspaceName', args),
+  approveScriptStep: (request: {
+    automationId: string
+    runId: string
+    stepId: string
+  }): Promise<void> => ipcRenderer.invoke('automations:approveScriptStep', request),
   onChanged: (callback: (payload: AutomationsChangedPayload) => void): (() => void) => {
     const listener = (_event: Electron.IpcRendererEvent, payload: AutomationsChangedPayload) =>
       callback(payload)

@@ -1,3 +1,4 @@
+import { translate } from '@/i18n/i18n'
 import type { Automation } from '../../../../../shared/automations/automation-definition'
 import {
   AUTOMATION_AGENT_STEP_ID,
@@ -18,8 +19,6 @@ export type AutomationScriptStepDraft = {
   args: string
   timeoutSeconds: string
   onFailure: AutomationScriptStepFailurePolicy
-  /** Kept only while `script` still names the file it was approved for. */
-  approved?: { script: string; contentHash: string }
 }
 
 export function scriptStepDraftsFromAutomation(
@@ -31,10 +30,7 @@ export function scriptStepDraftsFromAutomation(
     script: step.script,
     args: (step.args ?? []).join(' '),
     timeoutSeconds: String(step.timeoutSeconds),
-    onFailure: step.onFailure,
-    ...(step.approvedContentHash
-      ? { approved: { script: step.script, contentHash: step.approvedContentHash } }
-      : {})
+    onFailure: step.onFailure
   }))
 }
 
@@ -104,10 +100,7 @@ export function buildDraftSteps(draft: {
       timeoutSeconds: Number.isFinite(timeout)
         ? timeout
         : DEFAULT_AUTOMATION_SCRIPT_STEP_TIMEOUT_SECONDS,
-      onFailure: step.onFailure,
-      ...(step.approved && step.approved.script === script
-        ? { approvedContentHash: step.approved.contentHash }
-        : {})
+      onFailure: step.onFailure
     }
   })
   return draft.runAgentStep === false
@@ -119,11 +112,21 @@ export function buildDraftSteps(draft: {
 export function getDraftScriptStepsError(draft: {
   scriptSteps?: readonly AutomationScriptStepDraft[]
   runAgentStep?: boolean
+  surface?: 'chat' | 'terminal'
 }): string | null {
   const steps = buildDraftSteps(draft)
   if (!steps) {
     return null
   }
   const parsed = validateAutomationSteps(steps)
-  return parsed.ok ? null : parsed.error
+  if (!parsed.ok) {
+    return parsed.error
+  }
+  // The host refuses this too: a chat session takes no environment for the scripts' handoff.
+  return draft.surface === 'chat' && draft.runAgentStep !== false
+    ? translate(
+        'automations.scriptSteps.chatSurface',
+        'Script steps hand their results to a terminal agent. Choose a terminal agent, or run the scripts without one.'
+      )
+    : null
 }

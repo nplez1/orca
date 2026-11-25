@@ -88,7 +88,8 @@ export function automationStepHandoffEnv(result: AutomationStepResult): Record<s
   return {
     [`${prefix}_OUTCOME`]: result.outcome,
     [`${prefix}_EXIT`]: result.exitCode === null ? '' : String(result.exitCode),
-    [`${prefix}_STDOUT`]: result.stdout ?? ''
+    // A NUL cannot travel in an environment block; it would end the value early.
+    [`${prefix}_STDOUT`]: (result.stdout ?? '').replaceAll('\0', '')
   }
 }
 

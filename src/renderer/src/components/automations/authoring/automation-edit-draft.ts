@@ -11,6 +11,7 @@ import {
 import type { AutomationDraft } from './AutomationEditorDialog'
 import { AUTOMATION_DEFAULT_TIME, formatTimeInput } from './automation-draft-model'
 import { getAutomationSetupDecisionDraftValue } from './automation-setup-decision'
+import { getAutomationAgentPrompt } from '../../../../../shared/automations/steps/automation-steps'
 import {
   runsAgentStepFromAutomation,
   scriptStepDraftsFromAutomation
@@ -24,8 +25,8 @@ export function buildAutomationEditDraft(automation: Automation): AutomationDraf
   const hasCustomSchedule = scheduled && !schedule && isRunnableAutomationSchedule(automation.rrule)
   return {
     name: automation.name,
-    // A script-only record stores an older host's stand-down prompt, which is not the user's.
-    prompt: runsAgentStepFromAutomation(automation) ? automation.prompt : '',
+    // With steps the record's prompt is an older host's stand-down text; the user's is the agent step's.
+    prompt: getAutomationAgentPrompt(automation),
     agentId: automation.agentId,
     surface: automation.launchSetup?.surface ?? automation.surface ?? 'terminal',
     extraAgentArgs: setup.extraAgentArgs ?? '',

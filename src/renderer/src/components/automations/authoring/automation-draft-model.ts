@@ -14,7 +14,7 @@ import type { AutomationDraft } from './AutomationEditorDialog'
 import { extraAgentArgsErrorText } from './automation-extra-agent-args-error-copy'
 import { buildDraftSteps, type AutomationScriptStepDraft } from './automation-script-steps-draft'
 import {
-  AUTOMATION_SCRIPT_ONLY_FALLBACK_PROMPT,
+  AUTOMATION_STEPS_STAND_DOWN_PROMPT,
   type AutomationStepRecord
 } from '../../../../../shared/automations/steps/automation-steps'
 
@@ -129,7 +129,7 @@ export function draftStepsSave(
 } {
   const steps = buildDraftSteps(draft)
   const prompt =
-    steps && draft.runAgentStep === false ? AUTOMATION_SCRIPT_ONLY_FALLBACK_PROMPT : draft.prompt
+    steps && draft.runAgentStep === false ? AUTOMATION_STEPS_STAND_DOWN_PROMPT : draft.prompt
   const stepsEdited = edited('scriptSteps') || edited('runAgentStep')
   return {
     update: {

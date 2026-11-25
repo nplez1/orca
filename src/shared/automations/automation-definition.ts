@@ -57,8 +57,9 @@ export type Automation = {
   agentArgs?: string | null
   /** Saved text appended to the host's default agent Arguments on each fresh run; absent means none. */
   extraAgentArgs?: string
-  /** Script steps then the agent step; absent is the one-step agent case. Older hosts ignore it
-   *  and run the agent only, so a script-only record stores AUTOMATION_SCRIPT_ONLY_FALLBACK_PROMPT. */
+  /** Script steps then the agent step; absent is the one-step agent case. Older hosts ignore it,
+   *  so a record with steps keeps AUTOMATION_STEPS_STAND_DOWN_PROMPT in `prompt` and the user's
+   *  prompt on its agent step (getAutomationAgentPrompt). */
   steps?: AutomationStepRecord[]
   /** Why: runContext carries the logical project + host setup identity for
    *  multi-host projects; projectId remains only as the legacy repo-id storage

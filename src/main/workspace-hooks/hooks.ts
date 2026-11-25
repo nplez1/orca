@@ -197,7 +197,8 @@ export function runHook(
     pathEnv: getSetupEnvVars(repo, cwd, options.identity),
     runtimeTarget: getHookRuntimeTarget(projectRuntime),
     timeoutMs: options.timeoutMs ?? HOOK_TIMEOUT
-  })
+    // Hook callers keep only the combined output; drop the second copy of stdout.
+  }).then(({ stdout: _stdout, timedOut: _timedOut, ...outcome }) => outcome)
 }
 
 export type HookCommandRequest = {

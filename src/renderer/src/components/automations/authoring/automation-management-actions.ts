@@ -1,5 +1,8 @@
+import { toast } from 'sonner'
+import { translate } from '@/i18n/i18n'
 import {
   deleteAutomationForTarget,
+  getAutomationOwnerTarget,
   updateAutomationForTarget
 } from '../hosts/automation-host-client'
 import type { AutomationUpdateInput } from '../../../../../shared/automations/automation-definition'
@@ -90,12 +93,31 @@ export function createAutomationManagementActions({
     })
   }
 
-  const reviewScriptStep = (row: AutomationListRow, result: AutomationStepResult): void => {
-    void reviewAutomationScriptStep(row.automation, result, (steps) =>
-      updateAutomationRow(row, { steps })
-    ).catch((error: unknown) => {
-      console.error('Failed to approve the automation script:', error)
-    })
+  const reviewScriptStep = (
+    row: AutomationListRow,
+    runId: string,
+    result: AutomationStepResult
+  ): void => {
+    // Approval is desktop-local IPC; a paired host's user approves there.
+    if (
+      getAutomationOwnerTarget(row.automation, automationHostTargetFor(row)).kind === 'environment'
+    ) {
+      toast.error(
+        translate(
+          'automations.scriptSteps.approveOnHost',
+          'Approve this script in Orca on the host this automation runs on.'
+        )
+      )
+      return
+    }
+    void reviewAutomationScriptStep(row.automation, runId, result)
+      .then(() => {
+        invalidateRowHost(row.key, 'definition')
+        return pageRefresh.refresh()
+      })
+      .catch((error: unknown) => {
+        toast.error(error instanceof Error ? error.message : String(error))
+      })
   }
 
   const deleteAutomation = async (row: AutomationListRow): Promise<void> => {

@@ -1,3 +1,7 @@
+import {
+  approveAutomationScriptStep as approveAutomationScriptStepOperation,
+  type AutomationScriptStepApproval
+} from '../../scheduling-automations/automation-script-step-approval'
 import type { Repo } from '../../../../shared/repository/repo-types'
 import type { HostWorktreeTarget } from '../../../../shared/worktree/host-qualified-identity'
 import type {
@@ -207,6 +211,11 @@ export class AutomationPersistence {
 
   foldAutomationEvent(automationId: string, event: AutomationRunEvent): AutomationRun | null {
     return foldAutomationEventOperation(getAutomationRunOperations(this), automationId, event)
+  }
+
+  /** Desktop IPC only: the user approved a script a run refused. */
+  approveAutomationScriptStep(request: AutomationScriptStepApproval): void {
+    approveAutomationScriptStepOperation(getAutomationDefinitionOperations(this), request)
   }
 
   updateAutomationRun(result: AutomationDispatchResult): AutomationRun {

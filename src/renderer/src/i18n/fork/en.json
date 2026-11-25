@@ -1691,9 +1691,11 @@
   "automations": {
     "scriptSteps": {
       "add": "Add step",
+      "approveOnHost": "Approve this script in Orca on the host this automation runs on.",
       "approved": "Script approved. Later runs of this automation will run it.",
       "args": "Arguments",
       "argsPlaceholder": "Arguments",
+      "chatSurface": "Script steps hand their results to a terminal agent. Choose a terminal agent, or run the scripts without one.",
       "contentHash": "sha256 {{hash}}",
       "duration": "{{seconds}}s",
       "empty": "Run committed scripts on the host before the agent. A failing step stops the run.",
@@ -1721,7 +1723,7 @@
       "timeoutMinutes": "{{minutes}} min",
       "timeoutSeconds": "{{seconds}} sec",
       "title": "Script steps",
-      "trustBody": "An automation step runs this committed file on its host, unattended, on every run. Approving lets runs use this exact content; a change needs approval again. Only approve if you trust <repo/>.",
+      "trustBody": "An automation step runs this committed file on its host, unattended, with its saved arguments. Approval covers this exact file and those arguments only, not files it runs or sources; any change needs approval again. Only approve if you trust <repo/>.",
       "trustHeading": "Script",
       "trustTitle": "Approve this script from {{repo}}?"
     }

@@ -263,7 +263,9 @@ export function AutomationsPageSurface({
             runSelectedRowAction((row) => managementActions.reviewSkippedSetup(row, content))
           }
           onReviewScriptStep={(result) =>
-            runSelectedRowAction((row) => managementActions.reviewScriptStep(row, result))
+            runSelectedRowAction((row) =>
+              managementActions.reviewScriptStep(row, selectedAutomationRunPage.id, result)
+            )
           }
           onSelectRun={(run) => setSelectedAutomationRunPageId(run.id)}
         />

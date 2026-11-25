@@ -12,12 +12,18 @@ export type AutomationScriptStep = {
   args?: string[]
   timeoutSeconds: number
   onFailure: AutomationScriptStepFailurePolicy
-  /** Content hash approved through the hook trust prompt; a run whose file differs is refused. */
-  approvedContentHash?: string
+  /**
+   * Host-written only (see approveAutomationScriptStep): a digest over path, args and file bytes.
+   * Every client write is stripped of it, and a run whose pin differs is refused as unapproved.
+   */
+  approvedPin?: string
 }
 
-/** Marks where the automation's agent runs; its prompt, agent and arguments stay on the record. */
-export type AutomationAgentStepMarker = { kind: 'agent'; id: string }
+/**
+ * Where the automation's agent runs. Its prompt lives here because the record's own `prompt`
+ * holds the stand-down text an older host would hand its agent; agent and arguments stay on the record.
+ */
+export type AutomationAgentStepMarker = { kind: 'agent'; id: string; prompt?: string }
 
 export type AutomationStepRecord = AutomationScriptStep | AutomationAgentStepMarker
 
@@ -40,21 +46,28 @@ export const DEFAULT_AUTOMATION_SCRIPT_STEP_TIMEOUT_SECONDS = 120
 export const MAX_AUTOMATION_SCRIPT_STEP_TIMEOUT_SECONDS = 3600
 /** Bounded so the handoff fits one environment variable on every platform (Windows caps at 32767). */
 export const MAX_AUTOMATION_STEP_HANDOFF_CHARS = 16_000
-/** What an older Orca, which ignores steps, would send an agent for a script-only automation. */
-export const AUTOMATION_SCRIPT_ONLY_FALLBACK_PROMPT =
+/** The record's `prompt` whenever it has steps: an older Orca ignores steps and sends its agent this. */
+export const AUTOMATION_STEPS_STAND_DOWN_PROMPT =
   'This automation runs script steps, which this version of Orca cannot run. Do nothing else: reply that the run was skipped and that Orca must be updated to run it.'
 
 const STEP_ID_PATTERN = /^[a-z][a-z0-9_]{0,31}$/
 // Why: a portable path charset needs no quoting in bash or cmd.exe and cannot carry a shell body.
 const SCRIPT_PATH_PATTERN = /^[A-Za-z0-9._@+=,/-]+$/
-/** cmd.exe expands % and cannot escape " inside a quoted argument; control characters end lines. */
+/** Characters cmd.exe expands or cannot escape inside quotes (%, !, "), and control characters. */
+function isCmdUnsafe(char: string): boolean {
+  return char === '"' || char === '%' || char === '!' || char < ' ' || char === '\u007f'
+}
+
 function isPassableArg(arg: unknown): arg is string {
   return (
     typeof arg === 'string' &&
     arg.length <= MAX_AUTOMATION_SCRIPT_STEP_ARG_CHARS &&
-    ![...arg].some((char) => char === '"' || char === '%' || char < ' ' || char === '\u007f')
+    ![...arg].some(isCmdUnsafe)
   )
 }
+
+/** cmd.exe resolves an extensionless name through PATHEXT to a file Orca never hashed. */
+const CMD_RUNNABLE_EXTENSIONS = ['.cmd', '.bat', '.exe', '.com'] as const
 
 export type AutomationStepsErrorCode =
   | 'steps_invalid'
@@ -118,7 +131,7 @@ function validateScriptPath(script: unknown): AutomationStepsValidation | string
   return path.replace(/^(\.\/)+/, '')
 }
 
-function validateScriptStep(value: Record<string, unknown>, id: string) {
+function validateScriptStep(value: Record<string, unknown>, id: string, keepApproval: boolean) {
   const script = validateScriptPath(value.script)
   if (typeof script !== 'string') {
     return script
@@ -131,7 +144,7 @@ function validateScriptStep(value: Record<string, unknown>, id: string) {
   ) {
     return refuse(
       'script_step_args_invalid',
-      `Script step "${id}" has an argument Orca cannot pass safely on every platform (quotes, %, or control characters).`
+      `Script step "${id}" has an argument Orca cannot pass safely on every platform (quotes, %, !, or control characters).`
     )
   }
   const timeout = value.timeoutSeconds ?? DEFAULT_AUTOMATION_SCRIPT_STEP_TIMEOUT_SECONDS
@@ -153,8 +166,8 @@ function validateScriptStep(value: Record<string, unknown>, id: string) {
     ...(args.length > 0 ? { args: [...args] } : {}),
     timeoutSeconds: timeout,
     onFailure: value.onFailure === 'continue' ? 'continue' : 'stop',
-    ...(typeof value.approvedContentHash === 'string' && value.approvedContentHash
-      ? { approvedContentHash: value.approvedContentHash }
+    ...(keepApproval && typeof value.approvedPin === 'string' && value.approvedPin
+      ? { approvedPin: value.approvedPin }
       : {})
   }
   return step
@@ -164,7 +177,11 @@ function validateScriptStep(value: Record<string, unknown>, id: string) {
  * v1 shape: script steps, then at most one agent step, which must be last. Refuses rather than
  * repairs, so a write never silently drops a step that was meant to gate the agent.
  */
-export function validateAutomationSteps(value: unknown): AutomationStepsValidation {
+export function validateAutomationSteps(
+  value: unknown,
+  /** Only for records this host stored; anything a client sent must never carry an approval. */
+  options: { keepApprovals?: boolean } = {}
+): AutomationStepsValidation {
   if (!Array.isArray(value)) {
     return refuse('steps_invalid', 'Automation steps must be a list.')
   }
@@ -198,7 +215,11 @@ export function validateAutomationSteps(value: unknown): AutomationStepsValidati
       if (index !== value.length - 1) {
         return refuse('agent_step_not_last', 'The agent step must be the last step.')
       }
-      steps.push({ kind: 'agent', id })
+      steps.push({
+        kind: 'agent',
+        id,
+        ...(typeof entry.prompt === 'string' ? { prompt: entry.prompt } : {})
+      })
       continue
     }
     scriptSteps += 1
@@ -208,7 +229,7 @@ export function validateAutomationSteps(value: unknown): AutomationStepsValidati
         `An automation can have at most ${MAX_AUTOMATION_SCRIPT_STEPS} script steps.`
       )
     }
-    const step = validateScriptStep(entry, id)
+    const step = validateScriptStep(entry, id, options.keepApprovals === true)
     if ('ok' in step) {
       return step
     }
@@ -217,7 +238,7 @@ export function validateAutomationSteps(value: unknown): AutomationStepsValidati
   return { ok: true, steps }
 }
 
-/** Write-time form: a typed error the caller surfaces, never a partially saved list. */
+/** Write-time form: a typed error the caller surfaces, never a partially saved list, never a pin. */
 export function parseAutomationStepsForWrite(value: unknown): AutomationStepRecord[] | undefined {
   if (value === undefined || value === null) {
     return undefined
@@ -249,7 +270,7 @@ export function resolveAutomationSteps(
   const agentStep = (id: string): AutomationAgentStep => ({
     kind: 'agent',
     id,
-    prompt: automation.prompt,
+    prompt: getAutomationAgentPrompt(automation),
     agentId: automation.agentId,
     ...(automation.extraAgentArgs ? { extraAgentArgs: automation.extraAgentArgs } : {})
   })
@@ -260,7 +281,7 @@ export function resolveAutomationSteps(
       resolved: [agentStep(AUTOMATION_AGENT_STEP_ID)]
     }
   }
-  const parsed = validateAutomationSteps(automation.steps)
+  const parsed = validateAutomationSteps(automation.steps, { keepApprovals: true })
   if (!parsed.ok) {
     return parsed
   }
@@ -268,6 +289,15 @@ export function resolveAutomationSteps(
     ...parsed,
     resolved: parsed.steps.map((step) => (step.kind === 'agent' ? agentStep(step.id) : step))
   }
+}
+
+/** The prompt the agent step runs: the agent step's own, or the record's on a legacy record. */
+export function getAutomationAgentPrompt(automation: { steps?: unknown; prompt: string }): string {
+  if (!Array.isArray(automation.steps)) {
+    return automation.prompt
+  }
+  const marker: unknown = automation.steps.find((step) => isRecord(step) && step.kind === 'agent')
+  return isRecord(marker) && typeof marker.prompt === 'string' ? marker.prompt : ''
 }
 
 export function getAutomationScriptSteps(automation: { steps?: unknown }): AutomationScriptStep[] {
@@ -295,17 +325,32 @@ function quotePosixArg(value: string): string {
   return `'${value.replaceAll("'", `'\\''`)}'`
 }
 
+export type AutomationScriptStepCommand =
+  | { ok: true; command: string }
+  | { ok: false; error: string }
+
 /**
- * The command line the hook executor's shell runs. The path charset needs no quoting; `./`
- * keeps bash from searching PATH, and cmd.exe takes the file by its Windows-separated path.
+ * The command line the hook executor's shell runs for the verified copy at `executable` (an
+ * absolute path). cmd.exe gets the exact file, never a name it could resolve through PATHEXT.
  */
 export function automationScriptStepCommand(
-  step: Pick<AutomationScriptStep, 'script' | 'args'>,
+  executable: string,
+  args: readonly string[] | undefined,
   shell: 'posix' | 'cmd'
-): string {
-  const args = step.args ?? []
-  if (shell === 'cmd') {
-    return [`"${step.script.replaceAll('/', '\\')}"`, ...args.map((arg) => `"${arg}"`)].join(' ')
+): AutomationScriptStepCommand {
+  const argv = args ?? []
+  if (shell === 'posix') {
+    return { ok: true, command: [executable, ...argv].map(quotePosixArg).join(' ') }
   }
-  return [`./${step.script}`, ...args.map(quotePosixArg)].join(' ')
+  const lower = executable.toLowerCase()
+  if (!CMD_RUNNABLE_EXTENSIONS.some((extension) => lower.endsWith(extension))) {
+    return {
+      ok: false,
+      error: `on Windows a script step must name a ${CMD_RUNNABLE_EXTENSIONS.join(', ')} file.`
+    }
+  }
+  if ([...executable].some(isCmdUnsafe)) {
+    return { ok: false, error: 'the script path has characters cmd.exe would expand.' }
+  }
+  return { ok: true, command: [executable, ...argv].map((part) => `"${part}"`).join(' ') }
 }

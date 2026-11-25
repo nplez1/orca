@@ -210,12 +210,12 @@ export function mergeAutomationUpdate(
     delete merged.sourceContext
   }
   applyAutomationSetupTrust(merged, definedUpdates, current)
-  applyAutomationStepsWrite(merged, definedUpdates, current)
   delete merged.launchSetup
   for (const key of ['surface', 'launchPreferences', 'agentArgs', 'extraAgentArgs'] as const) {
     delete merged[key]
   }
   Object.assign(merged, automationCanonicalLaunchSetup(launchSetupUpdate))
+  applyAutomationStepsWrite(merged, definedUpdates, current)
   assertAutomationExtraAgentArgs(merged)
   settleAutomationTriggers(merged)
   const previousPin = automationWorkspaceSshPin(operations.state, current.workspaceId)

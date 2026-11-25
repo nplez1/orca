@@ -1,3 +1,4 @@
+import { withoutScriptStepApprovals } from '../../scheduling-automations/automation-steps-write'
 import { decodeSavedLocalAutomationRun } from '../../restoring-sessions/saved-local-terminal-ids'
 import { automationCanonicalDefinition } from '../../../../shared/automations/launch/automation-launch-setup'
 import { MAX_AUTOMATION_RUNS_PER_AUTOMATION } from '../../../../shared/automations/history/automation-run-retention'
@@ -65,7 +66,10 @@ export function applyPreparedOrcadMigrationAutomationState(
   state: PersistedState
 ): void {
   if (prepared.newAutomations.length > 0) {
-    state.automations = [...state.automations, ...prepared.newAutomations]
+    state.automations = [
+      ...state.automations,
+      ...prepared.newAutomations.map(withoutScriptStepApprovals)
+    ]
   }
   if (prepared.newRuns.length > 0) {
     state.automationRuns = [...state.automationRuns, ...prepared.newRuns]

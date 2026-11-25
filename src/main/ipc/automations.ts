@@ -3,6 +3,7 @@ import { hostWorktreeTarget } from '../../shared/worktree/host-qualified-identit
 import { ipcMain } from 'electron'
 import type { Store } from '../persistence/loading-store/store'
 import type { AutomationService } from '../automations/automation-service'
+import type { AutomationScriptStepApproval } from '../persistence/scheduling-automations/automation-script-step-approval'
 import { createScopedExternalAutomations } from '../automations/external-managers/scoped-external-automations'
 import {
   ExternalAutomationManagerCache,
@@ -76,6 +77,17 @@ export function registerAutomationHandlers(store: Store, service: AutomationServ
     'automations:retainExternalScopes',
     (_event, request?: { owners?: readonly AutomationOwnerRef[] } | null): void => {
       probeScheduler.retainScopes((request?.owners ?? []).map(ownerKey))
+    }
+  )
+  // Desktop-only by design: script approval must come from this app's user, never a runtime RPC caller.
+  ipcMain.handle(
+    'automations:approveScriptStep',
+    (_event, request: AutomationScriptStepApproval): void => {
+      store.approveAutomationScriptStep({
+        automationId: String(request?.automationId ?? ''),
+        runId: String(request?.runId ?? ''),
+        stepId: String(request?.stepId ?? '')
+      })
     }
   )
   ipcMain.handle(

@@ -20,7 +20,10 @@ import {
   formatAutomationStepFailure,
   type AutomationScriptStepsOutcome
 } from '../../../shared/automations/steps/automation-step-results'
-import { automationRunsAgentStep } from '../../../shared/automations/steps/automation-steps'
+import {
+  automationRunsAgentStep,
+  getAutomationAgentPrompt
+} from '../../../shared/automations/steps/automation-steps'
 
 type RunTarget = Extract<AutomationRunTargetResult, { ok: true }>
 
@@ -85,7 +88,8 @@ export async function runAutomationLaunch<Target extends RunTarget>(
   const dispatchedAt = Date.now()
   try {
     launch = await ctx.dispatcher({
-      automation,
+      // Launchers read `prompt`; with steps the record's is the stand-down text, not the agent step's.
+      automation: { ...automation, prompt: getAutomationAgentPrompt(automation) },
       run,
       target,
       ...(scripts ? { stepEnv: scripts.env } : {})
