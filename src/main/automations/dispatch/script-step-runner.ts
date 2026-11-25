@@ -1,6 +1,6 @@
-import { chmod, mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { basename, isAbsolute, join, relative } from 'node:path'
+import { randomBytes } from 'node:crypto'
+import { chmod, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
+import { basename, dirname, isAbsolute, join, relative } from 'node:path'
 import type { Repo } from '../../../shared/repository/repo-types'
 import type { AutomationScriptStep } from '../../../shared/automations/steps/automation-steps'
 import {
@@ -104,20 +104,33 @@ async function readScriptFile(
   }
 }
 
-/** Runs a private copy of the verified bytes, so a write between check and exec cannot swap them. */
+/**
+ * Runs a copy of the verified bytes beside the original, so a write between check and exec cannot
+ * swap them while `$0` / `%~dp0` still name the script's own directory. Exclusive and randomly
+ * named, so it never overwrites a file; the extension is kept for cmd.exe.
+ */
 async function withVerifiedCopy<T>(
   file: ScriptFile,
   run: (copy: string) => Promise<T>
-): Promise<T> {
-  const dir = await mkdtemp(join(tmpdir(), 'orca-step-'))
+): Promise<T | { copyError: string }> {
+  const copy = join(
+    dirname(file.path),
+    `.orca-step-${randomBytes(6).toString('hex')}-${basename(file.path)}`
+  )
   try {
-    const copy = join(dir, basename(file.path))
-    await writeFile(copy, file.bytes, { mode: 0o700 })
+    await writeFile(copy, file.bytes, { flag: 'wx', mode: 0o700 })
     await chmod(copy, file.mode)
+  } catch (error) {
+    await rm(copy, { force: true }).catch(() => {})
+    return {
+      copyError: `Orca could not write its verified copy beside the script (${errorMessage(error)}).`
+    }
+  }
+  try {
     return await run(copy)
   } finally {
-    // A cut-off step on Windows can still hold the file; the temp dir is left for the OS then.
-    await rm(dir, { recursive: true, force: true }).catch(() => {})
+    // A cut-off step on Windows can still hold the file; it is hidden and named as Orca's.
+    await rm(copy, { force: true }).catch(() => {})
   }
 }
 
@@ -154,7 +167,7 @@ export function createAutomationScriptStepExecutor(
       })
     }
     const wsl = getHookWslContext(host.cwd, host.runtimeTarget)
-    return withVerifiedCopy(file, async (copy) => {
+    const ran = await withVerifiedCopy(file, async (copy) => {
       const command = automationScriptStepCommand(
         wsl ? toLinuxPath(copy) : copy,
         step.args,
@@ -171,7 +184,7 @@ export function createAutomationScriptStepExecutor(
         hookName: `automation step ${step.id}`,
         script: command.command,
         cwd: host.cwd,
-        // The copy is what runs; a script that needs its own directory reads the original's path.
+        // The copy is what runs, beside the original; this names the original file itself.
         pathEnv: {
           ...getSetupEnvVars(host.repo, host.cwd),
           ORCA_AUTOMATION_STEP_SCRIPT: file.path
@@ -189,5 +202,12 @@ export function createAutomationScriptStepExecutor(
         stdout: outcome.stdout ?? ''
       })
     })
+    return 'copyError' in ran
+      ? stepResult(step, timing, {
+          outcome: 'unverifiable',
+          contentHash,
+          error: `${step.script}: ${ran.copyError}`
+        })
+      : ran
   }
 }

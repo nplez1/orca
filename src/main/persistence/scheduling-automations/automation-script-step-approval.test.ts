@@ -1,6 +1,6 @@
-import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, sep } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Automation } from '../../../shared/automations/automation-definition'
 import {
@@ -26,6 +26,27 @@ describe('script step approval', () => {
     const names = ALL_RPC_METHODS.map((method) => method.name)
     expect(names.length).toBeGreaterThan(100)
     expect(names.filter((name) => /approv/i.test(name) && /script|step/i.test(name))).toEqual([])
+  })
+
+  it('is called only from the desktop IPC handler and the store that serves it', async () => {
+    const callers: string[] = []
+    for (const entry of await readdir(join(process.cwd(), 'src'), { recursive: true })) {
+      if (!/\.(ts|tsx)$/.test(entry) || /\.test\.tsx?$/.test(entry)) {
+        continue
+      }
+      const source = await readFile(join(process.cwd(), 'src', entry), 'utf8')
+      if (/approveAutomationScriptStep|approveScriptStep/.test(source)) {
+        callers.push(entry.split(sep).join('/'))
+      }
+    }
+    expect(callers.sort()).toEqual([
+      'main/ipc/automations.ts',
+      'main/persistence/loading-store/automation-state/automation-persistence.ts',
+      'main/persistence/scheduling-automations/automation-script-step-approval.ts',
+      'preload/api/automations/automation-api.ts',
+      'preload/api/automations/automations-bridge.ts',
+      'renderer/src/components/automations/authoring/automation-script-step-review.ts'
+    ])
   })
 })
 

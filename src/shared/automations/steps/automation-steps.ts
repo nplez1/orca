@@ -13,7 +13,7 @@ export type AutomationScriptStep = {
   timeoutSeconds: number
   onFailure: AutomationScriptStepFailurePolicy
   /**
-   * Host-written only (see approveAutomationScriptStep): a digest over path, args and file bytes.
+   * Host-written only, by the desktop approval IPC: a digest over path, args and file bytes.
    * Every client write is stripped of it, and a run whose pin differs is refused as unapproved.
    */
   approvedPin?: string

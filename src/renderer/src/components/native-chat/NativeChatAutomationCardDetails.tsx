@@ -1,3 +1,4 @@
+import { getAutomationAgentPrompt } from '../../../../shared/automations/steps/automation-steps'
 import { useState, type ReactNode } from 'react'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -186,9 +187,9 @@ function ReadyDetails({
           runs={runs}
         />
       </div>
-      {automation.prompt ? (
+      {getAutomationAgentPrompt(automation) ? (
         <p className="mt-3 line-clamp-6 whitespace-pre-wrap break-words rounded-md border border-border px-3 py-2 text-sm text-foreground">
-          {automation.prompt}
+          {getAutomationAgentPrompt(automation)}
         </p>
       ) : null}
       <div className="mt-3 flex items-center gap-1.5">

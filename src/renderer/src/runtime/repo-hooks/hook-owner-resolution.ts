@@ -9,7 +9,11 @@ import {
   type ExecutionHostId
 } from '../../../../shared/execution-host/execution-host'
 
-export function findHookRepo(state: AppState, repoId: string, hostId?: ExecutionHostId) {
+export function findHookRepo(
+  state: Pick<AppState, 'projectGroups' | 'repos'>,
+  repoId: string,
+  hostId?: ExecutionHostId
+) {
   const group = state.projectGroups.find(
     (entry) =>
       projectGroupHookTrustKey(entry) === repoId &&

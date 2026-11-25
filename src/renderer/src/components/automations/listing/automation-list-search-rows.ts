@@ -1,3 +1,4 @@
+import { getAutomationAgentPrompt } from '../../../../../shared/automations/steps/automation-steps'
 import { getAutomationRunRepoId } from '../../../../../shared/automations/history/automation-run-identity'
 import type { Automation } from '../../../../../shared/automations/automation-definition'
 import type { Repo } from '../../../../../shared/repository/repo-types'
@@ -63,7 +64,7 @@ export function buildAutomationSearchFields(
     agent: getAgentLabel(automation.agentId),
     // Use the row’s own host; bare-ID lookup would give colliding authorities the same search label.
     host: row.hostLabel,
-    prompt: automation.prompt
+    prompt: getAutomationAgentPrompt(automation)
   }
 }
 

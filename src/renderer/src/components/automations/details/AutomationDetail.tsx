@@ -1,3 +1,4 @@
+import { getAutomationAgentPrompt } from '../../../../../shared/automations/steps/automation-steps'
 import { botAgentLabel } from '@/components/bots/bot-presentation'
 import { botAutomationWhen } from '../../bots/bot-automation-when'
 import { AutomationWontFireNote } from './AutomationWontFireNote'
@@ -386,8 +387,8 @@ export function AutomationDetail({
           />
           <div className="@container flex min-w-0 flex-col gap-5 @4xl:col-start-1 @4xl:row-start-1">
             <AutomationPromptDisclosure
-              key={`${automation.id}:${automation.prompt}`}
-              prompt={automation.prompt}
+              key={`${automation.id}:${getAutomationAgentPrompt(automation)}`}
+              prompt={getAutomationAgentPrompt(automation)}
             />
             <div className="grid grid-cols-1 gap-4 @xl:grid-cols-2">
               <DetailPropertySection

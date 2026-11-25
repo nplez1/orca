@@ -25,6 +25,43 @@ import {
 
 type ScriptKind = OrcaHookTrustKind
 
+type ScriptStepInvocation = { script: string; args: string[] }
+
+function readScriptStep(value: unknown): ScriptStepInvocation | null {
+  if (typeof value !== 'object' || value === null || !('script' in value) || !('args' in value)) {
+    return null
+  }
+  const { script, args } = value
+  return typeof script === 'string' &&
+    Array.isArray(args) &&
+    args.every((arg): arg is string => typeof arg === 'string')
+    ? { script, args }
+    : null
+}
+
+/** What a step runs, beside its content: the approval covers this path and these arguments. */
+function AutomationScriptStepInvocation({
+  step
+}: {
+  step: ScriptStepInvocation
+}): React.JSX.Element {
+  const t = useTranslate()
+  return (
+    <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-md border border-border/70 bg-muted/35 px-3 py-2 text-xs">
+      <dt className="text-muted-foreground">{t('automations.scriptSteps.trustPath', 'File')}</dt>
+      <dd className="font-mono break-all text-foreground">{step.script}</dd>
+      <dt className="text-muted-foreground">
+        {t('automations.scriptSteps.trustArgs', 'Arguments')}
+      </dt>
+      <dd className="font-mono break-all text-foreground">
+        {step.args.length > 0
+          ? step.args.map((arg) => JSON.stringify(arg)).join(' ')
+          : t('automations.scriptSteps.trustNoArgs', 'None')}
+      </dd>
+    </dl>
+  )
+}
+
 const OrcaYamlTrustDialog = React.memo(function OrcaYamlTrustDialog() {
   const t = useTranslate()
   useUiLanguageRevision()
@@ -63,6 +100,7 @@ const OrcaYamlTrustDialog = React.memo(function OrcaYamlTrustDialog() {
         ? getAutomationReviewCopy(t)
         : null
   const onResolve = typeof modalData.onResolve === 'function' ? modalData.onResolve : null
+  const scriptStep = readScriptStep(modalData.scriptStep)
 
   const resolveAndClose = useCallback(
     (decision: 'run' | 'trust' | 'skip') => {
@@ -116,6 +154,8 @@ const OrcaYamlTrustDialog = React.memo(function OrcaYamlTrustDialog() {
           </DialogDescription>
         </DialogHeader>
 
+        {scriptStep ? <AutomationScriptStepInvocation step={scriptStep} /> : null}
+
         {scriptContent && (
           <div className="rounded-md border border-border/70 bg-muted/35 px-3 py-2">
             <div className="mb-1 text-2xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -144,6 +184,11 @@ const OrcaYamlTrustDialog = React.memo(function OrcaYamlTrustDialog() {
           <Button variant="ghost" onClick={() => resolveAndClose('skip')}>
             {t('auto.components.sidebar.OrcaYamlTrustDialog.43b7bec4cd', "Don't run")}
           </Button>
+          {scriptStep ? (
+            <Button autoFocus onClick={() => resolveAndClose('run')}>
+              {t('automations.scriptSteps.approve', 'Approve')}
+            </Button>
+          ) : null}
           {(!automation || versionOnly) && (
             <Button
               variant={repoWideTrust ? 'secondary' : 'default'}

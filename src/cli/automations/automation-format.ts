@@ -1,5 +1,6 @@
 // Use authority-projected owners: stored target fields survive host removal and re-registration.
 
+import { getAutomationAgentPrompt } from '../../shared/automations/steps/automation-steps'
 import type { Automation } from '../../shared/automations/automation-definition'
 import type { AutomationRun } from '../../shared/automations/history/automation-run'
 import type { AutomationListItem } from '../../shared/automations/ownership/automation-list-scope'
@@ -199,7 +200,7 @@ export function formatAutomationShow(result: AutomationShowPayload): string {
     `reuseSession: ${automation.reuseSession}`,
     `target: ${automation.executionTargetType}:${automation.executionTargetId}`,
     ...(result.owner ? [`host: ${formatOwnerSelector(result.owner.selector)}`] : []),
-    `prompt: ${automation.prompt}`
+    `prompt: ${getAutomationAgentPrompt(automation)}`
   ].join('\n')
 }
 

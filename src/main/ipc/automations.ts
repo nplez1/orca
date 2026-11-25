@@ -3,6 +3,7 @@ import { hostWorktreeTarget } from '../../shared/worktree/host-qualified-identit
 import { ipcMain } from 'electron'
 import type { Store } from '../persistence/loading-store/store'
 import type { AutomationService } from '../automations/automation-service'
+import { isTrustedUIRenderer } from './ui'
 import type { AutomationScriptStepApproval } from '../persistence/scheduling-automations/automation-script-step-approval'
 import { createScopedExternalAutomations } from '../automations/external-managers/scoped-external-automations'
 import {
@@ -82,7 +83,11 @@ export function registerAutomationHandlers(store: Store, service: AutomationServ
   // Desktop-only by design: script approval must come from this app's user, never a runtime RPC caller.
   ipcMain.handle(
     'automations:approveScriptStep',
-    (_event, request: AutomationScriptStepApproval): void => {
+    (event, request: AutomationScriptStepApproval): void => {
+      // Only the main window's own document, never a subframe, guest page or other window.
+      if (!isTrustedUIRenderer(event.sender) || event.senderFrame !== event.sender.mainFrame) {
+        throw new Error('Script approval is only accepted from the Orca window.')
+      }
       store.approveAutomationScriptStep({
         automationId: String(request?.automationId ?? ''),
         runId: String(request?.runId ?? ''),

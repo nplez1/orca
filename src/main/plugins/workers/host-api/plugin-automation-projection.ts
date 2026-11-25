@@ -1,3 +1,4 @@
+import { getAutomationAgentPrompt } from '../../../../shared/automations/steps/automation-steps'
 import { z } from 'zod'
 import type { PluginHostResult } from '../../../../shared/plugins/workers/plugin-host-api'
 import {
@@ -87,8 +88,8 @@ export function projectPluginAutomations(
         id: automation.id,
         name: automation.name.slice(0, 512),
         agent: automation.agentId.slice(0, 64),
-        prompt: automation.prompt.slice(0, PLUGIN_HOST_TEXT_MAX_LENGTH),
-        promptTruncated: automation.prompt.length > PLUGIN_HOST_TEXT_MAX_LENGTH,
+        prompt: getAutomationAgentPrompt(automation).slice(0, PLUGIN_HOST_TEXT_MAX_LENGTH),
+        promptTruncated: getAutomationAgentPrompt(automation).length > PLUGIN_HOST_TEXT_MAX_LENGTH,
         projectId: fittingId(automation.runContext?.repoId ?? automation.projectId),
         hostId: fittingId(automation.runContext?.hostId),
         workspaceId,

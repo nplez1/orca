@@ -63,7 +63,10 @@ export function applyAutomationStepsWrite(
     ''
   delete automation.steps
   if (!written) {
-    automation.prompt = prompt
+    // Only a write that removes steps moves the prompt back; an agent-only write keeps its own.
+    if (current?.steps) {
+      automation.prompt = prompt
+    }
     return
   }
   if (automation.bot) {

@@ -1,4 +1,4 @@
-import { chmod, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -17,13 +17,16 @@ describe.skipIf(process.platform === 'win32')('automation script steps on this h
     'fail.sh': '#!/bin/sh\necho partial\nexit 3\n',
     'reads.sh': '#!/bin/sh\necho "saw=$ORCA_STEP_FIRST_STDOUT exit=$ORCA_STEP_FIRST_EXIT"\n',
     // Exits 0 on SIGTERM: a stopped step must still be cut off, never succeeded (#19334).
-    'trap.sh': "#!/bin/sh\ntrap 'exit 0' TERM\nsleep 30 &\nwait\n"
+    'trap.sh': "#!/bin/sh\ntrap 'exit 0' TERM\nsleep 30 &\nwait\n",
+    'where.sh': '#!/bin/sh\ndirname "$0"\necho "$ORCA_AUTOMATION_STEP_SCRIPT"\n',
+    'locked/run.sh': '#!/bin/sh\necho locked\n'
   }
   const repo: { path: string; kind: 'git' } = { path: '', kind: 'git' }
 
   beforeAll(async () => {
     cwd = await mkdtemp(join(tmpdir(), 'orca-script-steps-'))
     repo.path = cwd
+    await mkdir(join(cwd, 'locked'))
     for (const [name, content] of Object.entries(scripts)) {
       await writeFile(join(cwd, name), content)
       await chmod(join(cwd, name), 0o755)
@@ -132,6 +135,33 @@ describe.skipIf(process.platform === 'win32')('automation script steps on this h
     expect(outcome.stoppedBy?.error).toContain('outside the project')
     await rm(outside, { recursive: true, force: true })
   })
+
+  it('runs its verified copy beside the original, so the script’s own directory is unchanged', async () => {
+    const outcome = await run([step('first', 'where.sh')])
+    const root = await realpath(cwd)
+    expect(outcome.results[0]!.output).toBe(`${root}\n${join(root, 'where.sh')}`)
+  })
+
+  it('removes the copy after success, failure and timeout', async () => {
+    await run([step('first', 'ok.sh')])
+    await run([step('first', 'fail.sh')])
+    await run([step('first', 'trap.sh', { timeoutSeconds: 1 })])
+    expect((await readdir(cwd)).filter((name) => name.startsWith('.orca-step-'))).toEqual([])
+  })
+
+  it.skipIf(process.getuid?.() === 0)(
+    'refuses as unverifiable when the script’s directory takes no copy',
+    async () => {
+      await chmod(join(cwd, 'locked'), 0o555)
+      try {
+        const outcome = await run([step('first', 'locked/run.sh')])
+        expect(outcome.stoppedBy).toMatchObject({ outcome: 'unverifiable' })
+        expect(outcome.stoppedBy?.error).toContain('verified copy')
+      } finally {
+        await chmod(join(cwd, 'locked'), 0o755)
+      }
+    }
+  )
 
   it('persists results without the handoff stdout', async () => {
     const outcome = await run([step('first', 'ok.sh')])

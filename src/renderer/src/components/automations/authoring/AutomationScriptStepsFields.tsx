@@ -235,7 +235,7 @@ export function AutomationScriptStepsFields({
           <p className="text-xs text-muted-foreground">
             {t(
               'automations.scriptSteps.handoff',
-              'Later steps and the agent read each step’s result as ORCA_STEP_<ID>_STDOUT and ORCA_STEP_<ID>_EXIT. A new or changed script stops its run until you approve it from that run.'
+              'Later steps and the agent read each step’s result as ORCA_STEP_<ID>_STDOUT and ORCA_STEP_<ID>_EXIT. Each runs as a hidden copy beside its file; ORCA_AUTOMATION_STEP_SCRIPT names the original. A new or changed script or argument stops its run until you approve it from that run.'
             )}
           </p>
           {error ? (

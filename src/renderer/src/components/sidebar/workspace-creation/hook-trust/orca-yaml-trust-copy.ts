@@ -200,6 +200,6 @@ function automationScriptTitle(repoName: string, t: Translate): string {
 function automationScriptDescription(t: Translate): string {
   return t(
     'automations.scriptSteps.trustBody',
-    'An automation step runs this committed file on its host, unattended, with its saved arguments. Approval covers this exact file and those arguments only, not files it runs or sources; any change needs approval again. Only approve if you trust <repo/>.'
+    'An automation step runs this committed file on its host, unattended, with the arguments above. Approval covers this exact file and these arguments only, not files it runs or sources; any change needs approval again. Orca runs a hidden copy beside the file, and ORCA_AUTOMATION_STEP_SCRIPT names the original. Only approve if you trust <repo/>.'
   )
 }
