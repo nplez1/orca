@@ -194,8 +194,6 @@ export function createRecentlyClosedEditorTabs(
             editorDrafts: newEditorDrafts,
             editorCursorLine: newEditorCursorLine,
             activeFileId: null,
-            // Why no deselect: closing every editor keeps the workspace selected on its empty-tabs
-            // surface rather than the landing page (#96).
             activeBrowserTabId:
               browserTabsForWorktree.length > 0
                 ? (s.activeBrowserTabIdByWorktree[activeWorktreeId] ??

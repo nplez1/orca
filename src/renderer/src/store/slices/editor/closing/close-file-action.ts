@@ -249,8 +249,6 @@ export function createCloseFileAction(
             editorDrafts: newEditorDrafts,
             editorCursorLine: newEditorCursorLine,
             activeFileId: newActiveId,
-            // Why no deselect: closing the last editor keeps the workspace selected on its empty-tabs
-            // surface, like every other last-tab close (#96).
             activeBrowserTabId:
               activeWorktreeId && remainingForWorktree.length === 0
                 ? fallbackBrowserTabId

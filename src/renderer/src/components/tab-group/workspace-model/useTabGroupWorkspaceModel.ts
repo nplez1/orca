@@ -64,14 +64,12 @@ export function useTabGroupWorkspaceModel({
 
   const { closeItem, closeMany } = useTabGroupTabCloseCommands({ worktreeId })
 
-  // Why: closing a workspace's last tab keeps it selected and lands on the empty-tabs surface
-  // instead of the landing page, so the pane has to know it has nothing left to show (#96). It must
-  // not flash for a workspace whose first tab is still arriving — a fresh worktree, a host-owned
-  // list still mirroring, a chat launch waiting on its host. Two things rule that out: a terminal
-  // close record (which survives restart and re-activation; the row check matches the seeder,
-  // since a workspace this build never initialized has no terminal row), or the workspace having
-  // been emptied while on screen, which covers a last chat, browser or editor close that writes
-  // no record.
+  // Why: an emptied workspace stays selected on its empty-tabs surface (#96), which must not flash
+  // while a first tab is still arriving (fresh worktree, host list mirroring, pending chat launch).
+  // Either a terminal close record proves the user emptied it (it survives restart; the row check
+  // matches the seeder), or it was emptied while on screen: a last chat, browser or editor close
+  // writes no record. That mark resets on leaving, so a retained pane cannot carry it into a later
+  // visit (sleep, or re-seeding on return).
   const hasNoContent = useAppStore((state) => hasNoRenderableWorkspaceContent(state, worktreeId))
   const emptiedByRecordedClose = useAppStore(
     (state) =>
@@ -82,10 +80,6 @@ export function useTabGroupWorkspaceModel({
         getAgentStatusEpochNow(state.agentStatusEpoch ?? 0)
       )
   )
-  // Why reset on leaving: a retained pane must not carry the mark into a later visit — sleep
-  // deselects before it tears tabs down, and an unrecorded empty workspace re-seeds on return, so
-  // either would flash the surface. Known residue: a host list that drops every row and re-mirrors
-  // while on screen shows the surface until its rows return.
   const isOnScreen = useAppStore((state) => state.activeWorktreeId === worktreeId)
   const [hasShownContentOnScreen, setHasShownContentOnScreen] = useState(
     isOnScreen && !hasNoContent
