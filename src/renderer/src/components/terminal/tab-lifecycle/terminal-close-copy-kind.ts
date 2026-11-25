@@ -4,7 +4,8 @@ import {
   isTerminalLeafId,
   makePaneKey
 } from '../../../../../shared/workspace-layout/stable-pane-id'
-import { wasAgentTabLaunchedPromptFree } from '@/lib/agent-session/launch/new-tab/agent-tab-prompt-free-launch'
+import { isPromptFreeAgentLaunchProcess } from '@/lib/agent-session/launch/new-tab/agent-tab-prompt-free-launch'
+import type { PtyRunningWorkProbe } from '../../../../../shared/terminal/pty/lifecycle/pty-running-work-probe'
 import { isNeverTaskedAgentSession } from './never-tasked-agent-session'
 
 // Legacy/mid-attach leaf IDs may fail makePaneKey; confirmation must not break close.
@@ -28,33 +29,42 @@ export function resolveLeafCloseCopyKind(
   return agentType && agentType !== 'unknown' ? 'agent' : 'command'
 }
 
-/** One emptiness verdict for tab and pane closes, so the two prompts cannot drift (#95). */
-export function isLeafAgentSessionEmpty(tabId: string, leafId: string | null | undefined): boolean {
+/**
+ * One emptiness verdict for tab and pane closes, so the two prompts cannot drift (#95). Only an
+ * answered live probe of the very process a prompt-free launch spawned qualifies; `leafId` narrows
+ * a pane close to its own leaf. Any throw asks, because the tab guard's catch closes silently.
+ */
+export function isProbeOfEmptyAgentSession(
+  tabId: string,
+  probe: Pick<PtyRunningWorkProbe, 'ptyId' | 'verdict' | 'timedOut'>,
+  leafId?: string | null
+): boolean {
   try {
-    const paneKey = leafPaneKey(tabId, leafId)
-    if (!paneKey) {
+    if (probe.verdict !== 'live' || probe.timedOut) {
       return false
     }
     const state = useAppStore.getState()
-    return isNeverTaskedAgentSession({
-      entry: state.agentStatusByPaneKey.get(paneKey),
-      launchedPromptFree: wasAgentTabLaunchedPromptFree(tabId),
-      lastUserInputAt: state.lastTerminalInputAtByPaneKey[paneKey]
-    })
+    const ptyIdsByLeafId = state.terminalLayoutsByTabId?.[tabId]?.ptyIdsByLeafId ?? {}
+    const leafIds = Object.entries(ptyIdsByLeafId)
+      .filter(([candidate, ptyId]) => ptyId === probe.ptyId && (!leafId || candidate === leafId))
+      .map(([candidate]) => candidate)
+    return (
+      leafIds.length > 0 &&
+      leafIds.every((candidate) => {
+        const paneKey = leafPaneKey(tabId, candidate)
+        return (
+          paneKey !== null &&
+          isNeverTaskedAgentSession({
+            entry: state.agentStatusByPaneKey.get(paneKey),
+            launchedPromptFree: isPromptFreeAgentLaunchProcess(tabId, candidate, probe.ptyId),
+            lastUserInputAt: state.lastTerminalInputAtByPaneKey[paneKey]
+          })
+        )
+      })
+    )
   } catch {
-    // The guard's catch closes silently; a failed lookup must ask instead.
     return false
   }
-}
-
-/** Live PTYs whose only work is a never-tasked agent: closing them stops nothing. */
-export function isPtyEmptyAgentSession(tabId: string, ptyId: string): boolean {
-  const ptyIdsByLeafId =
-    useAppStore.getState().terminalLayoutsByTabId?.[tabId]?.ptyIdsByLeafId ?? {}
-  const leafIds = Object.entries(ptyIdsByLeafId)
-    .filter(([, leafPtyId]) => leafPtyId === ptyId)
-    .map(([leafId]) => leafId)
-  return leafIds.length > 0 && leafIds.every((leafId) => isLeafAgentSessionEmpty(tabId, leafId))
 }
 
 /** Agent copy wins mixed splits because stopping an agent mid-task is the costlier surprise. */

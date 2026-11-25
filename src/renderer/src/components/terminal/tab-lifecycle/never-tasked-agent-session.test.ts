@@ -14,55 +14,37 @@ const boundary: AgentStatusEntry = {
   stateHistory: [],
   mainAgent: { state: 'done', stateStartedAt: 1_000 }
 }
-const fresh = { entry: boundary, launchedPromptFree: true, lastUserInputAt: undefined }
+
+const workEvidence: Partial<AgentStatusEntry>[] = [
+  { agentType: 'unknown' },
+  { restoredUnconfirmed: true },
+  { state: 'working', sessionBoundary: undefined },
+  { state: 'blocked', sessionBoundary: undefined },
+  { sessionBoundary: undefined },
+  { stateHistory: [{ state: 'working', prompt: 'x', startedAt: 1 }] },
+  { turnStartedAt: 900 },
+  { turnEndedAt: 900 },
+  { prompt: 'fix the bug' },
+  { lastAssistantMessage: 'done' },
+  { lastCompletedAssistantMessage: 'done' },
+  { interactivePrompt: '{}' },
+  { toolName: 'Bash' },
+  { subagents: [{ id: 'a', state: 'working', startedAt: 900 }] },
+  { orchestration: { taskId: 't', dispatchId: 'd' } },
+  { mainAgent: { state: 'done', outcome: 'success', stateStartedAt: 1_000 } },
+  { mainAgent: { state: 'working', stateStartedAt: 1_000 } }
+]
 
 describe('isNeverTaskedAgentSession', () => {
+  const fresh = { entry: boundary, launchedPromptFree: true, lastUserInputAt: undefined }
+
   it('excuses only a prompt-free launch resting at its first session boundary', () => {
     expect(isNeverTaskedAgentSession(fresh)).toBe(true)
-  })
-
-  it.each<[string, Partial<Parameters<typeof isNeverTaskedAgentSession>[0]>]>([
-    ['no status row', { entry: undefined }],
-    ['launch not known to be prompt-free', { launchedPromptFree: false }],
-    ['user typed into the pane', { lastUserInputAt: 900 }],
-    ['unknown agent', { entry: { ...boundary, agentType: 'unknown' } }],
-    ['restored, unconfirmed row', { entry: { ...boundary, restoredUnconfirmed: true } }],
-    ['working', { entry: { ...boundary, state: 'working', sessionBoundary: undefined } }],
-    ['blocked', { entry: { ...boundary, state: 'blocked', sessionBoundary: undefined } }],
-    ['a finished turn', { entry: { ...boundary, sessionBoundary: undefined } }],
-    [
-      'turn history behind a /clear boundary',
-      { entry: { ...boundary, stateHistory: [{ state: 'working', prompt: 'x', startedAt: 1 }] } }
-    ],
-    ['a turn clock', { entry: { ...boundary, turnStartedAt: 900 } }],
-    ['a turn end', { entry: { ...boundary, turnEndedAt: 900 } }],
-    ['a prompt', { entry: { ...boundary, prompt: 'fix the bug' } }],
-    ['assistant output', { entry: { ...boundary, lastAssistantMessage: 'done' } }],
-    ['completed output', { entry: { ...boundary, lastCompletedAssistantMessage: 'done' } }],
-    ['an open question', { entry: { ...boundary, interactivePrompt: '{}' } }],
-    ['a tool in use', { entry: { ...boundary, toolName: 'Bash' } }],
-    [
-      'child work',
-      { entry: { ...boundary, subagents: [{ id: 'a', state: 'working', startedAt: 900 }] } }
-    ],
-    [
-      'an orchestration dispatch',
-      { entry: { ...boundary, orchestration: { taskId: 't', dispatchId: 'd' } } }
-    ],
-    [
-      'a main-agent verdict',
-      {
-        entry: {
-          ...boundary,
-          mainAgent: { state: 'done', outcome: 'success', stateStartedAt: 1_000 }
-        }
-      }
-    ],
-    [
-      'a working main agent',
-      { entry: { ...boundary, mainAgent: { state: 'working', stateStartedAt: 1_000 } } }
-    ]
-  ])('keeps the prompt with %s', (_label, change) => {
-    expect(isNeverTaskedAgentSession({ ...fresh, ...change })).toBe(false)
+    expect(isNeverTaskedAgentSession({ ...fresh, entry: undefined })).toBe(false)
+    expect(isNeverTaskedAgentSession({ ...fresh, launchedPromptFree: false })).toBe(false)
+    expect(isNeverTaskedAgentSession({ ...fresh, lastUserInputAt: 900 })).toBe(false)
+    for (const change of workEvidence) {
+      expect(isNeverTaskedAgentSession({ ...fresh, entry: { ...boundary, ...change } })).toBe(false)
+    }
   })
 })

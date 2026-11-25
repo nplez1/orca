@@ -20,6 +20,7 @@ import type { TerminalStoreGet, TerminalStoreSet } from '../terminal-state'
 import { copyOnWriteRecord } from './terminal-shutdown-record'
 import { removeTabsAttention } from '../../slices/workspace-attention/subject-attention-transitions'
 import { settleAttentionRemovedBy } from '../../slices/workspace-attention/attention-removal-follow-up'
+import { forgetPromptFreeAgentTabLaunch } from '@/lib/agent-session/launch/new-tab/agent-tab-prompt-free-launch'
 
 export function commitTerminalShutdownState({
   exitGuardPtyIds,
@@ -42,6 +43,10 @@ export function commitTerminalShutdownState({
   tabs: readonly TerminalTab[]
   worktreeId: string
 }): void {
+  // A woken tab resumes a real conversation; the prompt-free launch no longer describes it (#95).
+  for (const tab of tabs) {
+    forgetPromptFreeAgentTabLaunch(tab.id)
+  }
   settleAttentionRemovedBy(set, get, () =>
     set((state) => {
       const tabsByWorktree = keepIdentifiers

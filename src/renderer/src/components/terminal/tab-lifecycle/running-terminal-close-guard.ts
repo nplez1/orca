@@ -3,7 +3,7 @@ import { useRunningTerminalCloseConfirmStore } from '@/store/slices/tabs/closing
 import type { TerminalTabCloseReason } from '@/store/terminals/retirement/terminal-tab-retirement'
 import type { TerminalTabCloseIntent } from './terminal-tab-close-intent'
 import type { AppState } from '@/store/types'
-import { isPtyEmptyAgentSession, resolveBusyPtyCloseCopyKind } from './terminal-close-copy-kind'
+import { isProbeOfEmptyAgentSession, resolveBusyPtyCloseCopyKind } from './terminal-close-copy-kind'
 import { canSleepInsteadOfClosingTab } from './terminal-close-sleep-eligibility'
 import { probePtyRunningWork } from './pty-running-work-probe'
 
@@ -122,8 +122,8 @@ export function guardRunningTerminalClose(params: {
       const busyPtyIds = probes
         .filter(
           (probe) =>
-            // Only an answered live probe may be excused as a never-tasked agent; unverifiable still asks (#95).
-            (probe.verdict === 'live' && !isPtyEmptyAgentSession(terminalTabId, probe.ptyId)) ||
+            // A never-tasked agent stops nothing; unverifiable and timed-out probes still ask (#95).
+            (probe.verdict === 'live' && !isProbeOfEmptyAgentSession(terminalTabId, probe)) ||
             (probe.verdict === 'unverifiable' && boundPtyIds.has(probe.ptyId))
         )
         .map((probe) => probe.ptyId)

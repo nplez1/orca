@@ -1,19 +1,58 @@
-/** Session-only: tabs this window launched with no prompt, draft or argument override. Absence (reload, eviction, other launch paths) means unknown, never empty. */
+import type { TuiAgent } from '../../../../../../shared/agent-launch/catalog/tui-agent'
+import type { AgentStartupSettings } from '../../../../../../shared/agent-launch/startup/agent-startup-plan-inputs'
+
+/**
+ * Session-only: the one PTY this window spawned for a tab launched with no prompt, draft, args or
+ * command override. It vouches for that process alone; a respawn, resume, wake or moved pane in the
+ * same tab is a different process. Absence (reload, eviction, other launch paths) means unknown.
+ */
 
 const MAX_REMEMBERED_LAUNCHES = 256
-const promptFreeTabIds = new Set<string>()
+type PromptFreeLaunch = { leafId: string; ptyId: string } | 'awaiting-spawn'
+const launchesByTabId = new Map<string, PromptFreeLaunch>()
+
+/** Resume/continue flags and wrapper commands live in args and overrides the status row cannot see. */
+export function isPromptFreeAgentTabLaunch(
+  launch: { agent: TuiAgent; prompt?: string; agentArgs?: string | null; actionAgentArgs?: string },
+  settings: Pick<AgentStartupSettings, 'agentDefaultArgs' | 'agentCmdOverrides'> | null | undefined
+): boolean {
+  const effectiveArgs =
+    launch.actionAgentArgs ??
+    (launch.agentArgs === undefined ? settings?.agentDefaultArgs?.[launch.agent] : launch.agentArgs)
+  return (
+    !launch.prompt?.trim() &&
+    !effectiveArgs?.trim() &&
+    !settings?.agentCmdOverrides?.[launch.agent]?.trim()
+  )
+}
 
 export function notePromptFreeAgentTabLaunch(tabId: string): void {
-  promptFreeTabIds.delete(tabId)
-  promptFreeTabIds.add(tabId)
-  for (const oldest of promptFreeTabIds) {
-    if (promptFreeTabIds.size <= MAX_REMEMBERED_LAUNCHES) {
+  launchesByTabId.delete(tabId)
+  launchesByTabId.set(tabId, 'awaiting-spawn')
+  for (const oldest of launchesByTabId.keys()) {
+    if (launchesByTabId.size <= MAX_REMEMBERED_LAUNCHES) {
       break
     }
-    promptFreeTabIds.delete(oldest)
+    launchesByTabId.delete(oldest)
   }
 }
 
-export function wasAgentTabLaunchedPromptFree(tabId: string): boolean {
-  return promptFreeTabIds.has(tabId)
+/** Only the queued startup's own first spawn binds; later spawns in the tab stay unknown. */
+export function bindPromptFreeAgentTabLaunch(tabId: string, leafId: string, ptyId: string): void {
+  if (launchesByTabId.get(tabId) === 'awaiting-spawn') {
+    launchesByTabId.set(tabId, { leafId, ptyId })
+  }
+}
+
+export function forgetPromptFreeAgentTabLaunch(tabId: string): void {
+  launchesByTabId.delete(tabId)
+}
+
+export function isPromptFreeAgentLaunchProcess(
+  tabId: string,
+  leafId: string,
+  ptyId: string
+): boolean {
+  const launch = launchesByTabId.get(tabId)
+  return typeof launch === 'object' && launch.leafId === leafId && launch.ptyId === ptyId
 }

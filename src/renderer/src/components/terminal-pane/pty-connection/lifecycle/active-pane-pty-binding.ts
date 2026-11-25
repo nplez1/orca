@@ -137,7 +137,7 @@ export function installActivePanePtyBinding(session: ConnectPanePtySession): voi
     }
     // Spend queued startup only after this pane owns a concrete PTY.
     try {
-      session.deps.onQueuedStartupSpawned?.()
+      session.deps.onQueuedStartupSpawned?.(ptyId)
     } catch {
       // Do not strand a successful spawn because a delivery callback failed.
     }

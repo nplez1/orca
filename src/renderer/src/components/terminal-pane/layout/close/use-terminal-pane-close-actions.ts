@@ -7,7 +7,7 @@ import { retireUnboundRuntimeTerminalPane } from './retire-unbound-runtime-termi
 import { makePaneKey } from '../../../../../../shared/workspace-layout/stable-pane-id'
 import { closeWebRuntimeTerminal } from '@/runtime/hosted-terminals/actions/web-runtime-terminal-close'
 import {
-  isLeafAgentSessionEmpty,
+  isProbeOfEmptyAgentSession,
   resolveLeafCloseCopyKind
 } from '../../../terminal/tab-lifecycle/terminal-close-copy-kind'
 import { RUNNING_CLOSE_PROBE_TIMEOUT_MS } from '../../../terminal/tab-lifecycle/running-terminal-close-guard'
@@ -201,12 +201,12 @@ export function useTerminalPaneCloseActions(controller: TerminalPaneBindingContr
         .then((probes) => {
           clearTimeout(probeTimeout)
           decide(() => {
-            const verdict = probes[0]?.verdict
+            const probe = probes[0]
+            const leafId = managerRef.current?.getLeafId(paneId)
             if (
-              verdict === 'exited' ||
+              probe?.verdict === 'exited' ||
               // Same never-tasked verdict as the tab close; unverifiable and timed-out probes still ask (#95).
-              (verdict === 'live' &&
-                isLeafAgentSessionEmpty(tabId, managerRef.current?.getLeafId(paneId))) ||
+              (probe !== undefined && leafId && isProbeOfEmptyAgentSession(tabId, probe, leafId)) ||
               settings?.skipCloseTerminalWithRunningProcessConfirm
             ) {
               close()
