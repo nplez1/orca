@@ -138,8 +138,10 @@ export function measureSurface(base) {
     ) {
       continue
     }
-    // A file upstream does not have is fork-owned by construction: nothing there can conflict.
-    if (!existsAt(mergeBase, entry.path)) {
+    // Ownership is decided by upstream's own tree, not by the merge base: a file an earlier fork patch added
+    // exists at the fork's main and would otherwise be miscounted as upstream's, which is how a fork file
+    // ends up needing a seam declaration for its own edit.
+    if (!existsAt('upstream/main', entry.path)) {
       continue
     }
     touched.push({ path: entry.path, lines: entry.added + entry.removed })

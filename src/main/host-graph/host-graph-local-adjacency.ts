@@ -1,6 +1,6 @@
 import type { HostGraphAdjacency } from '../../shared/host-graph/host-graph-contract'
 import { listEnvironments } from '../../shared/remote-runtime/host-store/runtime-environment-store'
-import { getRuntimeEnvironmentRegistryRoot } from '../ipc/runtime-environments/catalog/runtime-environment-registry-root'
+import { getCanonicalUserDataPath } from '../persistence/loading-store/user-data-path'
 import { loadTrustedHostKeys } from '../ssh/host-keys/ssh-host-key-store'
 import { getRegisteredSshState, listRegisteredSshTargets } from '../ssh/targets/ssh-target-registry'
 import { buildOwnAdjacency, type HostGraphOwnEdgeSources } from './host-graph-own-edges'
@@ -21,7 +21,9 @@ export async function readLocalAdjacency(): Promise<HostGraphAdjacency> {
       return fallback
     }
   }
-  const root = getRuntimeEnvironmentRegistryRoot()
+  // Why the canonical path helper rather than the Electron registry root: these methods answer peers from
+  // orcad and the CLI too, where `electron` cannot be imported at all. Both resolve the same directory.
+  const root = getCanonicalUserDataPath()
   const [environments, sshTargets, trustedHostKeys] = await Promise.all([
     readSafely<HostGraphOwnEdgeSources['environments']>(() => listEnvironments(root), []),
     readSafely<HostGraphOwnEdgeSources['sshTargets']>(() => listRegisteredSshTargets(), []),
