@@ -1,5 +1,5 @@
 import type React from 'react'
-import { useEffect, useMemo, useState, type RefObject } from 'react'
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { ChevronRight, CopyPlus, FolderInput, FolderUp, Loader2 } from 'lucide-react'
 import {
   CommandDialog,
@@ -65,6 +65,7 @@ export function FileExplorerMoveCopyDialog({
   const [currentDir, setCurrentDir] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [highlighted, setHighlighted] = useState('')
+  const submittedMoveRef = useRef(false)
   if (request !== openedRequest) {
     // Each request opens on its own start folder with a clear filter.
     setOpenedRequest(request)
@@ -98,8 +99,23 @@ export function FileExplorerMoveCopyDialog({
     )
   }, [listing, query])
 
+  // Why on both branches: the closing render swaps in the closed dialog, whose handler Radix calls.
+  const restoreFocus = (event: Event): void => {
+    event.preventDefault()
+    const root = returnFocusRoot.current
+    const treeViewport = root
+      ?.querySelector('[data-file-explorer-row]')
+      ?.closest<HTMLElement>('[data-slot="scroll-area-viewport"]')
+    // A moved row leaves its old path once the tree refreshes, so a submitted move focuses the tree.
+    const selectedRow = submittedMoveRef.current
+      ? null
+      : root?.querySelector<HTMLElement>('[data-file-explorer-row][data-selected="true"]')
+    submittedMoveRef.current = false
+    ;(selectedRow ?? treeViewport)?.focus({ preventScroll: true })
+  }
+
   if (!request || !currentDir || !rootPath) {
-    return <CommandDialog open={false} />
+    return <CommandDialog open={false} onCloseAutoFocus={restoreFocus} />
   }
 
   const isMove = request.mode === 'move'
@@ -149,14 +165,7 @@ export function FileExplorerMoveCopyDialog({
         }
       }}
       shouldFilter={false}
-      onCloseAutoFocus={(event) => {
-        event.preventDefault()
-        const root = returnFocusRoot.current
-        const target =
-          root?.querySelector<HTMLElement>('[data-file-explorer-row][data-selected="true"]') ??
-          root?.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]')
-        target?.focus({ preventScroll: true })
-      }}
+      onCloseAutoFocus={restoreFocus}
       title={title}
       description={t('fileExplorer.moveCopy.description', 'Choose a folder in this workspace.')}
       contentClassName="w-[520px] overflow-hidden"
@@ -194,7 +203,10 @@ export function FileExplorerMoveCopyDialog({
             <CommandItem
               value={HERE_VALUE}
               disabled={!canChooseHere}
-              onSelect={() => onSubmit(currentDir)}
+              onSelect={() => {
+                submittedMoveRef.current = isMove
+                onSubmit(currentDir)
+              }}
               className="cursor-pointer"
             >
               {isMove ? (
