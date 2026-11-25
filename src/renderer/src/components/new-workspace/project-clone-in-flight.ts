@@ -97,8 +97,15 @@ export function trackProjectClone(
       entry.reportUnseen(outcome)
     }
   }
-  // Two-arg then, not finally: a derived rejected promise here would go unhandled.
-  void promise.then(settle, release)
+  // Two-arg then, not finally: a derived rejected promise here would go unhandled. Why the rejection
+  // is settled rather than merely released: releasing alone left every watcher waiting on a clone
+  // whose entry was gone, so the composer sat on "cloning" for ever instead of reporting a failure.
+  void promise.then(settle, (error: unknown) =>
+    settle({
+      kind: 'failed',
+      message: error instanceof Error ? error.message : String(error)
+    })
+  )
   return promise
 }
 

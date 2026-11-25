@@ -44,7 +44,15 @@ export async function loadMoreJiraBoardPage(args: {
   boardId: string
   siteId: string
   issueScope: JiraBoardIssueScope
-  current: TaskPageJiraBoardCachedPage
+  /**
+   * The scope's page as it stands *now* — read twice, not once.
+   *
+   * Why a reader and not a snapshot: an optimistic card move patches the page in place without
+   * bumping the generation (it is a local-only edit, not a reload), so appending onto the snapshot
+   * taken before the await writes the pre-move statuses back — the card jumps to its old column and
+   * the cache keeps it there.
+   */
+  readBase: () => TaskPageJiraBoardCachedPage
   generation: number
   generationRef: MutableRefObject<number>
   commit: (page: TaskPageJiraBoardCachedPage) => void
@@ -54,9 +62,10 @@ export async function loadMoreJiraBoardPage(args: {
 }): Promise<void> {
   // Why guarded on every branch: a reload that started meanwhile owns the scope's state.
   const stale = (): boolean => args.generation !== args.generationRef.current
+  const base = args.readBase()
   const pageArgs = {
-    ...(args.current.pageToken ? { pageToken: args.current.pageToken } : {}),
-    startAt: args.current.startAt,
+    ...(base.pageToken ? { pageToken: base.pageToken } : {}),
+    startAt: base.startAt,
     maxResults: JIRA_BOARD_ISSUE_PAGE_SIZE
   }
   const request =
@@ -74,7 +83,12 @@ export async function loadMoreJiraBoardPage(args: {
   try {
     const page = await jiraListBoardIssues(args.providerSettings, request)
     if (!stale()) {
-      args.commit(appendJiraBoardIssuePage(args.current, page))
+      const latest = args.readBase()
+      // Why the depth check: this answer continues the page that was at `base.startAt`. A page whose
+      // depth moved on (a deeper load finished first) would be appended at the wrong offset.
+      if (latest.startAt === base.startAt) {
+        args.commit(appendJiraBoardIssuePage(latest, page))
+      }
     }
   } catch (error) {
     if (!stale()) {

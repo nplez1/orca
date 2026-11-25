@@ -317,6 +317,12 @@ function JiraLabelsRow({
   }, [displayed.labels, open])
 
   const save = (): void => {
+    // Why the guard and not just a disabled button: Enter reaches `save` too, and the mutation queue
+    // refuses while another field is saving — which used to close the popover and drop the edit with
+    // no word about it. Staying open keeps the text where the person put it.
+    if (detail.pendingField !== null) {
+      return
+    }
     const labels = draft
       .split(',')
       .map((label) => label.trim())
@@ -362,7 +368,9 @@ function JiraLabelsRow({
               size="sm"
               variant="outline"
               onClick={save}
-              disabled={detail.pendingField === 'labels'}
+              // Why any pending field: the queue takes one mutation at a time and refuses the rest, so
+              // a Save that cannot land must not look available.
+              disabled={detail.pendingField !== null}
             >
               {t('auto.components.right.sidebar.IssuePane.save', 'Save')}
             </Button>

@@ -245,7 +245,9 @@ describe('post-merge review refresh', () => {
     const { store, worktree } = setup({ linkedPR: 42, branch: 'feature/linked' })
     const calls = stubRefresh(store)
     store.setState({
-      prCache: { [keyFor('feature/linked')]: { data: makePR({ state: 'open' }), fetchedAt: 1 } }
+      prCache: {
+        [keyFor('feature/linked')]: { data: makePR({ number: 42, state: 'open' }), fetchedAt: 1 }
+      }
     })
 
     startPostMergeReviewRefresh(
@@ -257,11 +259,42 @@ describe('post-merge review refresh', () => {
     expect(calls).toHaveLength(1)
     store.setState({
       prCache: {
-        [keyFor(worktree.branch)]: { data: makePR({ state: 'merged' }), fetchedAt: 2 }
+        [keyFor(worktree.branch)]: {
+          data: makePR({ number: 42, state: 'merged' }),
+          fetchedAt: 2
+        }
       }
     })
     await vi.advanceTimersByTimeAsync(50)
     expect(calls).toHaveLength(1)
+  })
+
+  it('keeps asking while the branch cache holds a different, already-closed PR', async () => {
+    // The cache is keyed by branch, so it can hold the PR that branch had before — closed, and
+    // terminal. Reading its state as this merge's settled the burst on the first tick, which left the
+    // merged review on screen as open.
+    const { store, worktree } = setup({ linkedPR: 42, branch: 'feature/linked' })
+    const calls = stubRefresh(store)
+    store.setState({
+      prCache: {
+        [keyFor('feature/linked')]: { data: makePR({ number: 41, state: 'closed' }), fetchedAt: 1 }
+      }
+    })
+
+    startPostMergeReviewRefresh(
+      { repoPath: repo.path, repoId: repo.id, prNumber: 42 },
+      { getState: store.getState, intervalMs: 10 }
+    )
+
+    await vi.advanceTimersByTimeAsync(0)
+    expect(calls).toHaveLength(1)
+    store.setState({
+      prCache: {
+        [keyFor(worktree.branch)]: { data: makePR({ number: 42, state: 'open' }), fetchedAt: 2 }
+      }
+    })
+    await vi.advanceTimersByTimeAsync(50)
+    expect(calls.length).toBeGreaterThan(1)
   })
 
   it('replaces an earlier burst for the same merged PR', async () => {
