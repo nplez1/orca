@@ -147,3 +147,75 @@ export function hostMeshPairStatus(hostKey: string, links: HostMeshLinkMatrix): 
   }
   return outboundOk || inboundOk ? 'half' : 'missing'
 }
+
+/**
+ * `hostMesh.join`: a newcomer asks one member to admit it, and hands over its own sealed offer.
+ *
+ * Why the joiner carries its own offer rather than asking for one: an offer this host mints is
+ * `pairing-admin`, and a peer must never be able to make this host widen itself. The joiner mints for
+ * itself, the member redeems, and the credential lands on the side that chose to hand it out.
+ */
+export type HostMeshJoinRequest = {
+  version: typeof HOST_MESH_PAYLOAD_VERSION
+  groupId: string
+  epoch: number
+  joiner: { hostKey: string; label: string }
+  /** Minted by the joiner, addressed to the member receiving this request. */
+  sealedForIntroducer: HostMeshSealedOffer
+}
+
+export type HostMeshJoinReply =
+  | {
+      kind: 'joined'
+      groupId: string
+      epoch: number
+      /** Members and tombstones only; endpoint addresses are never relayed third-hand. */
+      members: HostMeshMember[]
+      tombstones: HostMeshTombstone[]
+    }
+  | { kind: 'refused'; reason: string }
+
+/** One sealed offer per member the joiner still needs, so the relay is a single batch. */
+export type HostMeshRelayRequest = {
+  version: typeof HOST_MESH_PAYLOAD_VERSION
+  groupId: string
+  epoch: number
+  joiner: { hostKey: string; label: string }
+  sealed: HostMeshSealedOffer[]
+}
+
+export type HostMeshIntroduceRequest = {
+  version: typeof HOST_MESH_PAYLOAD_VERSION
+  groupId: string
+  epoch: number
+  /** The member doing the introducing, as it claims to be. Attribution, not the security boundary. */
+  introducerHostKey: string
+  newcomer: { hostKey: string; label: string }
+  /** The newcomer's offer, addressed to this recipient. */
+  sealedForRecipient: HostMeshSealedOffer
+}
+
+export type HostMeshIntroduceReply =
+  | { kind: 'accepted'; sealedForNewcomer: HostMeshSealedOffer | null }
+  | { kind: 'refused'; reason: string }
+
+/**
+ * Why a newcomer polls for its own boxes instead of the member pushing them: the member knows the
+ * newcomer's key but not when it is listening, and a poll is one call where a push is a dial from
+ * whichever member happens to finish second.
+ */
+export type HostMeshPendingRequest = {
+  version: typeof HOST_MESH_PAYLOAD_VERSION
+  groupId: string
+  hostKey: string
+}
+
+export type HostMeshPendingReply = { sealed: HostMeshSealedOffer[] }
+
+export type HostMeshRemoveRequest = {
+  version: typeof HOST_MESH_PAYLOAD_VERSION
+  groupId: string
+  hostKey: string
+  removedBy: string
+  epoch: number
+}
