@@ -66,6 +66,15 @@ export function hostMeshRpcService(): HostMeshRpcService {
   return buildRpcService(deps)
 }
 
+// For wiring that must run in tests and non-mesh builds, where throwing at startup would refuse every call.
+export function hostMeshRpcServiceIfAvailable(): HostMeshRpcService | null {
+  try {
+    return hostMeshRpcService()
+  } catch {
+    return null
+  }
+}
+
 // Filled in by the driver module; declared here so the two layers above can be built against the names.
 let buildDriver: (deps: HostMeshDriverDeps) => HostMeshDriver = () => {
   throw new Error('host_mesh_driver_not_wired')
