@@ -110,6 +110,8 @@ export type HookListenerState = {
   lastLaunchTokenByPaneKey: Map<string, string>
   /** Copilot background work that can outlive the foreground turn. */
   copilotBackgroundWorkByPaneKey: Map<string, CopilotBackgroundWorkState>
+  /** Copilot background agents whose turn already ended, so a duplicate end report is a no-op. */
+  copilotEndedAgentIdsByPaneKey: Map<string, Set<string>>
   /** Live descendants for every provider that does not own a roster of its own. */
   descendantRosterByPaneKey: Map<string, AgentDescendantRoster>
   // fork-comment-ok: the field must sit beside the roster it completes, and its doc is one line
@@ -201,6 +203,7 @@ export function createHookListenerState(
     opencodeSessionPaneBySessionId: new Map(),
     lastLaunchTokenByPaneKey: new Map(),
     copilotBackgroundWorkByPaneKey: new Map(),
+    copilotEndedAgentIdsByPaneKey: new Map(),
     descendantRosterByPaneKey: new Map(),
     reportedSubagentsByPaneKey: new Map(),
     retiredPiClaudeChildrenByPaneKey: new Map(),
@@ -296,6 +299,7 @@ export function clearPaneProcessCacheState(state: HookListenerState, paneKey: st
   unbindOpenCodeSessionsOfPane(state, paneKey)
   deletePaneScopedCacheEntry(state.lastLaunchTokenByPaneKey, paneKey)
   state.copilotBackgroundWorkByPaneKey.delete(paneKey)
+  state.copilotEndedAgentIdsByPaneKey.delete(paneKey)
   state.descendantRosterByPaneKey.delete(paneKey)
   state.reportedSubagentsByPaneKey.delete(paneKey)
   state.retiredPiClaudeChildrenByPaneKey.delete(paneKey)
@@ -360,6 +364,7 @@ export function movePaneCacheState(
   moveOpenCodeSessionBindings(state, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.lastLaunchTokenByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.copilotBackgroundWorkByPaneKey, fromPaneKey, toPaneKey)
+  movePaneScopedMapEntries(state.copilotEndedAgentIdsByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.descendantRosterByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.reportedSubagentsByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.retiredPiClaudeChildrenByPaneKey, fromPaneKey, toPaneKey)
@@ -415,6 +420,7 @@ export function clearAllListenerCaches(state: HookListenerState): void {
   state.opencodeSessionPaneBySessionId.clear()
   state.lastLaunchTokenByPaneKey.clear()
   state.copilotBackgroundWorkByPaneKey.clear()
+  state.copilotEndedAgentIdsByPaneKey.clear()
   state.descendantRosterByPaneKey.clear()
   state.reportedSubagentsByPaneKey.clear()
   state.retiredPiClaudeChildrenByPaneKey.clear()

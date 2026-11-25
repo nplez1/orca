@@ -71,3 +71,53 @@ export function readCopilotToolResultText(
     extractToolResponseText(hookPayload.toolResponse)
   )
 }
+
+// Why: these tools only read, message or list agents (or run shell commands); their output can
+// quote another agent's launch line, which must not register that agent again.
+const COPILOT_NON_LAUNCH_TOOLS = new Set([
+  'read_agent',
+  'write_agent',
+  'list_agents',
+  'bash',
+  'powershell',
+  'read_bash',
+  'write_bash',
+  'stop_bash',
+  'read_powershell',
+  'write_powershell',
+  'stop_powershell'
+])
+
+export function isCopilotAgentLaunchResultTool(toolName: string | undefined): boolean {
+  return toolName !== undefined && !COPILOT_NON_LAUNCH_TOOLS.has(toolName.toLowerCase())
+}
+
+/** Copilot's own refusals for a `write_agent` that reached no agent. */
+const COPILOT_WRITE_AGENT_UNDELIVERED_RE =
+  /No agent found|not accepting messages|only supports background agents|No matching agents|Delivery failed|Failed to deliver/i
+
+/** The agents a delivered `write_agent` addressed by id; a `scope` send names none. */
+export function readCopilotWriteAgentTargets(hookPayload: Record<string, unknown>): string[] {
+  const toolInput = readCopilotToolInput(hookPayload)
+  if (readCopilotToolName(hookPayload)?.toLowerCase() !== 'write_agent' || !isRecord(toolInput)) {
+    return []
+  }
+  const toolResult = hookPayload.tool_result ?? hookPayload.toolResult
+  const resultType = isRecord(toolResult)
+    ? readFirstString(toolResult, ['result_type', 'resultType'])
+    : undefined
+  const resultText = readCopilotToolResultText(hookPayload)
+  if (
+    (resultType !== undefined && resultType !== 'success') ||
+    (resultText && COPILOT_WRITE_AGENT_UNDELIVERED_RE.test(resultText))
+  ) {
+    return []
+  }
+  const ids: unknown[] =
+    typeof toolInput.agent_id === 'string' && toolInput.agent_id.length > 0
+      ? [toolInput.agent_id]
+      : Array.isArray(toolInput.agent_ids)
+        ? toolInput.agent_ids
+        : []
+  return ids.filter((id): id is string => typeof id === 'string' && id.length > 0)
+}

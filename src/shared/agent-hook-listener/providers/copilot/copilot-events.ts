@@ -11,7 +11,7 @@ import {
   readBackgroundAgentId,
   readCopilotAgentNotificationAgentId,
   readCopilotShellCompletionShellId,
-  readCopilotWriteAgentTargets,
+  readEndedAgentIdFromReadAgent,
   readStartedShellId,
   readTerminatedShellIds,
   reengageCopilotBackgroundAgents,
@@ -25,17 +25,18 @@ import type { HookListenerState } from '../../listener-state'
 import { resolvePrompt, resolveToolState } from '../../prompt-fields'
 import { extractToolFields, isNewTurnEvent } from '../../provider-event-routing'
 import {
+  isCopilotAgentLaunchResultTool,
   isCopilotBackgroundShellLaunch,
   isCopilotBackgroundSubagentLaunch,
   isCopilotBackgroundWorkCompletionNotification,
   readCopilotShellDescription,
   readCopilotToolName,
-  readCopilotToolResultText
+  readCopilotToolResultText,
+  readCopilotWriteAgentTargets
 } from './copilot-background-signals'
 import {
   isAskUserTool,
   normalizeCopilotEventName,
-  readCopilotToolInput,
   resolveCopilotEventName
 } from './copilot-tool-fields'
 
@@ -111,17 +112,19 @@ export function normalizeCopilotEvent(
   // Why: an agent that reads a shell to completion with `read_bash` gets the completion in the tool
   // result and Copilot then suppresses `shell_completed`; without this the shell would stay pending.
   const terminatedShellIds = readTerminatedShellIds(postToolResultText)
-  // Why: the launch result names the agent whatever tool, mode or "moved to background" path
-  // started it, so completions match it by id and a duplicate report cannot end another agent.
-  const backgroundAgentId = readBackgroundAgentId(postToolResultText)
+  // Why: the launch result names the agent whatever tool or mode started it, so its ends match it
+  // by id and a duplicate report cannot end another agent.
+  const toolName = readCopilotToolName(hookPayload)
+  const backgroundAgentId = isCopilotAgentLaunchResultTool(toolName)
+    ? readBackgroundAgentId(postToolResultText)
+    : undefined
+  const readAgentEndedId =
+    toolName?.toLowerCase() === 'read_agent'
+      ? readEndedAgentIdFromReadAgent(postToolResultText)
+      : undefined
   const reengagedAgentIds =
-    normalizedEventName === 'PostToolUse'
-      ? readCopilotWriteAgentTargets(
-          readCopilotToolName(hookPayload),
-          readCopilotToolInput(hookPayload),
-          postToolResultText
-        )
-      : []
+    normalizedEventName === 'PostToolUse' ? readCopilotWriteAgentTargets(hookPayload) : []
+  const endedAgentIds = state.copilotEndedAgentIdsByPaneKey.get(paneKey) ?? new Set<string>()
   const subagentToolStarted =
     normalizedEventName === 'PreToolUse' && isCopilotBackgroundSubagentLaunch(hookPayload)
   // Why: a background task launch that fails (e.g. the task tool rejects a missing agent name) never
@@ -140,9 +143,18 @@ export function normalizeCopilotEvent(
   const preserveLeadStopped = (previous: CopilotBackgroundWorkState | undefined): boolean =>
     isChildSessionEvent ? (previous?.leadStopped ?? false) : false
 
+  const storeBackgroundWork = (work: CopilotBackgroundWorkState): void => {
+    if (pendingCopilotBackgroundWork(work) === 0) {
+      state.copilotBackgroundWorkByPaneKey.delete(paneKey)
+    } else {
+      state.copilotBackgroundWorkByPaneKey.set(paneKey, work)
+    }
+  }
+
   let backgroundWorkState = getCopilotBackgroundWorkState(state, paneKey)
   if (normalizedEventName === 'SessionStart') {
     state.copilotBackgroundWorkByPaneKey.delete(paneKey)
+    endedAgentIds.clear()
     backgroundWorkState = undefined
   } else if (startedShellId) {
     backgroundWorkState = {
@@ -161,21 +173,18 @@ export function normalizeCopilotEvent(
       ...consumeCopilotBackgroundShells(backgroundWorkState, terminatedShellIds),
       leadStopped
     }
-    if (pendingCopilotBackgroundWork(backgroundWorkState) === 0) {
-      state.copilotBackgroundWorkByPaneKey.delete(paneKey)
-    } else {
-      state.copilotBackgroundWorkByPaneKey.set(paneKey, backgroundWorkState)
+    storeBackgroundWork(backgroundWorkState)
+  } else if (backgroundAgentId || readAgentEndedId || reengagedAgentIds.length > 0) {
+    let next = backgroundWorkState ?? createCopilotBackgroundWorkState()
+    if (backgroundAgentId) {
+      next = registerCopilotBackgroundAgent(next, backgroundAgentId, endedAgentIds)
     }
-  } else if (backgroundAgentId || reengagedAgentIds.length > 0) {
-    const base = backgroundWorkState ?? createCopilotBackgroundWorkState()
-    backgroundWorkState = {
-      ...reengageCopilotBackgroundAgents(
-        backgroundAgentId ? registerCopilotBackgroundAgent(base, backgroundAgentId) : base,
-        reengagedAgentIds
-      ),
-      leadStopped: preserveLeadStopped(backgroundWorkState)
+    if (readAgentEndedId) {
+      next = endCopilotSubagent(next, readAgentEndedId, endedAgentIds, 'none')
     }
-    state.copilotBackgroundWorkByPaneKey.set(paneKey, backgroundWorkState)
+    next = reengageCopilotBackgroundAgents(next, reengagedAgentIds, endedAgentIds)
+    backgroundWorkState = { ...next, leadStopped: preserveLeadStopped(backgroundWorkState) }
+    storeBackgroundWork(backgroundWorkState)
   } else if (subagentToolStarted) {
     const base = backgroundWorkState ?? createCopilotBackgroundWorkState()
     backgroundWorkState = {
@@ -191,12 +200,11 @@ export function normalizeCopilotEvent(
     state.copilotBackgroundWorkByPaneKey.set(paneKey, backgroundWorkState)
   } else if (failedBackgroundLaunch && backgroundWorkState) {
     const leadStopped = preserveLeadStopped(backgroundWorkState)
-    backgroundWorkState = { ...consumeCopilotSubagent(backgroundWorkState), leadStopped }
-    if (pendingCopilotBackgroundWork(backgroundWorkState) === 0) {
-      state.copilotBackgroundWorkByPaneKey.delete(paneKey)
-    } else {
-      state.copilotBackgroundWorkByPaneKey.set(paneKey, backgroundWorkState)
+    backgroundWorkState = {
+      ...consumeCopilotSubagent(backgroundWorkState, { includeRoster: false }),
+      leadStopped
     }
+    storeBackgroundWork(backgroundWorkState)
   } else if (
     !isChildSessionEvent &&
     backgroundWorkState &&
@@ -214,29 +222,39 @@ export function normalizeCopilotEvent(
   } else if (backgroundWorkCompletion && backgroundWorkState) {
     // Why: a detached shell reports `shell_detached_completed`, an async one `shell_completed`; a
     // completion is matched to the shell it names, so an unknown one cannot consume a different
-    // pending shell and settle the pane early. An agent completion ends the agent it names.
+    // pending shell and settle the pane early. An agent end is matched to the agent it names; an
+    // id-less `agent_idle` ends nothing, since its turn's `SubagentStop` may already have.
+    const agentId = readCopilotAgentNotificationAgentId(hookPayload)
     backgroundWorkState =
       backgroundWorkCompletion === 'shell'
         ? consumeCopilotBackgroundShells(
             backgroundWorkState,
             completionShellId ? [completionShellId] : []
           )
-        : endCopilotSubagent(backgroundWorkState, readCopilotAgentNotificationAgentId(hookPayload))
-    if (pendingCopilotBackgroundWork(backgroundWorkState) === 0) {
-      state.copilotBackgroundWorkByPaneKey.delete(paneKey)
-    } else {
-      state.copilotBackgroundWorkByPaneKey.set(paneKey, backgroundWorkState)
-    }
+        : endCopilotSubagent(
+            backgroundWorkState,
+            agentId,
+            endedAgentIds,
+            agentId
+              ? 'counts'
+              : notificationType === 'agent_completed'
+                ? 'counts-or-roster'
+                : 'none'
+          )
+    storeBackgroundWork(backgroundWorkState)
   } else if (normalizedEventName === 'SubagentStop' && backgroundWorkState) {
     backgroundWorkState = endCopilotSubagent(
       backgroundWorkState,
-      readFirstString(hookPayload, ['agent_id', 'agentId'])
+      readFirstString(hookPayload, ['agent_id', 'agentId']),
+      endedAgentIds,
+      'counts'
     )
-    if (pendingCopilotBackgroundWork(backgroundWorkState) === 0) {
-      state.copilotBackgroundWorkByPaneKey.delete(paneKey)
-    } else {
-      state.copilotBackgroundWorkByPaneKey.set(paneKey, backgroundWorkState)
-    }
+    storeBackgroundWork(backgroundWorkState)
+  }
+  if (endedAgentIds.size > 0) {
+    state.copilotEndedAgentIdsByPaneKey.set(paneKey, endedAgentIds)
+  } else {
+    state.copilotEndedAgentIdsByPaneKey.delete(paneKey)
   }
 
   // Why: everything below describes the LEAD turn; a child's own event only contributed background

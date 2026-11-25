@@ -309,64 +309,94 @@ describe('Copilot background agent roster', () => {
   const AGENT_A = '73c57907-bd4f-4e0e-af1f-26de720697e5'
   const AGENT_B = '5d1f0c2e-9a7b-4c3d-8e6f-0a1b2c3d4e5f'
 
-  function launched(agentId: string, toolInput: Record<string, unknown>, text: string) {
+  function launched(agentId: string) {
     return {
       hook_event_name: 'PostToolUse',
       session_id: LEAD,
       tool_name: 'task',
-      tool_input: toolInput,
-      tool_result: { result_type: 'success', text_result_for_llm: text.replace('<id>', agentId) }
+      tool_input: { name: 'worker', mode: 'background' },
+      tool_result: {
+        result_type: 'success',
+        text_result_for_llm: `Agent started in background with agent_id: ${agentId}. You'll be notified when it completes.`
+      }
     }
   }
 
-  function idle(agentId: string) {
+  function idle(agentId?: string) {
+    const hint = agentId
+      ? ` Use read_agent with agent_id "${agentId}" to retrieve the full results.`
+      : ''
     return {
       hook_event_name: 'Notification',
       sessionId: LEAD,
       notification_type: 'agent_idle',
-      message: `Agent "worker" (task) has finished processing and is now idle. Use read_agent with agent_id "${agentId}" to retrieve the full results.`
+      message: `Agent "worker" (task) has finished processing and is now idle.${hint}`
     }
   }
 
-  it('holds the pane until every agent ends, matching each end to the agent it names', () => {
+  it("settles only on the end of the last agent, never on another agent's reports", () => {
     post({ hook_event_name: 'UserPromptSubmit', session_id: LEAD, prompt: 'go' })
     post({
       hook_event_name: 'PreToolUse',
       session_id: LEAD,
       tool_name: 'task',
-      tool_input: { name: 'a', mode: 'background' }
+      tool_input: { name: 'worker', mode: 'background' }
     })
-    post(
-      launched(
-        AGENT_A,
-        { name: 'a', mode: 'background' },
-        'Agent started in background with agent_id: <id>. You will be notified when it completes.'
-      )
-    )
+    post(launched(AGENT_A))
     post({ hook_event_name: 'subagentStart', sessionId: LEAD, agentName: 'task' })
-    // A mode-less launch the CLI moved to background is still background work.
-    post({ hook_event_name: 'PreToolUse', session_id: LEAD, tool_name: 'task', tool_input: {} })
-    post({ hook_event_name: 'subagentStart', sessionId: LEAD, agentName: 'task' })
-    post(launched(AGENT_B, {}, 'Agent moved to background (agent_id: <id>)'))
+    post(launched(AGENT_B))
     expect(post({ hook_event_name: 'Stop', session_id: LEAD })?.payload.state).toBe('working')
 
-    // A's turn end is reported twice; neither report may end B.
+    // A's turn end arrives as SubagentStop, then again with and without its id; a sync child's stop
+    // names an agent the pane never rostered. None of them may end B.
     expect(
       post({ hook_event_name: 'SubagentStop', session_id: LEAD, agent_id: AGENT_A })
     ).toBeNull()
     expect(post(idle(AGENT_A))).toBeNull()
+    expect(post(idle())).toBeNull()
+    expect(
+      post({ hook_event_name: 'SubagentStop', session_id: LEAD, agent_id: 'sync-child' })
+    ).toBeNull()
     expect(post(idle(AGENT_B))?.payload.state).toBe('done')
+
+    // A late duplicate after the pane settled must not consume a fresh launch.
+    post({ hook_event_name: 'UserPromptSubmit', session_id: LEAD, prompt: 'again' })
+    post({
+      hook_event_name: 'PreToolUse',
+      session_id: LEAD,
+      tool_name: 'task',
+      tool_input: { name: 'worker', mode: 'background' }
+    })
+    expect(post({ hook_event_name: 'Stop', session_id: LEAD })?.payload.state).toBe('working')
+    expect(
+      post({ hook_event_name: 'SubagentStop', session_id: LEAD, agent_id: AGENT_B })
+    ).toBeNull()
+  })
+
+  it('ends an agent its read_agent reports idle and ignores launch lines quoted in output', () => {
+    post({ hook_event_name: 'UserPromptSubmit', session_id: LEAD, prompt: 'go' })
+    post(launched(AGENT_A))
+    post({
+      hook_event_name: 'PostToolUse',
+      session_id: LEAD,
+      tool_name: 'read_agent',
+      tool_input: { agent_id: AGENT_A, wait: true },
+      tool_result: {
+        result_type: 'success',
+        text_result_for_llm: `Agent is idle (waiting for messages). agent_id: ${AGENT_A}, agent_type: general-purpose, status: idle, elapsed: 28s, total_turns: 1\n\n[Turn 0]\nAgent started in background with agent_id: ${AGENT_B}.`
+      }
+    })
+    expect(post({ hook_event_name: 'Stop', session_id: LEAD })?.payload.state).toBe('done')
+
+    // A replayed launch of the ended agent does not re-open it.
+    post({ hook_event_name: 'UserPromptSubmit', session_id: LEAD, prompt: 'again' })
+    post(launched(AGENT_A))
+    expect(post({ hook_event_name: 'Stop', session_id: LEAD })?.payload.state).toBe('done')
   })
 
   it('keeps the pane working while write_agent re-engages an idle agent', () => {
     post({ hook_event_name: 'UserPromptSubmit', session_id: LEAD, prompt: 'go' })
-    post(
-      launched(
-        AGENT_A,
-        { name: 'a', mode: 'background' },
-        'Agent started in background with agent_id: <id>.'
-      )
-    )
+    post(launched(AGENT_A))
     expect(post({ hook_event_name: 'Stop', session_id: LEAD })?.payload.state).toBe('working')
     expect(post(idle(AGENT_A))?.payload.state).toBe('done')
 
@@ -375,7 +405,7 @@ describe('Copilot background agent roster', () => {
       hook_event_name: 'PostToolUse',
       session_id: LEAD,
       tool_name: 'write_agent',
-      tool_input: { agent_id: AGENT_A, message: 'one more thing' },
+      tool_input: { agent_ids: [AGENT_A], message: 'one more thing' },
       tool_result: { result_type: 'success', text_result_for_llm: 'Message delivered.' }
     })
     expect(post({ hook_event_name: 'Stop', session_id: LEAD })?.payload.state).toBe('working')
