@@ -5881,6 +5881,26 @@ Recorded as an anchor because it is an upstream file:
 stale — `check:code-quality:changed`, `wholeStep`, left from the 2026-11-20 sync — is gone, because the
 changed checks run clean here.
 
+### `local(lint)`: two `check:changed` ratchets red on `main` after the 2026-11-24 sync
+
+`pnpm check:changed` reports two failures at `767c078fde1` that the fork's lint gate —
+`node local/gate-lint.mjs`, the PR line's gate — does not run, so that gate is green (54/54) while the
+changed-checks entry point is not:
+
+- **`main-blocking-api`, sqlite category.** Ten `src/main/ai-vault-search/storage/` files carry
+  blocking sqlite with no baseline row. `countBlockingApis` scans `readEventLoopSources(root)` — the
+  whole tree, never the diff — and those files are byte-identical at `main` and on a branch cut from it,
+  so this is a base-branch red that no branch fixes by changing its own code. The 2026-11-08 note above
+  (AI-vault paging work on orcad's event loop) is the same red: it is a code fix, and a baseline row
+  would silence the check that exists to catch it.
+- **`react-compiler-compat`.** Three entries record more bailouts than the tree has —
+  `DiffViewer.tsx`, `RepositoryIconPicker.tsx`, `ClaudeSwitcherForOwner.tsx` — a baseline the
+  2026-11-24 sync shrank past. The fix is that ratchet's own `--prune`, re-taken on `main`, not in a
+  feature branch's diff.
+
+Neither goes in `local/lint-known-red.json`: that file allowlists failures of `local/gate-lint.mjs`'s own
+steps, and an entry for a step the gate never runs allows nothing.
+
 ### `local(test)`: one `host-load` flake seen on the iMessage branch, and why the red set was left alone
 
 `local/unit-known-red.json` has been empty of entries since the 2026-10-31 sweep, and this branch leaves

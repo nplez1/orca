@@ -41,9 +41,8 @@ async function fetchFromDefaultSession(url: string, init?: RequestInit): Promise
 /** Chromium honors session/proxy state; read defaultSession per call because it throws before app readiness. */
 export const electronHttpClient: MainHttpClient = {
   fetch: fetchFromDefaultSession,
-  // Why the wait: a cold request must not overtake the proxy policy being applied to the session, or
-  // it leaves on a bare route. `hasConfiguredProxyCredentials` is what waits; whether credentials
-  // exist is `fetchWithElectronManualRedirects`' own `login` listener to answer.
+  // fork-comment-ok: ordering trap. A cold request must not overtake the session's proxy policy, and
+  // `hasConfiguredProxyCredentials` is the wait; credentials themselves are the `login` listener's.
   fetchManualRedirects: async (url, init) => {
     const proxySession = session.defaultSession
     await hasConfiguredProxyCredentials(proxySession, init?.signal ?? undefined)

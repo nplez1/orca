@@ -95,13 +95,8 @@ export type DiffCommentZoneCardContext = {
   ) => Promise<boolean>
 }
 
-/**
- * One thread card, with every callback read at click time rather than at render time.
- *
- * Why: a card only re-renders when its content signature changes, and the callbacks arrive in refs
- * that the decorator fills from an effect. A callback captured here is therefore the one that existed
- * when the zone was inserted — an old target, or `undefined`, which hid Reply and Resolve on a card
- * that never re-rendered to find them.
+/** fork-comment-ok: callbacks are read at click time; a card re-renders only when its signature
+ * changes, so a captured ref is the one from when the zone was inserted, or `undefined`.
  */
 function renderPRCommentThreadCard(
   root: Root,
@@ -134,9 +129,7 @@ function renderPRCommentThreadCard(
           resolveRef && threadId
             ? async (resolve) => {
                 const setResolved = resolveRef.current
-                // Why the toast covers a missing handler too: the ref is always passed, so the button
-                // shows even where no review target exists — and a silent `false` there is the same
-                // flip-back this reporting exists to stop.
+                // fork-comment-ok: the button shows wherever the ref is passed, target or not.
                 let ok: unknown = false
                 if (setResolved) {
                   try {

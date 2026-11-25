@@ -193,9 +193,8 @@ function credentialFailure(readResult: CursorAuthReadResult): ProviderRateLimits
     })
   }
   if (readResult.status === 'error') {
-    // Why not `missing-credentials`: that kind tells the policy to drop the last reading, because no
-    // key answers any more. A momentary read failure of the auth store is not evidence of a signed-out
-    // account, and reporting it as one blanked the bars until the next poll succeeded.
+    // fork-comment-ok: `missing-credentials` clears the last reading; a failed read is not a dead key.
+    // Reporting one as the other blanked the bars until the next poll succeeded.
     return result('error', readResult.error, {
       usageMetadata: { failureKind: 'keychain-unavailable' }
     })

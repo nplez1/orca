@@ -29,11 +29,7 @@ function buildPatterns() {
   return patterns
 }
 
-/**
- * Names that are also ordinary words. Matching one finds prose in a fixture rather than a leak, and it
- * made this scan pass or fail depending on who ran it: a runner called `unknown` red-flagged five
- * committed fixtures.
- */
+/** fork-comment-ok: words a transcript contains on its own; matching one finds prose, not a leak. */
 const COMMON_IDENTIFIERS = new Set([
   'root',
   'user',
@@ -55,16 +51,14 @@ const COMMON_IDENTIFIERS = new Set([
   'build'
 ])
 
-/** Three characters or more, and not a word the transcripts contain on their own. */
+/** fork-comment-ok: three characters or more, and not an ordinary word. */
 export function isDistinctiveIdentifier(value) {
   return value.length >= 3 && !COMMON_IDENTIFIERS.has(value.toLowerCase())
 }
 
-/**
- * A literal, bounded by word edges so `nathanp` does not match inside `nathanp2` or `xnathanp`.
- *
- * Why the edges are conditional: a value that starts or ends with a non-word character has no word
- * boundary there, and adding one would either shift the span this scan reports or never match.
+/** fork-comment-ok: the conditional edge is the rule — one added to an edge the value breaks
+ * (`/Users/x`) shifts the reported span or never matches.
+ * Bounded, so `nathanp` misses `nathanp2`.
  */
 export function identifierPattern(value) {
   const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')

@@ -68,8 +68,8 @@ async function updateBot(params: BotUpdateParams, context: RpcContext) {
   } else if (params.updates.paused === false && !bot.paused) {
     // Every resume, not only a seen transition: a pause still being saved reads as unpaused here.
     releaseHeldBotMail(context.runtime, bot)
-    // Why the catch: `releaseHeld` replays the bot's held mail, so a rejection here would surface as an
-    // unhandled one from an RPC that already answered.
+    // fork-comment-ok: `releaseHeld` replays held mail, so a rejection surfaces unhandled after the
+    // RPC answered.
     void photonChannel(context.runtime)
       .releaseHeld(bot.id)
       .catch((error: unknown) =>

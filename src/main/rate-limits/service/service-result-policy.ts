@@ -57,9 +57,7 @@ export abstract class RateLimitServiceResultPolicy extends RateLimitServiceFetch
       }
     }
 
-    // Unavailability, a rejected Codex login and a credential the provider now refuses all clear the
-    // prior reading and its provenance: those numbers describe a key that no longer answers, so
-    // showing them beside "check the key in Settings" claims a balance nothing verified.
+    // fork-comment-ok: a reading describes the key that produced it; refusing that key retires it.
     const failureKind = fresh.usageMetadata?.failureKind
     if (
       fresh.status === 'unavailable' ||

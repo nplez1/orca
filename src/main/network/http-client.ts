@@ -5,10 +5,8 @@ import type { Session } from 'electron'
 
 export type MainHttpClient = {
   fetch(url: string, init?: RequestInit): Promise<Response>
-  /**
-   * One hop, with a 3xx handed back instead of followed, so a caller can vet the destination before
-   * the next request carries its credentials there. Absent only on a host whose transport cannot do
-   * it, where a caller that must vet hops has to refuse instead.
+  /** fork-comment-ok: fork-added seam; a 3xx comes back instead of being followed.
+   * Absent only where the transport cannot do it — a caller that must vet hops then refuses.
    */
   fetchManualRedirects?(url: string, init?: RequestInit): Promise<Response>
   proxySession(): Session | null

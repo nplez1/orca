@@ -32,9 +32,8 @@ describe('pty transcript secret scan', () => {
   })
 })
 
-// Why this is pinned: the operator's own name was matched as an unbounded literal, so a runner called
-// `unknown` or `worker` red-flagged five committed fixtures. The bound is what keeps the scan a
-// judgement about this transcript rather than about who ran it.
+// fork-comment-ok: the bound is what keeps the scan about this transcript, not about who ran it.
+// Unbounded, a runner called `unknown` or `worker` red-flagged five committed fixtures.
 describe('operator identifiers', () => {
   it('matches the name only at a word edge', () => {
     expect(identifierPattern('nathanp').test('/Users/nathanp/Code')).toBe(true)
@@ -47,7 +46,7 @@ describe('operator identifiers', () => {
       expect(isDistinctiveIdentifier(common)).toBe(false)
     }
     expect(isDistinctiveIdentifier('nathanp')).toBe(true)
-    // Three letters is still a leak when the name is nobody's ordinary word.
+    // fork-comment-ok: three letters still leaks when the name is nobody's ordinary word.
     expect(isDistinctiveIdentifier('bob')).toBe(true)
   })
 })

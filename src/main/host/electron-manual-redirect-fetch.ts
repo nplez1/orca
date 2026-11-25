@@ -23,13 +23,8 @@ function webBody(response: Readable, request: ClientRequest): ReadableStream<Uin
   })
 }
 
-/**
- * net.fetch rejects manual redirects; expose each hop so callers can validate its destination.
- *
- * Why a `login` listener of its own: Electron cancels a proxy challenge when nothing answers it
- * (see `fetchWithProxyLogin`), so a bare `net.request` behind an authenticated proxy returns 407 to
- * every call — a Jenkins read that worked through `net.fetch` before this path existed. The handler
- * answers proxy challenges only, and never a server 401, which is the caller's business.
+/** fork-comment-ok: `login` answers proxy challenges only. Electron cancels one nobody answers, so
+ * a bare `net.request` behind an authenticated proxy would 407 every call (see `fetchWithProxyLogin`).
  */
 export function fetchWithElectronManualRedirects(
   url: string,
@@ -46,9 +41,8 @@ export function fetchWithElectronManualRedirects(
       url,
       method: 'GET',
       redirect: 'manual',
-      // Why include: `net.fetch` sends the session's cookies for a same-origin request, and Jenkins
-      // authenticates some routes with the session cookie alone. Credential headers stay the caller's
-      // to replay, hop by hop, which is the whole point of this follower.
+      // fork-comment-ok: Jenkins authenticates some routes by session cookie alone, and credential
+      // headers stay the caller's to replay hop by hop — the point of this follower.
       credentials: init.credentials === 'omit' ? 'omit' : origin ? 'same-origin' : 'include',
       ...(session ? { session } : {})
     })
@@ -63,8 +57,7 @@ export function fetchWithElectronManualRedirects(
         callback()
       }
     })
-    // Why headers are forwarded: a caller that vets its own hops still has to authenticate the hop it
-    // approved, and `net.request` starts with none of `init`'s.
+    // fork-comment-ok: a caller vetting its own hops still authenticates the one it approved.
     for (const [key, value] of new Headers(init.headers)) {
       request.setHeader(key, value)
     }
