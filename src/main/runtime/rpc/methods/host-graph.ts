@@ -1,4 +1,3 @@
-import { hostname } from 'node:os'
 import type { z } from 'zod'
 import {
   HOST_GRAPH_EXCHANGE_METHOD,
@@ -7,22 +6,11 @@ import {
   type HostGraphExchangeResult
 } from '../../../../shared/host-graph/host-graph-contract'
 import { HostGraphExchangeParams } from '../../../../shared/rpc-contract/host-graph-params'
-import { listEnvironments } from '../../../../shared/remote-runtime/host-store/runtime-environment-store'
 import {
   createHostGraphHeardReports,
   type HostGraphHeardReports
 } from '../../../host-graph/host-graph-heard-reports'
-import {
-  buildOwnAdjacency,
-  type HostGraphOwnEdgeSources
-} from '../../../host-graph/host-graph-own-edges'
-import { readSelfMachineRef } from '../../../host-graph/host-graph-self-identity'
-import { getRuntimeEnvironmentRegistryRoot } from '../../../ipc/runtime-environments/catalog/runtime-environment-registry-root'
-import { loadTrustedHostKeys } from '../../../ssh/host-keys/ssh-host-key-store'
-import {
-  getRegisteredSshState,
-  listRegisteredSshTargets
-} from '../../../ssh/targets/ssh-target-registry'
+import { readLocalAdjacency } from '../../../host-graph/host-graph-local-adjacency'
 import { defineMethod } from '../core'
 
 type ParsedAdjacency = NonNullable<z.infer<typeof HostGraphExchangeParams>['self']>
@@ -53,7 +41,7 @@ export const HOST_GRAPH_METHODS = [
           receivedAt: Date.now()
         })
       }
-      const own = await ownAdjacency()
+      const own = await readLocalAdjacency()
       if (params.knownRevision === own.revision) {
         return { unchanged: true }
       }
@@ -78,37 +66,4 @@ function ownPayloadOf(parsed: ParsedAdjacency): HostGraphAdjacency | null {
     return null
   }
   return { ...parsed, version: HOST_GRAPH_PAYLOAD_VERSION }
-}
-
-/**
- * Why every read degrades to empty: a host that cannot list its own targets must still answer, or one
- * unreadable store removes it from every peer's fleet instead of showing it with no edges.
- */
-async function ownAdjacency(): Promise<HostGraphAdjacency> {
-  const readSafely = async <T>(read: () => T | Promise<T>, fallback: T): Promise<T> => {
-    try {
-      return await read()
-    } catch {
-      return fallback
-    }
-  }
-  const root = getRuntimeEnvironmentRegistryRoot()
-  const [environments, sshTargets, trustedHostKeys] = await Promise.all([
-    readSafely<HostGraphOwnEdgeSources['environments']>(() => listEnvironments(root), []),
-    readSafely<HostGraphOwnEdgeSources['sshTargets']>(() => listRegisteredSshTargets(), []),
-    readSafely<HostGraphOwnEdgeSources['trustedHostKeys']>(() => loadTrustedHostKeys(), [])
-  ])
-  const connectedSshTargetIds = sshTargets
-    .filter((target) => getRegisteredSshState(target.id)?.status === 'connected')
-    .map((target) => target.id)
-  return buildOwnAdjacency({
-    now: Date.now(),
-    // Why the host's own keys: a peer names this machine by the pairing key it recorded, so without
-    // them this host cannot recognise its own row in the fleet it asks about.
-    self: { label: hostname(), ...readSelfMachineRef(root) },
-    environments,
-    sshTargets,
-    trustedHostKeys,
-    connectedSshTargetIds
-  })
 }
