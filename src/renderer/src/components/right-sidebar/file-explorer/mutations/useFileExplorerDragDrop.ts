@@ -28,7 +28,6 @@ type UseFileExplorerDragDropParams = {
 
 type UseFileExplorerDragDropResult = {
   handleMoveDrop: (sourcePath: string, destDir: string) => void
-  /** The per-path move the drop loop runs, for "Move to…". */
   movePath: (sourcePath: string, destDir: string) => Promise<FileExplorerMoveResult>
   handleDragExpandDir: (dirPath: string) => void
   dropTargetDir: string | null

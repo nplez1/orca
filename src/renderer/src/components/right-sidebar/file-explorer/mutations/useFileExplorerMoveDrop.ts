@@ -13,7 +13,6 @@ import { classifyMoveDestination } from './file-explorer-move-copy-paths'
 import { fileExplorerGuardContext } from './file-explorer-copy-into-dir'
 import { translate } from '@/i18n/i18n'
 
-/** Strip Electron invoke error wrappers before showing the underlying message. */
 export function extractIpcErrorMessage(err: unknown, fallback: string): string {
   if (!(err instanceof Error)) {
     return fallback
@@ -40,7 +39,6 @@ export function pathCollisionMessage(name: string): string {
 }
 
 function describeMoveFailure(err: unknown, fileName: string): string {
-  // Why: a failed rollback can itself report EEXIST; its stranded-file message must survive.
   return !(err instanceof EditorPathMoveRetargetError) && isPathCollisionError(err)
     ? pathCollisionMessage(fileName)
     : extractIpcErrorMessage(
@@ -63,7 +61,6 @@ type UseFileExplorerMovePathParams = {
   getOperationOwnerForPath: (path: string) => FileExplorerOperationOwner | undefined
 }
 
-/** One explorer move: editor-tab rekeying, rollback and an undo entry, shared by drag-drop and "Move to…". */
 export async function moveFileExplorerPath(
   {
     worktreePath,
@@ -88,7 +85,6 @@ export async function moveFileExplorerPath(
   try {
     const operationGuard = captureFileExplorerOperationGuard(activeWorktreeId, operationOwner)
     const context = fileExplorerGuardContext(operationGuard, activeWorktreeId, worktreePath)
-    // Hosts word no-clobber refusals differently; checking first names the real cause.
     if (await runtimePathExists(context, newPath)) {
       return { status: 'failed', message: pathCollisionMessage(fileName) }
     }
@@ -127,7 +123,6 @@ export async function moveFileExplorerPath(
   } catch (err) {
     return { status: 'failed', message: describeMoveFailure(err, fileName) }
   }
-  // A refresh failure must not report a completed move as failed.
   await Promise.all([refreshDir(sourceDir), refreshDir(destDir)]).catch(() => {})
   return { status: 'moved' }
 }

@@ -21,7 +21,6 @@ import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../../shared/workspace-layou
 
 let moveOperationCounter = 0
 
-/** The rename landed but open editors could not follow it; its message says whether the rollback did too. */
 export class EditorPathMoveRetargetError extends Error {}
 
 /** Quiesce saves, suppress source events, rename disk, rekey sessions atomically and verify destination echoes. Failed rename leaves store state untouched and releases suppression. */
