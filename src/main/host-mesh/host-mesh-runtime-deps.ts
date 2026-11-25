@@ -115,6 +115,23 @@ function depsFromApp(server: HostMeshRuntimeServer): HostMeshDriverDeps {
     },
     environmentIdForHostKey: (hostKey) => environmentForHostKey(userDataPath, hostKey)?.id ?? null,
     labelForHostKey: (hostKey) => environmentForHostKey(userDataPath, hostKey)?.name ?? null,
+    listPairedHostKeys: () => {
+      try {
+        return listEnvironments(userDataPath).flatMap((environment) => {
+          if (environment.endpoints.length === 0) {
+            return []
+          }
+          const publicKey = getPreferredPairedRuntimeConnection(environment).hostPublicKeyB64
+          return publicKey === undefined
+            ? []
+            : [{ hostKey: orcaHostKeyOf(publicKey), label: environment.name }]
+        })
+      } catch {
+        // An unreadable table migrates nothing: a group invented from a failed read would be worse than
+        // starting with none, and the next launch retries.
+        return []
+      }
+    },
     send: async <T>(environmentId: string, method: string, params: unknown): Promise<T> => {
       const offer = await resolveEnvironmentPairingOffer(userDataPath, environmentId)
       const response = await sendRemoteRuntimeRequestOnSocket<T>(

@@ -22,6 +22,7 @@ import { SettingsRow, SettingsSwitchRow } from '../../form-controls/SettingsForm
 import { SettingsGroup, SettingsGroupSubsection } from '../../section-layout/SettingsGroup'
 import {
   hostGroupCapacityNote,
+  hostGroupMigrationLine,
   hostGroupGroupLine,
   hostGroupMemberDetail,
   hostGroupMemberStatus,
@@ -52,6 +53,7 @@ export function HostGroupSection(): React.JSX.Element | null {
   const busyAction = busy !== null && busy !== 'read'
   const failure = describeFailure(group.failure, t)
   const capacityNote = snapshot ? hostGroupCapacityNote(snapshot.summary, t) : null
+  const migrationLine = snapshot ? hostGroupMigrationLine(snapshot.migration, t) : null
 
   const updateSetting = (patch: Partial<HostMeshSettings>): void => {
     void group.updateSettings(patch)
@@ -91,6 +93,7 @@ export function HostGroupSection(): React.JSX.Element | null {
             ? hostGroupGroupLine(snapshot, t)
             : t('auto.components.settings.hostGroup.reading', 'Reading the group…')}
         </p>
+        {migrationLine ? <p className="text-xs text-muted-foreground">{migrationLine}</p> : null}
         {capacityNote ? <p className="text-xs text-muted-foreground">{capacityNote}</p> : null}
         {snapshot?.lastError ? (
           <p className="text-xs text-status-warning-text">{snapshot.lastError}</p>

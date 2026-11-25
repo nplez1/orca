@@ -2,6 +2,7 @@ import type {
   HostMeshDriver,
   HostMeshDriverDeps,
   HostMeshJoinOutcome,
+  HostMeshMigrationOutcome,
   HostMeshRpcService,
   HostMeshSnapshot
 } from './host-mesh-driver-contract'
@@ -35,6 +36,21 @@ function requireDriver(): HostMeshDriver {
 
 export function readHostMeshSnapshot(): Promise<HostMeshSnapshot> {
   return requireDriver().snapshot()
+}
+
+/**
+ * Runs the upgrade step once, at startup.
+ *
+ * Why here rather than in the RPC surface: it writes a group into the store, and an RPC-reachable call could
+ * be driven by a peer. Startup is the only moment at which "the owner just installed this build" is true.
+ */
+export function migrateHostMeshFromPairings(): HostMeshMigrationOutcome {
+  try {
+    return requireDriver().migrateFromPairings()
+  } catch {
+    // A mesh that cannot be built yet must not stop the app from starting: the next launch retries.
+    return { kind: 'nothing-to-group' }
+  }
 }
 
 export function joinHostMesh(environmentId: string): Promise<HostMeshJoinOutcome> {

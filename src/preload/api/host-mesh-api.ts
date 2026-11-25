@@ -29,6 +29,8 @@ export type HostMeshSnapshot = {
   settings: HostMeshSettings
   /** A line a surface can show verbatim when the last pass failed, or null. */
   lastError: string | null
+  /** Where the group came from when an upgrade created it, or null when the owner made it. */
+  migration: { appliedAt: number; peerCount: number } | null
 }
 
 export type HostMeshJoinOutcome =

@@ -55,6 +55,31 @@ export function hostGroupMemberStatus(
   }
 }
 
+/**
+ * Where the group came from, when an upgrade made it.
+ *
+ * Why the pane says this: the group appears without the owner creating it, so the first question it has to
+ * answer is "why is this here?". Absent when the owner made the group themselves.
+ */
+export function hostGroupMigrationLine(
+  migration: { peerCount: number } | null,
+  t: Translate
+): string | null {
+  if (migration === null || migration.peerCount === 0) {
+    return null
+  }
+  return migration.peerCount === 1
+    ? t(
+        'auto.components.settings.hostGroup.migratedOne',
+        'Created when this version arrived, from the computer this one was already paired with.'
+      )
+    : t(
+        'auto.components.settings.hostGroup.migratedMany',
+        'Created when this version arrived, from the {{count}} computers this one was already paired with.',
+        { count: migration.peerCount }
+      )
+}
+
 export function hostGroupSummaryLine(summary: HostMeshGroupSummary, t: Translate): string {
   const parts = [
     summary.memberCount === 1

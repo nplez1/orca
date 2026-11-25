@@ -6187,3 +6187,32 @@ can be replayed inside its ten-minute window. A member list arrives unauthentica
 cost of auto-pairing: one member can name a machine it controls and every member will pair with it. Any
 `workspace` caller can drain another host's pending boxes (a denial of service, since only the addressee can
 open one). The store has no lock, so two concurrent RPCs can lose an update.
+
+**Upgrading an existing install.** Nothing is rewritten: the group lives in its own `host-mesh.json`, the
+pairing table and its schema are untouched, and a build without the mesh simply ignores the new file. What
+would otherwise happen is that an existing fleet stays exactly as scattered as it was — pairings are
+directional, so every machine already holds the machines it was paired with but nothing groups them — and the
+owner would have to create a group by hand on each one.
+
+So there is one migration, at startup, and it runs once per install. It reads the pairing table (the same
+edges discovery already reports), groups this host with every machine it is already paired with, and records
+that it ran. Nothing is minted or dialled by it: every link starts awaiting its offer, so the panel shows an
+unrepaired fleet rather than a false one. A machine with no pairings has nothing to group and records that,
+which is why pairing a second machine later does not silently create a group the owner never asked for. And
+because the file is written, leaving the group is never undone by the next launch.
+
+Two machines upgrading independently cannot agree on a group id without help — each derives one from the
+fleet it can see, and a leaf sees only the hub — so `adoptHostMeshGroup` is the rule that settles it: a host
+takes on another's group when that group contains its own and every machine in it is either already paired
+here or vouched for by a member that is. The id is derived from the members rather than random so two
+machines that saw the same fleet agree outright, and containment rather than overlap so two fleets that share
+one machine never merge through it.
+
+The other half of the same gap was structural, not migration-specific: `decideIntroduce` refused a host with
+no group at all, so a machine that had never joined could not be brought in by anyone — the opposite of one
+join pairing it with everyone. It adopts instead, on the same trust rule. `hostMesh.sync` also answered a
+member whose group id differed with an empty member list, which is what kept a fleet split after an upgrade;
+membership now decides that rather than the id, and a non-member still learns nothing.
+
+Verified by a three-host simulation of the upgrade itself: three machines that only ever knew the hub each
+migrate to their own group, and after two syncs each they hold one group and know all three members.

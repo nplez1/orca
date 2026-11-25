@@ -9,6 +9,7 @@ import {
 } from '../../persistence/loading-store/user-data-path'
 import { OrcaRuntimeRpcServer } from '../../runtime/rpc/server/runtime-rpc'
 import { configureHostMeshRuntimeFromApp } from '../../host-mesh/host-mesh-runtime-deps'
+import { migrateHostMeshFromPairings } from '../../host-mesh/host-mesh-runtime'
 import { resolveServePinnedBindHost } from '../serve-launch/serve-pinned-bind-host'
 import { isOrcadSidecarLaunch } from '../../window/activation/foreground-activation-policy'
 import type { MainWindowOpenOptions } from '../../window/main-window/main-window-contracts'
@@ -116,6 +117,9 @@ function installRuntimeRpc(
   })
   state.core.runtimeRpc = runtimeRpc
   configureHostMeshRuntimeFromApp(runtimeRpc) // Offers mint lazily, so the server need only exist.
+  // The upgrade step: a build with the mesh in it groups the machines this install was already paired with,
+  // once. It reads the pairing table, so it must run after the runtime's own paths are resolved.
+  migrateHostMeshFromPairings()
   runtime.setAgentSenderPeerKey(() => runtimeRpc.getE2EEPublicKey())
   runtimeRpc.setMobileDesktopRelayHosts(createRuntimeEnvironmentMobileRelayHosts())
   registerMobileHandlers(runtimeRpc, {

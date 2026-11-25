@@ -161,6 +161,12 @@ class Mesh {
         return null
       },
       labelForHostKey: (hostKey) => host.labels.get(hostKey) ?? null,
+      // What an upgrade reads: the pairings this host already holds. Only the migration test calls it.
+      listPairedHostKeys: () =>
+        [...host.environments.values()].flatMap((target) => {
+          const peer = [...this.hosts.values()].find((entry) => entry.hostKey === target)
+          return peer === undefined ? [] : [{ hostKey: peer.hostKey, label: peer.name }]
+        }),
       send: <T>(environmentId: string, method: string, params: unknown): Promise<T> =>
         this.dispatch<T>(host, environmentId, method, params),
       settings: () => host.settings,
@@ -392,6 +398,94 @@ describe('a box is spent once', () => {
     // Whatever the studio minted, a box cannot be redeemed twice by the same host.
     const studioView = await studio.driver.snapshot()
     expect(studioView.members.length).toBeGreaterThan(0)
+  })
+})
+
+describe('an existing fleet upgrading to this build', () => {
+  it('groups the machines it was already paired with, without minting or dialling anything', async () => {
+    const mesh = new Mesh()
+    const studio = mesh.add('studio')
+    const laptop = mesh.add('laptop')
+    const vm = mesh.add('vm')
+    // Before the upgrade: pairing is directional, so each leaf knows the studio and nothing of the other leaf.
+    mesh.seedPairing(laptop, studio)
+    mesh.seedPairing(vm, studio)
+
+    expect(studio.driver.migrateFromPairings()).toEqual({ kind: 'grouped', peerCount: 2 })
+    expect(laptop.driver.migrateFromPairings()).toEqual({ kind: 'grouped', peerCount: 1 })
+
+    const view = await studio.driver.snapshot()
+    expect(view.inGroup).toBe(true)
+    expect(view.members.map((member) => member.hostKey).sort()).toEqual(
+      [laptop.hostKey, vm.hostKey].sort()
+    )
+    // Nothing was handed out by the upgrade itself: only the pairings the owner already had are grouped.
+    expect(studio.labels.size).toBe(2)
+    expect(view.migration?.peerCount).toBe(2)
+  })
+
+  it('does it once, so leaving the group afterwards is not undone by the next launch', async () => {
+    const mesh = new Mesh()
+    const studio = mesh.add('studio')
+    const laptop = mesh.add('laptop')
+    mesh.seedPairing(laptop, studio)
+
+    expect(laptop.driver.migrateFromPairings()).toEqual({ kind: 'grouped', peerCount: 1 })
+    expect(laptop.driver.migrateFromPairings()).toEqual({ kind: 'already-recorded' })
+
+    await laptop.driver.leave()
+    expect((await laptop.driver.snapshot()).inGroup).toBe(false)
+
+    // A later launch runs the same one-shot step and leaves the owner's decision alone.
+    expect(laptop.driver.migrateFromPairings()).toEqual({ kind: 'already-recorded' })
+    expect((await laptop.driver.snapshot()).inGroup).toBe(false)
+  })
+
+  it('records a run that found nothing, so pairing a machine later does not silently create a group', async () => {
+    const mesh = new Mesh()
+    const studio = mesh.add('studio')
+
+    expect(studio.driver.migrateFromPairings()).toEqual({ kind: 'nothing-to-group' })
+
+    const laptop = mesh.add('laptop')
+    mesh.seedPairing(laptop, studio)
+    expect(studio.driver.migrateFromPairings()).toEqual({ kind: 'already-recorded' })
+    expect((await studio.driver.snapshot()).inGroup).toBe(false)
+  })
+
+  it('converges on one group when the leaves only ever knew the hub', async () => {
+    const mesh = new Mesh()
+    const studio = mesh.add('studio')
+    const laptop = mesh.add('laptop')
+    const vm = mesh.add('vm')
+    mesh.seedPairing(laptop, studio)
+    mesh.seedPairing(vm, studio)
+
+    // Three machines upgrade independently, each deriving a group from the pairings it can see.
+    for (const host of [studio, laptop, vm]) {
+      host.driver.migrateFromPairings()
+    }
+    const groups = await Promise.all(
+      [studio, laptop, vm].map(async (host) => (await host.driver.snapshot()).groupId)
+    )
+    expect(new Set(groups).size).toBeGreaterThan(1)
+
+    // The hub pairs the two leaves with each other, and the leaves then take on the group that contains
+    // everything they are paired with — which is the "add every host to every host" half of this.
+    await studio.driver.sync()
+    await laptop.driver.sync()
+    await vm.driver.sync()
+    await studio.driver.sync()
+    await laptop.driver.sync()
+    await vm.driver.sync()
+
+    const settled = await Promise.all(
+      [studio, laptop, vm].map(async (host) => (await host.driver.snapshot()).groupId)
+    )
+    expect(new Set(settled).size).toBe(1)
+    expect((await laptop.driver.snapshot()).members.map((member) => member.hostKey).sort()).toEqual(
+      [studio.hostKey, vm.hostKey].sort()
+    )
   })
 })
 

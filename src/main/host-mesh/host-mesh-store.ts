@@ -91,6 +91,13 @@ const settingsSchema = z.looseObject({
   allowJoins: z.boolean()
 })
 
+export type HostMeshMigrationRecord = {
+  version: number
+  appliedAt: number
+  /** Machines the group was created from; 0 records that this install had none to group. */
+  peerCount: number
+}
+
 export type HostMeshPeerIndexEntry = {
   deviceRowIds: readonly string[]
   environmentId: string | null
@@ -111,7 +118,9 @@ const storedFileSchema = z.looseObject({
   /** Box nonces already redeemed, with when, so a replay fails rather than joining twice. */
   spentNonces: z.record(z.string().min(1), z.number()).default({}),
   /** The group's own admission rules, which belong with the group rather than with this install's settings. */
-  settings: z.unknown().default(null)
+  settings: z.unknown().default(null),
+  /** What an upgrade found and grouped, so the panel can say where this group came from. */
+  migration: z.unknown().default(null)
 })
 
 type StoredFile = z.infer<typeof storedFileSchema>
@@ -123,6 +132,7 @@ const emptyFile = (): StoredFile => ({
   pendingBoxes: {},
   admissions: {},
   spentNonces: {},
+  migration: null,
   settings: null
 })
 
@@ -196,6 +206,13 @@ function writeStoredFile(path: string, file: StoredFile): void {
   writeSecureJsonFileWithinLimit(path, file, MAX_HOST_MESH_STORE_BYTES, { durable: true })
 }
 
+function migrationRecordOf(raw: unknown): HostMeshMigrationRecord | null {
+  const parsed = z
+    .object({ version: z.number(), appliedAt: z.number(), peerCount: z.number() })
+    .safeParse(raw)
+  return parsed.success ? parsed.data : null
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -227,6 +244,9 @@ export type HostMeshStore = {
   readPeerIndex(): ReadonlyMap<string, HostMeshPeerIndexEntry>
   readSettings(): HostMeshSettings
   writeSettings(settings: HostMeshSettings): void
+  /** What the one-time upgrade migration did, or null when it has not run in this install. */
+  readMigration(): HostMeshMigrationRecord | null
+  recordMigration(record: HostMeshMigrationRecord): void
   /** True when this box's nonce was already used, so a replay inside the offer window is refused. */
   hasSpentNonce(nonce: string, now: number): boolean
   spendNonce(nonce: string, now: number): void
@@ -334,6 +354,16 @@ export function createHostMeshStore({ userDataPath }: { userDataPath: string }):
         ...file,
         spentNonces: { ...Object.fromEntries(kept), [nonce]: now }
       })
+    },
+
+    readMigration: () => {
+      const file = readOrRefuse(path)
+      return file === null ? null : migrationRecordOf(file.migration)
+    },
+
+    recordMigration: (record) => {
+      const file = readOrRefuse(path) ?? emptyFile()
+      writeStoredFile(path, { ...file, migration: record })
     },
 
     readAdmissions: (groupId, now) => {

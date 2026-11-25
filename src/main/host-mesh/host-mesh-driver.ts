@@ -26,6 +26,7 @@ import {
   membersAwaitingNewcomerOffer,
   type HostMeshSettings
 } from '../../shared/host-mesh/host-mesh-admission'
+import { adoptHostMeshGroup } from '../../shared/host-mesh/host-mesh-adoption'
 import {
   addHostMeshMember,
   applyHostMeshSync,
@@ -38,6 +39,7 @@ import {
 } from '../../shared/host-mesh/host-mesh-membership'
 import { orcaHostKeyOf } from '../host-graph/host-graph-self-identity'
 import { createHostMeshStore, type HostMeshStore } from './host-mesh-store'
+import { HOST_MESH_MIGRATION_VERSION, planHostMeshMigration } from './host-mesh-migration'
 import { createHostMeshRpcService } from './host-mesh-rpc-service'
 
 export { createHostMeshRpcService }
@@ -46,6 +48,7 @@ import type {
   HostMeshDriver,
   HostMeshDriverDeps,
   HostMeshJoinOutcome,
+  HostMeshMigrationOutcome,
   HostMeshMemberView,
   HostMeshSnapshot,
   RedeemedPeer
@@ -85,6 +88,16 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
   const selfKey = () => orcaHostKeyOf(keypair().publicKeyB64)
 
   let lastError: string | null = null
+
+  /** Read once per snapshot, and never allowed to fail a snapshot: it only annotates one. */
+  function storedMigration(): { appliedAt: number; peerCount: number } | null {
+    try {
+      const record = store.readMigration()
+      return record === null ? null : { appliedAt: record.appliedAt, peerCount: record.peerCount }
+    } catch {
+      return null
+    }
+  }
 
   function loadState(): HostMeshState {
     return store.read() ?? createHostMeshState({ selfKey: selfKey(), groupId: '', epoch: 1 })
@@ -196,6 +209,43 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
     }
   }
 
+  /**
+   * Groups the machines this install is already paired with, once, the first time a build with the mesh runs.
+   *
+   * Why not a side effect of reading the state: this runs at startup and writes the store, and a read path
+   * that quietly creates a group would fire from any RPC — including one a peer is driving.
+   */
+  function migrateFromPairings(): HostMeshMigrationOutcome {
+    if (store.readMigration() !== null) {
+      return { kind: 'already-recorded' }
+    }
+    // A group of this install's own is authoritative: this is an upgrade step, never a reset.
+    if (store.read() !== null) {
+      store.recordMigration({
+        version: HOST_MESH_MIGRATION_VERSION,
+        appliedAt: deps.now(),
+        peerCount: 0
+      })
+      return { kind: 'already-recorded' }
+    }
+    const plan = planHostMeshMigration({ selfKey: selfKey(), peers: deps.listPairedHostKeys() })
+    if (plan === null) {
+      store.recordMigration({
+        version: HOST_MESH_MIGRATION_VERSION,
+        appliedAt: deps.now(),
+        peerCount: 0
+      })
+      return { kind: 'nothing-to-group' }
+    }
+    store.write(plan.state)
+    store.recordMigration({
+      version: HOST_MESH_MIGRATION_VERSION,
+      appliedAt: deps.now(),
+      peerCount: plan.peerCount
+    })
+    return { kind: 'grouped', peerCount: plan.peerCount }
+  }
+
   async function snapshot(): Promise<HostMeshSnapshot> {
     const state = loadState()
     const members: HostMeshMemberView[] = state.members.map((member) => ({
@@ -212,7 +262,8 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
       members,
       summary: summarizeHostMesh(state),
       settings: deps.settings(),
-      lastError
+      lastError,
+      migration: storedMigration()
     }
   }
 
@@ -482,6 +533,27 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
           hostKey: selfKey()
         } satisfies HostMeshPendingRequest)
         if (confirmKey(payload.selfKey, payload.publicKeyB64)) {
+          // Why adoption precedes the merge: two hosts upgraded from the same fleet derive their own group
+          // ids, and the merge refuses a payload from a group it is not in — so without this the fleet
+          // would stay split with each half convinced the other is a stranger.
+          const adoption = adoptHostMeshGroup(
+            state,
+            {
+              groupId: payload.groupId,
+              epoch: payload.epoch,
+              hostKeys: [payload.selfKey, ...payload.members.map((view) => view.hostKey)]
+            },
+            {
+              isTrusted: (hostKey) => deps.environmentIdForHostKey(hostKey) !== null,
+              // The member that sent this payload vouches for the list it sent, which is the same standing an
+              // introduction has: a machine we are paired with saying "this one is in the group too". Anything
+              // we have not been told about is still refused, so a stranger cannot arrive unnoticed.
+              vouched: payload.members.map((view) => view.hostKey)
+            }
+          )
+          if (adoption.kind === 'adopt') {
+            state = adoption.state
+          }
           state = applyHostMeshSync(state, payload)
         }
       } catch {
@@ -635,5 +707,5 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
     return snapshot()
   }
 
-  return { snapshot, join, sync, removeMember, leave, updateSettings }
+  return { snapshot, join, sync, removeMember, leave, updateSettings, migrateFromPairings }
 }

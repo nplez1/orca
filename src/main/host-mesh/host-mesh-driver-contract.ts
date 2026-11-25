@@ -43,6 +43,13 @@ export type HostMeshSnapshot = {
   settings: HostMeshSettings
   /** A line a surface can show verbatim when the last pass failed, or null. */
   lastError: string | null
+  /**
+   * Where this group came from, when an upgrade created it from existing pairings.
+   *
+   * Why a surface needs it: the group appears without the owner asking for it, so the panel has to be able to
+   * say what happened instead of presenting an unexplained group.
+   */
+  migration: { appliedAt: number; peerCount: number } | null
 }
 
 export type HostMeshJoinOutcome =
@@ -74,12 +81,30 @@ export type HostMeshDriverDeps = {
   /** Cuts inbound reach: the device row the member's credential belongs to. */
   forgetDevice: (hostKey: string) => void
   environmentIdForHostKey: (hostKey: string) => string | null
+  /**
+   * Every machine this install is already paired with, which is the only thing an upgrade can group.
+   *
+   * Why the environment table rather than the group: the point of migration is to read the trust the owner
+   * already declared, and on the first run of a new build the group is empty by definition.
+   */
+  listPairedHostKeys: () => { hostKey: string; label: string }[]
   labelForHostKey: (hostKey: string) => string | null
   /** One call to a peer this host is paired with. Rejects only on transport failure. */
   send: <T>(environmentId: string, method: string, params: unknown) => Promise<T>
   settings: () => HostMeshSettings
   saveSettings: (settings: HostMeshSettings) => void
 }
+
+/**
+ * What the one-shot upgrade step did.
+ *
+ * `nothing-to-group` is a real outcome and not a failure: a machine with no pairings is a fresh install, and
+ * it still records the run so pairing a machine later cannot be turned into a group it never asked for.
+ */
+export type HostMeshMigrationOutcome =
+  | { kind: 'grouped'; peerCount: number }
+  | { kind: 'nothing-to-group' }
+  | { kind: 'already-recorded' }
 
 export type RedeemedPeer = {
   environmentId: string
@@ -96,6 +121,8 @@ export type HostMeshDriver = {
   removeMember: (hostKey: string) => Promise<HostMeshSnapshot>
   leave: () => Promise<HostMeshSnapshot>
   updateSettings: (patch: Partial<HostMeshSettings>) => Promise<HostMeshSnapshot>
+  /** The one-shot upgrade step: group the machines this install was already paired with. */
+  migrateFromPairings: () => HostMeshMigrationOutcome
 }
 
 /** The six methods a peer calls. Each one is a whole pass on the receiver's own store. */

@@ -17,6 +17,7 @@ import {
   type HostMeshState,
   type HostMeshSyncPayload
 } from '../../shared/host-mesh/host-mesh-contract'
+import { adoptHostMeshGroup } from '../../shared/host-mesh/host-mesh-adoption'
 import { decideIntroduce, decideJoin } from '../../shared/host-mesh/host-mesh-admission'
 import {
   addHostMeshMember,
@@ -245,6 +246,30 @@ export function createHostMeshRpcService(deps: HostMeshDriverDeps): HostMeshRpcS
 
     introduce: async (params: HostMeshIntroduceRequest): Promise<HostMeshIntroduceReply> => {
       let state = loadState()
+      // Why a host with no group can still be introduced: the group id is derived per host, so a machine that
+      // has never joined has none to match, and refusing it would leave every new machine permanently
+      // outside — the opposite of one join pairing it with everyone. Adoption is still gated: the group must
+      // name only machines this host is already paired with.
+      const adoption = adoptHostMeshGroup(
+        state,
+        {
+          groupId: params.groupId,
+          epoch: params.epoch,
+          hostKeys: [state.selfKey, params.introducerHostKey, params.newcomer.hostKey]
+        },
+        {
+          isTrusted: (hostKey) => deps.environmentIdForHostKey(hostKey) !== null,
+          // The introducer vouches for the newcomer; `decideIntroduce` below is what checks the box in the
+          // envelope really came from that newcomer, so this cannot be used to name a stranger.
+          vouched: [params.newcomer.hostKey]
+        }
+      )
+      if (adoption.kind === 'refuse') {
+        return { kind: 'refused', reason: adoption.reason }
+      }
+      if (adoption.kind === 'adopt') {
+        state = adoption.state
+      }
       const opened = openFrom(params.sealedForRecipient, params.newcomer.publicKeyB64)
       const decision = decideIntroduce(state, deps.settings(), {
         groupId: params.groupId,
@@ -323,13 +348,21 @@ export function createHostMeshRpcService(deps: HostMeshDriverDeps): HostMeshRpcS
     sync: async (params: HostMeshPendingRequest): Promise<HostMeshSyncPayload> => {
       const state = loadState()
       if (state.groupId !== '' && params.groupId !== '' && state.groupId !== params.groupId) {
+        // Why a member still gets the list: two hosts upgraded from the same fleet derive different group
+        // ids, and the id is precisely what has to converge — so refusing the list to a member on an id
+        // mismatch would leave the fleet permanently split with each half unable to learn the other exists.
+        // Membership is what is trusted here, not the id; a caller that is not a member still gets nothing.
+        const isMember = state.members.some((member) => member.hostKey === params.hostKey)
         return {
           version: HOST_MESH_PAYLOAD_VERSION,
           groupId: state.groupId,
           epoch: state.epoch,
           selfKey: selfKey(),
           publicKeyB64: deps.ownKeypair().publicKeyB64,
-          members: [],
+          // The requester is left in the list on purpose: this reply is what tells it the group is one it
+          // belongs to, and it can only learn that from a list that names it. A non-member gets an empty
+          // list, so the group's membership is not disclosed to anyone outside it.
+          members: isMember ? state.members : [],
           tombstones: [],
           links: {}
         }
