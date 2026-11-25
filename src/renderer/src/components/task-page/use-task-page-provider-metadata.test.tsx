@@ -98,9 +98,7 @@ describe('TaskPage provider metadata', () => {
     )
     await waitFor(() => expect(result.current.jiraProjectsError).toBe(true))
 
-    // Why a held promise: a resolved mock races the assertions below. The switch drops the failure on
-    // its own, before the new read lands, so waiting on `jiraProjectsError` alone passes in the window
-    // where the site-2 list is still unknown — which is how this failed on the nightly (45640634918).
+    // Why held: the switch clears the error before the site-2 read lands, so waiting on it alone races.
     let resolveSiteTwoRead: (projects: JiraProject[]) => void = () => {}
     transport.jiraListProjects.mockImplementationOnce(
       () =>
@@ -110,7 +108,7 @@ describe('TaskPage provider metadata', () => {
     )
     rerender({ siteId: 'site-2' })
 
-    await waitFor(() => expect(result.current.jiraProjectsLoading).toBe(true))
+    expect(result.current.jiraProjectsLoading).toBe(true)
     expect(result.current.jiraProjectsError).toBe(false)
     expect(result.current.availableJiraProjects).toEqual([])
 
