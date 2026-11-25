@@ -15,6 +15,8 @@ export type ProcRow = {
   privateMemory?: number
   /** Executable basename; never a path or command line. */
   name?: string
+  /** macOS runs it as x86_64 under Rosetta. */
+  translated?: true
   /** Creation time in 100 ns ticks (Windows CIM only); orders a parent before its children. */
   startTicks?: bigint
 }
@@ -58,11 +60,20 @@ export function buildProcessIndex(
   }
 }
 
-export function parsePsOutput(stdout: string, withName = false): ProcRow[] {
+// <sys/proc.h> P_TRANSLATED, in `ps -o flags=` hex: Activity Monitor's "Kind: Intel".
+const P_TRANSLATED = 0x00020000
+
+export function isTranslatedPsFlags(flags: string | undefined): boolean {
+  return (Number.parseInt(flags ?? '', 16) & P_TRANSLATED) !== 0
+}
+
+/** Columns pid, ppid, pcpu, rss, then flags when `withFlags`, then the name when `withName`. */
+export function parsePsOutput(stdout: string, withName = false, withFlags = false): ProcRow[] {
   const rows: ProcRow[] = []
+  const fieldCount = withFlags ? 5 : 4
   for (const line of iterateProcessOutputLines(stdout)) {
-    const fields = getProcessOutputFields(line, 4)
-    if (fields.length < 4) {
+    const fields = getProcessOutputFields(line, fieldCount)
+    if (fields.length < fieldCount) {
       continue
     }
     const pid = Number.parseInt(fields[0], 10)
@@ -72,13 +83,15 @@ export function parsePsOutput(stdout: string, withName = false): ProcRow[] {
     if (Number.isNaN(pid) || Number.isNaN(ppid)) {
       continue
     }
-    const name = withName ? executableBasename(PS_COMM_COLUMN.exec(line)?.[1]) : undefined
+    const nameColumn = withFlags ? PS_COMM_AFTER_FLAGS_COLUMN : PS_COMM_COLUMN
+    const name = withName ? executableBasename(nameColumn.exec(line)?.[1]) : undefined
     rows.push({
       pid,
       ppid,
       cpu: Number.isFinite(cpu) && cpu > 0 ? cpu : 0,
       memory: Number.isFinite(rssKb) && rssKb > 0 ? rssKb * 1024 : 0,
-      ...(name ? { name } : {})
+      ...(name ? { name } : {}),
+      ...(withFlags && isTranslatedPsFlags(fields[4]) ? { translated: true as const } : {})
     })
   }
   return rows
@@ -86,6 +99,7 @@ export function parsePsOutput(stdout: string, withName = false): ProcRow[] {
 
 // The name column is last and may hold spaces.
 const PS_COMM_COLUMN = /^\s*\S+\s+\S+\s+\S+\s+\S+\s+(.+)$/
+const PS_COMM_AFTER_FLAGS_COLUMN = /^\s*\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+(.+)$/
 
 const MAX_EXECUTABLE_NAME_CHARS = 64
 

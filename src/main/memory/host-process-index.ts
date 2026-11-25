@@ -40,11 +40,14 @@ export async function enumerateHostProcesses(
 const PS_NAME_COLUMN: Partial<Record<NodeJS.Platform, string>> = { darwin: 'ucomm=' }
 
 async function enumerateUnix(nameColumn: string | undefined): Promise<ProcRow[]> {
+  // macOS flags carry P_TRANSLATED, which names the Rosetta processes behind its Intel-app warning.
+  const withFlags = os.platform() === 'darwin'
+  const columns = ['pid=,ppid=,pcpu=,rss=', withFlags && 'flags=', nameColumn].filter(Boolean)
   // Force dot decimals: parseFloat silently truncates locale-formatted comma values.
   try {
     const result = await runProcess({
       program: 'ps',
-      args: ['-eo', nameColumn ? `pid=,ppid=,pcpu=,rss=,${nameColumn}` : 'pid=,ppid=,pcpu=,rss='],
+      args: ['-eo', columns.join(',')],
       maxOutputBytes: PS_MAX_BUFFER,
       timeoutMs: PS_EXEC_TIMEOUT_MS,
       env: { ...process.env, LC_ALL: 'C', LANG: 'C' }
@@ -52,7 +55,7 @@ async function enumerateUnix(nameColumn: string | undefined): Promise<ProcRow[]>
     if (result.timedOut || result.outputTruncated || result.code !== 0) {
       throw new Error(`ps exited ${result.code ?? 'on timeout'}`)
     }
-    return parsePsOutput(result.stdout, nameColumn !== undefined)
+    return parsePsOutput(result.stdout, nameColumn !== undefined, withFlags)
   } catch (err) {
     console.warn('[memory] ps enumeration failed', err)
     return []

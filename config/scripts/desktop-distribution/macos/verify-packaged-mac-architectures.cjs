@@ -8,6 +8,8 @@ const CPU_ARCH_NAMES = new Map([
   [0x0100000c, 'arm64']
 ])
 const HEADER_BYTES = 8 + 20 * 32
+// MH_OBJECT and MH_DSYM are never loaded, so a stale build slice there is not a runtime component.
+const UNLOADED_FILE_TYPES = new Set([0x1, 0xa])
 
 /** The CPU types a Mach-O header declares, or null when the bytes are not Mach-O. */
 function machOArchitectures(header) {
@@ -26,14 +28,16 @@ function machOArchitectures(header) {
       archName(header.readUInt32BE(8 + i * entryBytes))
     )
   }
-  if (magicBE === 0xfeedface || magicBE === 0xfeedfacf) {
-    return [archName(header.readUInt32BE(4))]
-  }
   const magicLE = header.readUInt32LE(0)
-  if (magicLE === 0xfeedface || magicLE === 0xfeedfacf) {
-    return [archName(header.readUInt32LE(4))]
+  const isThinBE = magicBE === 0xfeedface || magicBE === 0xfeedfacf
+  if (!isThinBE && magicLE !== 0xfeedface && magicLE !== 0xfeedfacf) {
+    return null
   }
-  return null
+  const word = (offset) => (isThinBE ? header.readUInt32BE(offset) : header.readUInt32LE(offset))
+  if (header.length < 16 || UNLOADED_FILE_TYPES.has(word(12))) {
+    return null
+  }
+  return [archName(word(4))]
 }
 
 function archName(cpuType) {
@@ -52,7 +56,7 @@ function readHeader(path) {
 
 /** The darwin arch a path is scoped to (`ripgrep/darwin-x64/rg`, `watcher-darwin-arm64`), if any. */
 function scopedDarwinArch(relativePath) {
-  return relativePath.match(/darwin[-_](x64|arm64)(?![a-z0-9])/)?.[1] ?? null
+  return relativePath.match(/darwin[-_](x64|arm64)(?![a-z0-9+])/)?.[1] ?? null
 }
 
 // Not readdirSync({ recursive }): it follows framework `Versions/Current` symlinks and counts files twice.

@@ -14,6 +14,18 @@ describe('process sweep executable names', () => {
     expect(rows.map((row) => row.name)).toEqual(['claude', 'node'])
   })
 
+  it('reads the macOS flags column as hex and still finds the name after it', () => {
+    const rows = parsePsOutput(
+      '  10     1   0.0  2048    24004 /usr/local/bin/x86 tool\n  11    10  1.5   512     4004 node\n',
+      true,
+      true
+    )
+    expect(rows.map(({ name, translated }) => ({ name, translated }))).toEqual([
+      { name: 'x86 tool', translated: true },
+      { name: 'node', translated: undefined }
+    ])
+  })
+
   it('reads the CIM Name column and typeperf instance names', () => {
     const cim = parseWindowsProcessSample(
       '42\t7\t1048576\t10\t20\t638000000000000000\t2048\tclaude.exe\n'

@@ -10,18 +10,23 @@ const { findMacArchitectureProblems } = require('./verify-packaged-mac-architect
 const X64 = 0x01000007
 const ARM64 = 0x0100000c
 
-function thin(cpuType) {
+const MH_EXECUTE = 0x2
+const MH_OBJECT = 0x1
+
+function thin(cpuType, fileType = MH_EXECUTE) {
   const header = Buffer.alloc(32)
   header.writeUInt32LE(0xfeedfacf, 0)
   header.writeUInt32LE(cpuType, 4)
+  header.writeUInt32LE(fileType, 12)
   return header
 }
 
-function fat(...cpuTypes) {
-  const header = Buffer.alloc(8 + cpuTypes.length * 20)
-  header.writeUInt32BE(0xcafebabe, 0)
+function fat(cpuTypes, { is64 = false } = {}) {
+  const entryBytes = is64 ? 32 : 20
+  const header = Buffer.alloc(8 + cpuTypes.length * entryBytes)
+  header.writeUInt32BE(is64 ? 0xcafebabf : 0xcafebabe, 0)
   header.writeUInt32BE(cpuTypes.length, 4)
-  cpuTypes.forEach((cpuType, i) => header.writeUInt32BE(cpuType, 8 + i * 20))
+  cpuTypes.forEach((cpuType, i) => header.writeUInt32BE(cpuType, 8 + i * entryBytes))
   return header
 }
 
@@ -38,13 +43,17 @@ function app(files) {
 }
 
 describe('findMacArchitectureProblems', () => {
-  it('fails an x86_64-only Mach-O in an arm64 app unless its path is scoped to darwin-x64', () => {
+  it('holds each loadable Mach-O to the app arch, or to the darwin arch its path names', () => {
     const appPath = app({
       'Contents/MacOS/Orca NP': thin(ARM64),
-      'Contents/MacOS/helper-universal': fat(X64, ARM64),
+      'Contents/MacOS/helper-universal': fat([X64, ARM64]),
+      'Contents/MacOS/helper-universal-64': fat([X64, ARM64], { is64: true }),
+      'Contents/MacOS/helper-intel-64': fat([X64], { is64: true }),
       'Contents/Resources/ripgrep/darwin-x64/rg': thin(X64),
+      'Contents/Resources/ripgrep/darwin-x64-alt/rg': thin(ARM64),
       'Contents/Resources/ripgrep/darwin-arm64/rg': thin(X64),
       'Contents/Resources/intel-only-cli': thin(X64),
+      'Contents/Resources/build/obj.target/pty.o': thin(X64, MH_OBJECT),
       // Java class files share the fat magic; their version word is >= 45.
       'Contents/Resources/Main.class': Buffer.from('cafebabe00000034', 'hex'),
       'Contents/Resources/readme.txt': Buffer.from('not a binary')
@@ -54,11 +63,13 @@ describe('findMacArchitectureProblems', () => {
     symlinkSync('A', join(appPath, 'Contents/Frameworks/X.framework/Versions/Current'))
 
     expect(findMacArchitectureProblems(appPath, 'arm64')).toEqual({
-      checked: 6,
+      checked: 9,
       problems: [
         'Contents/Frameworks/X.framework/Versions/A/X has x64, expected arm64',
+        'Contents/MacOS/helper-intel-64 has x64, expected arm64',
         'Contents/Resources/intel-only-cli has x64, expected arm64',
-        'Contents/Resources/ripgrep/darwin-arm64/rg has x64, expected arm64'
+        'Contents/Resources/ripgrep/darwin-arm64/rg has x64, expected arm64',
+        'Contents/Resources/ripgrep/darwin-x64-alt/rg has arm64, expected x64'
       ]
     })
   })
