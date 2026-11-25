@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { createElement, useCallback, useState } from 'react'
 import { toast } from 'sonner'
 import { basename, dirname } from '@/lib/path'
 import { translate } from '@/i18n/i18n'
@@ -63,7 +63,14 @@ function reportFailures(mode: FileExplorerMoveCopyMode, failures: string[], tota
             total
           }
         )
-  toast.error(title, { description: failures.join('\n') })
+  // Why a list: sonner collapses newlines in a plain-text description.
+  toast.error(title, {
+    description: createElement(
+      'ul',
+      { className: 'list-disc pl-4' },
+      failures.map((failure, index) => createElement('li', { key: index }, failure))
+    )
+  })
 }
 
 /** "Move to…"/"Copy to…": acts on the selection when the right-clicked row is part of it, like Delete. */
@@ -79,8 +86,11 @@ export function useFileExplorerMoveCopy({
   const moveCopyRequest = pendingRequest?.worktreeId === activeWorktreeId ? pendingRequest : null
 
   const targetsFor = useCallback(
+    // Why skip outside links: main refuses tree writes there, as keyboard Delete does.
     (node: TreeNode): TreeNode[] =>
-      selectedPaths.has(node.path) && selectedNodes.length > 1 ? selectedNodes : [node],
+      selectedPaths.has(node.path) && selectedNodes.length > 1
+        ? selectedNodes.filter((selected) => !selected.outsideProject)
+        : [node],
     [selectedPaths, selectedNodes]
   )
 
@@ -179,7 +189,9 @@ export function useFileExplorerMoveCopy({
       if (!request) {
         return
       }
-      void (request.mode === 'move' ? runMove : runCopy)(request.sources, destDir)
+      void (request.mode === 'move' ? runMove : runCopy)(request.sources, destDir).catch(
+        (err: unknown) => toast.error(err instanceof Error ? err.message : String(err))
+      )
     },
     [moveCopyRequest, runMove, runCopy]
   )

@@ -1702,7 +1702,10 @@
       "escKey": "Esc",
       "close": "Close",
       "moveTo": "Move to…",
-      "copyTo": "Copy to…"
+      "copyTo": "Copy to…",
+      "alreadyHere": "Already in this folder",
+      "insideSource": "Can't move a folder into itself",
+      "partialListing": "Only part of this folder is listed."
     }
   }
 }

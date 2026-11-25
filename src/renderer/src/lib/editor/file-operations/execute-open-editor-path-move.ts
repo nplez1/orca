@@ -21,6 +21,9 @@ import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../../shared/workspace-layou
 
 let moveOperationCounter = 0
 
+/** The rename landed but open editors could not follow it; its message says whether the rollback did too. */
+export class EditorPathMoveRetargetError extends Error {}
+
 /** Quiesce saves, suppress source events, rename disk, rekey sessions atomically and verify destination echoes. Failed rename leaves store state untouched and releases suppression. */
 export async function executeOpenEditorPathMove(args: {
   context: RuntimeFileOperationArgs
@@ -114,7 +117,7 @@ export async function executeOpenEditorPathMove(args: {
         rollbackError = err
       }
       const base = `Could not retarget open editors for the move (${rekeyResult.reason}).`
-      throw new Error(
+      throw new EditorPathMoveRetargetError(
         rollbackError
           ? `${base} The on-disk move could not be undone and the file may remain at the new path: ${
               rollbackError instanceof Error ? rollbackError.message : String(rollbackError)

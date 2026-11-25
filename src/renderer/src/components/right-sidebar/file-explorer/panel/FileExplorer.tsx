@@ -381,6 +381,7 @@ function FileExplorerFiles(): React.JSX.Element {
         dirCache={tree.dirCache}
         loadingDirPaths={tree.loadingDirPaths}
         loadDir={tree.loadDir}
+        returnFocusRoot={rowScrolling.explorerShellRef}
         onCancel={paneState.nodeCommands.closeMoveCopy}
         onSubmit={paneState.nodeCommands.submitMoveCopy}
       />

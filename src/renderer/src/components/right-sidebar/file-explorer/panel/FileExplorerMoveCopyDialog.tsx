@@ -1,5 +1,5 @@
 import type React from 'react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type RefObject } from 'react'
 import { ChevronRight, CopyPlus, FolderInput, FolderUp, Loader2 } from 'lucide-react'
 import {
   CommandDialog,
@@ -28,16 +28,25 @@ type FileExplorerMoveCopyDialogProps = {
   dirCache: Record<string, DirCache>
   loadingDirPaths: ReadonlySet<string>
   loadDir: (dirPath: string, depth: number) => Promise<boolean>
+  /** The explorer shell; focus returns to its selected row, since the row menu skips its own focus return. */
+  returnFocusRoot: RefObject<HTMLElement | null>
   onCancel: () => void
   onSubmit: (destDir: string) => void
 }
 
-function canChooseDestination(request: FileExplorerMoveCopyRequest, destDir: string): boolean {
+/** Why "Move here" is unavailable in `destDir`, or null when it is available. */
+function moveHereBlockedReason(
+  request: FileExplorerMoveCopyRequest,
+  destDir: string
+): 'same-folder' | 'inside-source' | null {
   if (request.mode === 'copy') {
-    return true
+    return null
   }
   const verdicts = request.sources.map((source) => classifyMoveDestination(source.path, destDir))
-  return !verdicts.includes('inside-source') && verdicts.includes('allowed')
+  if (verdicts.includes('inside-source')) {
+    return 'inside-source'
+  }
+  return verdicts.includes('allowed') ? null : 'same-folder'
 }
 
 /** Orca-rendered folder chooser over the explorer's own listings, so remote and folder workspaces browse the same way. */
@@ -47,6 +56,7 @@ export function FileExplorerMoveCopyDialog({
   dirCache,
   loadingDirPaths,
   loadDir,
+  returnFocusRoot,
   onCancel,
   onSubmit
 }: FileExplorerMoveCopyDialogProps): React.JSX.Element {
@@ -93,7 +103,8 @@ export function FileExplorerMoveCopyDialog({
   }
 
   const isMove = request.mode === 'move'
-  const canChooseHere = canChooseDestination(request, currentDir)
+  const hereBlockedReason = moveHereBlockedReason(request, currentDir)
+  const canChooseHere = hereBlockedReason === null
   const canGoUp = currentDir !== rootPath
   const isFolderEnterable = (folder: TreeNode): boolean =>
     !isMove || !request.sources.some((source) => source.path === folder.path)
@@ -138,6 +149,14 @@ export function FileExplorerMoveCopyDialog({
         }
       }}
       shouldFilter={false}
+      onCloseAutoFocus={(event) => {
+        event.preventDefault()
+        const root = returnFocusRoot.current
+        const target =
+          root?.querySelector<HTMLElement>('[data-file-explorer-row][data-selected="true"]') ??
+          root?.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]')
+        target?.focus({ preventScroll: true })
+      }}
       title={title}
       description={t('fileExplorer.moveCopy.description', 'Choose a folder in this workspace.')}
       contentClassName="w-[520px] overflow-hidden"
@@ -188,9 +207,16 @@ export function FileExplorerMoveCopyDialog({
                   ? t('fileExplorer.moveCopy.moveHere', 'Move here')
                   : t('fileExplorer.moveCopy.copyHere', 'Copy here')}
               </span>
-              <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">
+              <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
                 {currentLabel}
               </span>
+              {hereBlockedReason ? (
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  {hereBlockedReason === 'same-folder'
+                    ? t('fileExplorer.moveCopy.alreadyHere', 'Already in this folder')
+                    : t('fileExplorer.moveCopy.insideSource', "Can't move a folder into itself")}
+                </span>
+              ) : null}
             </CommandItem>
             {canGoUp ? (
               <CommandItem value={UP_VALUE} onSelect={goUp} className="cursor-pointer">
@@ -239,6 +265,11 @@ export function FileExplorerMoveCopyDialog({
               </CommandItem>
             ))
           )}
+          {listing?.more && !isLoading ? (
+            <div className="px-2 py-2 text-xs text-muted-foreground">
+              {t('fileExplorer.moveCopy.partialListing', 'Only part of this folder is listed.')}
+            </div>
+          ) : null}
         </CommandGroup>
       </CommandList>
       <div className="flex items-center justify-end gap-2 border-t border-border/60 px-3.5 py-2 text-2xs text-muted-foreground">

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { classifyMoveDestination, outermostPaths } from './file-explorer-move-copy-paths'
+import {
+  classifyMoveDestination,
+  copyNameCandidates,
+  outermostPaths
+} from './file-explorer-move-copy-paths'
 
 describe('classifyMoveDestination', () => {
   it('refuses a folder moved into itself or its subtree, on either separator', () => {
@@ -21,6 +25,31 @@ describe('outermostPaths', () => {
       '/w/src',
       '/w/src-old/b.ts',
       '/w/c.ts'
+    ])
+  })
+})
+
+describe('copyNameCandidates', () => {
+  const firstThree = (name: string, keepName: boolean): string[] => {
+    const names = copyNameCandidates(name, keepName)
+    return [names.next().value, names.next().value, names.next().value]
+  }
+
+  it("keeps the name in another folder, then follows Duplicate's sequence", () => {
+    expect(firstThree('a.test.ts', true)).toEqual([
+      'a.test.ts',
+      'a.test copy.ts',
+      'a.test copy 2.ts'
+    ])
+    expect(firstThree('a.ts', false)).toEqual(['a copy.ts', 'a copy 2.ts', 'a copy 3.ts'])
+  })
+
+  it('treats a dotfile and an extensionless name as all stem', () => {
+    expect(firstThree('.env', false)).toEqual(['.env copy', '.env copy 2', '.env copy 3'])
+    expect(firstThree('Makefile', false)).toEqual([
+      'Makefile copy',
+      'Makefile copy 2',
+      'Makefile copy 3'
     ])
   })
 })

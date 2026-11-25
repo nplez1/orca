@@ -1,7 +1,10 @@
 import { useCallback } from 'react'
 import { toast } from 'sonner'
 import { basename, dirname, joinPath } from '@/lib/path'
-import { executeOpenEditorPathMove } from '@/lib/editor/file-operations/execute-open-editor-path-move'
+import {
+  EditorPathMoveRetargetError,
+  executeOpenEditorPathMove
+} from '@/lib/editor/file-operations/execute-open-editor-path-move'
 import { runtimePathExists } from '@/runtime/files/metadata/runtime-file-metadata-client'
 import { commitFileExplorerOp } from './fileExplorerUndoRedo'
 import type { FileExplorerOperationOwner } from '../tree/file-explorer-types'
@@ -37,7 +40,8 @@ export function pathCollisionMessage(name: string): string {
 }
 
 function describeMoveFailure(err: unknown, fileName: string): string {
-  return isPathCollisionError(err)
+  // Why: a failed rollback can itself report EEXIST; its stranded-file message must survive.
+  return !(err instanceof EditorPathMoveRetargetError) && isPathCollisionError(err)
     ? pathCollisionMessage(fileName)
     : extractIpcErrorMessage(
         err,
@@ -60,6 +64,74 @@ type UseFileExplorerMovePathParams = {
 }
 
 /** One explorer move: editor-tab rekeying, rollback and an undo entry, shared by drag-drop and "Move to…". */
+export async function moveFileExplorerPath(
+  {
+    worktreePath,
+    activeWorktreeId,
+    refreshDir,
+    getOperationOwnerForPath
+  }: UseFileExplorerMovePathParams,
+  sourcePath: string,
+  destDir: string
+): Promise<FileExplorerMoveResult> {
+  if (!worktreePath || !activeWorktreeId) {
+    return { status: 'skipped' }
+  }
+  if (classifyMoveDestination(sourcePath, destDir) !== 'allowed') {
+    return { status: 'skipped' }
+  }
+  const fileName = basename(sourcePath),
+    sourceDir = dirname(sourcePath)
+  const newPath = joinPath(destDir, fileName)
+  const operationOwner = getOperationOwnerForPath(sourcePath)
+
+  try {
+    const operationGuard = captureFileExplorerOperationGuard(activeWorktreeId, operationOwner)
+    const context = fileExplorerGuardContext(operationGuard, activeWorktreeId, worktreePath)
+    // Hosts word no-clobber refusals differently; checking first names the real cause.
+    if (await runtimePathExists(context, newPath)) {
+      return { status: 'failed', message: pathCollisionMessage(fileName) }
+    }
+    operationGuard.assertCurrent()
+    await executeOpenEditorPathMove({
+      context,
+      fromPath: sourcePath,
+      toPath: newPath,
+      worktreeId: activeWorktreeId,
+      worktreePath
+    })
+    commitFileExplorerOp({
+      undo: async () => {
+        operationGuard.assertCurrent()
+        await executeOpenEditorPathMove({
+          context,
+          fromPath: newPath,
+          toPath: sourcePath,
+          worktreeId: activeWorktreeId,
+          worktreePath
+        })
+        await Promise.all([refreshDir(destDir), refreshDir(sourceDir)])
+      },
+      redo: async () => {
+        operationGuard.assertCurrent()
+        await executeOpenEditorPathMove({
+          context,
+          fromPath: sourcePath,
+          toPath: newPath,
+          worktreeId: activeWorktreeId,
+          worktreePath
+        })
+        await Promise.all([refreshDir(sourceDir), refreshDir(destDir)])
+      }
+    })
+  } catch (err) {
+    return { status: 'failed', message: describeMoveFailure(err, fileName) }
+  }
+  // A refresh failure must not report a completed move as failed.
+  await Promise.all([refreshDir(sourceDir), refreshDir(destDir)]).catch(() => {})
+  return { status: 'moved' }
+}
+
 export function useFileExplorerMovePath({
   worktreePath,
   activeWorktreeId,
@@ -70,64 +142,12 @@ export function useFileExplorerMovePath({
   destDir: string
 ) => Promise<FileExplorerMoveResult> {
   return useCallback(
-    async (sourcePath: string, destDir: string): Promise<FileExplorerMoveResult> => {
-      if (!worktreePath || !activeWorktreeId) {
-        return { status: 'skipped' }
-      }
-      if (classifyMoveDestination(sourcePath, destDir) !== 'allowed') {
-        return { status: 'skipped' }
-      }
-      const fileName = basename(sourcePath),
-        sourceDir = dirname(sourcePath)
-      const newPath = joinPath(destDir, fileName)
-      const operationOwner = getOperationOwnerForPath(sourcePath)
-
-      try {
-        const operationGuard = captureFileExplorerOperationGuard(activeWorktreeId, operationOwner)
-        const context = fileExplorerGuardContext(operationGuard, activeWorktreeId, worktreePath)
-        // Hosts word no-clobber refusals differently; checking first names the real cause.
-        if (await runtimePathExists(context, newPath)) {
-          return { status: 'failed', message: pathCollisionMessage(fileName) }
-        }
-        operationGuard.assertCurrent()
-        await executeOpenEditorPathMove({
-          context,
-          fromPath: sourcePath,
-          toPath: newPath,
-          worktreeId: activeWorktreeId,
-          worktreePath
-        })
-        commitFileExplorerOp({
-          undo: async () => {
-            operationGuard.assertCurrent()
-            await executeOpenEditorPathMove({
-              context,
-              fromPath: newPath,
-              toPath: sourcePath,
-              worktreeId: activeWorktreeId,
-              worktreePath
-            })
-            await Promise.all([refreshDir(destDir), refreshDir(sourceDir)])
-          },
-          redo: async () => {
-            operationGuard.assertCurrent()
-            await executeOpenEditorPathMove({
-              context,
-              fromPath: sourcePath,
-              toPath: newPath,
-              worktreeId: activeWorktreeId,
-              worktreePath
-            })
-            await Promise.all([refreshDir(sourceDir), refreshDir(destDir)])
-          }
-        })
-      } catch (err) {
-        return { status: 'failed', message: describeMoveFailure(err, fileName) }
-      }
-      // A refresh failure must not report a completed move as failed.
-      await Promise.all([refreshDir(sourceDir), refreshDir(destDir)]).catch(() => {})
-      return { status: 'moved' }
-    },
+    (sourcePath: string, destDir: string) =>
+      moveFileExplorerPath(
+        { worktreePath, activeWorktreeId, refreshDir, getOperationOwnerForPath },
+        sourcePath,
+        destDir
+      ),
     [worktreePath, activeWorktreeId, refreshDir, getOperationOwnerForPath]
   )
 }
