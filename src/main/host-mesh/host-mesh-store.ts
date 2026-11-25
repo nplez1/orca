@@ -2,6 +2,10 @@ import { existsSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { z } from 'zod'
 import { readNodeFileSyncWithinLimit } from '../../shared/file-content/node-bounded-file-reader'
+import {
+  DEFAULT_HOST_MESH_SETTINGS,
+  type HostMeshSettings
+} from '../../shared/host-mesh/host-mesh-admission'
 import type { HostMeshSealedOffer, HostMeshState } from '../../shared/host-mesh/host-mesh-contract'
 import { writeSecureJsonFileWithinLimit } from '../../shared/secure-storage/bounded-secure-json-file'
 import { hardenExistingSecureFile } from '../../shared/secure-storage/secure-file'
@@ -78,6 +82,13 @@ const peerEntrySchema = z.looseObject({
   environmentId: z.string().min(1).nullable()
 })
 
+/** Partial on purpose: a build that adds a rule leaves this one's booleans at their defaults. */
+const settingsSchema = z.looseObject({
+  autoAcceptIntroducedMembers: z.boolean(),
+  acceptIntroductions: z.boolean(),
+  relayIntroductions: z.boolean()
+})
+
 export type HostMeshPeerIndexEntry = {
   deviceRowIds: readonly string[]
   environmentId: string | null
@@ -92,12 +103,28 @@ const storedFileSchema = z.looseObject({
   state: z.unknown(),
   peerIndex: z.record(z.string().min(1), z.unknown()).default({}),
   /** Boxes a member asked this host to hold for a newcomer, keyed by the machine they are addressed to. */
-  pendingBoxes: z.record(z.string().min(1), z.array(z.unknown())).default({})
+  pendingBoxes: z.record(z.string().min(1), z.array(z.unknown())).default({}),
+  /** The group's own admission rules, which belong with the group rather than with this install's settings. */
+  settings: z.unknown().default(null)
 })
 
 type StoredFile = z.infer<typeof storedFileSchema>
 
-const emptyFile = (): StoredFile => ({ version: 1, state: null, peerIndex: {}, pendingBoxes: {} })
+const emptyFile = (): StoredFile => ({
+  version: 1,
+  state: null,
+  peerIndex: {},
+  pendingBoxes: {},
+  settings: null
+})
+
+/** A value this build cannot read is the defaults, not a refusal: the rules decide who joins, not the file. */
+function settingsFrom(raw: unknown): HostMeshSettings {
+  const parsed = settingsSchema.partial().safeParse(raw)
+  return parsed.success
+    ? { ...DEFAULT_HOST_MESH_SETTINGS, ...parsed.data }
+    : { ...DEFAULT_HOST_MESH_SETTINGS }
+}
 
 export class HostMeshStoreUnreadableError extends Error {
   constructor(
@@ -190,6 +217,8 @@ export type HostMeshStore = {
   recordPeer(hostKey: string, entry: { deviceRowId?: string; environmentId?: string }): void
   forgetPeer(hostKey: string): void
   readPeerIndex(): ReadonlyMap<string, HostMeshPeerIndexEntry>
+  readSettings(): HostMeshSettings
+  writeSettings(settings: HostMeshSettings): void
   /** Boxes this host is holding for a machine that has not collected them yet. */
   readPendingBoxes(recipientHostKey: string): HostMeshSealedOffer[]
   /** Returns and removes them: a box is collected once, so a re-read cannot re-redeem it. */
@@ -267,6 +296,14 @@ export function createHostMeshStore({ userDataPath }: { userDataPath: string }):
         }
       }
       return index
+    },
+
+    readSettings: () => settingsFrom(readOrRefuse(path)?.settings),
+
+    writeSettings: (settings) => {
+      const file = readOrRefuse(path) ?? emptyFile()
+      file.settings = settings
+      writeStoredFile(path, file)
     },
 
     readPendingBoxes: (recipientHostKey) => {

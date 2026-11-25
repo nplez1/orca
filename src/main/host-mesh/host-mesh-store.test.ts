@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { HostMeshState } from '../../shared/host-mesh/host-mesh-contract'
+import { DEFAULT_HOST_MESH_SETTINGS } from '../../shared/host-mesh/host-mesh-admission'
 import {
   createHostMeshStore,
   hostMeshStorePath,
@@ -162,5 +163,38 @@ describe('the group on disk', () => {
 
     expect(() => store().write(state)).toThrow()
     expect(store().read()).toBeNull()
+  })
+
+  it('defaults the group’s settings and round-trips a change', () => {
+    expect(store().readSettings()).toEqual(DEFAULT_HOST_MESH_SETTINGS)
+
+    store().writeSettings({ ...DEFAULT_HOST_MESH_SETTINGS, acceptIntroductions: false })
+
+    expect(store().readSettings()).toEqual({
+      ...DEFAULT_HOST_MESH_SETTINGS,
+      acceptIntroductions: false
+    })
+  })
+
+  it('keeps a setting this build cannot read at its default rather than refusing the group', () => {
+    writeFileSync(
+      statePath(),
+      JSON.stringify({
+        version: 1,
+        state: null,
+        peerIndex: {},
+        settings: { relayIntroductions: 'yes', futureRule: true }
+      }),
+      'utf-8'
+    )
+
+    expect(store().readSettings()).toEqual(DEFAULT_HOST_MESH_SETTINGS)
+  })
+
+  it('keeps the settings across a state write', () => {
+    store().writeSettings({ ...DEFAULT_HOST_MESH_SETTINGS, relayIntroductions: false })
+    store().write(groupState())
+
+    expect(store().readSettings().relayIntroductions).toBe(false)
   })
 })
