@@ -5,8 +5,8 @@ import { readHostGraph } from '../../host-graph/host-graph-driver'
 /**
  * The renderer's read of the fleet.
  *
- * Why a read and nothing else: the driver owns when a refresh happens, so an IPC call can never be
- * the thing that fans out to every paired host.
+ * Why the renderer cannot ask for a refresh: the driver decides when the fleet is old enough to re-ask,
+ * so a renderer that renders often cannot turn into a fan-out per render.
  */
 export function registerHostGraphHandlers(): void {
   ipcMain.handle('hostGraph:read', (): Promise<HostGraphSnapshot> => readHostGraph())

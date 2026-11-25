@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  HOST_GRAPH_NODE_TTL_MS,
   HOST_GRAPH_PAYLOAD_VERSION,
   type HostGraphAdjacency,
   type HostGraphExchangeResult,
@@ -220,5 +221,56 @@ describe('refreshHostGraph', () => {
     const snapshot = await refreshHostGraph(deps)
 
     expect(labels(snapshot.fleet.nodes)).toEqual(['Laptop', 'VM', 'Windows'])
+  })
+})
+
+describe('hearsay across refreshes', () => {
+  const heard: HostGraphHeardReport = {
+    adjacency: adjacency('Laptop'),
+    reportedBy: 'fp-laptop',
+    receivedAt: BASE
+  }
+
+  it('stays fresh while the host keeps confirming the same answer', async () => {
+    let calls = 0
+    const send = vi.fn<Send>(async () => {
+      calls += 1
+      return calls === 1
+        ? fullAnswer('Studio', [], [heard])
+        : {
+            id: 'rpc-2',
+            ok: true,
+            result: { unchanged: true },
+            _meta: { runtimeId: 'rt' }
+          }
+    })
+    const { deps, clock } = harness([{ id: 'env-studio', name: 'Studio' }], send)
+
+    await refreshHostGraph(deps)
+    clock.now += HOST_GRAPH_NODE_TTL_MS + 1_000
+    const snapshot = await refreshHostGraph(deps)
+
+    // The revision ignores arrival times, so an unchanged reply must still re-stamp the hearsay it
+    // carries or a stable fleet quietly empties itself every five minutes.
+    expect(labels(snapshot.fleet.nodes).sort()).toEqual(['Laptop', 'Studio'])
+  })
+
+  it('expires when the host stops answering at all', async () => {
+    let calls = 0
+    const send = vi.fn<Send>(async () => {
+      calls += 1
+      if (calls === 1) {
+        return fullAnswer('Studio', [], [heard])
+      }
+      throw new Error('socket closed')
+    })
+    const { deps, clock } = harness([{ id: 'env-studio', name: 'Studio' }], send)
+
+    await refreshHostGraph(deps)
+    clock.now += HOST_GRAPH_NODE_TTL_MS + 1_000
+    const snapshot = await refreshHostGraph(deps)
+
+    expect(labels(snapshot.fleet.nodes)).toEqual([])
+    expect(snapshot.failures.map((failure) => failure.code)).toEqual(['host_unavailable'])
   })
 })
