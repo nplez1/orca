@@ -15,6 +15,7 @@ import type {
   SessionSearchStateCounts
 } from '../storage/session-search-store-types'
 import type { SessionContentHash } from '../storage/session-search-content-hash'
+import type { IndexedSessionList, IndexedSessionListArgs } from '../session-search-list'
 
 export type SessionSearchSnapshotRow = SessionSearchFileRow & {
   byteOffset: number | null
@@ -23,7 +24,14 @@ export type SessionSearchSnapshotRow = SessionSearchFileRow & {
   contentHash: SessionContentHash
 }
 export type SearchWorkerCommand =
-  | { op: 'open'; path: string; reader: boolean; cutoff: number | null }
+  | {
+      op: 'open'
+      path: string
+      reader: boolean
+      cutoff: number | null
+      /** Writer only: the consent the owning instance decided, recorded before readers open. */
+      contentEnabled?: boolean
+    }
   | {
       op: 'begin'
       handle: number
@@ -45,6 +53,8 @@ export type SearchWorkerCommand =
   | { op: 'purge'; cutoff: number | null }
   | { op: 'sync' }
   | { op: 'query'; request: AiVaultSearchRequest; scope?: SessionSearchHostScope }
+  /** Reader only: Agent Session History pages, read in one worker turn. */
+  | { op: 'list'; lists: IndexedSessionListArgs[] }
 export type SearchWorkerRequest = { id: number; command: SearchWorkerCommand }
 export type SearchWorkerResponse = {
   id: number
@@ -57,4 +67,5 @@ export type SearchWorkerResponse = {
   counts?: SessionSearchStateCounts
   generation?: number
   result?: AiVaultSearchResponse
+  lists?: IndexedSessionList[]
 }

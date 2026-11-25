@@ -1,0 +1,11 @@
+# Fork-owned rows for config/main-blocking-sqlite-baseline.txt, which upstream owns and this fork
+# keeps byte-identical. A row here replaces the base's, 0 included.
+# Each raised row is fork code that predates this ratchet's arrival in the fork (the 2026-11-15 sync,
+# upstream #41263) and carries its why. The in-process session search is not here on purpose: it was
+# fixed in the code (SessionSearchInstance lists and records consent through its worker threads).
+# Evidence: the commit that added this file records how each row arrived; LOCAL-PATCHES.md
+# § local(lint): three ratchets red on `main` is the older record of the session-search class.
+# This is a RATCHET: counts may only go DOWN. Prune: node config/scripts/static-analysis/ratchets/runtime-lifecycle/check-main-blocking-api-ratchet.mjs --prune
+0 src/main/ai-vault-search/storage/session-search-schema.ts # orcad's SessionSearchInstance now imports only the async unlink (storage/session-search-database-removal.ts), so the opener's SQL left the event-loop graph
+27 src/main/ai-vault/parse-cache/session-parse-cache-database.ts # worker-only: +7 is the fork's parser-version stamp (#238); the database opens only in the scanner child (initSessionParseCachePersistence), main imports its sibling for the options
+1 src/main/runtime/orchestration/db/schema/migrate.ts # one-shot: the fork's pre-DDL user_version read at orchestration DB open (#238, refuse a newer build's schema); the DB itself is on main by upstream's design

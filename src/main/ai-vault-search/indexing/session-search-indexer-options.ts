@@ -19,7 +19,8 @@ export type SessionSearchIndexerOptions = {
    * Content tier: store message bodies and index their text.
    *
    * Optional only because tests construct an indexer directly; the consent
-   * decision belongs to `SessionSearchInstance`, which always passes it.
+   * decision belongs to `SessionSearchInstance`, which always passes it. The
+   * writer thread records it in the index, where the reader threads read it.
    */
   contentEnabled?: boolean
   clock?: SessionSearchClock

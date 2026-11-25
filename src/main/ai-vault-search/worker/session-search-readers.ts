@@ -2,6 +2,7 @@ import type { AiVaultSearchRequest } from '../../../shared/ai-vault/search/ai-va
 import type { SessionSearchHostScope } from '../session-search-service'
 import { SessionSearchWorkerClient } from './session-search-worker-client'
 import type { SearchWorkerCommand, SearchWorkerResponse } from './session-search-worker-protocol'
+import type { IndexedSessionList, IndexedSessionListArgs } from '../session-search-list'
 
 /** Two fixed slots count retiring native readers against capacity until their exit. */
 export class SessionSearchReaders {
@@ -24,6 +25,14 @@ export class SessionSearchReaders {
   ) {}
   query(request: AiVaultSearchRequest, scope?: SessionSearchHostScope, signal?: AbortSignal) {
     return this.execute({ op: 'query', request, scope }, signal)
+  }
+  /** Agent Session History pages off the caller's loop; one request, so they share a worker turn. */
+  async list(lists: IndexedSessionListArgs[], signal?: AbortSignal): Promise<IndexedSessionList[]> {
+    const response = await this.execute({ op: 'list', lists }, signal)
+    if (!response.lists || response.lists.length !== lists.length) {
+      throw new Error('Could not list sessions')
+    }
+    return response.lists
   }
   private execute(
     command: SearchWorkerCommand,

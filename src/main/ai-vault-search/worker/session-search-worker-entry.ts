@@ -3,7 +3,8 @@ import { readIndexGeneration } from '../storage/session-search-index-generation'
 import { parentPort } from 'node:worker_threads'
 import SyncDatabase from '../../sqlite/sync-database'
 import { withSpan, setActiveSink } from '../../observability/tracer'
-import { SessionSearchStore } from '../storage/session-search-store'
+import type { SessionSearchStore } from '../storage/session-search-store'
+import { listSessionPages, openWriterStore } from './session-search-worker-instance-ops'
 import type { SessionSearchStateCounts } from '../storage/session-search-store-types'
 import { SessionSearchEngine } from '../query/session-search-engine'
 import { createSessionSearchService } from '../session-search-service'
@@ -139,7 +140,7 @@ async function execute({ id, command: c }: SearchWorkerRequest): Promise<SearchW
     const onError = (error: unknown): never => {
       throw error
     }
-    store = new SessionSearchStore(c.path, onError, onMessagesChanged)
+    store = openWriterStore(c, onError, onMessagesChanged)
     // Why: worker retirement closes the connection and its maintenance together.
     toolPurge = new SessionSearchToolPurge(
       store.connection,
@@ -168,6 +169,9 @@ async function execute({ id, command: c }: SearchWorkerRequest): Promise<SearchW
       id,
       result: await withSpan('aiVault.search.query', () => service.search(c.request, c.scope))
     }
+  }
+  if (c.op === 'list') {
+    return { id, lists: listSessionPages(reader, c) }
   }
   if (!store) {
     throw new Error('Search writer is not open')

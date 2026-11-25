@@ -13,7 +13,6 @@
 3 src/main/agent-hooks/wsl-relay/wsl-hook-relay-launch.ts
 1 src/main/agent-launch/trust/agent-trust-ownership-ledger.ts
 8 src/main/agent-launch/trust/agent-trust-presets.ts
-1 src/main/ai-vault-search/session-search-list-schema.ts # fork-owned or fork-modified; adopted at the 2026-11-09 sync, one-shot startup/shutdown use
 1 src/main/ai-vault-search/worker/session-search-worker-client.ts
 4 src/main/ai-vault/parse-cache/session-parse-cache-legacy-json.ts
 2 src/main/ai-vault/scan-service/session-scanner-service-entry-path.ts

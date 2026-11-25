@@ -59,9 +59,9 @@ it('answers a list from the index after the transcript is gone', async () => {
     scopePaths: [],
     executionHostId: LOCAL_EXECUTION_HOST_ID
   } as const
-  expect(instance.listSessions(listArgs)?.sessions.map((session) => session.sessionId)).toEqual([
-    SESSION_ID
-  ])
+  expect(
+    (await instance.listSessions([listArgs]))?.[0]?.sessions.map((session) => session.sessionId)
+  ).toEqual([SESSION_ID])
 
   await rm(transcript)
 
@@ -69,9 +69,9 @@ it('answers a list from the index after the transcript is gone', async () => {
   const scanned = await scanAiVaultSessions({ ...harness.roots, platform: 'darwin' })
   expect(scanned.sessions.map((session) => session.sessionId)).not.toContain(SESSION_ID)
   // ...while the index still answers, which is only possible if it never read.
-  expect(instance.listSessions(listArgs)?.sessions.map((session) => session.sessionId)).toEqual([
-    SESSION_ID
-  ])
+  expect(
+    (await instance.listSessions([listArgs]))?.[0]?.sessions.map((session) => session.sessionId)
+  ).toEqual([SESSION_ID])
 })
 
 it('serves preview turns from the parse cache rather than the transcript', async () => {

@@ -10,6 +10,8 @@
 # 2026-11-20 sync's lint gate. Fixing it is a refactor of the fork's identity layer, not a sync fix.
 # The 2026-11-24 sync (7daf01d99f3) raised nine rows for the same class: upstream's new code in a file the
 # fork's graph reaches, or the fork's own in-process session search (upstream runs that store in a worker).
+# The session-search rows were then removed in the code, not here: SessionSearchInstance, which orcad loads,
+# lists and records consent through its worker threads, so the store and the opener left orcad's graph.
 # Evidence: LOCAL-PATCHES.md § local(lint): the 2026-11-24 sync's lint gate.
 # This is a RATCHET: counts may only go DOWN. Prune: node config/scripts/static-analysis/ratchets/runtime-lifecycle/check-main-blocking-helper-ratchet.mjs --prune
 1 src/main/agent-hooks/first-work/first-work-folder-rename.ts
@@ -18,17 +20,7 @@
 1 src/main/agent-hooks/server/pi-claude-child-parent-marker.ts
 2 src/main/agent-hooks/server/server-status-hook-lifecycle.ts
 1 src/main/agent-hooks/server/server-status-update.ts
-3 src/main/ai-vault-search/session-search-instance.ts
-13 src/main/ai-vault-search/session-search-list-schema.ts
-1 src/main/ai-vault-search/storage/session-search-file-records.ts
-4 src/main/ai-vault-search/storage/session-search-index-compaction.ts # upstream #46549 added the compaction pass's SQLite calls; the fork's in-process session search keeps this file on the event loop, where upstream runs it only in the worker
-2 src/main/ai-vault-search/storage/session-search-index-generation.ts
-3 src/main/ai-vault-search/storage/session-search-index-writer.ts # one more caller of the compaction pass #46549 charges (see index-compaction.ts above)
-1 src/main/ai-vault-search/storage/session-search-query-schema.ts
-13 src/main/ai-vault-search/storage/session-search-retention-delete.ts # three more call sites of the compaction pass's now-blocking helpers; the file itself is upstream's, unchanged by the fork
-4 src/main/ai-vault-search/storage/session-search-schema.ts
-5 src/main/ai-vault-search/storage/session-search-store.ts # the fork's content-consent read (readSessionSearchContentConsent) plus the #46549 compaction helpers
-12 src/main/ai-vault-search/storage/session-search-tool-purge.ts # two more call sites of the compaction pass's now-blocking helpers
+0 src/main/ai-vault-search/storage/session-search-schema.ts
 12 src/main/ai-vault/parse-cache/session-parse-cache-database.ts
 1 src/main/antigravity/hooks-json-bundle.ts
 2 src/main/bitbucket/client.ts
