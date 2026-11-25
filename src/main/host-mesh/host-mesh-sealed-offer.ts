@@ -158,7 +158,8 @@ function parseHostMeshOfferPayload(text: string): HostMeshOfferPayload | null {
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
     return null
   }
-  const record = parsed as Record<string, unknown>
+  const record: Record<string, unknown> = {}
+  Object.assign(record, parsed)
   if (
     Object.keys(record).length !== PAYLOAD_FIELDS.length ||
     !PAYLOAD_FIELDS.every((field) => Object.hasOwn(record, field)) ||
