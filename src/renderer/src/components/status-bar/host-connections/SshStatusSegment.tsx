@@ -199,8 +199,6 @@ export function SshStatusSegment(): React.JSX.Element | null {
     ...targets.map((target) => sshStatusForOverall(target.status)),
     ...runtimeHostRows.map((host) => runtimeHostStatusForOverall(host.state, host.blockedReason))
   ]
-  // Why the relayed count is added: a machine reached through a peer is a host this instance knows
-  // about, and on a mesh of diameter two every instance then reports the same fleet size.
   const connectedHostCount =
     statuses.filter((status) => status === 'connected').length +
     relayed.filter((host) => host.live).length
@@ -335,7 +333,6 @@ export function SshStatusSegment(): React.JSX.Element | null {
                 staleMinutes={host.staleMinutes}
               />
             ))}
-            {/* Why read out loud: a short fleet must be readable as a short fleet, not as hosts lost. */}
             {unavailablePeerCount > 0 ? (
               <div className="px-2 py-1 text-[10px] text-muted-foreground">
                 {hostGraphPartialLabel(unavailablePeerCount, t)}

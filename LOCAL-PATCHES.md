@@ -5989,3 +5989,57 @@ the folder, including bots other people can message.
 touched it: a bot is no longer woken by its workers' pull requests. The account-free way to react to GitHub
 is the local webhook route plus an automation rule, which is what #453 ships. Diverging here would fight an
 upstream decision for a behaviour the fork does not need.
+
+### `local(hosts)`: hosts know each other, so every instance shows the same fleet
+
+The design, its trade-offs and the four capabilities it separates are `local/design/host-graph.md`; this
+records what shipped, where the anchors are, and the three places the note was wrong. The complaint this
+answers is one sentence long: **a host is a record in one install, not a machine**, so four machines paired
+into a mesh each showed only its own pairings, and a laptop that could reach nothing but the Studio showed
+nothing at all. Stage 2 (discovery) is built; stages 1, 3 and 4 are not, and this patch does not touch
+`ExecutionHostId`, so nothing about row identity, settings scope or worktree ownership changes underneath.
+
+**The mechanism, and why it is not a pull-only read.** One capability (`host.graph.adjacency.v1`) and one
+method (`hostGraph.exchange`). The method is _symmetric_: the caller sends its own adjacency and the callee
+answers with its own plus the reports its callers have left with it. A pull-only design cannot work here,
+because in this fork's own topology (`bot-host-topology.md`) a leaf has no outbound pairings and can call
+nobody — it would report zero hosts forever. Hearsay is labelled as hearsay and never re-nested, so depth is
+bounded by the payload's shape rather than by a hop decrement. Nothing is persisted: the answer is other
+machines' claims about right now, and a file would outlive the pairing it was read under.
+
+**Identity without an id migration.** A machine is named by `orcaHostKey` — the digest
+`publicRuntimeEnvironmentWithHostKey` already publishes, derived from the host's own E2EE key — with
+`sshHostKeys` beside it as the only key a non-orcad host has. `machineKey` was the note's name for it and was
+already taken by the managed-server home naming. A merge on equal `orcaHostKey` is trusted; an SSH-key match
+may complete an SSH-only entry but never join two machines that each presented a _different_ pairing key, or
+a lying peer could hide a host from the count. The viewer's own machine (`viewer` and the `own.self` it sent)
+is dropped, which is what makes the number mean "all the OTHER hosts".
+
+**What is disclosed, and what bounds it.** An adjacent host learns labels and public-key digests of every
+member machine, and the edge kinds — no endpoints, ports, usernames, device tokens, target ids or pairing
+ids. A direct caller needs `workspace`, which already implies command execution on this host, so it learns
+nothing it could not read from `orca-environments.json` itself. The genuinely new disclosure is that a
+**callee** learns upstream membership: a work host the Studio controls, holding no rights on the Studio,
+learns the laptop's name and identity. The bounds are: `ephemeral-vm` environments are never reported, the
+method is deliberately absent from both mobile allowlists so a phone cannot enumerate the fleet, heard
+reports are memory-only and dropped with the pairing, every array and string is bounded in
+`host-graph-params.ts`, and relayed rows are labelled and not actionable (there is no connect control,
+because reaching one needs stage 3).
+
+**The anchors.** Five files upstream owns, each a line or two, plus one generated catalog; every reason each
+exists is this section. `src/shared/host-graph/**` is under `src/shared/`, so it is a **global input**: a PR
+carrying it needs the full unit gate, and a sync that moves it invalidates a cached verdict.
+
+| File                                                                                 | Anchor                                                    | Change                                                                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------ | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/main/runtime/rpc/methods/rpc-method-registry.ts`                                | beside `...HOST_SETTINGS_METHODS`                         | `...HOST_GRAPH_METHODS`, plus its import                                                                                                                                                                                                      |
+| `src/shared/remote-runtime/protocol/protocol-version.ts`                             | beside `HOST_SETTINGS_REPLICATION_RUNTIME_CAPABILITY`     | `HOST_GRAPH_RUNTIME_CAPABILITY`, in the same commit as the method                                                                                                                                                                             |
+| `src/renderer/src/components/status-bar/host-connections/SshStatusSegment.tsx`       | the selector block, the early return, the count, the menu | imports; `useRelayedFleetHosts()`; the early return also requires `relayed.length > 0`, or a leaf shows nothing; the count adds live relayed hosts; a `Via other hosts` section with its two failure footers; `refreshRelayed()` on menu open |
+| `src/renderer/src/components/status-bar/host-connections/ssh-status-segment-copy.ts` | end of file                                               | five copy helpers: `relayedHostViaLabel`, `relayedHostStaleLabel`, `viaOtherHostsLabel`, `hostGraphPartialLabel`, `hostGraphOlderPeerLabel`                                                                                                   |
+| `src/shared/rpc-contract/rpc-params-catalog.generated.ts`                            | generated                                                 | `pnpm generate:rpc-params-catalog`, never hand-edited                                                                                                                                                                                         |
+
+**Why the count is additive, and what it is not.** The status-bar number is the direct connected hosts plus
+the relayed machines confirmed inside `HOST_GRAPH_NODE_TTL_MS`; on a mesh of diameter two that is the same
+fleet size on every instance, which is the whole ask. It is not a claim that this client can reach them, and
+the menu says so twice: each relayed row reads `via <host>`, and a partial fan-out or a peer too old to
+answer is stated in its own footer rather than being allowed to look like hosts lost.
