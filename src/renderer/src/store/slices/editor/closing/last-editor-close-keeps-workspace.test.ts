@@ -1,5 +1,6 @@
-// Closing a workspace's last editor keeps it selected on its empty-tabs surface; a sync once
-// restored the landing patch that deselected it (#96).
+// closeFile and closeAllFiles write no landing patch when they close a workspace's last editor
+// (#96); a sync once restored the one that deselected it. The tabs slice is stubbed, so this pins
+// the editor slice's own write only.
 import { describe, expect, it, vi } from 'vitest'
 import type { StoreApi } from 'zustand'
 import type { AppState } from '../../../types'
