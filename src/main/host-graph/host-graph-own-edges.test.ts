@@ -172,3 +172,19 @@ describe('buildOwnAdjacency', () => {
     expect(adjacency.edges[0]?.label).toHaveLength(256)
   })
 })
+
+describe('liveness of a paired host', () => {
+  it('reports a pairing as connected when its own transport is up', () => {
+    const adjacency = buildOwnAdjacency(
+      sources({ environments: [environment()], connectedSshTargetIds: ['env-1'] })
+    )
+
+    expect(adjacency.edges[0]).toMatchObject({ kind: 'pairing-out', liveness: 'connected' })
+  })
+
+  it('reports a pairing as idle when nothing observed it connecting', () => {
+    const adjacency = buildOwnAdjacency(sources({ environments: [environment()] }))
+
+    expect(adjacency.edges[0]).toMatchObject({ kind: 'pairing-out', liveness: 'idle' })
+  })
+})

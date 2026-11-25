@@ -318,7 +318,7 @@ export function SshStatusSegment(): React.JSX.Element | null {
             {moreSshHostsLabel(hiddenIdleCount, t)}
           </DropdownMenuItem>
         ) : null}
-        {relayed.length > 0 ? (
+        {relayed.length > 0 || unavailablePeerCount > 0 || unsupportedPeerCount > 0 ? (
           <>
             <DropdownMenuSeparator />
             <div className="px-2 pt-1.5 pb-1 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">

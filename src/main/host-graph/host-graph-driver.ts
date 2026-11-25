@@ -2,10 +2,13 @@ import { getAppEnvironment } from '../../shared/app-lifecycle/app-environment'
 import { mapWithConcurrency } from '../../shared/concurrency/map-with-concurrency'
 import {
   HOST_GRAPH_EXCHANGE_METHOD,
+  HOST_GRAPH_PAYLOAD_VERSION,
   type HostGraphAdjacency,
-  type HostGraphExchangeResult
+  type HostGraphExchangeResult,
+  type HostGraphHeardReport
 } from '../../shared/host-graph/host-graph-contract'
 import { composeHostGraph, type HostGraphAnswer } from '../../shared/host-graph/host-graph-compose'
+import { HostGraphExchangeResultParams } from '../../shared/rpc-contract/host-graph-params'
 import type {
   HostGraphFailure,
   HostGraphSnapshot
@@ -25,6 +28,7 @@ import {
   FLEET_HOST_TIMEOUT_MS
 } from '../runtime/orchestration/legacy-remote-home/federated-fleet-snapshot'
 import { readLocalAdjacency } from './host-graph-local-adjacency'
+import { getHostGraphHeardReports } from './host-graph-heard-reports'
 
 /**
  * The client half of host discovery: ask every paired host for its adjacency, compose what comes back.
@@ -59,6 +63,8 @@ export type HostGraphDriverDeps = {
     timeoutMs: number
   ) => Promise<RuntimeRpcResponse<HostGraphExchangeResult>>
   readOwn: () => Promise<HostGraphAdjacency>
+  /** What other machines have reported to this host. A host that is only called learns the fleet here. */
+  readHeard: () => HostGraphHeardReport[]
   now: () => number
 }
 
@@ -68,12 +74,16 @@ type PeerAsk =
   | { kind: 'answer'; answer: HostGraphAnswer }
   | { kind: 'failure'; code: HostGraphFailure['code'] }
 
+type FullAnswer = Exclude<HostGraphExchangeResult, { unchanged: true }>
+
 type DriverState = {
   snapshot: HostGraphSnapshot | null
   /** One fan-out at a time: a burst of reads is a burst of the same question. */
   inFlight: Promise<HostGraphSnapshot> | null
   /** The last full answer per environment, so an `unchanged` reply does not drop its machines. */
-  answers: Map<string, HostGraphExchangeResult>
+  answers: Map<string, FullAnswer>
+  /** When that answer arrived, so a replayed one keeps its age instead of looking current. */
+  answerAt: Map<string, number>
   /** The revision each environment last answered with, so an unchanged reply is one word. */
   revisions: Map<string, string>
   /** Expiry times for hosts that answered `capability_unsupported`. */
@@ -87,6 +97,7 @@ function emptyState(): DriverState {
     snapshot: null,
     inFlight: null,
     answers: new Map(),
+    answerAt: new Map(),
     revisions: new Map(),
     unsupportedUntil: new Map()
   }
@@ -95,6 +106,11 @@ function emptyState(): DriverState {
 /** Tests only: forget every cached answer, revision and refusal. */
 export function resetHostGraphDriver(): void {
   state = emptyState()
+}
+
+/** Why a caller outside the driver needs this: a host attaching changes the fleet before the TTL does. */
+export function invalidateHostGraphSnapshot(): void {
+  state.snapshot = null
 }
 
 /** The last snapshot, refreshed when it is older than a minute. */
@@ -137,10 +153,17 @@ async function fanOut(deps: HostGraphDriverDeps): Promise<HostGraphSnapshot> {
 
   const answers: HostGraphAnswer[] = []
   const failures: HostGraphFailure[] = []
+  const listed = new Set(environments.map((environment) => environment.id))
   asks.forEach((ask, index) => {
     if (ask.kind === 'answer') {
       answers.push(ask.answer)
       return
+    }
+    // Why a failed host still contributes: one dropped exchange must not shrink the fleet. What it last
+    // said is replayed at its original age, so it expires on the TTL rather than on a bad round trip.
+    const stale = staleAnswer(environments[index].id)
+    if (stale) {
+      answers.push(stale)
     }
     failures.push({
       environmentId: environments[index].id,
@@ -148,6 +171,20 @@ async function fanOut(deps: HostGraphDriverDeps): Promise<HostGraphSnapshot> {
       code: ask.code
     })
   })
+
+  // Why the reports this host holds are answers too: a machine that only ever *calls* this one is a
+  // direct pairing in the other direction. Without this a leaf that nothing asks reports an empty
+  // fleet, and a hub shows a shorter list than the client it serves.
+  for (const report of deps.readHeard()) {
+    answers.push({
+      adjacency: report.adjacency,
+      heard: [],
+      receivedAt: report.receivedAt,
+      depth: 1
+    })
+  }
+
+  pruneCachesFor(listed)
 
   const snapshot: HostGraphSnapshot = {
     own,
@@ -204,21 +241,65 @@ async function askPeer(
   }
 
   const result = response.result
+  // Why a peer's answer is parsed: `params` bounds what this host is asked, not what it is told.
+  const parsed = HostGraphExchangeResultParams.safeParse(result)
+  if (!parsed.success) {
+    return { kind: 'failure', code: 'host_unavailable' }
+  }
   // Why an unchanged answer reuses the stored one: the host is saying "same facts as last time", and
   // reading that as "no facts" would drop every machine it had reported from the fleet.
   if (isUnchanged(result)) {
     const previous = state.answers.get(environment.id)
-    if (previous !== undefined && !isUnchanged(previous)) {
+    if (previous !== undefined) {
+      state.answerAt.set(environment.id, deps.now())
       return { kind: 'answer', answer: answerOf(previous, deps.now()) }
     }
     return { kind: 'failure', code: 'host_unavailable' }
   }
-  if (!isFullAnswer(result)) {
+  const answer = parsed.data
+  if (!('adjacency' in answer) || answer.adjacency.version !== HOST_GRAPH_PAYLOAD_VERSION) {
     return { kind: 'failure', code: 'host_unavailable' }
   }
-  state.answers.set(environment.id, result)
-  state.revisions.set(environment.id, result.adjacency.revision)
-  return { kind: 'answer', answer: answerOf(result, deps.now()) }
+  const full: FullAnswer = {
+    adjacency: asOurPayload(answer.adjacency),
+    // Why filtered: a report inside an answer can carry a version this build does not speak, and reading
+    // it as ours would put another host's future payload into this client's fleet.
+    heard: answer.heard
+      .filter((report) => report.adjacency.version === HOST_GRAPH_PAYLOAD_VERSION)
+      .map((report) => ({ ...report, adjacency: asOurPayload(report.adjacency) })),
+    revision: answer.revision
+  }
+  state.answers.set(environment.id, full)
+  state.answerAt.set(environment.id, deps.now())
+  state.revisions.set(environment.id, full.revision)
+  return { kind: 'answer', answer: answerOf(full, deps.now()) }
+}
+
+/**
+ * A host that answered nothing this round keeps what it last said until that ages out.
+ *
+ * Why the original arrival time: the stored edges are as old as they are, so replaying them with a fresh
+ * timestamp would keep a machine in the fleet for as long as the client kept asking anyone else.
+ */
+function staleAnswer(environmentId: string): HostGraphAnswer | null {
+  const previous = state.answers.get(environmentId)
+  const at = state.answerAt.get(environmentId)
+  if (previous === undefined || at === undefined) {
+    return null
+  }
+  return answerOf(previous, at)
+}
+
+function pruneCachesFor(listed: ReadonlySet<string>): void {
+  for (const environmentId of state.answers.keys()) {
+    if (listed.has(environmentId)) {
+      continue
+    }
+    state.answers.delete(environmentId)
+    state.answerAt.delete(environmentId)
+    state.revisions.delete(environmentId)
+    state.unsupportedUntil.delete(environmentId)
+  }
 }
 
 function answerOf(
@@ -226,6 +307,13 @@ function answerOf(
   receivedAt: number
 ): HostGraphAnswer {
   return { adjacency: result.adjacency, heard: result.heard, receivedAt, depth: 1 }
+}
+
+/** The schema types `version` as a number; only a payload this build speaks reaches here. */
+function asOurPayload<T extends { version: number }>(
+  adjacency: T
+): Omit<T, 'version'> & { version: typeof HOST_GRAPH_PAYLOAD_VERSION } {
+  return { ...adjacency, version: HOST_GRAPH_PAYLOAD_VERSION }
 }
 
 function rememberUnsupported(environmentId: string, now: number): void {
@@ -236,28 +324,16 @@ function isUnchanged(result: HostGraphExchangeResult): result is { unchanged: tr
   return typeof result === 'object' && result !== null && 'unchanged' in result
 }
 
-function isFullAnswer(
-  result: HostGraphExchangeResult
-): result is Exclude<HostGraphExchangeResult, { unchanged: true }> {
-  return (
-    typeof result === 'object' &&
-    result !== null &&
-    'adjacency' in result &&
-    typeof result.adjacency === 'object' &&
-    result.adjacency !== null &&
-    Array.isArray(result.heard)
-  )
-}
-
 /**
- * Why the same refusal set as host-settings replication: an older host answers `method_not_found`,
- * and a host that refuses this caller answers `forbidden`. Both mean this build cannot answer.
+ * Why only `method_not_found`: an older build answers that, and it is the one refusal that says the
+ * host cannot answer this wire. `forbidden` says this caller may not, which a re-pair can fix at once
+ * and which must not park the host for ten minutes.
  */
 function isUnsupported(response: RuntimeRpcResponse<HostGraphExchangeResult>): boolean {
   if (response.ok) {
     return false
   }
-  return response.error.code === 'method_not_found' || response.error.code === 'forbidden'
+  return response.error.code === 'method_not_found'
 }
 
 /** A re-pairing adds a new environment, so a saved pairing that no longer resolves is a changed peer. */
@@ -287,6 +363,7 @@ function defaultDeps(): HostGraphDriverDeps {
         timeoutMs
       ),
     readOwn: readLocalAdjacency,
+    readHeard: () => getHostGraphHeardReports().list(),
     now: () => Date.now()
   }
 }

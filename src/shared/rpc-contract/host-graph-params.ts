@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import {
   HOST_GRAPH_MAX_EDGES,
+  HOST_GRAPH_MAX_HEARD,
   HOST_GRAPH_MAX_ID_CHARS,
   HOST_GRAPH_MAX_LABEL_CHARS,
   HOST_GRAPH_MAX_SSH_KEYS
@@ -48,9 +49,31 @@ export const HostGraphAdjacencyParams = z.object({
   generatedAt: z.number().int().nonnegative()
 })
 
+export const HostGraphHeardReportParams = z.object({
+  adjacency: HostGraphAdjacencyParams,
+  reportedBy: z.string().min(1).max(HOST_GRAPH_MAX_ID_CHARS),
+  receivedAt: z.number().int().nonnegative()
+})
+
 export const HostGraphExchangeParams = z
   .object({
     self: HostGraphAdjacencyParams.nullable(),
     knownRevision: z.string().min(1).max(HOST_GRAPH_MAX_ID_CHARS).optional()
   })
   .strict()
+
+/**
+ * A peer's answer, validated before it is composed.
+ *
+ * Why the result is parsed at all: `params` bounds what this host is *asked*, but a hostile or buggy
+ * peer answers whatever it likes. Without this, one bad label or a missing `ref` throws inside
+ * composition and the whole fan-out is lost, and an unbounded `heard` list is work nobody asked for.
+ */
+export const HostGraphExchangeResultParams = z.union([
+  z.object({ unchanged: z.literal(true) }).strict(),
+  z.object({
+    adjacency: HostGraphAdjacencyParams,
+    heard: z.array(HostGraphHeardReportParams).max(HOST_GRAPH_MAX_HEARD),
+    revision: z.string().min(1).max(HOST_GRAPH_MAX_ID_CHARS)
+  })
+])

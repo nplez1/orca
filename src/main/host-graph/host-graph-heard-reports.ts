@@ -23,6 +23,24 @@ export type HostGraphHeardReports = {
   forget(callerFingerprint: string): void
 }
 
+/**
+ * The process-wide store.
+ *
+ * Why one instance shared by the method and the driver: a host that is only ever *called* learns the
+ * fleet from these reports and nothing else. A per-request store would leave its own status bar showing
+ * none of the machines that asked it.
+ */
+let shared: HostGraphHeardReports | null = null
+
+export function getHostGraphHeardReports(): HostGraphHeardReports {
+  shared ??= createHostGraphHeardReports()
+  return shared
+}
+
+export function resetHostGraphHeardReports(): void {
+  shared = null
+}
+
 export function createHostGraphHeardReports(
   options: { now?: () => number } = {}
 ): HostGraphHeardReports {

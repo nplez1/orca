@@ -4,6 +4,7 @@ import { getRuntimeEnvironmentRegistryRoot } from '../ipc/runtime-environments/c
 import { loadTrustedHostKeys } from '../ssh/host-keys/ssh-host-key-store'
 import { getRegisteredSshState, listRegisteredSshTargets } from '../ssh/targets/ssh-target-registry'
 import { buildOwnAdjacency, type HostGraphOwnEdgeSources } from './host-graph-own-edges'
+import { connectedHostGraphEnvironmentIds } from './host-graph-connection-state'
 import { readSelfMachineRef, selfLabel } from './host-graph-self-identity'
 
 /**
@@ -26,9 +27,14 @@ export async function readLocalAdjacency(): Promise<HostGraphAdjacency> {
     readSafely<HostGraphOwnEdgeSources['sshTargets']>(() => listRegisteredSshTargets(), []),
     readSafely<HostGraphOwnEdgeSources['trustedHostKeys']>(() => loadTrustedHostKeys(), [])
   ])
-  const connectedSshTargetIds = sshTargets
-    .filter((target) => getRegisteredSshState(target.id)?.status === 'connected')
-    .map((target) => target.id)
+  const connectedSshTargetIds = [
+    ...sshTargets
+      .filter((target) => getRegisteredSshState(target.id)?.status === 'connected')
+      .map((target) => target.id),
+    // Why environment ids here too: a pairing is connected on its own transport, not over an SSH
+    // tunnel, and a host that reported its pairings as idle would be relayed as idle everywhere.
+    ...connectedHostGraphEnvironmentIds()
+  ]
   return buildOwnAdjacency({
     now: Date.now(),
     // Why the host's own keys: a peer names this machine by the pairing key it recorded, so without

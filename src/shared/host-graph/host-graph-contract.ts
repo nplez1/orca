@@ -23,9 +23,10 @@ export const HOST_GRAPH_PAYLOAD_VERSION = 1
 /**
  * Graph distance a composed node may sit at.
  *
- * Why 2 is enough: the documented topology is a hub of diameter 2, and the heard-report half of the
- * exchange already carries a peer's direct neighbours. A fleet with three or more owners on one
- * machine still converges, it just takes one refresh period to fill in.
+ * Why 2 is enough: a host answers with its own pairings plus the machines that reported themselves to
+ * it, and a client composes both. That covers a hub of any diameter one refresh period after the peers
+ * have talked to each other, because a machine is never more than one hop from a host this client can
+ * reach. Anything deeper would be a report of a report, which the payload shape does not carry.
  */
 export const HOST_GRAPH_HOP_CAP = 2
 
@@ -103,7 +104,11 @@ export type HostGraphHeardReport = {
 
 export type HostGraphExchangeResult =
   | { unchanged: true }
-  | { adjacency: HostGraphAdjacency; heard: HostGraphHeardReport[] }
+  /**
+   * `revision` covers the adjacency *and* the hearsay in this answer, so a caller can send it back as
+   * `knownRevision`. The adjacency's own revision would not notice a new caller appearing here.
+   */
+  | { adjacency: HostGraphAdjacency; heard: HostGraphHeardReport[]; revision: string }
 
 /** The alias a node is addressed by during composition. */
 export type HostGraphAlias = { kind: 'orca'; key: string } | { kind: 'ssh'; key: string }

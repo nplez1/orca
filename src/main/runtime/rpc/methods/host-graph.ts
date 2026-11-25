@@ -6,8 +6,9 @@ import {
   type HostGraphExchangeResult
 } from '../../../../shared/host-graph/host-graph-contract'
 import { HostGraphExchangeParams } from '../../../../shared/rpc-contract/host-graph-params'
+import { hostGraphAnswerRevision } from '../../../../shared/host-graph/host-graph-compose'
 import {
-  createHostGraphHeardReports,
+  getHostGraphHeardReports,
   type HostGraphHeardReports
 } from '../../../host-graph/host-graph-heard-reports'
 import { readLocalAdjacency } from '../../../host-graph/host-graph-local-adjacency'
@@ -15,9 +16,9 @@ import { defineMethod } from '../core'
 
 type ParsedAdjacency = NonNullable<z.infer<typeof HostGraphExchangeParams>['self']>
 
-// Why one process-wide store: what a caller reported is what the next caller is told, so a per-request
-// instance would answer with an empty fleet every time.
-const heardReports: HostGraphHeardReports = createHostGraphHeardReports()
+// Why the shared instance: a host that is only ever called learns the fleet from these reports, so the
+// driver that composes its own status bar has to read the same store this method writes.
+const heardReports: HostGraphHeardReports = getHostGraphHeardReports()
 
 /**
  * The host-graph exchange, as a paired host answers it.
@@ -42,17 +43,18 @@ export const HOST_GRAPH_METHODS = [
         })
       }
       const own = await readLocalAdjacency()
-      if (params.knownRevision === own.revision) {
-        return { unchanged: true }
-      }
       // Why excluded: a caller already holds its own adjacency, so echoing it back is payload it
       // cannot use and would have to filter.
-      return {
-        adjacency: own,
-        heard: heardReports
-          .list({ now: Date.now() })
-          .filter((report) => report.reportedBy !== callerFingerprint)
+      const heard = heardReports
+        .list({ now: Date.now() })
+        .filter((report) => report.reportedBy !== callerFingerprint)
+      // Why the answer's revision and not the adjacency's: a new caller appearing here changes what
+      // the next caller is told, while this host's own pairings have not moved.
+      const revision = hostGraphAnswerRevision(own, heard)
+      if (params.knownRevision === revision) {
+        return { unchanged: true }
       }
+      return { adjacency: own, heard, revision }
     }
   })
 ]

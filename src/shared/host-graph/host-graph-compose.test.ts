@@ -8,6 +8,7 @@ import {
 } from './host-graph-contract'
 import {
   composeHostGraph,
+  hostGraphAnswerRevision,
   hostGraphRevision,
   type HostGraphAnswer,
   type HostGraphComposeInput
@@ -232,5 +233,94 @@ describe('the adjacency revision', () => {
     })
 
     expect(two).not.toBe(one)
+  })
+})
+
+describe('merging machines one SSH key at a time', () => {
+  it('refuses a chain that would bridge two pairing keys', () => {
+    const own = adjacency('laptop', VIEWER, [
+      edge(machine('key-x', ['SHA256:k1']), 'x'),
+      edge(machine(undefined, ['SHA256:k1', 'SHA256:k2']), 'bridge'),
+      edge(machine('key-y', ['SHA256:k2']), 'y')
+    ])
+
+    const fleet = compose({ own })
+
+    // x and bridge share one pairing key, so they are one machine labelled by the entry that named its
+    // own key; y presents a different one, so the bridge cannot join them and the refusal is counted.
+    expect(fleet.nodes.map((node) => node.label).sort()).toEqual(['x', 'y'])
+    expect(fleet.aliasConflicts).toBe(1)
+  })
+
+  it('does not let a peer hide another machine by claiming our SSH key', () => {
+    const selfKey = 'SHA256:viewer-ssh'
+    const studio = adjacency('studio', machine('studio-key'), [
+      edge(machine('victim-key', [selfKey]), 'victim')
+    ])
+
+    const fleet = compose({
+      viewer: machine('viewer-key', [selfKey]),
+      own: null,
+      answers: [answer(studio)]
+    })
+
+    expect(fleet.nodes.map((node) => node.label).sort()).toEqual(['studio', 'victim'])
+  })
+
+  it('keeps an SSH-only entry that shares our key, because a hidden machine costs more than a spare row', () => {
+    const selfKey = 'SHA256:viewer-ssh'
+    const studio = adjacency('studio', machine('studio-key'), [
+      edge(machine(undefined, [selfKey]), 'a clone of us')
+    ])
+
+    const fleet = compose({
+      viewer: machine('viewer-key', [selfKey]),
+      own: null,
+      answers: [answer(studio)]
+    })
+
+    // Only a pairing-key match identifies us once we know our own key: treating an SSH-only entry as
+    // self would let any peer hide any machine by claiming our host key alongside its pairing key.
+    expect(fleet.nodes.map((node) => node.label).sort()).toEqual(['a clone of us', 'studio'])
+  })
+})
+
+describe('the answer revision', () => {
+  const own = { revision: 'own-1' }
+
+  it('moves when a machine starts reporting itself to the host', () => {
+    const before = hostGraphAnswerRevision(own, [])
+    const after = hostGraphAnswerRevision(own, [
+      { adjacency: adjacency('laptop', machine('laptop-key')), reportedBy: 'fp', receivedAt: NOW }
+    ])
+
+    expect(after).not.toBe(before)
+  })
+
+  it('does not move when the same report is only re-sent later', () => {
+    const report = (receivedAt: number) => [
+      { adjacency: adjacency('laptop', machine('laptop-key')), reportedBy: 'fp', receivedAt }
+    ]
+
+    expect(hostGraphAnswerRevision(own, report(NOW + 60_000))).toBe(
+      hostGraphAnswerRevision(own, report(NOW))
+    )
+  })
+
+  it('does not depend on the order the reports arrive in', () => {
+    const first = {
+      adjacency: adjacency('laptop', machine('laptop-key')),
+      reportedBy: 'fp-a',
+      receivedAt: NOW
+    }
+    const second = {
+      adjacency: adjacency('phone', machine('phone-key')),
+      reportedBy: 'fp-b',
+      receivedAt: NOW
+    }
+
+    expect(hostGraphAnswerRevision(own, [first, second])).toBe(
+      hostGraphAnswerRevision(own, [second, first])
+    )
   })
 })

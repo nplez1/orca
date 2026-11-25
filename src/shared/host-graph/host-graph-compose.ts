@@ -16,15 +16,16 @@ import {
  */
 
 export type HostGraphAnswer = {
-  /** The paired host's own adjacency, as it answered. */
+  /** A machine this client asked, or one that asked this client. */
   adjacency: HostGraphAdjacency
-  /** Machines that called the paired host, as it reported them. Never re-nested. */
+  /** Machines that reported themselves to the `adjacency`'s machine. Never re-nested. */
   heard: readonly HostGraphHeardReport[]
+  /** When this fact was last confirmed: the answer's arrival, or the report's own arrival there. */
   receivedAt: number
   /**
-   * Hops between this client and the reporter. 1 for a direct pairing, which is the only case the
-   * driver produces today. It exists so a report reached through another host is capped out rather
-   * than silently counted at a depth it was never confirmed at.
+   * Hops between this client and the reporting machine. 1 for a direct pairing in either direction,
+   * which is the only value the driver produces. It exists so a report reached through another host
+   * is capped out rather than silently counted at a depth it was never confirmed at.
    */
   depth?: number
 }
@@ -85,6 +86,7 @@ export function composeHostGraph(input: HostGraphComposeInput): HostGraphFleet {
     const reporter = answer.adjacency
     const depth = answer.depth ?? 1
     const via = [reporter.self.label]
+    // Why empty: the reporter itself is a machine this client is paired with, in whichever direction.
     observations.push({
       ref: reporter.self.ref,
       label: reporter.self.label,
@@ -103,8 +105,8 @@ export function composeHostGraph(input: HostGraphComposeInput): HostGraphFleet {
         lastConfirmedAt: answer.receivedAt
       })
     }
-    // Hearsay keeps its distance at the reporter's: we do not walk a peer's neighbours' edges, which
-    // is what bounds the payload's depth without a per-hop decrement we would get wrong.
+    // Hearsay is one hop beyond the reporter and is never walked further, which is what bounds the
+    // payload's depth. Its own timestamp travels with it, so an ageing report ages here too.
     for (const report of answer.heard) {
       observations.push({
         ref: report.adjacency.self.ref,
@@ -112,7 +114,7 @@ export function composeHostGraph(input: HostGraphComposeInput): HostGraphFleet {
         distance: depth + 1,
         via,
         liveness: 'connected',
-        lastConfirmedAt: answer.receivedAt
+        lastConfirmedAt: report.receivedAt
       })
       for (const edge of report.adjacency.edges) {
         observations.push({
@@ -121,7 +123,7 @@ export function composeHostGraph(input: HostGraphComposeInput): HostGraphFleet {
           distance: depth + 1,
           via,
           liveness: edge.liveness,
-          lastConfirmedAt: answer.receivedAt
+          lastConfirmedAt: report.receivedAt
         })
       }
     }
@@ -134,11 +136,9 @@ export function composeHostGraph(input: HostGraphComposeInput): HostGraphFleet {
   )
 
   const merged = mergeByMachine(live)
-  // Why `own.self` as well as `viewer`: the two are read from different places, and a host that could
-  // name itself in the payload it sends must not reappear in the list it just asked for.
   const selfRefs = input.own ? [input.viewer, input.own.self.ref] : [input.viewer]
   const nodes: HostGraphFleetNode[] = merged.groups.filter(
-    (group) => !selfRefs.some((ref) => sharesMachine(group.ref, ref))
+    (group) => !selfRefs.some((ref) => isSelfGroup(group.ref, ref))
   )
 
   nodes.sort(
@@ -153,20 +153,36 @@ export function composeHostGraph(input: HostGraphComposeInput): HostGraphFleet {
 }
 
 /**
+ * Whether a composed entry is this client's own machine.
+ *
+ * Why an SSH-key match cannot identify us once the entry carries a pairing key: every peer is told our
+ * SSH keys, so otherwise one peer could claim any machine's pairing key alongside our SSH key and have
+ * that machine dropped from our own list. VM images cloned from one template also share host keys.
+ */
+function isSelfGroup(ref: HostGraphMachineRef, self: HostGraphMachineRef): boolean {
+  if (ref.orcaHostKey || self.orcaHostKey) {
+    return ref.orcaHostKey !== undefined && ref.orcaHostKey === self.orcaHostKey
+  }
+  const selfKeys = new Set(self.sshHostKeys ?? [])
+  return (ref.sshHostKeys ?? []).some((key) => selfKeys.has(key))
+}
+
+/**
  * Merge observations that describe one machine.
  *
  * Why an `orcaHostKey` match is trusted but an SSH-key match is conditional: two paths to one machine
  * carry that machine's own pairing key, so it is evidence the machine itself supplied. An SSH host key
- * is self-reported too, so it may complete an SSH-only entry — but never join two machines that each
- * presented a *different* pairing key, because then a lying peer could hide another host from the
- * count by claiming its SSH key.
+ * is self-reported too, so it may complete an SSH-only entry — but never join two components that each
+ * presented a *different* pairing key, because then a lying peer could hide another host from the count
+ * by claiming its SSH key. The check is made between components at union time, so a chain that bridges
+ * two pairing keys through two different SSH keys is refused as a whole rather than one link at a time.
  */
 function mergeByMachine(observations: readonly Observation[]): {
   groups: HostGraphFleetNode[]
   conflicts: number
 } {
   const parent = observations.map((_, index) => index)
-  const find = (index: number): number => {
+  const rootOf = (index: number): number => {
     let root = index
     while (parent[root] !== root) {
       parent[root] = parent[parent[root]]
@@ -174,12 +190,33 @@ function mergeByMachine(observations: readonly Observation[]): {
     }
     return root
   }
+  const orcaKeysByRoot = new Map<number, Set<string>>()
+  observations.forEach((observation, index) => {
+    const key = observation.ref.orcaHostKey
+    orcaKeysByRoot.set(index, key ? new Set([key]) : new Set())
+  })
   const union = (left: number, right: number): void => {
-    const leftRoot = find(left)
-    const rightRoot = find(right)
-    if (leftRoot !== rightRoot) {
-      parent[rightRoot] = leftRoot
+    const leftRoot = rootOf(left)
+    const rightRoot = rootOf(right)
+    if (leftRoot === rightRoot) {
+      return
     }
+    parent[rightRoot] = leftRoot
+    const merged = orcaKeysByRoot.get(leftRoot) ?? new Set<string>()
+    for (const key of orcaKeysByRoot.get(rightRoot) ?? []) {
+      merged.add(key)
+    }
+    orcaKeysByRoot.set(leftRoot, merged)
+    orcaKeysByRoot.delete(rightRoot)
+  }
+  const pairingKeysOf = (roots: readonly number[]): Set<string> => {
+    const keys = new Set<string>()
+    for (const root of roots) {
+      for (const key of orcaKeysByRoot.get(rootOf(root)) ?? []) {
+        keys.add(key)
+      }
+    }
+    return keys
   }
 
   const byAlias = new Map<string, number[]>()
@@ -195,10 +232,11 @@ function mergeByMachine(observations: readonly Observation[]): {
   })
 
   for (const [alias, members] of byAlias) {
-    if (alias.startsWith('orca\u0000')) {
-      for (const member of members.slice(1)) {
-        union(members[0], member)
-      }
+    if (!alias.startsWith('orca\u0000')) {
+      continue
+    }
+    for (const member of members.slice(1)) {
+      union(members[0], member)
     }
   }
 
@@ -207,25 +245,22 @@ function mergeByMachine(observations: readonly Observation[]): {
     if (!alias.startsWith('ssh\u0000')) {
       continue
     }
-    const orcaKeys = new Set<string>()
-    for (const member of members) {
-      const key = observations[member].ref.orcaHostKey
-      if (key) {
-        orcaKeys.add(key)
-      }
+    const roots = [...new Set(members.map((member) => rootOf(member)))]
+    if (roots.length < 2) {
+      continue
     }
-    if (orcaKeys.size > 1) {
+    if (pairingKeysOf(roots).size > 1) {
       conflicts += 1
       continue
     }
-    for (const member of members.slice(1)) {
-      union(members[0], member)
+    for (const root of roots.slice(1)) {
+      union(roots[0], root)
     }
   }
 
   const byRoot = new Map<number, Observation[]>()
   observations.forEach((observation, index) => {
-    const root = find(index)
+    const root = rootOf(index)
     const existing = byRoot.get(root)
     if (existing) {
       existing.push(observation)
@@ -286,14 +321,6 @@ function aliasesOf(ref: HostGraphMachineRef): string[] {
   return aliases
 }
 
-function sharesMachine(left: HostGraphMachineRef, right: HostGraphMachineRef): boolean {
-  if (left.orcaHostKey && right.orcaHostKey && left.orcaHostKey === right.orcaHostKey) {
-    return true
-  }
-  const rightKeys = new Set(right.sshHostKeys ?? [])
-  return (left.sshHostKeys ?? []).some((key) => rightKeys.has(key))
-}
-
 /**
  * A digest of what a peer would be told, for the `knownRevision` short-circuit.
  *
@@ -308,6 +335,26 @@ export function hostGraphRevision(adjacency: Pick<HostGraphAdjacency, 'self' | '
     parts.push(...aliasesOf(edge.to).sort())
   }
   return fnv1a(parts.join('\u0000'))
+}
+
+/**
+ * The revision of a whole answer, hearsay included.
+ *
+ * Why the adjacency's own revision is not enough: a host that is only ever *called* changes what it
+ * would tell the next caller whenever a new caller appears, while its own pairings have not moved. An
+ * `unchanged` reply keyed on the adjacency alone would then keep a new machine invisible to everyone
+ * else for as long as the caller asked. Report arrival times are excluded for the same reason
+ * `observedAt` is: membership is what matters, not when it was last re-sent.
+ */
+export function hostGraphAnswerRevision(
+  own: Pick<HostGraphAdjacency, 'revision'>,
+  heard: readonly HostGraphHeardReport[]
+): string {
+  const parts = [own.revision]
+  for (const report of heard) {
+    parts.push(`${report.reportedBy}\u001f${report.adjacency.revision}`)
+  }
+  return fnv1a(parts.sort().join('\u0000'))
 }
 
 function fnv1a(input: string): string {
