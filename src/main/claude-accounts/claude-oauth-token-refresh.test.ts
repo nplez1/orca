@@ -16,7 +16,10 @@ import { setMainHttpClient } from '../network/http-client'
 
 const fetchMock = vi.fn()
 const keychain = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn() }))
-const filesystem = vi.hoisted(() => ({ refuseWrites: false }))
+const filesystem = vi.hoisted((): { refuseWrites: boolean; beforeWrite: (() => void) | null } => ({
+  refuseWrites: false,
+  beforeWrite: null
+}))
 
 vi.mock('../network/proxy-settings', () => ({
   ensureElectronProxyFromEnvironment: vi.fn(async () => {})
@@ -29,6 +32,7 @@ vi.mock('../macos-keychain/generic-password', async (importOriginal) => ({
 vi.mock('../filesystem/atomic-file-publication', async (importOriginal) => {
   const actual = await importOriginal<typeof FileUtils>()
   const guard = () => {
+    filesystem.beforeWrite?.()
     if (filesystem.refuseWrites) {
       throw Object.assign(new Error('EACCES: read-only file system'), { code: 'EACCES' })
     }
@@ -93,6 +97,7 @@ beforeEach(() => {
   keychain.write.mockReset()
   keychain.write.mockResolvedValue(undefined)
   filesystem.refuseWrites = false
+  filesystem.beforeWrite = null
   sealedStore.failDecrypts = false
   // Why every case: a pending rotation must never land in the developer's real app home, and the
   // default scheduler would leave timers running past the test that armed them.
@@ -362,6 +367,26 @@ it('keeps the rotation when the store refuses it, and spends it on the next atte
     refreshToken: 'unwritable-3'
   })
   warn.mockRestore()
+})
+
+it('writes the rotation to the sealed file before it reaches the store', async () => {
+  // The old refresh token is already spent server-side when this answer arrives, so it is the only
+  // copy of a working login. A quit or a crash during the store write — a keychain that blocks for
+  // seconds — used to lose it entirely.
+  const { target } = storedFile({ accessToken: 'expired', refreshToken: 'order-1' })
+  let pendingDuringStoreWrite: boolean | null = null
+  filesystem.beforeWrite = () => {
+    pendingDuringStoreWrite = existsSync(pendingRotationPath)
+  }
+  tokenResponse({ access_token: 'fresh', refresh_token: 'order-2' })
+
+  expect(await refreshClaudeOAuthCredentials(target, 'expired')).toMatchObject({
+    status: 'refreshed'
+  })
+
+  expect(pendingDuringStoreWrite).toBe(true)
+  // And it is dropped once the store took it, so a later launch does not replay a spent rotation.
+  expect(existsSync(pendingRotationPath)).toBe(false)
 })
 
 it('keeps spending the pending rotation while the store stays unwritable', async () => {
