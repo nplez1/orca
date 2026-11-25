@@ -43,7 +43,7 @@ import { REFERENCE_COMMAND_SPECS } from './reference'
 import { PORTS_COMMAND_SPECS } from './ports'
 import { PLUGIN_AUTHORING_COMMAND_SPECS, PLUGIN_RUNTIME_COMMAND_SPECS } from './plugin'
 import { PAIR_COMMAND_SPECS } from './pair'
-import { HOST_MESH_COMMAND_SPECS } from './host-mesh' // local(hosts)
+import { HOST_MESH_COMMAND_SPECS } from './host-mesh'
 import { PLUGIN_VIEW_COMMAND_SPECS } from './plugin-view'
 import { PLUGIN_INSTALL_COMMAND_SPECS } from './plugin-install'
 import { WORKSPACE_CLEANUP_COMMAND_SPECS } from './workspace-cleanup'

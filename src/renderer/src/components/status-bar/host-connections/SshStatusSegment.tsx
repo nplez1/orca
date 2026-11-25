@@ -26,7 +26,7 @@ import {
 } from '../../../../../shared/remote-runtime/host-catalog/runtime-environments'
 import { RuntimeHostStatusRow } from './RuntimeHostStatusRow'
 import { connectedHostCountLabel, moreSshHostsLabel } from './ssh-status-segment-copy'
-import { RelayedFleetStatusItems } from './RelayedFleetStatusItems' // local(hosts)
+import { RelayedFleetStatusItems } from './RelayedFleetStatusItems'
 import { useRelayedFleetHosts } from './use-relayed-fleet-hosts'
 import { SshHostFindPopover } from './SshHostFindPopover'
 import { splitSshStatusMenuRows } from './ssh-status-menu-rows'
@@ -68,7 +68,6 @@ export function SshStatusSegment(): React.JSX.Element | null {
   const [findOpen, setFindOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const [repairTarget, setRepairTarget] = useState<{ id: string; label: string } | null>(null)
-  // local(hosts): see LOCAL-PATCHES.md — the fleet this host can only see through another.
   const {
     relayed,
     unavailablePeerCount,
@@ -187,7 +186,6 @@ export function SshStatusSegment(): React.JSX.Element | null {
   )
 
   if (targets.length === 0 && runtimeHosts.length === 0 && relayed.length === 0) {
-    // local(hosts): added `relayed.length === 0`, so a group-only fleet still renders.
     return null
   }
 
@@ -195,7 +193,6 @@ export function SshStatusSegment(): React.JSX.Element | null {
     ...targets.map((target) => sshStatusForOverall(target.status)),
     ...runtimeHostRows.map((host) => runtimeHostStatusForOverall(host.state, host.blockedReason))
   ]
-  // local(hosts): relayed hosts count toward the badge too.
   const connectedHostCount =
     statuses.filter((status) => status === 'connected').length +
     relayed.filter((host) => host.live).length
@@ -315,7 +312,6 @@ export function SshStatusSegment(): React.JSX.Element | null {
             {moreSshHostsLabel(hiddenIdleCount, t)}
           </DropdownMenuItem>
         ) : null}
-        {/* local(hosts): the machines seen through another host. See LOCAL-PATCHES.md. */}
         <RelayedFleetStatusItems
           relayed={relayed}
           unavailablePeerCount={unavailablePeerCount}

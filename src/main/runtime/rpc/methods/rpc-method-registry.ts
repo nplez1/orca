@@ -75,7 +75,7 @@ import { MOBILE_WEB_BUNDLE_METHODS } from './mobile-delivery/mobile-web-bundle'
 import { RUNTIME_CLIENT_CAPABILITY_METHODS } from './client-events/runtime-client-capabilities'
 import { EMULATOR_METHODS } from './emulator/emulator'
 import { PAIRING_METHODS } from './pairing/pairing'
-import { FORK_RPC_METHODS } from '../../../host-mesh/fork-rpc-methods' // local(hosts)
+import { FORK_RPC_METHODS } from '../../../host-mesh/fork-rpc-methods'
 import { MOBILE_RELAY_HOSTS_METHODS } from './pairing/mobile-relay-hosts'
 import { MOBILE_PROJECT_SECTIONS_METHODS } from './mobile-delivery/mobile-project-sections'
 import { UPDATER_METHODS } from './updater/updater'

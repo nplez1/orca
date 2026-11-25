@@ -1,5 +1,4 @@
-/* eslint-disable max-lines -- local(hosts): upstream's launcher sits exactly at 300 lines, and the group needs two
-   lines on it (see LOCAL-PATCHES.md). Resolving a sync here means keeping those two lines and this one. */
+/* eslint-disable max-lines */
 import { settleDesktopActivation } from './runtime-launch-activation'
 import { app, type BrowserWindow } from 'electron'
 import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../shared/workspace-layout/layout-owner-switch'
@@ -116,7 +115,6 @@ function installRuntimeRpc(
     webClientRoot: getBundledWebClientRoot()
   })
   state.core.runtimeRpc = runtimeRpc
-  // local(hosts): the group, and the one-shot upgrade from existing pairings. See LOCAL-PATCHES.md.
   installHostMeshRuntime(runtimeRpc)
   runtime.setAgentSenderPeerKey(() => runtimeRpc.getE2EEPublicKey())
   runtimeRpc.setMobileDesktopRelayHosts(createRuntimeEnvironmentMobileRelayHosts())

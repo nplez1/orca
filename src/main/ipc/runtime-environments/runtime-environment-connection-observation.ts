@@ -1,6 +1,6 @@
 import type { RemoteRuntimeSharedConnectionDiagnostics } from '../../../shared/remote-runtime/control/remote-runtime-shared-control-types'
 import { getHostSettingsReplicationSync } from '../../host-sync/host-settings-replication-driver'
-import { notifyHostGraphOfConnectionChange } from '../../host-graph/host-graph-connection-observation' // local(hosts)
+import { notifyHostGraphOfConnectionChange } from '../../host-graph/host-graph-connection-observation'
 import { publishRuntimeEnvironmentDiagnostics } from './status/runtime-environment-diagnostics-broadcast'
 
 /**
@@ -22,7 +22,6 @@ export function publishConnectionDiagnostics(args: {
     transportGeneration: args.transportGeneration,
     state: args.diagnostics.state
   })
-  // local(hosts): the fleet's view of this connection, one call so this file gains one line.
   notifyHostGraphOfConnectionChange(args)
   publishRuntimeEnvironmentDiagnostics(args)
 }
