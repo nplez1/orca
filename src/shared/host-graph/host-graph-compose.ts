@@ -134,8 +134,11 @@ export function composeHostGraph(input: HostGraphComposeInput): HostGraphFleet {
   )
 
   const merged = mergeByMachine(live)
+  // Why `own.self` as well as `viewer`: the two are read from different places, and a host that could
+  // name itself in the payload it sends must not reappear in the list it just asked for.
+  const selfRefs = input.own ? [input.viewer, input.own.self.ref] : [input.viewer]
   const nodes: HostGraphFleetNode[] = merged.groups.filter(
-    (group) => !sharesMachine(group.ref, input.viewer)
+    (group) => !selfRefs.some((ref) => sharesMachine(group.ref, ref))
   )
 
   nodes.sort(
