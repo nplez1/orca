@@ -1,7 +1,7 @@
 // One host's view of an RPC that reads a value: loading, ready, unavailable on a host that predates the
 // method, or failed. Shared by the bot connectors, so each does not carry its own copy of the same four
 // states and the same `method_not_found` special case.
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useState } from 'react'
 import { RuntimeRpcCallError } from '@/runtime/rpc/calls/runtime-rpc-result'
 
 export type HostRpcView<T> =
@@ -19,9 +19,12 @@ export function useHostRpcView<T>(
   const [view, setView] = useState<HostRpcView<T>>({ status: 'loading' })
   const [reads, setReads] = useState(0)
   const reload = useCallback(() => setReads((count) => count + 1), [])
+  // `read` is rebuilt each render by its caller, so the host and the reload count are the identity;
+  // an effect event reads the latest closure without making it one.
+  const readLatest = useEffectEvent(() => read())
   useEffect(() => {
     let live = true
-    void read().then(
+    void readLatest().then(
       (value) => live && setView({ status: 'ready', value }),
       (error: unknown) =>
         live &&
@@ -34,8 +37,6 @@ export function useHostRpcView<T>(
     return () => {
       live = false
     }
-    // `read` is rebuilt each render by its caller, so the host and the reload count are the identity.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- a new closure per render is the caller's business
   }, [hostKey, reads])
   return { view, reload }
 }
