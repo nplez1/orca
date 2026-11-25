@@ -90,7 +90,9 @@ export function buildOwnAdjacency(deps: HostGraphOwnEdgeSources): HostGraphAdjac
     }
     edges.push({
       to: machineRef(undefined, sshHostKeys),
-      label: labelOf(target.label || target.host || ''),
+      // Why not the host itself as a fallback: an address is how you reach a machine, which is the one
+      // thing this payload never discloses.
+      label: labelOf(target.label || ''),
       kind: 'ssh',
       liveness: connected.has(target.id) ? 'connected' : 'idle',
       observedAt: deps.now
@@ -136,11 +138,11 @@ function sshHostKeysOfTarget(
   }
   const host = normalizeHost(target.host)
   const forHost = deps.trustedHostKeys.filter((record) => normalizeHost(record.host) === host)
-  const exact =
+  // Why exact when a port is known: a different port on the same hostname is a different sshd, and a
+  // never-connected target borrowing another one's key invents a machine that does not exist.
+  const matches =
     target.port === undefined ? forHost : forHost.filter((record) => record.port === target.port)
-  return [
-    ...new Set((exact.length > 0 ? exact : forHost).map((record) => record.fingerprint))
-  ].slice(0, HOST_GRAPH_MAX_SSH_KEYS)
+  return [...new Set(matches.map((record) => record.fingerprint))].slice(0, HOST_GRAPH_MAX_SSH_KEYS)
 }
 
 function normalizeHost(host: string): string {

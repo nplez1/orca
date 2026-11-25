@@ -1,5 +1,7 @@
 import type { RemoteRuntimeSharedConnectionDiagnostics } from '../../../shared/remote-runtime/control/remote-runtime-shared-control-types'
 import { getHostSettingsReplicationSync } from '../../host-sync/host-settings-replication-driver'
+import { observeHostGraphEnvironmentConnection } from '../../host-graph/host-graph-connection-state'
+import { invalidateHostGraphSnapshot } from '../../host-graph/host-graph-driver'
 import { publishRuntimeEnvironmentDiagnostics } from './status/runtime-environment-diagnostics-broadcast'
 
 /**
@@ -21,5 +23,11 @@ export function publishConnectionDiagnostics(args: {
     transportGeneration: args.transportGeneration,
     state: args.diagnostics.state
   })
+  observeHostGraphEnvironmentConnection({
+    environmentId: args.environmentId,
+    transportGeneration: args.transportGeneration,
+    state: args.diagnostics.state
+  })
+  invalidateHostGraphSnapshot()
   publishRuntimeEnvironmentDiagnostics(args)
 }

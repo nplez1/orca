@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   HOST_GRAPH_PAYLOAD_VERSION,
   type HostGraphAdjacency,
-  type HostGraphExchangeResult
+  type HostGraphExchangeResult,
+  type HostGraphHeardReport
 } from '../../shared/host-graph/host-graph-contract'
 import type { PairingOffer } from '../../shared/remote-runtime/pairing/mobile-relay-pairing-offer'
 import type { RuntimeRpcResponse } from '../../shared/remote-runtime/rpc/runtime-rpc-envelope'
@@ -43,12 +44,14 @@ function adjacency(
 
 function fullAnswer(
   label: string,
-  edges: readonly { label: string; orcaHostKey: string }[] = []
+  edges: readonly { label: string; orcaHostKey: string }[] = [],
+  heard: readonly HostGraphHeardReport[] = []
 ): RuntimeRpcResponse<HostGraphExchangeResult> {
+  const value = adjacency(label, edges)
   return {
     id: 'rpc-1',
     ok: true,
-    result: { adjacency: adjacency(label, edges), heard: [] },
+    result: { adjacency: value, heard: [...heard], revision: `rev-${label}-${value.revision}` },
     _meta: { runtimeId: 'rt' }
   }
 }
@@ -65,14 +68,19 @@ const PEER_OFFER: PairingOffer = {
   publicKeyB64: 'a2V5'
 }
 
-function harness(peers: readonly HostGraphPeerEnvironment[], send: Send) {
+function harness(
+  peers: readonly HostGraphPeerEnvironment[],
+  send: Send,
+  options: { heard?: readonly HostGraphHeardReport[]; own?: HostGraphAdjacency } = {}
+) {
   const clock = { now: BASE }
   const deps: HostGraphDriverDeps = {
     listEnvironments: async () => peers,
     resolvePairing: async (environmentId) => ({ environmentId, offer: PEER_OFFER }),
     sendRequest: (peer, method, params, timeoutMs) =>
       send(peer.environmentId, method, params, timeoutMs),
-    readOwn: async () => adjacency('viewer'),
+    readOwn: async () => options.own ?? adjacency('viewer'),
+    readHeard: () => [...(options.heard ?? [])],
     now: () => clock.now
   }
   return { deps, clock }
@@ -156,5 +164,61 @@ describe('refreshHostGraph', () => {
       'host_unavailable',
       'host_unavailable'
     ])
+  })
+
+  it('shows the machines that called this host, though it asked nobody', async () => {
+    // The VM in the documented topology: nothing to call, one machine that calls it.
+    const studioReport: HostGraphHeardReport = {
+      adjacency: adjacency('Studio', [
+        { label: 'Laptop', orcaHostKey: 'key-Laptop' },
+        { label: 'Windows', orcaHostKey: 'key-Windows' },
+        { label: 'VM', orcaHostKey: 'key-VM' }
+      ]),
+      reportedBy: 'fp-studio',
+      receivedAt: BASE
+    }
+    const send = vi.fn<Send>(async () => {
+      throw new Error('this host has nobody to ask')
+    })
+    const { deps } = harness([], send, {
+      heard: [studioReport],
+      own: adjacency('VM')
+    })
+
+    const snapshot = await refreshHostGraph(deps)
+
+    expect(send).not.toHaveBeenCalled()
+    // Distance order: the machine that called this one, then the machines it reported.
+    expect(labels(snapshot.fleet.nodes)).toEqual(['Studio', 'Laptop', 'Windows'])
+  })
+
+  it('counts the same fleet from the hub as from the leaf that asked it', async () => {
+    const laptopReport: HostGraphHeardReport = {
+      adjacency: adjacency('Laptop'),
+      reportedBy: 'fp-laptop',
+      receivedAt: BASE
+    }
+    const send = vi.fn<Send>(async (environmentId) => {
+      return environmentId === 'env-vm' ? fullAnswer('VM') : fullAnswer('Windows')
+    })
+    const { deps } = harness(
+      [
+        { id: 'env-vm', name: 'VM' },
+        { id: 'env-windows', name: 'Windows' }
+      ],
+      send,
+      {
+        heard: [laptopReport],
+        // The Studio's own pairings, which is also what it hands to the laptop that asks it.
+        own: adjacency('Studio', [
+          { label: 'VM', orcaHostKey: 'key-VM' },
+          { label: 'Windows', orcaHostKey: 'key-Windows' }
+        ])
+      }
+    )
+
+    const snapshot = await refreshHostGraph(deps)
+
+    expect(labels(snapshot.fleet.nodes)).toEqual(['Laptop', 'VM', 'Windows'])
   })
 })

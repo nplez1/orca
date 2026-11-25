@@ -6022,11 +6022,12 @@ nothing it could not read from `orca-environments.json` itself. The genuinely ne
 **callee** learns upstream membership: a work host the Studio controls, holding no rights on the Studio,
 learns the laptop's name and identity. The bounds are: `ephemeral-vm` environments are never reported, the
 method is deliberately absent from both mobile allowlists so a phone cannot enumerate the fleet, heard
-reports are memory-only and dropped with the pairing, every array and string is bounded in
-`host-graph-params.ts`, and relayed rows are labelled and not actionable (there is no connect control,
-because reaching one needs stage 3).
+reports are memory-only and aged out by the same TTL the client uses, the answer a peer returns is
+validated before it is composed (`params` bounds what this host is asked, not what it is told), every array
+and string is bounded in `host-graph-params.ts`, and relayed rows are labelled and not actionable (there is
+no connect control, because reaching one needs stage 3).
 
-**The anchors.** Five files upstream owns, each a line or two, plus one generated catalog; every reason each
+**The anchors.** Six files upstream owns, each a line or two, plus one generated catalog; every reason each
 exists is this section. `src/shared/host-graph/**` is under `src/shared/`, so it is a **global input**: a PR
 carrying it needs the full unit gate, and a sync that moves it invalidates a cached verdict.
 
@@ -6037,9 +6038,27 @@ carrying it needs the full unit gate, and a sync that moves it invalidates a cac
 | `src/renderer/src/components/status-bar/host-connections/SshStatusSegment.tsx`       | the selector block, the early return, the count, the menu | imports; `useRelayedFleetHosts()`; the early return also requires `relayed.length > 0`, or a leaf shows nothing; the count adds live relayed hosts; a `Via other hosts` section with its two failure footers; `refreshRelayed()` on menu open |
 | `src/renderer/src/components/status-bar/host-connections/ssh-status-segment-copy.ts` | end of file                                               | five copy helpers: `relayedHostViaLabel`, `relayedHostStaleLabel`, `viaOtherHostsLabel`, `hostGraphPartialLabel`, `hostGraphOlderPeerLabel`                                                                                                   |
 | `src/shared/rpc-contract/rpc-params-catalog.generated.ts`                            | generated                                                 | `pnpm generate:rpc-params-catalog`, never hand-edited                                                                                                                                                                                         |
+| `src/main/ipc/runtime-environments/runtime-environment-connection-observation.ts`    | beside the replication `observeConnection` call           | `observeHostGraphEnvironmentConnection(args)` and `invalidateHostGraphSnapshot()`, so a pairing's own liveness is known and a host attaching refreshes the fleet before the TTL                                                               |
 
 **Why the count is additive, and what it is not.** The status-bar number is the direct connected hosts plus
 the relayed machines confirmed inside `HOST_GRAPH_NODE_TTL_MS`; on a mesh of diameter two that is the same
 fleet size on every instance, which is the whole ask. It is not a claim that this client can reach them, and
 the menu says so twice: each relayed row reads `via <host>`, and a partial fan-out or a peer too old to
 answer is stated in its own footer rather than being allowed to look like hosts lost.
+
+**What the review changed, and why it is worth knowing.** The first version answered the exchange
+symmetrically but composed only the answers to the questions it had asked, so a host that is _called_ and
+never _calls_ learned nothing: on the documented hub the Studio showed two hosts, the laptop three, and the
+VM and the Windows box zero — the exact failure the requirement forbids. The driver now composes the reports
+it holds as well, which makes a machine that only ever calls this one a direct pairing in the other
+direction. Three corrections came with it: an answer's `revision` covers the hearsay as well as the
+adjacency, or a new caller stayed invisible to everyone else for as long as the caller kept asking; a failed
+host replays what it last said at its original age instead of vanishing on one bad round trip; and a
+pairing's liveness comes from its own transport rather than from an SSH tunnel it may not use.
+
+**Known limits, accepted deliberately.** A machine reached both directly and through a relay whose stored
+SSH key is filed under a different hostname spelling can be counted twice, because only a pairing key can
+prove two entries are one machine. And once this client knows its own pairing key, an entry carrying only an
+SSH key is never treated as "us": VM images cloned from one template share `/etc/ssh` host keys, so a clone
+shows as its own row. That is the safer direction — a spare row, instead of a peer being able to hide a
+machine from the count by claiming our host key.

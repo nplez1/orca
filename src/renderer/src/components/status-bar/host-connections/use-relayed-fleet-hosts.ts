@@ -1,13 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { HOST_GRAPH_NODE_TTL_MS } from '../../../../../shared/host-graph/host-graph-contract'
 import type { HostGraphSnapshot } from '../../../../../shared/host-graph/host-graph-snapshot'
 
 /**
  * The machines this client can see but is not paired with.
  *
- * Why `distance > 1` is the test: `composeHostGraph` gives a node this client is directly paired with a
- * distance of 1, so anything further only exists because a peer reported it. Those are the rows the
- * status bar could not show before.
+ * Why `distance > 1` is the test: `composeHostGraph` gives a node this client is paired with a distance
+ * of 1, so anything further exists only because a peer reported it. Those are the rows the status bar
+ * could not show before.
  */
 
 export type RelayedFleetHost = {
@@ -28,19 +28,12 @@ export type RelayedFleet = {
   refresh: () => void
 }
 
-const EMPTY: RelayedFleet = {
-  relayed: [],
-  unavailablePeerCount: 0,
-  unsupportedPeerCount: 0,
-  refresh: () => undefined
-}
+/** How often staleness is re-read from an unchanged snapshot, so a dead host stops counting as live. */
+const TICK_MS = 60_000
 
 export function useRelayedFleetHosts(): RelayedFleet {
-  const [fleet, setFleet] = useState<RelayedFleetHost[]>([])
-  const [failures, setFailures] = useState<{ unavailable: number; unsupported: number }>({
-    unavailable: 0,
-    unsupported: 0
-  })
+  const [snapshot, setSnapshot] = useState<HostGraphSnapshot | null>(null)
+  const [nowMs, setNowMs] = useState(() => Date.now())
   const mountedRef = useRef(true)
   const inFlightRef = useRef(false)
 
@@ -51,19 +44,12 @@ export function useRelayedFleetHosts(): RelayedFleet {
     }
     inFlightRef.current = true
     try {
-      const snapshot: HostGraphSnapshot = await api.read()
+      const next: HostGraphSnapshot = await api.read()
       if (!mountedRef.current) {
         return
       }
-      setFleet(relayedHostsOf(snapshot, Date.now()))
-      setFailures({
-        unavailable: snapshot.failures.filter(
-          (failure) => failure.code !== 'capability_unsupported'
-        ).length,
-        unsupported: snapshot.failures.filter(
-          (failure) => failure.code === 'capability_unsupported'
-        ).length
-      })
+      setSnapshot(next)
+      setNowMs(Date.now())
     } catch {
       // Why silent: a fleet read that fails is a fleet this client cannot see, and the direct hosts it
       // does know about are still a correct answer.
@@ -75,19 +61,28 @@ export function useRelayedFleetHosts(): RelayedFleet {
   useEffect(() => {
     mountedRef.current = true
     void load()
+    const tick = setInterval(() => setNowMs(Date.now()), TICK_MS)
     return () => {
       mountedRef.current = false
+      clearInterval(tick)
     }
   }, [load])
 
-  return fleet.length === 0 && failures.unavailable === 0 && failures.unsupported === 0
-    ? { ...EMPTY, refresh: () => void load() }
-    : {
-        relayed: fleet,
-        unavailablePeerCount: failures.unavailable,
-        unsupportedPeerCount: failures.unsupported,
-        refresh: () => void load()
-      }
+  const relayed = useMemo(
+    () => (snapshot ? relayedHostsOf(snapshot, nowMs) : []),
+    [snapshot, nowMs]
+  )
+  const unavailablePeerCount =
+    snapshot?.failures.filter((failure) => failure.code !== 'capability_unsupported').length ?? 0
+  const unsupportedPeerCount =
+    snapshot?.failures.filter((failure) => failure.code === 'capability_unsupported').length ?? 0
+
+  return {
+    relayed,
+    unavailablePeerCount,
+    unsupportedPeerCount,
+    refresh: () => void load()
+  }
 }
 
 export function relayedHostsOf(snapshot: HostGraphSnapshot, now: number): RelayedFleetHost[] {
