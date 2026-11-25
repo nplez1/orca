@@ -534,9 +534,11 @@ that drive them. They did not get the same answer, because only one of them was 
   `AGENT_STATUS_STALE_AFTER_MS` stays fresh (and decays once the cap stops the reposts), driven
   through the real listener on the `task:subagent:lifecycle` lane and on the descendant bus's hand-off
   of a child spawned inside the lead's turn. That hand-off (0ddf9485840) also means upstream's suite now
-  passes unchanged here. **Not covered, because nothing reposts them:** a `subagent:async-*` child
-  spawned between turns and any `subagents:*` child never reach the roster, so their pane posts nothing
-  after the start and goes stale at the window, while the descendant lane quiet-reaps the child.
+  passes unchanged here (evidence in LOCAL-PATCHES.md § `local(agents)`: one binding per pi subagent
+  channel), so restoring it is viable; the deletion is kept and the choice is left to the maintainer.
+  **Unverified — not pinned by this suite:** a `subagent:async-*` child spawned between turns and any
+  `subagents:*` child do not reach the roster, so whether their pane goes stale at the window (and the
+  descendant lane quiet-reaps the child) is not asserted anywhere.
 
 ---
 

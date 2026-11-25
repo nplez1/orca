@@ -583,6 +583,13 @@ the normal path. With both lineages in place every child lifecycle event fired t
 deliberate silence on those channels for omp/prime-agent was filled by upstream's unconditional
 binding.
 
+**Evidence, 2026-11-25 (#464):** upstream's deleted held-turn repost suite passes unchanged on this
+tree, because the descendant bus hands a `subagent:async-*` child spawned inside the lead's turn to the
+roster (`handToRoster`, since 0ddf9485840). On base `767c078fde1`:
+`git show upstream/main:src/main/pi/managed-extensions/agent-status/agent-status-extension-held-turn-repost.test.ts`
+written to that path, then `pnpm test <that path> --maxWorkers=2` → `Tests 3 passed (3)`. The file was
+removed again; its cases are re-homed in `src/main/pi/agent-status-held-turn-repost-lanes.test.ts`.
+
 **Since the 2026-10-06 sync the live set belongs to a session, not to the process.**
 `agent-status-async-subagent-session-source.ts` publishes
 `globalThis.__orcaPiAsyncSubagents = { bySession, registration, awaitingSession }`: each factory run
@@ -973,8 +980,8 @@ Anchors, both on upstream-owned files and marked `LOCAL(nplez1)`:
   the 2026-11-20 sync). The cancel verdict's upstream suite survived 2026-11-24 and is kept
   (`agent-hook-cancel-verdict-latch.test.ts`, with the snapshot rule marked LOCAL(nplez1) above). The
   held-turn repost suite (#48146) is the `fork-refactor` deletion in
-  `local/sync/expected-deletions.json`, because it drives the two `subagent:async-*` bindings this fork
-  removed, and its cases are re-homed on the fork's lanes in
+  `local/sync/expected-deletions.json`, because at the deletion it drove the two `subagent:async-*`
+  bindings this fork removed, and its cases are re-homed on the fork's lanes in
   `src/main/pi/agent-status-held-turn-repost-lanes.test.ts` (#464); the cancel invariant is also pinned by
   `src/shared/agent-hook-listener-descendant-lifecycle.test.ts` › "starts a background child right
   after a cancel, instead of holding it as late work". The
