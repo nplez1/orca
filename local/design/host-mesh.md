@@ -116,28 +116,17 @@ A mesh that cannot shrink is a liability, so removal is the failure-intolerant h
 
 ## What is built, and what is not
 
-Built, tested, inert:
+Built and tested: the wire contract, the membership reducer, the admission rules (one ordered function, so
+what an introducer can talk us into is auditable), the sealed-offer envelope, the store with the peer index,
+the driver, the peer-facing and owner-facing RPC methods, the IPC/preload/renderer surface, `orca group`, and
+the startup wiring that makes any of it reachable.
 
-| Piece                                          | Why it is shaped that way                                                                                                           |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `src/shared/host-mesh/host-mesh-contract.ts`   | capability `host.mesh.v1`, the sealed-offer and sync payloads, the bounds, and `hostMeshPairStatus` so a half-join is representable |
-| `src/shared/host-mesh/host-mesh-membership.ts` | the group's rules as a pure reducer: union of members, union of tombstones, cap, removal-wins, link states                          |
-| `src/main/host-mesh/host-mesh-sealed-offer.ts` | `nacl.box` static-static, domain-separated, refuses rather than throws on every untrusted-input path                                |
-| `src/main/host-mesh/host-mesh-store.ts`        | the on-disk group and the peer index removal depends on                                                                             |
+Proven by a three-host simulation through a fake transport, with the real reducer, the real admission rules
+and real sealed boxes: a join reaches every pair; the fleet a host renders is identical on every host; a
+refused introduction shows as a gap instead of a false pairing; a stalled pair repairs on the next sync;
+removal cuts both directions and a tombstone refuses re-introduction. 81 unit tests.
 
-Not built: minting an offer with `grants: []` and `ticket: true` on the pairing layer; the device-row and
-environment tags; the six `hostMesh.*` methods and the `mesh-member` permission tier; the introduction and
-removal outboxes; the Settings surface; `orca group`.
-
-## What cannot be validated without real machines
-
-- **Two real Electron main processes** are needed for a real offer exchange, a real ticket redemption, and
-  the network widening that accompanies them. Two profiles on one Mac can check the protocol only with
-  loopback allowed, which `verifyPairingCode` refuses outside tests.
-- **Three real machines — Studio, laptop, VM** — are needed for the transitive join itself, for endpoint
-  reachability across LAN and Tailscale (the likeliest cause of a half-join), and for removal while one
-  member is asleep.
-- Everything in the "built" table above is validated by unit tests only.
-
-So the honest merge order is: the inert layers land on unit evidence, and the pairing side lands behind an
-experimental setting and is turned on only after a three-machine run.
+**Not verified, and not verifiable on one machine:** endpoint reachability across LAN and Tailscale — the
+likeliest cause of a half-join — and removal while a member is asleep. `verifyPairingCode` refuses loopback
+outside tests, so a real offer exchange needs two real Electron main processes. Until a Studio-plus-laptop-plus-VM
+run happens, a group is proven on one network and unproven across two.

@@ -6122,41 +6122,52 @@ machine from the count by claiming our host key.
 
 ### `local(hosts)`: mesh groups, so one join pairs a machine with every member
 
-The design, the three rejected mechanisms and the security reasoning are `local/design/host-mesh.md`; this
-records what shipped and, more importantly, what did not. Orca pairing is directional — the caller holds the
-environment record — so a fully connected group of n machines needs n(n−1) records and n(n−1) user actions.
-Three machines is six links, four is twelve. A group makes it n actions.
+The design, the three rejected mechanisms and the security reasoning are `local/design/host-mesh.md`. This
+records what shipped, every upstream file it anchors, and what is still unproven.
+
+Orca pairing is directional — the caller holds the environment record — so a fully connected group of n
+machines needs n(n−1) records and n(n−1) user actions. Three machines is six links. A group makes it n
+actions: joining one member introduces the newcomer to every other member, and every host in the group then
+lists every member's workspaces, which is the outcome the feature exists for.
 
 **The decision that shapes it: no host mints a pairing offer for another.** `pairing.createOffer` is
 `pairing-admin` and that tier is owner-only (`runtime/rpc/methods/pairing/pairing.ts`, _"paired clients and
 phones never hold pairing-admin"_). Minting on a peer's behalf would turn every pairing into a grant to widen
-that peer's access — the escalation `host-graph.md` §4 refuses. So each host mints its own offer, sealed to
-the one machine allowed to redeem it, and the introducer is a courier for a box it cannot open.
+that peer's access — the escalation `local/design/host-graph.md` §4 refuses. So each host mints its own offer
+with **no grants**, seals it to the one machine allowed to redeem it (`nacl.box` static-static over the domain
+`orca-mesh-offer/v1`), and the introducer is a courier for a box it cannot open, alter or relabel.
 
-**Shipped, all of it fork-owned and inert:**
+**Fork-owned files** (no sync cost): `src/shared/host-mesh/*` (contract, membership reducer, admission
+rules), `src/main/host-mesh/*` (sealed offer, store, driver, RPC service, runtime façade) — with 81 unit
+tests, including a three-host simulation that drives the real protocol through a fake transport.
 
-| File                                           | What it fixes in place                                                                                                                                                        |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/shared/host-mesh/host-mesh-contract.ts`   | capability `host.mesh.v1`, the sealed-offer and sync payloads, the bounds, `hostMeshPairStatus` so a half-join is representable                                               |
-| `src/shared/host-mesh/host-mesh-membership.ts` | the group's rules as a pure reducer: union of members, union of tombstones, the cap, removal-wins-forever, link states                                                        |
-| `src/main/host-mesh/host-mesh-sealed-offer.ts` | `nacl.box` static-static over a domain prefix, refusing rather than throwing on every untrusted path; the box is bound to the sender it names, so a courier cannot relabel it |
-| `src/main/host-mesh/host-mesh-store.ts`        | the on-disk group plus a peer index, because a build that rewrites the device registry must not strand a removal                                                              |
+**Upstream anchors — every one of these will need resolving at the next sync:**
 
-**No upstream anchors.** Every file above is new and fork-owned, so this patch currently costs a sync
-nothing. That changes the moment the pairing side lands: minting an offer, tagging a device row, tagging an
-environment and the six `hostMesh.*` methods all touch files upstream owns, and each will need an anchor here.
+| Upstream file                                                                                                                                   | What the fork adds                                        |
+| ----------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `src/main/runtime/rpc/core.ts`                                                                                                                  | the `hostMesh` context field                              |
+| `src/main/runtime/rpc/methods/rpc-method-registry.ts`                                                                                           | the `HOST_MESH_METHODS` spread                            |
+| `src/main/runtime/rpc/methods/host-mesh.ts`                                                                                                     | new: twelve methods, six peer-facing and six owner-facing |
+| `src/main/runtime/rpc/dispatch/dispatcher-stream-options.ts`, `server/runtime-rpc-request-admission.ts`, `server/runtime-rpc-mobile-pairing.ts` | threading the service to the handler context              |
+| `src/shared/rpc-contract/host-mesh-params.ts`, `rpc-params-catalog.generated.ts`                                                                | the params schemas and their generated catalog            |
+| `src/main/ipc/register-fork-handlers.ts`, `.test.ts`, `src/main/ipc/host-mesh/host-mesh-handlers.ts`                                            | the renderer's six IPC channels                           |
+| `src/preload/api/{fork-preload-api,index,api-types}.ts`                                                                                         | the `window.api` surface                                  |
+| `src/renderer/src/components/settings/runtime-environments/…`                                                                                   | the Host group panel                                      |
+| `src/cli/{specs/index,hosts/host-handler-groups,dispatch/remote-selection-scope}.ts`                                                            | `orca group` registration                                 |
+| `src/main/startup/runtime-startup/main-process-runtime-launch.ts`                                                                               | the one `configureHostMeshRuntimeFromApp` call            |
 
-**Not built, and deliberately not half-wired:** offer minting with `grants: []` and `ticket: true`, the
-device-row and environment tags, the `hostMesh.*` methods and the `mesh-member` permission tier, the
-introduction and removal outboxes, the Settings surface, and `orca group`. Nothing in a running app can join a
-group today — the layers above are unreachable from the UI, which is what makes them safe to land first.
+**Permissions, and why they are what they are.** The six peer-facing methods are `workspace` — a caller at
+that tier already runs host-user code, so learning membership is not a new capability, and every dangerous
+effect is bounded by a sealed box only the newcomer's key could have minted — except removal, which is
+`host-admin`. The six owner-facing methods are `host-admin`, so no paired desktop can widen itself.
 
-**Why the rest needs three real machines.** Two real Electron main processes are needed for a real offer
-exchange, a real ticket redemption and the network widening that goes with them; loopback is refused outside
-tests. The transitive join itself, endpoint reachability across LAN and Tailscale — the likeliest cause of a
-half-join — and removal while a member sleeps all need Studio, laptop and VM.
+**One honest cost of auto-accept, stated on the settings row.** With introductions accepted automatically,
+one compromised member can add a machine it controls to every member, and every member gains a shell on every
+other. That is inherent in what the group is for. The bounds are attribution on every row, a notification on
+each host, a cap of 12 members, four introductions per introducer per hour, and any member able to eject.
 
-**One honest cost of auto-accept.** With introductions accepted automatically, one compromised member can add
-a machine it controls to every member of the group, and every member gains a shell on every other. That is
-inherent in what the group is for. The bounds are attribution on every row, a notification on each host, a
-cap of 12, four introductions per introducer per hour, and any member able to eject.
+**What the unit evidence does not cover.** Endpoint reachability across LAN and Tailscale is the likeliest
+cause of a half-join and needs three real machines; loopback is refused outside tests, so an offer exchange
+between two real Electron main processes cannot be exercised on one Mac. Removal while a member sleeps is
+likewise proven only at the store level. Until that run happens, treat a group as reliable on one network and
+unproven across two.

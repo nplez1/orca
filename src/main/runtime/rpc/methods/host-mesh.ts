@@ -1,120 +1,67 @@
-import { z } from 'zod'
 import {
   HOST_MESH_INTRODUCE_METHOD,
   HOST_MESH_JOIN_METHOD,
-  HOST_MESH_MAX_LABEL_CHARS,
-  HOST_MESH_MAX_MEMBERS,
-  HOST_MESH_PAYLOAD_VERSION,
   HOST_MESH_PENDING_METHOD,
   HOST_MESH_RELAY_METHOD,
   HOST_MESH_REMOVE_METHOD,
   HOST_MESH_SYNC_METHOD
 } from '../../../../shared/host-mesh/host-mesh-contract'
+import {
+  HostMeshIntroduceParamsSchema,
+  HostMeshJoinParamsSchema,
+  HostMeshLocalJoinParamsSchema,
+  HostMeshLocalRemoveParamsSchema,
+  HostMeshLocalSnapshotParamsSchema,
+  HostMeshPendingParamsSchema,
+  HostMeshRelayParamsSchema,
+  HostMeshRemoveParamsSchema,
+  HostMeshSettingsPatchParamsSchema
+} from '../../../../shared/rpc-contract/host-mesh-params'
 import type {
   HostMeshCaller,
   HostMeshRpcService
 } from '../../../host-mesh/host-mesh-driver-contract'
-import { hostMeshRpcService } from '../../../host-mesh/host-mesh-runtime'
+import {
+  hostMeshRpcServiceIfAvailable,
+  joinHostMesh,
+  leaveHostMeshGroup,
+  readHostMeshSnapshot,
+  removeHostMeshMember,
+  syncHostMesh,
+  updateHostMeshSettings
+} from '../../../host-mesh/host-mesh-runtime'
 import { defineMethod, type RpcContext } from '../core'
 
-// Base64 is bounded by length only: the crypto layer re-checks canonical form, and duplicating that
-// here would refuse payloads it would accept.
-const KEY_B64_MAX_CHARS = 128
-const NONCE_MAX_CHARS = 128
-// A box holds an offer URL plus up to HOST_MESH_MAX_ENDPOINT_CANDIDATES endpoints, so it is the widest field.
-const CIPHERTEXT_MAX_CHARS = 16_384
-const GROUP_ID_MAX_CHARS = 256
-
-const keyB64 = z.string().min(1).max(KEY_B64_MAX_CHARS)
-const groupId = z.string().min(1).max(GROUP_ID_MAX_CHARS)
-const epoch = z.number().int().nonnegative()
-const hostLabel = z.string().min(1).max(HOST_MESH_MAX_LABEL_CHARS)
-const joiner = z.object({ hostKey: keyB64, label: hostLabel }).strict()
-const joinerWithPublicKey = joiner.extend({ publicKeyB64: keyB64 })
-const joinerWithOptionalPublicKey = joiner.extend({ publicKeyB64: keyB64.optional() })
-
-export const HostMeshSealedOfferSchema = z
-  .object({
-    version: z.literal(HOST_MESH_PAYLOAD_VERSION),
-    recipientHostKey: keyB64,
-    senderHostKey: keyB64,
-    nonceB64: z.string().min(1).max(NONCE_MAX_CHARS),
-    ciphertextB64: z.string().min(1).max(CIPHERTEXT_MAX_CHARS)
-  })
-  .strict()
-
-export const HostMeshJoinParamsSchema = z
-  .object({
-    version: z.literal(HOST_MESH_PAYLOAD_VERSION),
-    groupId,
-    epoch,
-    joiner: joinerWithPublicKey,
-    sealedForIntroducer: HostMeshSealedOfferSchema
-  })
-  .strict()
-
-export const HostMeshRelayParamsSchema = z
-  .object({
-    version: z.literal(HOST_MESH_PAYLOAD_VERSION),
-    groupId,
-    epoch,
-    joiner: joinerWithOptionalPublicKey,
-    // One box per member the joiner still needs, so the batch cannot outgrow the group.
-    sealed: z.array(HostMeshSealedOfferSchema).max(HOST_MESH_MAX_MEMBERS)
-  })
-  .strict()
-
-export const HostMeshIntroduceParamsSchema = z
-  .object({
-    version: z.literal(HOST_MESH_PAYLOAD_VERSION),
-    groupId,
-    epoch,
-    introducerHostKey: keyB64,
-    newcomer: joinerWithOptionalPublicKey,
-    sealedForRecipient: HostMeshSealedOfferSchema
-  })
-  .strict()
-
-export const HostMeshPendingParamsSchema = z
-  .object({
-    version: z.literal(HOST_MESH_PAYLOAD_VERSION),
-    groupId,
-    hostKey: keyB64
-  })
-  .strict()
-
-export const HostMeshRemoveParamsSchema = z
-  .object({
-    version: z.literal(HOST_MESH_PAYLOAD_VERSION),
-    groupId,
-    hostKey: keyB64,
-    removedBy: keyB64,
-    epoch
-  })
-  .strict()
-
-// The context wins so a test can supply the service; the runtime throws host_mesh_runtime_unavailable
-// when nothing configured it, which is an error answer rather than a crash.
+/** Throws rather than answering an empty group, which would read as "you have no members". */
 function meshService(ctx: RpcContext): HostMeshRpcService {
-  return ctx.hostMesh ?? hostMeshRpcService()
-}
-
-// The inbound path knows only the paired device and its fingerprint; a member's claimed host key is
-// attribution, never the trust anchor (host-mesh-driver-contract.ts HostMeshCaller).
-function meshCaller(ctx: RpcContext): HostMeshCaller {
-  return { pairedDeviceId: ctx.pairedDeviceId, fingerprint: ctx.authenticatedCallerFingerprint }
+  const service = ctx.hostMesh ?? hostMeshRpcServiceIfAvailable()
+  if (!service) {
+    throw new Error('host_mesh_runtime_unavailable')
+  }
+  return service
 }
 
 /**
- * The mesh's six methods, as a member answers them.
+ * Who called, as far as the inbound path knows.
  *
- * Why `workspace` for five of them: a caller at `workspace` already runs host-user code, so learning who
- * the group's members are is not a new capability, and every dangerous effect is bounded by a sealed offer
- * only the newcomer's key could have minted. Removal is the exception: it changes who may connect.
+ * Why only these two: there is no environment id or host key on a paired-device request, so a caller's
+ * claim to be a particular member is attribution the UI can show and never a trust anchor. What a member
+ * can actually cause is bounded by the sealed boxes it carries, and only the newcomer's key can mint one.
  */
+function meshCaller(ctx: RpcContext): HostMeshCaller {
+  return {
+    ...(ctx.pairedDeviceId === undefined ? {} : { pairedDeviceId: ctx.pairedDeviceId }),
+    ...(ctx.authenticatedCallerFingerprint === undefined
+      ? {}
+      : { fingerprint: ctx.authenticatedCallerFingerprint })
+  }
+}
+
 export const HOST_MESH_METHODS = [
   defineMethod({
     name: HOST_MESH_JOIN_METHOD,
+    // A `workspace` caller already runs host-user code, so learning membership is not a new capability;
+    // admitting anyone still needs a box only the joining machine's key could have minted.
     permission: 'workspace',
     params: HostMeshJoinParamsSchema,
     handler: async (params, ctx) => await meshService(ctx).join(params, meshCaller(ctx))
@@ -150,5 +97,44 @@ export const HOST_MESH_METHODS = [
     permission: 'host-admin',
     params: HostMeshRemoveParamsSchema,
     handler: async (params, ctx) => await meshService(ctx).remove(params, meshCaller(ctx))
+  }),
+  // The local surface: what an owner's CLI or the settings pane drives, as opposed to what a peer calls.
+  // Why these are `host-admin` and not `workspace`: joining, syncing and ejecting change who may reach this
+  // machine, and a paired desktop holds neither this tier nor the ability to widen itself.
+  defineMethod({
+    name: 'hostMesh.snapshot',
+    permission: 'workspace',
+    params: HostMeshLocalSnapshotParamsSchema,
+    handler: () => readHostMeshSnapshot()
+  }),
+  defineMethod({
+    name: 'hostMesh.joinGroup',
+    permission: 'host-admin',
+    params: HostMeshLocalJoinParamsSchema,
+    handler: (params) => joinHostMesh(params.environmentId)
+  }),
+  defineMethod({
+    name: 'hostMesh.syncNow',
+    permission: 'host-admin',
+    params: HostMeshLocalSnapshotParamsSchema,
+    handler: () => syncHostMesh()
+  }),
+  defineMethod({
+    name: 'hostMesh.removeMember',
+    permission: 'host-admin',
+    params: HostMeshLocalRemoveParamsSchema,
+    handler: (params) => removeHostMeshMember(params.hostKey)
+  }),
+  defineMethod({
+    name: 'hostMesh.leaveGroup',
+    permission: 'host-admin',
+    params: HostMeshLocalSnapshotParamsSchema,
+    handler: () => leaveHostMeshGroup()
+  }),
+  defineMethod({
+    name: 'hostMesh.settings',
+    permission: 'host-admin',
+    params: HostMeshSettingsPatchParamsSchema,
+    handler: (params) => updateHostMeshSettings(params)
   })
 ]

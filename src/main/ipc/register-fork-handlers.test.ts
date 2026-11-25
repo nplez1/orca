@@ -16,6 +16,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock('./jenkins', () => ({
   registerJenkinsHandlers: mocks.registerJenkinsHandlers
 }))
+vi.mock('./host-mesh/host-mesh-handlers', () => ({
+  registerHostMeshHandlers: vi.fn()
+}))
+
 vi.mock('./host-graph/host-graph-handlers', () => ({
   registerHostGraphHandlers: mocks.registerHostGraphHandlers
 }))

@@ -76,7 +76,10 @@ class Mesh {
       publicKeyB64,
       secretKey: keypair.secretKey,
       hostKey,
+      // SAFETY: both are assigned two lines below, before any test can reach the host.
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: placeholder filled before use
       driver: null as unknown as HostMeshDriver,
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: placeholder filled before use
       rpc: null as unknown as HostMeshRpcService,
       environments: new Map(),
       labels: new Map(),
@@ -185,7 +188,6 @@ class Mesh {
         // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the caller built this payload from HostMeshRelayRequest
         return target.rpc.relayIntroductions(params as HostMeshRelayRequest, caller) as Promise<T>
       case HOST_MESH_INTRODUCE_METHOD:
-        // oxlint-disable-next-line typescript-unsafe-type-assertion -- SAFETY: as above
         // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the caller built this payload from HostMeshIntroduceRequest
         return target.rpc.introduce(params as HostMeshIntroduceRequest, caller) as Promise<T>
       case HOST_MESH_PENDING_METHOD:

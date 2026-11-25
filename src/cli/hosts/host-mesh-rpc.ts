@@ -52,8 +52,6 @@ export type HostMeshJoinRow =
   | { kind: 'joined'; snapshot: HostMeshSnapshotRow; muted: string[] }
   | { kind: 'refused'; reason: string; snapshot: HostMeshSnapshotRow }
 
-const PAIR_STATUSES: readonly HostMeshPairStatus[] = ['complete', 'half', 'missing']
-
 function unreadable(what: string): RuntimeClientError {
   return new RuntimeClientError(
     'incompatible_runtime',
@@ -69,7 +67,8 @@ export function readHostMeshSnapshot(value: unknown): HostMeshSnapshotRow {
   if (typeof value !== 'object' || value === null) {
     throw unreadable('state')
   }
-  const candidate = value as Partial<HostMeshSnapshotRow>
+  const candidate: Partial<HostMeshSnapshotRow> = {}
+  Object.assign(candidate, value)
   if (
     typeof candidate.inGroup !== 'boolean' ||
     typeof candidate.groupId !== 'string' ||
@@ -94,11 +93,12 @@ function readMember(value: unknown): HostMeshMemberRow {
   if (typeof value !== 'object' || value === null) {
     throw unreadable('member')
   }
-  const member = value as Partial<HostMeshMemberRow>
+  const member: Partial<HostMeshMemberRow> = {}
+  Object.assign(member, value)
   if (
     typeof member.hostKey !== 'string' ||
     typeof member.label !== 'string' ||
-    !PAIR_STATUSES.includes(member.status as HostMeshPairStatus)
+    !isPairStatus(member.status)
   ) {
     throw unreadable('member')
   }
@@ -106,16 +106,21 @@ function readMember(value: unknown): HostMeshMemberRow {
     hostKey: member.hostKey,
     label: member.label,
     ...(typeof member.introducedBy === 'string' ? { introducedBy: member.introducedBy } : {}),
-    status: member.status as HostMeshPairStatus,
+    status: member.status,
     environmentId: typeof member.environmentId === 'string' ? member.environmentId : null
   }
+}
+
+function isPairStatus(value: unknown): value is HostMeshPairStatus {
+  return value === 'complete' || value === 'half' || value === 'missing'
 }
 
 function isSummary(value: unknown): value is HostMeshSummaryRow {
   if (typeof value !== 'object' || value === null) {
     return false
   }
-  const summary = value as Partial<HostMeshSummaryRow>
+  const summary: Partial<HostMeshSummaryRow> = {}
+  Object.assign(summary, value)
   return (
     typeof summary.memberCount === 'number' &&
     typeof summary.completePairs === 'number' &&
@@ -128,7 +133,8 @@ export function readHostMeshJoin(value: unknown): HostMeshJoinRow {
   if (typeof value !== 'object' || value === null) {
     throw unreadable('join')
   }
-  const outcome = value as Partial<HostMeshJoinRow>
+  const outcome: Partial<HostMeshJoinRow> = {}
+  Object.assign(outcome, value)
   if (outcome.kind === 'joined') {
     return {
       kind: 'joined',
