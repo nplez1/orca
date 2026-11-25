@@ -14,6 +14,11 @@ import { folderRelativePathToIncludeGlob } from '../content-search/file-search-i
 import type { InlineInput } from './file-explorer-inline-input-row'
 import type { TreeNode } from '../tree/file-explorer-types'
 import { useFileDuplicate } from './useFileDuplicate'
+import {
+  useFileExplorerMoveCopy,
+  type UseFileExplorerMoveCopyResult
+} from './use-file-explorer-move-copy'
+import type { FileExplorerMoveResult } from './useFileExplorerMoveDrop'
 import { useFileExplorerKeys } from '../selection/useFileExplorerKeys'
 import type { LocalPathOpenOwner } from '@/lib/files/os-open/local-path-open-guard'
 
@@ -38,13 +43,14 @@ type UseFileExplorerNodeCommandsParams = {
   requestDelete: (node: TreeNode) => void
   requestDeleteAll: (nodes: TreeNode[]) => void
   refreshDir: (dirPath: string) => Promise<void>
+  movePath: (sourcePath: string, destDir: string) => Promise<FileExplorerMoveResult>
   handleClick: (node: TreeNode) => void
   toggleDir: (worktreeId: string, dirPath: string) => void
   scrollToIndex: (index: number) => void
   pathOwner: LocalPathOpenOwner
 }
 
-type UseFileExplorerNodeCommandsResult = {
+type UseFileExplorerNodeCommandsResult = UseFileExplorerMoveCopyResult & {
   handleStartRename: (node: TreeNode) => void
   handleContextMenuDelete: (node: TreeNode) => void
   handleDuplicate: (node: TreeNode) => void
@@ -72,6 +78,7 @@ export function useFileExplorerNodeCommands({
   requestDelete,
   requestDeleteAll,
   refreshDir,
+  movePath,
   handleClick,
   toggleDir,
   scrollToIndex,
@@ -128,6 +135,14 @@ export function useFileExplorerNodeCommands({
   )
 
   const handleDuplicate = useFileDuplicate({ activeWorktreeId, worktreePath, refreshDir })
+  const moveCopy = useFileExplorerMoveCopy({
+    activeWorktreeId,
+    worktreePath,
+    selectedPaths,
+    selectedNodes,
+    movePath,
+    refreshDir
+  })
   const handleRowClick = useCallback(
     (node: TreeNode, event: React.MouseEvent<HTMLButtonElement>) => {
       selectRowWithModifiers(node, event, (target) => {
@@ -182,6 +197,7 @@ export function useFileExplorerNodeCommands({
   )
 
   return {
+    ...moveCopy,
     handleStartRename: startRename,
     handleContextMenuDelete,
     handleDuplicate,

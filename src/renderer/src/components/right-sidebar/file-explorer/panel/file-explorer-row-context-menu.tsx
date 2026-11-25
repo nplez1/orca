@@ -2,12 +2,14 @@ import { preventSecondaryMenuSelection } from '@/components/ui/prevent-secondary
 import React, { useCallback } from 'react'
 import {
   Copy,
+  CopyPlus,
   Download,
   ExternalLink,
   Eye,
   File,
   FilePlus,
   Files,
+  FolderInput,
   FolderPlus,
   Globe,
   ListCollapse,
@@ -68,6 +70,9 @@ type FileExplorerRowContextMenuProps = Pick<
   | 'onStartNew'
   | 'onStartRename'
   | 'onDuplicate'
+  | 'onMoveTo'
+  | 'onCopyTo'
+  | 'canCopyTo'
   | 'onAddFolderAsProject'
   | 'canAddAsProject'
   | 'onOpenInTerminal'
@@ -92,6 +97,9 @@ export function FileExplorerRowContextMenu({
   onStartNew,
   onStartRename,
   onDuplicate,
+  onMoveTo,
+  onCopyTo,
+  canCopyTo,
   onAddFolderAsProject,
   canAddAsProject,
   onOpenInTerminal,
@@ -264,6 +272,16 @@ export function FileExplorerRowContextMenu({
         {revealBlocked ? <LocalOnlyMenuHint /> : null}
       </ContextMenuItem>
       <ContextMenuSeparator />
+      <ContextMenuItem disabled={writesBlocked} onSelect={onMoveTo}>
+        <FolderInput />
+        {t('fileExplorer.moveCopy.moveTo', 'Move to…')}
+      </ContextMenuItem>
+      {canCopyTo && (
+        <ContextMenuItem disabled={writesBlocked} onSelect={onCopyTo}>
+          <CopyPlus />
+          {t('fileExplorer.moveCopy.copyTo', 'Copy to…')}
+        </ContextMenuItem>
+      )}
       <ContextMenuItem disabled={writesBlocked} onSelect={() => onStartRename(node)}>
         <Pencil />
         {t('auto.components.right.sidebar.FileExplorerRow.fc747429bf', 'Rename')}

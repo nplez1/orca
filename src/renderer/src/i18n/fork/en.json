@@ -1675,5 +1675,34 @@
       "unfinished": "Set up only as far as {{step}}, so it has no number yet. Repair finishes it.",
       "notReceiving": "Not receiving"
     }
+  },
+  "fileExplorer": {
+    "moveCopy": {
+      "moveFailedSummary": "Couldn't move {{failed}} of {{total}} items.",
+      "copyFailedSummary": "Couldn't copy {{failed}} of {{total}} items.",
+      "copyFailed": "Failed to copy '{{name}}'.",
+      "collision": "An item named '{{name}}' already exists in that folder.",
+      "moveOneTitle": "Move '{{name}}' to…",
+      "moveManyTitle": "Move {{total}} items to…",
+      "copyOneTitle": "Copy '{{name}}' to…",
+      "copyManyTitle": "Copy {{total}} items to…",
+      "description": "Choose a folder in this workspace.",
+      "filterPlaceholder": "Filter folders",
+      "moveHere": "Move here",
+      "copyHere": "Copy here",
+      "parentFolder": "Parent folder",
+      "foldersHeading": "Folders",
+      "loading": "Loading folders…",
+      "noMatches": "No matching folders",
+      "noFolders": "No folders here",
+      "enterKey": "Enter",
+      "select": "Select",
+      "backspaceKey": "Backspace",
+      "up": "Up",
+      "escKey": "Esc",
+      "close": "Close",
+      "moveTo": "Move to…",
+      "copyTo": "Copy to…"
+    }
   }
 }

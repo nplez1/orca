@@ -19,6 +19,7 @@ import { basename } from '@/lib/path'
 import { isGitRepoKind } from '../../../../../../shared/repository/repo-kind'
 import { getVisibleFileExplorerWorktreePath } from '../navigation/file-explorer-reset'
 import { FileExplorerBackgroundMenu } from './FileExplorerBackgroundMenu'
+import { FileExplorerMoveCopyDialog } from './FileExplorerMoveCopyDialog'
 import { FileExplorerFilesTreePane } from '../tree/FileExplorerFilesTreePane'
 import { FileExplorerNameFilter } from './FileExplorerNameFilter'
 import { FileExplorerNameFilterTruncationNotice } from '../../FileExplorerNameFilterTruncationNotice'
@@ -373,6 +374,15 @@ function FileExplorerFiles(): React.JSX.Element {
         worktreePath={displayRootPath ?? worktreePath}
         displayDepth={displayDepth}
         onStartNew={inlineInputState.startNew}
+      />
+      <FileExplorerMoveCopyDialog
+        request={paneState.nodeCommands.moveCopyRequest}
+        rootPath={worktreePath}
+        dirCache={tree.dirCache}
+        loadingDirPaths={tree.loadingDirPaths}
+        loadDir={tree.loadDir}
+        onCancel={paneState.nodeCommands.closeMoveCopy}
+        onSubmit={paneState.nodeCommands.submitMoveCopy}
       />
     </>
   )

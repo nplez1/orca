@@ -45,6 +45,9 @@ type FileExplorerVirtualRowsProps = {
   onStartNew: (type: 'file' | 'folder', parentPath: string, depth: number) => void
   onStartRename: (node: TreeNode) => void
   onDuplicate: (node: TreeNode) => void
+  onMoveTo: (node: TreeNode) => void
+  onCopyTo: (node: TreeNode) => void
+  canCopyTo: (node: TreeNode) => boolean
   onAddFolderAsProject: (node: TreeNode) => void
   canAddFolderAsProject: (node: TreeNode) => boolean
   onOpenInTerminal: (node: TreeNode) => void
@@ -132,6 +135,9 @@ export function FileExplorerVirtualRows(props: FileExplorerVirtualRowsProps): Re
     onStartNew,
     onStartRename,
     onDuplicate,
+    onMoveTo,
+    onCopyTo,
+    canCopyTo,
     onAddFolderAsProject,
     canAddFolderAsProject,
     onOpenInTerminal,
@@ -248,6 +254,9 @@ export function FileExplorerVirtualRows(props: FileExplorerVirtualRowsProps): Re
               onStartNew={onStartNew}
               onStartRename={onStartRename}
               onDuplicate={onDuplicate}
+              onMoveTo={() => onMoveTo(n)}
+              onCopyTo={() => onCopyTo(n)}
+              canCopyTo={canCopyTo(n)}
               onAddFolderAsProject={() => onAddFolderAsProject(n)}
               canAddAsProject={canAddFolderAsProject(n)}
               onOpenInTerminal={() => onOpenInTerminal(n)}
