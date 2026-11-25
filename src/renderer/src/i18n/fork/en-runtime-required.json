@@ -28,6 +28,16 @@
           "foreignColumnRefusedOtherHosts_one": "This workspace lives on another host.",
           "foreignColumnRefusedOtherHosts_other": "These {{count}} workspaces live on other hosts."
         }
+      },
+      "status": {
+        "bar": {
+          "SshStatusSegment": {
+            "hostGraphOlderPeer_one": "{{count}} host can't share its host list yet",
+            "hostGraphOlderPeer_other": "{{count}} hosts can't share their host list yet",
+            "hostGraphPartial_one": "{{count}} host didn't answer",
+            "hostGraphPartial_other": "{{count}} hosts didn't answer"
+          }
+        }
       }
     }
   },

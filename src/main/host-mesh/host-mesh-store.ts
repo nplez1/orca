@@ -174,7 +174,7 @@ function readStoredFile(path: string): StoredFileRead {
     // size is itself evidence that this build does not understand the file.
     // Why ENOENT is "missing" rather than "unreadable": a first run has no file, and that is not a fault
     // the owner should be told about — but a probe for existence is a sync fs call this process must not make.
-    if ((error as { code?: string } | null)?.code === 'ENOENT') {
+    if (isMissingFile(error)) {
       return { kind: 'missing' }
     }
     return {
@@ -216,6 +216,11 @@ function migrationRecordOf(raw: unknown): HostMeshMigrationRecord | null {
     .object({ version: z.number(), appliedAt: z.number(), peerCount: z.number() })
     .safeParse(raw)
   return parsed.success ? parsed.data : null
+}
+
+/** Whether a read failed because the file is not there, which is a first run rather than a fault. */
+function isMissingFile(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT'
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
