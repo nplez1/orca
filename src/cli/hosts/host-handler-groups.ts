@@ -38,5 +38,10 @@ export const HOST_HANDLER_GROUPS: readonly HandlerGroup[] = [
     name: 'vm-env',
     keys: ['vm env doctor'],
     load: async () => (await import('./vm-env.js')).VM_ENV_HANDLERS
+  },
+  {
+    name: 'host-mesh',
+    keys: ['group status', 'group join', 'group sync', 'group remove', 'group leave'],
+    load: async () => (await import('./host-mesh.js')).HOST_MESH_HANDLERS
   }
 ]
