@@ -16,6 +16,7 @@ import {
   buildOwnAdjacency,
   type HostGraphOwnEdgeSources
 } from '../../../host-graph/host-graph-own-edges'
+import { readSelfMachineRef } from '../../../host-graph/host-graph-self-identity'
 import { getRuntimeEnvironmentRegistryRoot } from '../../../ipc/runtime-environments/catalog/runtime-environment-registry-root'
 import { loadTrustedHostKeys } from '../../../ssh/host-keys/ssh-host-key-store'
 import {
@@ -102,9 +103,9 @@ async function ownAdjacency(): Promise<HostGraphAdjacency> {
     .map((target) => target.id)
   return buildOwnAdjacency({
     now: Date.now(),
-    // Why the hostname: it is the only name this machine has before it is paired, and a label is all
-    // the fleet shows for it.
-    self: { label: hostname() },
+    // Why the host's own keys: a peer names this machine by the pairing key it recorded, so without
+    // them this host cannot recognise its own row in the fleet it asks about.
+    self: { label: hostname(), ...readSelfMachineRef(root) },
     environments,
     sshTargets,
     trustedHostKeys,
