@@ -113,8 +113,6 @@ export function normalizeCopilotEvent(
   // Why: an agent that reads a shell to completion with `read_bash` gets the completion in the tool
   // result and Copilot then suppresses `shell_completed`; without this the shell would stay pending.
   const terminatedShellIds = readTerminatedShellIds(postToolResultText)
-  // Why: the launch result names the agent whatever tool or mode started it, so its ends match it
-  // by id and a duplicate report cannot end another agent.
   const toolName = readCopilotToolName(hookPayload)
   const backgroundAgentId = isCopilotAgentLaunchResultTool(toolName)
     ? readBackgroundAgentId(postToolResultText)
@@ -223,8 +221,7 @@ export function normalizeCopilotEvent(
   } else if (backgroundWorkCompletion && backgroundWorkState) {
     // Why: a detached shell reports `shell_detached_completed`, an async one `shell_completed`; a
     // completion is matched to the shell it names, so an unknown one cannot consume a different
-    // pending shell and settle the pane early. An agent end is matched to the agent it names; an
-    // id-less `agent_idle` ends nothing, since its turn's `SubagentStop` may already have.
+    // pending shell and settle the pane early. Either subagent completion consumes one subagent.
     const agentId = readCopilotAgentNotificationAgentId(hookPayload)
     backgroundWorkState =
       backgroundWorkCompletion === 'shell'

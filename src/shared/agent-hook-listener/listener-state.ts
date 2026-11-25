@@ -110,7 +110,6 @@ export type HookListenerState = {
   lastLaunchTokenByPaneKey: Map<string, string>
   /** Copilot background work that can outlive the foreground turn. */
   copilotBackgroundWorkByPaneKey: Map<string, CopilotBackgroundWorkState>
-  /** Copilot background agents whose turn already ended, so a duplicate end report is a no-op. */
   copilotEndedAgentIdsByPaneKey: Map<string, Set<string>>
   /** Live descendants for every provider that does not own a roster of its own. */
   descendantRosterByPaneKey: Map<string, AgentDescendantRoster>

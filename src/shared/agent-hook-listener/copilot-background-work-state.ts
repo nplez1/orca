@@ -170,7 +170,9 @@ export function startCopilotSubagent(work: CopilotBackgroundWorkState): CopilotB
 }
 
 /** What an end that names no rostered agent may consume instead: anonymous counts, anonymous
- *  counts or the roster, or nothing. */
+ *  counts or the roster, or nothing. An id-less `agent_idle` takes `none`: its turn's
+ *  `SubagentStop` may already have ended the agent. Ended ids live per pane in
+ *  `copilotEndedAgentIdsByPaneKey` until `SessionStart`. */
 export type CopilotSubagentEndFallback = 'counts' | 'counts-or-roster' | 'none'
 
 /**

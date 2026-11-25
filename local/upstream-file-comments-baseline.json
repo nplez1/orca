@@ -3,7 +3,7 @@
   "base": "7daf01d99f3d3301bf3c867e293ebb9d1f9a324e",
   "perFileThreshold": 5,
   "accepted": "The 2026-11-24 release: the Photon runtime's socket.io-client packaging root records why a fork dependency must be copied beside the main bundle (three platform package jobs failed without it), and the zsh login-shell arm's guard explains why the binary rather than the platform decides.",
-  "total": 4767,
+  "total": 4759,
   "files": {
     ".github/workflows/e2e.yml": 11,
     ".github/workflows/pr.yml": 7,
@@ -274,7 +274,7 @@
     "src/shared/agent-hook-listener/normalization/normalize-hook-payload.ts": 28,
     "src/shared/agent-hook-listener/provider-dispatch.ts": 15,
     "src/shared/agent-hook-listener/providers/claude/lifecycle/claude-pane-hold-evidence.ts": 8,
-    "src/shared/agent-hook-listener/providers/copilot/copilot-events.ts": 33,
+    "src/shared/agent-hook-listener/providers/copilot/copilot-events.ts": 25,
     "src/shared/agent-hook-listener/providers/copilot/copilot-tool-fields.ts": 5,
     "src/shared/agent-hook-listener/providers/pi-family/pi-family-events.ts": 10,
     "src/shared/agent-status/contracts/agent-status-subagent-snapshot.ts": 8,
