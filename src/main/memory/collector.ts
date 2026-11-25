@@ -10,7 +10,7 @@ import { ORPHAN_WORKTREE_ID } from '../../shared/terminal/pty/orphan-worktree-id
 import { listRegisteredPtys } from './pty-registry'
 import { collectHostMemory } from './host-memory'
 import { getLocalDaemonPid } from './local-daemon-pid'
-import { enumerateHostProcesses } from './host-process-index'
+import { enumerateHostProcesses, readRosettaSnapshotFields } from './host-process-index'
 import { claimProcessTree, claimPtyProcessTrees } from './pty-process-trees'
 import {
   agentRegistrationMark,
@@ -310,6 +310,7 @@ async function runSnapshot(store: MemorySnapshotStore): Promise<MemorySnapshot> 
     ),
     totalCpu: appBuckets.cpu + agentProcesses.cpu + terminals.cpu,
     totalMemory: appBuckets.memory + agentProcesses.memory + terminals.memory,
+    ...(await readRosettaSnapshotFields(processIndex, claimed)),
     collectedAt: now
   }
   if (asPaired) {

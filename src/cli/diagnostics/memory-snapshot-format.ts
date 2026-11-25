@@ -25,7 +25,8 @@ export function formatMemorySnapshot(snapshot: MemorySnapshot): string {
     ...(snapshot.agentProcesses
       ? [`agentProcesses: ${formatByteCount(snapshot.agentProcesses.memory)}`]
       : []),
-    `worktrees: ${snapshot.worktrees.length}`
+    `worktrees: ${snapshot.worktrees.length}`,
+    ...formatRosettaLines(snapshot)
   ]
 
   if (topWorktrees.length === 0) {
@@ -53,6 +54,17 @@ function formatWorktreeMemoryLine(worktree: WorktreeMemory): string {
     `${formatCpu(worktree.cpu)}`,
     `${worktree.sessions.length} session${worktree.sessions.length === 1 ? '' : 's'}`
   ].join('  ')
+}
+
+function formatRosettaLines(snapshot: MemorySnapshot): string[] {
+  const processes = snapshot.rosettaProcesses ?? []
+  if (processes.length === 0) {
+    return []
+  }
+  return [
+    `rosettaProcesses: ${processes.length} running as Intel (x86_64) under Rosetta`,
+    ...processes.map((entry) => `- pid ${entry.pid}  ${entry.executable}`)
+  ]
 }
 
 // Missing commit fields mean unknown usage, not zero.

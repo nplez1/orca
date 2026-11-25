@@ -11,6 +11,7 @@ import {
   type ProcIndex,
   type ProcRow
 } from './process-index'
+export { readRosettaSnapshotFields } from './darwin-rosetta-processes'
 
 const PS_EXEC_TIMEOUT_MS = 5_000
 const PS_MAX_BUFFER = 10 * 1024 * 1024

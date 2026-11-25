@@ -8,6 +8,9 @@ const {
 const {
   giveMacExecutableUniqueUuid
 } = require('./scripts/desktop-distribution/macos/macos-executable-uuid.cjs')
+const {
+  verifyPackagedMacArchitectures
+} = require('./scripts/desktop-distribution/macos/verify-packaged-mac-architectures.cjs')
 const electronBuilderNativeRebuild = require('./scripts/desktop-distribution/runtime-verification/electron-builder-native-rebuild.cjs')
 const {
   assertPackagedDaemonEntryExists,
@@ -620,6 +623,10 @@ module.exports = {
         context.packager
       )
       await packageMacTerminalHost(join(resourcesDir, '..', '..'), context)
+      verifyPackagedMacArchitectures(
+        join(resourcesDir, '..', '..'),
+        macSliceArch(context.arch, 'architecture census')
+      )
     }
   },
   win: {
