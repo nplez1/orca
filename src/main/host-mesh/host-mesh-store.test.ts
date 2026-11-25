@@ -42,7 +42,15 @@ function groupState(): HostMeshState {
 }
 
 function storedJson(): Record<string, unknown> {
-  return JSON.parse(readFileSync(statePath(), 'utf-8'))
+  const record: Record<string, unknown> = {}
+  Object.assign(record, JSON.parse(readFileSync(statePath(), 'utf-8')))
+  return record
+}
+
+function nestedRecord(parent: Record<string, unknown>, key: string): Record<string, unknown> {
+  const value = parent[key]
+  const record: Record<string, unknown> = {}
+  return value !== null && typeof value === 'object' ? Object.assign(record, value) : record
 }
 
 describe('the group on disk', () => {
@@ -97,7 +105,7 @@ describe('the group on disk', () => {
 
     store().write(groupState())
 
-    const peerIndex = storedJson().peerIndex as Record<string, Record<string, unknown>>
+    const peerIndex = nestedRecord(storedJson(), 'peerIndex')
     expect(peerIndex['key-a']).toEqual({
       deviceRowIds: ['row-1'],
       environmentId: 'env-1',
