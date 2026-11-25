@@ -77,9 +77,11 @@ describe('the request Discord receives', () => {
       reference: '6'
     })
 
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the multipart path always sends FormData
     const form = h.requests[0].init.body as FormData
     expect(new Headers(h.requests[0].init.headers).get('content-type')).toBeNull()
     expect(form.get('files[0]')).toBeInstanceOf(Blob)
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: a form file part is a File
     expect((form.get('files[0]') as File).name).toBe('shot.png')
     expect(JSON.parse(String(form.get('payload_json')))).toEqual({
       content: 'a file',

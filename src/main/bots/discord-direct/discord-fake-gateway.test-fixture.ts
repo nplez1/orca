@@ -27,11 +27,13 @@ export class FakeDiscordGatewaySocket implements DiscordGatewaySocket {
     handler: DiscordGatewayEvents[Event]
   ): void {
     const list = this.handlers.get(event) ?? []
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: every handler is called with its own event payload
     list.push(handler as (payload?: unknown) => void)
     this.handlers.set(event, list)
   }
 
   send(data: string): void {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the gateway only ever sends its own frames
     this.sent.push(JSON.parse(data) as FakeSentFrame)
   }
 

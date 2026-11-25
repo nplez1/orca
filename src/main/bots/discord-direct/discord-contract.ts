@@ -74,9 +74,9 @@ export type DiscordCloseDecision = 'resume' | 'identify' | 'stop'
 /** `4007`/`4009` are the codes the docs tell you to reconnect *and start a new session*; every other
  *  reconnectable code — and any code the table does not list — resumes, docs: gateway (resuming). */
 export function discordCloseDecision(code: number): DiscordCloseDecision {
-  const known: { reconnect: boolean } | undefined = Object.hasOwn(DISCORD_CLOSE_CODES, code)
-    ? DISCORD_CLOSE_CODES[code as DiscordCloseCode]
-    : undefined
+  const known: { reconnect: boolean } | undefined = Object.entries(DISCORD_CLOSE_CODES).find(
+    ([entryCode]) => entryCode === String(code)
+  )?.[1]
   if (known && !known.reconnect) {
     return 'stop'
   }

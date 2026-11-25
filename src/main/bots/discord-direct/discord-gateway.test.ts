@@ -30,6 +30,7 @@ function createFakeClock(): FakeClock {
       return id
     },
     clearTimer: (handle) => {
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: this fake clock mints numeric handles
       timers.delete(handle as number)
     },
     advance: (ms) => {

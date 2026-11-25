@@ -211,6 +211,7 @@ function rateLimit(
 /** A response body, or nothing when it is empty or not JSON — Discord sends either on a 429. */
 async function readErrorBody(response: Response): Promise<DiscordRateLimitBody> {
   try {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the schema checks every field read
     return (await response.json()) as DiscordRateLimitBody
   } catch {
     return {}
@@ -314,9 +315,11 @@ export function createDiscordRest(deps: DiscordRestDeps): DiscordRest {
         return failure(code, response.status, message)
       }
       if (response.status === 204) {
+        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: a 204 has no body and T is the caller's
         return { ok: true, body: null as T }
       }
       try {
+        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the caller names the shape Discord returns
         return { ok: true, body: (await response.json()) as T }
       } catch {
         return failure('failed', response.status, 'body was not JSON')

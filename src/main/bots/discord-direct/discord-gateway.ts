@@ -8,6 +8,7 @@ import {
   discordCloseDecision,
   type DiscordGatewayPayload
 } from './discord-contract'
+import { readField, readString } from './discord-frame-read'
 
 /** The doc's Connecting/Heartbeating/Identifying/Resuming, plus the two states the caller acts on. */
 type LiveState = 'connecting' | 'identifying' | 'resuming' | 'ready' | 'deaf' | 'backoff'
@@ -81,6 +82,7 @@ export function createDiscordGateway(deps: DiscordGatewayDeps) {
   const setTimer = deps.setTimer ?? ((fn: () => void, ms: number): unknown => setTimeout(fn, ms))
   const clearTimer =
     deps.clearTimer ??
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the handle came from the default setTimeout above
     ((handle: unknown): void => clearTimeout(handle as ReturnType<typeof setTimeout>))
 
   let state: DiscordGatewayState = 'idle'
@@ -346,15 +348,4 @@ function parseFrame(data: string): DiscordGatewayPayload | undefined {
   } catch {
     return undefined
   }
-}
-
-function readField(value: unknown, key: string): unknown {
-  return value === null || typeof value !== 'object'
-    ? undefined
-    : (value as Record<string, unknown>)[key]
-}
-
-function readString(value: unknown, key: string): string | undefined {
-  const field = readField(value, key)
-  return typeof field === 'string' ? field : undefined
 }
