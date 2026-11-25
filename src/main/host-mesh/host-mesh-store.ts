@@ -2,7 +2,7 @@ import { existsSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { z } from 'zod'
 import { readNodeFileSyncWithinLimit } from '../../shared/file-content/node-bounded-file-reader'
-import type { HostMeshState } from '../../shared/host-mesh/host-mesh-contract'
+import type { HostMeshSealedOffer, HostMeshState } from '../../shared/host-mesh/host-mesh-contract'
 import { writeSecureJsonFileWithinLimit } from '../../shared/secure-storage/bounded-secure-json-file'
 import { hardenExistingSecureFile } from '../../shared/secure-storage/secure-file'
 
@@ -90,12 +90,14 @@ export type HostMeshPeerIndexEntry = {
 const storedFileSchema = z.looseObject({
   version: z.literal(1),
   state: z.unknown(),
-  peerIndex: z.record(z.string().min(1), z.unknown()).default({})
+  peerIndex: z.record(z.string().min(1), z.unknown()).default({}),
+  /** Boxes a member asked this host to hold for a newcomer, keyed by the machine they are addressed to. */
+  pendingBoxes: z.record(z.string().min(1), z.array(z.unknown())).default({})
 })
 
 type StoredFile = z.infer<typeof storedFileSchema>
 
-const emptyFile = (): StoredFile => ({ version: 1, state: null, peerIndex: {} })
+const emptyFile = (): StoredFile => ({ version: 1, state: null, peerIndex: {}, pendingBoxes: {} })
 
 export class HostMeshStoreUnreadableError extends Error {
   constructor(
@@ -163,12 +165,36 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+const sealedOfferSchema = z.looseObject({
+  version: z.literal(1),
+  recipientHostKey: z.string().min(1),
+  senderHostKey: z.string().min(1),
+  nonceB64: z.string().min(1),
+  ciphertextB64: z.string().min(1)
+})
+
+/** A box this build cannot parse is dropped rather than carried: it can never be opened, and it is bounded. */
+function readBoxes(raw: unknown): HostMeshSealedOffer[] {
+  if (!Array.isArray(raw)) {
+    return []
+  }
+  return raw.flatMap((entry) => {
+    const box = sealedOfferSchema.safeParse(entry)
+    return box.success ? [box.data] : []
+  })
+}
+
 export type HostMeshStore = {
   read(): HostMeshState | null
   write(state: HostMeshState): void
   recordPeer(hostKey: string, entry: { deviceRowId?: string; environmentId?: string }): void
   forgetPeer(hostKey: string): void
   readPeerIndex(): ReadonlyMap<string, HostMeshPeerIndexEntry>
+  /** Boxes this host is holding for a machine that has not collected them yet. */
+  readPendingBoxes(recipientHostKey: string): HostMeshSealedOffer[]
+  /** Returns and removes them: a box is collected once, so a re-read cannot re-redeem it. */
+  takePendingBoxes(recipientHostKey: string): HostMeshSealedOffer[]
+  addPendingBox(recipientHostKey: string, sealed: HostMeshSealedOffer): void
   clear(): void
 }
 
@@ -241,6 +267,39 @@ export function createHostMeshStore({ userDataPath }: { userDataPath: string }):
         }
       }
       return index
+    },
+
+    readPendingBoxes: (recipientHostKey) => {
+      const file = readOrRefuse(path)
+      return readBoxes(file?.pendingBoxes[recipientHostKey])
+    },
+
+    takePendingBoxes: (recipientHostKey) => {
+      const file = readOrRefuse(path) ?? emptyFile()
+      const boxes = readBoxes(file.pendingBoxes[recipientHostKey])
+      if (boxes.length === 0) {
+        return []
+      }
+      const { [recipientHostKey]: _taken, ...pendingBoxes } = file.pendingBoxes
+      writeStoredFile(path, { ...file, pendingBoxes })
+      return boxes
+    },
+
+    addPendingBox: (recipientHostKey, sealed) => {
+      const file = readOrRefuse(path) ?? emptyFile()
+      const held = readBoxes(file.pendingBoxes[recipientHostKey])
+      // Why keyed on the nonce: a relay retried after a timeout must not queue the same box twice, or the
+      // newcomer would redeem one and hold a second dead credential for the same member.
+      if (held.some((box) => box.nonceB64 === sealed.nonceB64)) {
+        return
+      }
+      writeStoredFile(path, {
+        ...file,
+        pendingBoxes: {
+          ...file.pendingBoxes,
+          [recipientHostKey]: [...held, sealed]
+        }
+      })
     },
 
     clear: () => {

@@ -1,5 +1,4 @@
 import type {
-  HostMeshGroupSummary,
   HostMeshIntroduceReply,
   HostMeshIntroduceRequest,
   HostMeshJoinReply,
@@ -13,6 +12,7 @@ import type {
   HostMeshSyncPayload
 } from '../../shared/host-mesh/host-mesh-contract'
 import type { HostMeshSettings } from '../../shared/host-mesh/host-mesh-admission'
+import type { HostMeshGroupSummary } from '../../shared/host-mesh/host-mesh-membership'
 
 /**
  * The mesh's public surface, so the RPC layer, the IPC layer and the renderer can be written against one

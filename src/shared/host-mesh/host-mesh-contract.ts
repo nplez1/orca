@@ -80,6 +80,12 @@ export type HostMeshOfferPayload = {
 export type HostMeshMember = {
   hostKey: string
   label: string
+  /**
+   * The member's X25519 public key, base64. Why it is relayed: a sealed box needs a recipient key, and
+   * `hostKey` is a one-way digest of this value, so a member list without it cannot be sealed to. Absent
+   * for a member this build has not learned the key for, which refuses sealing rather than guessing.
+   */
+  publicKeyB64?: string
   /** Absent for the host that created the group. */
   introducedBy?: string
   addedAtEpoch: number
@@ -128,6 +134,9 @@ export type HostMeshSyncPayload = {
   version: typeof HOST_MESH_PAYLOAD_VERSION
   groupId: string
   epoch: number
+  /** The sender's own host key and public key, so a caller can address a sealed box back to it. */
+  selfKey: string
+  publicKeyB64: string
   /** The sender's own view. Receivers union members and tombstones; they never replace their own. */
   members: HostMeshMember[]
   tombstones: HostMeshTombstone[]
@@ -159,7 +168,7 @@ export type HostMeshJoinRequest = {
   version: typeof HOST_MESH_PAYLOAD_VERSION
   groupId: string
   epoch: number
-  joiner: { hostKey: string; label: string }
+  joiner: { hostKey: string; label: string; publicKeyB64: string }
   /** Minted by the joiner, addressed to the member receiving this request. */
   sealedForIntroducer: HostMeshSealedOffer
 }
@@ -172,6 +181,11 @@ export type HostMeshJoinReply =
       /** Members and tombstones only; endpoint addresses are never relayed third-hand. */
       members: HostMeshMember[]
       tombstones: HostMeshTombstone[]
+      /**
+       * The introducer's own offer, minted now and addressed to the joiner — without it the joiner would
+       * hold nothing for the host that just admitted it, which is the half-join this feature exists to avoid.
+       */
+      sealedForJoiner: HostMeshSealedOffer | null
     }
   | { kind: 'refused'; reason: string }
 
@@ -180,7 +194,7 @@ export type HostMeshRelayRequest = {
   version: typeof HOST_MESH_PAYLOAD_VERSION
   groupId: string
   epoch: number
-  joiner: { hostKey: string; label: string }
+  joiner: { hostKey: string; label: string; publicKeyB64?: string }
   sealed: HostMeshSealedOffer[]
 }
 
@@ -190,7 +204,7 @@ export type HostMeshIntroduceRequest = {
   epoch: number
   /** The member doing the introducing, as it claims to be. Attribution, not the security boundary. */
   introducerHostKey: string
-  newcomer: { hostKey: string; label: string }
+  newcomer: { hostKey: string; label: string; publicKeyB64?: string }
   /** The newcomer's offer, addressed to this recipient. */
   sealedForRecipient: HostMeshSealedOffer
 }

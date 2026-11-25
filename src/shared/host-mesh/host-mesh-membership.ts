@@ -53,7 +53,13 @@ export function hostMeshJoin(
 
 export function addHostMeshMember(
   state: HostMeshState,
-  args: { hostKey: string; label: string; introducedBy?: string; epoch: number }
+  args: {
+    hostKey: string
+    label: string
+    publicKeyB64?: string
+    introducedBy?: string
+    epoch: number
+  }
 ): { state: HostMeshState; outcome: HostMeshMemberOutcome } {
   const { hostKey } = args
   if (hostKey === state.selfKey) {
@@ -67,7 +73,9 @@ export function addHostMeshMember(
     // Why the label is refreshed: a machine that was renamed is the same machine, and the newest
     // introduction is the newest name it gave.
     const members = state.members.map((member) =>
-      member.hostKey === hostKey ? { ...member, label: args.label } : member
+      member.hostKey === hostKey
+        ? { ...member, label: args.label, publicKeyB64: args.publicKeyB64 ?? member.publicKeyB64 }
+        : member
     )
     return { state: { ...state, members }, outcome: 'alreadyMember' }
   }
@@ -77,6 +85,7 @@ export function addHostMeshMember(
   const member: HostMeshMember = {
     hostKey,
     label: args.label,
+    ...(args.publicKeyB64 === undefined ? {} : { publicKeyB64: args.publicKeyB64 }),
     ...(args.introducedBy === undefined ? {} : { introducedBy: args.introducedBy }),
     addedAtEpoch: args.epoch
   }
@@ -182,6 +191,9 @@ export function applyHostMeshSync(
       existing.label = incoming.label
       existing.addedAtEpoch = incoming.addedAtEpoch
     }
+    if (existing.publicKeyB64 === undefined && incoming.publicKeyB64 !== undefined) {
+      existing.publicKeyB64 = incoming.publicKeyB64
+    }
   }
   const links: HostMeshLinkMatrix = {
     outbound: { ...state.links.outbound },
@@ -214,6 +226,23 @@ export function setHostMeshOutboundLink(
   return {
     ...state,
     links: { ...state.links, outbound: { ...state.links.outbound, [args.hostKey]: args.link } }
+  }
+}
+
+/**
+ * Marks the direction a member holds TO this host.
+ *
+ * Why receiving a sealed box is evidence of it: only a host that just redeemed our offer mints one back with
+ * a real offer inside, so a box from a member means that member holds a credential for us. The bound is that
+ * a hostile member could claim this falsely, which misdraws one row's status and grants it nothing.
+ */
+export function setHostMeshInboundLink(
+  state: HostMeshState,
+  args: { hostKey: string; link: HostMeshInboundLink }
+): HostMeshState {
+  return {
+    ...state,
+    links: { ...state.links, inbound: { ...state.links.inbound, [args.hostKey]: args.link } }
   }
 }
 

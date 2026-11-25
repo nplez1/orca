@@ -100,6 +100,8 @@ describe('merging another member’s view', () => {
       version: 1,
       groupId: 'group-1',
       epoch: 9,
+      selfKey: 'key-a',
+      publicKeyB64: 'pk-a',
       members: [{ hostKey: 'key-b', label: 'Laptop', addedAtEpoch: 4 }],
       tombstones: [],
       links: {},
@@ -197,6 +199,8 @@ describe('summarising the group', () => {
       version: 1,
       groupId: 'group-1',
       epoch: 2,
+      selfKey: 'key-a',
+      publicKeyB64: 'pk-a',
       members: [],
       tombstones: [],
       links: { 'key-a': { outbound: { 'key-self': { kind: 'ok' } }, inbound: {} } }
