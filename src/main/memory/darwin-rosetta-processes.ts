@@ -4,6 +4,8 @@ import { collectSubtree, isTranslatedPsFlags, type ProcIndex } from './process-i
 import type { MemorySnapshot, RosettaProcess } from '../../shared/diagnostics/process-stats-types'
 import { iterateProcessOutputLines } from '../../shared/process-observation/process-output-field-scanner'
 
+// The memory sweep reads macOS `ps -o flags=` (hex); <sys/proc.h> P_TRANSLATED marks a process Rosetta
+// runs as x86_64 (Activity Monitor's "Kind: Intel"), the source of macOS's Intel-app warning (#101).
 const PS_TIMEOUT_MS = 5_000
 const PS_MAX_BUFFER = 1024 * 1024
 

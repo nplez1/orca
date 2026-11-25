@@ -74,10 +74,8 @@ export type HostMemory = {
   loadAverage1m: number
 }
 
-/** A process in Orca's tree that macOS runs as x86_64 under Rosetta; the source of its Intel-app warning. */
 export type RosettaProcess = {
   pid: number
-  /** As `ps -o comm=` reports it: the executed path. */
   executable: string
 }
 
@@ -97,7 +95,6 @@ export type MemorySnapshot = {
   totalMemory: number
   /** App, agent-process and tracked-worktree committed bytes, present exactly with processCommitMetric; exceeding physical RAM is meaningful. */
   totalPrivateMemory?: number
-  /** macOS only, and only while one runs. */
   rosettaProcesses?: RosettaProcess[]
   collectedAt: number
 }

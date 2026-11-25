@@ -15,7 +15,6 @@ export type ProcRow = {
   privateMemory?: number
   /** Executable basename; never a path or command line. */
   name?: string
-  /** macOS runs it as x86_64 under Rosetta. */
   translated?: true
   /** Creation time in 100 ns ticks (Windows CIM only); orders a parent before its children. */
   startTicks?: bigint
@@ -60,14 +59,12 @@ export function buildProcessIndex(
   }
 }
 
-// <sys/proc.h> P_TRANSLATED, in `ps -o flags=` hex: Activity Monitor's "Kind: Intel".
 const P_TRANSLATED = 0x00020000
 
 export function isTranslatedPsFlags(flags: string | undefined): boolean {
   return (Number.parseInt(flags ?? '', 16) & P_TRANSLATED) !== 0
 }
 
-/** Columns pid, ppid, pcpu, rss, then flags when `withFlags`, then the name when `withName`. */
 export function parsePsOutput(stdout: string, withName = false, withFlags = false): ProcRow[] {
   const rows: ProcRow[] = []
   const fieldCount = withFlags ? 5 : 4

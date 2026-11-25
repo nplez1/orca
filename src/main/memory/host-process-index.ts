@@ -40,7 +40,6 @@ export async function enumerateHostProcesses(
 const PS_NAME_COLUMN: Partial<Record<NodeJS.Platform, string>> = { darwin: 'ucomm=' }
 
 async function enumerateUnix(nameColumn: string | undefined): Promise<ProcRow[]> {
-  // macOS flags carry P_TRANSLATED, which names the Rosetta processes behind its Intel-app warning.
   const withFlags = os.platform() === 'darwin'
   const columns = ['pid=,ppid=,pcpu=,rss=', withFlags && 'flags=', nameColumn].filter(Boolean)
   // Force dot decimals: parseFloat silently truncates locale-formatted comma values.
