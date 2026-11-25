@@ -20,17 +20,57 @@ function buildPatterns() {
     { kind: 'uuid', re: /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi },
     { kind: 'opaque-token', re: /\b[A-Za-z0-9_-]{40,}\b/g }
   ]
-  if (username.length >= 3) {
-    patterns.splice(5, 0, { kind: 'local-username', re: literalPattern(username) })
+  if (isDistinctiveIdentifier(username)) {
+    patterns.splice(5, 0, { kind: 'local-username', re: identifierPattern(username) })
   }
-  if (hostname.length >= 3) {
-    patterns.splice(5, 0, { kind: 'local-hostname', re: literalPattern(hostname) })
+  if (isDistinctiveIdentifier(hostname)) {
+    patterns.splice(5, 0, { kind: 'local-hostname', re: identifierPattern(hostname) })
   }
   return patterns
 }
 
-function literalPattern(value) {
-  return new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')
+/**
+ * Names that are also ordinary words. Matching one finds prose in a fixture rather than a leak, and it
+ * made this scan pass or fail depending on who ran it: a runner called `unknown` red-flagged five
+ * committed fixtures.
+ */
+const COMMON_IDENTIFIERS = new Set([
+  'root',
+  'user',
+  'users',
+  'admin',
+  'guest',
+  'unknown',
+  'test',
+  'local',
+  'localhost',
+  'dev',
+  'main',
+  'work',
+  'box',
+  'mac',
+  'runner',
+  'worker',
+  'ubuntu',
+  'build'
+])
+
+/** Three characters or more, and not a word the transcripts contain on their own. */
+export function isDistinctiveIdentifier(value) {
+  return value.length >= 3 && !COMMON_IDENTIFIERS.has(value.toLowerCase())
+}
+
+/**
+ * A literal, bounded by word edges so `nathanp` does not match inside `nathanp2` or `xnathanp`.
+ *
+ * Why the edges are conditional: a value that starts or ends with a non-word character has no word
+ * boundary there, and adding one would either shift the span this scan reports or never match.
+ */
+export function identifierPattern(value) {
+  const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const start = /^\w/.test(value) ? '\\b' : ''
+  const end = /\w$/.test(value) ? '\\b' : ''
+  return new RegExp(`${start}${escaped}${end}`, 'g')
 }
 
 /**

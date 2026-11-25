@@ -5989,3 +5989,37 @@ the folder, including bots other people can message.
 touched it: a bot is no longer woken by its workers' pull requests. The account-free way to react to GitHub
 is the local webhook route plus an automation rule, which is what #453 ships. Diverging here would fight an
 upstream decision for a behaviour the fork does not need.
+
+### `local(ci)`: the secret-holding jobs name a GitHub Environment (#review-2 R2-1)
+
+`workflow_dispatch --ref <branch>` runs **that branch's** copy of the workflow, so every guard the
+fork's release, tag-mirror and CI-health lanes run is a file in the dispatched tree — and none of
+those guards costs the `workflows` permission to edit. Anyone who can push a branch and dispatch a run
+could therefore neuter the guard and reach the Apple signing secrets, the mirror PAT (contents and
+workflows write; the `exempt` actor on `main`'s ruleset) and the agent delegate token.
+
+The tree's half of the fix is `environment:` on `release-ref`, `release-draft`, `macos`, `windows`,
+`linux` and `publish` in `fork-release.yml`, on `mirror` in `fork-upstream-tags.yml`, and on `health`
+(`ci-health`) in `fork-ci-health.yml`. The half that matters is repository state and cannot be carried
+by a sync: three environments — `release`, `ci-health`, `upstream-tag-mirror` — created with
+**Deployment branches: `main`** (Settings → Environments, or `PUT
+/repos/nplez1/orca/environments/<name>` with `custom_branch_policies` plus a `main` branch policy).
+That rule is what GitHub checks before a job's steps run, whatever the dispatched branch contains. A
+required reviewer on `release` is the second check worth adding for releases; it is not configured here
+because a dispatch would then wait on a human.
+
+**Verified 2026-11-25:** all three exist and each allows only `main`
+(`gh api repos/nplez1/orca/environments` → 3, one branch policy each).
+
+What is **not** done, because it needs the secret values re-entered by hand: the seven repository
+secrets (`APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `MAC_CERTS`,
+`MAC_CERTS_PASSWORD`, `FORK_TAG_MIRROR_TOKEN`, `AGENT_DELEGATE_TOKEN`) are still repository-level, so
+any job that does **not** name an environment can read them. Every job that uses them now does, which
+is what makes the branch rule bite; moving them into the matching environment is the defence in depth
+left to do.
+
+Two smaller changes ride with it, from the same review: the three release legs' checkouts carry
+`persist-credentials: false` (`pnpm install` and the release build run third-party lifecycle scripts
+while a `contents: write` token would otherwise sit in `.git/config`), and their electron-builder
+caches no longer `restore-keys` by prefix — a prefix match lets any `main` job, including the read-only
+ones that run those same install scripts, seed the cache a signing leg restores.
