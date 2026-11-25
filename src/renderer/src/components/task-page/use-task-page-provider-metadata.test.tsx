@@ -98,11 +98,25 @@ describe('TaskPage provider metadata', () => {
     )
     await waitFor(() => expect(result.current.jiraProjectsError).toBe(true))
 
-    transport.jiraListProjects.mockResolvedValueOnce([OTHER_PROJECT])
+    // Why a held promise: a resolved mock races the assertions below. The switch drops the failure on
+    // its own, before the new read lands, so waiting on `jiraProjectsError` alone passes in the window
+    // where the site-2 list is still unknown — which is how this failed on the nightly (45640634918).
+    let resolveSiteTwoRead: (projects: JiraProject[]) => void = () => {}
+    transport.jiraListProjects.mockImplementationOnce(
+      () =>
+        new Promise<JiraProject[]>((resolve) => {
+          resolveSiteTwoRead = resolve
+        })
+    )
     rerender({ siteId: 'site-2' })
 
-    await waitFor(() => expect(result.current.jiraProjectsError).toBe(false))
+    await waitFor(() => expect(result.current.jiraProjectsLoading).toBe(true))
+    expect(result.current.jiraProjectsError).toBe(false)
+    expect(result.current.availableJiraProjects).toEqual([])
+
+    await act(async () => resolveSiteTwoRead([OTHER_PROJECT]))
     expect(result.current.availableJiraProjects).toEqual([OTHER_PROJECT])
+    expect(result.current.jiraProjectsError).toBe(false)
   })
 
   it('reports a failed Linear team read instead of an empty team list', async () => {
