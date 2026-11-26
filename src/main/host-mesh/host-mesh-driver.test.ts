@@ -222,9 +222,12 @@ class Mesh {
       // The pairing store's name for a peer, which is what every surface reads.
       renameEnvironment: async (environmentId, name) => {
         const hostKey = host.environments.get(environmentId)
-        if (hostKey !== undefined) {
-          host.labels.set(hostKey, name)
+        if (hostKey === undefined) {
+          return false
         }
+        const changed = host.labels.get(hostKey) !== name
+        host.labels.set(hostKey, name)
+        return changed
       },
       requestOwnSync: () => {
         this.ownSyncs.push(host)
@@ -928,6 +931,30 @@ describe('renaming a machine for the group', () => {
     const view = await studio.driver.snapshot()
     expect(view.members.find((member) => member.hostKey === laptop.hostKey)?.label).toBe(
       'Build mini'
+    )
+  })
+})
+
+describe('a name someone typed against one a pairing invented', () => {
+  it('keeps the typed name when the spoke’s own row holds its hostname', async () => {
+    const mesh = new Mesh()
+    const studio = mesh.add('studio')
+    const laptop = mesh.add('laptop')
+    // The hub is where the owner typed "Studio laptop"; the spoke's row for the hub is what a redemption wrote.
+    mesh.seedPairingFromCaller(studio, laptop)
+    studio.labels.set(laptop.hostKey, 'Studio laptop')
+    laptop.labels.set(studio.hostKey, 'studio.local')
+    studio.driver.migrateFromPairings()
+    await studio.driver.sync()
+    await mesh.drainOwnSyncs()
+
+    // The invented name must never walk the typed one back, on the hub or anywhere it reaches.
+    await laptop.driver.sync()
+    await mesh.drainOwnSyncs()
+    expect(studio.labels.get(laptop.hostKey)).toBe('Studio laptop')
+    const view = await studio.driver.snapshot()
+    expect(view.members.find((member) => member.hostKey === laptop.hostKey)?.label).toBe(
+      'Studio laptop'
     )
   })
 })

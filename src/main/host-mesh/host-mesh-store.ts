@@ -1,14 +1,23 @@
 import { join } from 'node:path'
 import { z } from 'zod'
 import { readNodeFileSyncWithinLimit } from '../../shared/file-content/node-bounded-file-reader'
-import {
-  DEFAULT_HOST_MESH_SETTINGS,
-  type HostMeshSettings
-} from '../../shared/host-mesh/host-mesh-admission'
+import type { HostMeshSettings } from '../../shared/host-mesh/host-mesh-admission'
 import type { HostMeshSealedOffer, HostMeshState } from '../../shared/host-mesh/host-mesh-contract'
 import { writeSecureJsonFileWithinLimit } from '../../shared/secure-storage/bounded-secure-json-file'
 import { hardenExistingSecureFile } from '../../shared/secure-storage/secure-file'
 import { createPendingBoxStore } from './host-mesh-store-pending-boxes'
+import {
+  emptyFile,
+  peerEntrySchema,
+  settingsFrom,
+  stateSchema,
+  storedFileSchema,
+  type HostMeshMigrationRecord,
+  type HostMeshPeerIndexEntry,
+  type StoredFile
+} from './host-mesh-store-schema'
+
+export type { HostMeshMigrationRecord, HostMeshPeerIndexEntry, StoredFile }
 
 /**
  * A group's state on this host: the reducer's output, plus the index removal needs.
@@ -28,124 +37,6 @@ export const MAX_HOST_MESH_STORE_BYTES = 256 * 1024
 
 export function hostMeshStorePath(userDataPath: string): string {
   return join(userDataPath, HOST_MESH_STORE_FILE_NAME)
-}
-
-const memberSchema = z.looseObject({
-  hostKey: z.string().min(1),
-  label: z.string(),
-  introducedBy: z.string().min(1).optional(),
-  addedAtEpoch: z.number()
-})
-
-const tombstoneSchema = z.looseObject({
-  hostKey: z.string().min(1),
-  epoch: z.number(),
-  removedBy: z.string().min(1)
-})
-
-// A version per name: the group's word for a machine changes by rename, and two owners must converge.
-const nameSchema = z.looseObject({ label: z.string().min(1), version: z.number() })
-
-const outboundLinkSchema = z.discriminatedUnion('kind', [
-  z.looseObject({ kind: z.literal('ok') }),
-  z.looseObject({
-    kind: z.literal('awaitingOffer'),
-    requestedAtEpoch: z.number(),
-    expiresAt: z.number()
-  }),
-  z.looseObject({
-    kind: z.literal('redeemFailed'),
-    reason: z.string(),
-    attempts: z.number(),
-    retryAt: z.number()
-  }),
-  z.looseObject({ kind: z.literal('unreachable'), since: z.number() }),
-  // A peer on a build that predates the group answers `method_not_found`, which is a state worth keeping:
-  // it is what stops the repair minting offers at a machine that cannot redeem them.
-  z.looseObject({ kind: z.literal('unsupported'), since: z.number() })
-])
-
-const inboundLinkSchema = z.discriminatedUnion('kind', [
-  z.looseObject({ kind: z.literal('active') }),
-  z.looseObject({ kind: z.literal('awaitingRedeem'), expiresAt: z.number() }),
-  z.looseObject({ kind: z.literal('absent') })
-])
-
-const stateSchema = z.looseObject({
-  groupId: z.string(),
-  epoch: z.number(),
-  selfKey: z.string().min(1),
-  members: z.array(memberSchema),
-  tombstones: z.array(tombstoneSchema),
-  links: z.looseObject({
-    outbound: z.record(z.string().min(1), outboundLinkSchema),
-    inbound: z.record(z.string().min(1), inboundLinkSchema)
-  }),
-  names: z.record(z.string().min(1), nameSchema).default({})
-})
-
-const peerEntrySchema = z.looseObject({
-  deviceRowIds: z.array(z.string().min(1)),
-  environmentId: z.string().min(1).nullable()
-})
-
-/** Partial on purpose: a build that adds a rule leaves this one's booleans at their defaults. */
-const settingsSchema = z.looseObject({
-  enabled: z.boolean()
-})
-
-export type HostMeshMigrationRecord = {
-  version: number
-  appliedAt: number
-  /** Machines the group was created from; 0 records that this install had none to group. */
-  peerCount: number
-}
-
-export type HostMeshPeerIndexEntry = {
-  deviceRowIds: readonly string[]
-  environmentId: string | null
-}
-
-/**
- * `peerIndex` values are held as `unknown` so an entry a newer build wrote is carried back out verbatim:
- * this build cannot parse it, and deleting it would forget the device rows removal has to delete.
- */
-const storedFileSchema = z.looseObject({
-  version: z.literal(1),
-  state: z.unknown(),
-  peerIndex: z.record(z.string().min(1), z.unknown()).default({}),
-  /** Boxes a member asked this host to hold for a newcomer, keyed by the machine they are addressed to. */
-  pendingBoxes: z.record(z.string().min(1), z.array(z.unknown())).default({}),
-  /** Admission timestamps per group, kept so the introduction limit survives a restart. */
-  admissions: z.record(z.string().min(1), z.array(z.number())).default({}),
-  /** Box nonces already redeemed, with when, so a replay fails rather than joining twice. */
-  spentNonces: z.record(z.string().min(1), z.number()).default({}),
-  /** The group's own admission rules, which belong with the group rather than with this install's settings. */
-  settings: z.unknown().default(null),
-  /** What an upgrade found and grouped, so the panel can say where this group came from. */
-  migration: z.unknown().default(null)
-})
-type StoredFile = z.infer<typeof storedFileSchema>
-
-export type { StoredFile }
-
-const emptyFile = (): StoredFile => ({
-  version: 1,
-  state: null,
-  peerIndex: {},
-  pendingBoxes: {},
-  admissions: {},
-  spentNonces: {},
-  migration: null,
-  settings: null
-})
-
-/** A value this build cannot read is the defaults, not a refusal: the rules decide who joins, not the file. */
-function settingsFrom(raw: unknown): HostMeshSettings {
-  const parsed = settingsSchema.partial().safeParse(raw)
-  return parsed.success
-    ? { ...DEFAULT_HOST_MESH_SETTINGS, ...parsed.data }
-    : { ...DEFAULT_HOST_MESH_SETTINGS }
 }
 
 export class HostMeshStoreUnreadableError extends Error {
@@ -233,7 +124,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export type HostMeshStore = {
   read(): HostMeshState | null
   write(state: HostMeshState): void
-  recordPeer(hostKey: string, entry: { deviceRowId?: string; environmentId?: string }): void
+  recordPeer(
+    hostKey: string,
+    entry: {
+      deviceRowId?: string
+      environmentId?: string
+      redeemedLabel?: string
+    }
+  ): void
   forgetPeer(hostKey: string): void
   readPeerIndex(): ReadonlyMap<string, HostMeshPeerIndexEntry>
   readSettings(): HostMeshSettings
@@ -289,6 +187,7 @@ export function createHostMeshStore({ userDataPath }: { userDataPath: string }):
       const known = peerEntrySchema.safeParse(raw)
       const deviceRowIds = known.success ? known.data.deviceRowIds : []
       const environmentId = known.success ? known.data.environmentId : null
+      const redeemedLabel = entry.redeemedLabel ?? (known.success ? known.data.redeemedLabel : null)
       file.peerIndex = {
         ...file.peerIndex,
         [hostKey]: {
@@ -297,7 +196,9 @@ export function createHostMeshStore({ userDataPath }: { userDataPath: string }):
             entry.deviceRowId === undefined || deviceRowIds.includes(entry.deviceRowId)
               ? deviceRowIds
               : [...deviceRowIds, entry.deviceRowId],
-          environmentId: entry.environmentId ?? environmentId
+          environmentId: entry.environmentId ?? environmentId,
+          // Why omitted when this host named nothing: an entry written before names existed keeps its own shape.
+          ...(redeemedLabel === null || redeemedLabel === undefined ? {} : { redeemedLabel })
         }
       }
       writeStoredFile(path, file)

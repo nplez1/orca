@@ -250,3 +250,32 @@ describe('the names the group agreed on', () => {
     expect(store().read()?.names).toEqual({ 'key-b': { label: 'Build mini', version: 3 } })
   })
 })
+
+describe('a group written before names existed', () => {
+  beforeEach(() => {
+    testState.dir = mkdtempSync(join(tmpdir(), 'orca-mesh-store-legacy-'))
+  })
+  afterEach(() => {
+    rmSync(testState.dir, { recursive: true, force: true })
+  })
+
+  it('reads back with no names rather than as an unreadable file', () => {
+    // Why the file is written by hand: every build before this one wrote exactly this, and the reader has to accept it.
+    writeFileSync(
+      statePath(),
+      JSON.stringify({
+        version: 1,
+        state: {
+          groupId: 'group-1',
+          epoch: 7,
+          selfKey: 'key-self',
+          members: [{ hostKey: 'key-a', label: 'Studio', addedAtEpoch: 3 }],
+          tombstones: [],
+          links: { outbound: {}, inbound: {} }
+        }
+      })
+    )
+
+    expect(store().read()?.names).toEqual({})
+  })
+})

@@ -4,6 +4,7 @@ import nacl from 'tweetnacl'
 import {
   HOST_MESH_JOIN_METHOD,
   HOST_MESH_MAX_LABEL_CHARS,
+  HOST_MESH_NAME_DEFAULT_VERSION,
   HOST_MESH_NAME_SEED_VERSION,
   HOST_MESH_OFFER_BACK_METHOD,
   HOST_MESH_OFFER_TTL_MS,
@@ -167,22 +168,26 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
    */
   function namesForPass(state: HostMeshState): HostMeshState {
     let names = state.names
+    const peerIndex = store.readPeerIndex()
     for (const member of state.members) {
       if (names[member.hostKey] !== undefined) {
         continue
       }
       const label = deps.labelForHostKey(member.hostKey)
-      // Why a placeholder is skipped rather than seeded: it is the string a redemption invented, so seeding it
-      // would make it a group-wide name that outranks the real one the other host already holds.
-      if (
-        label === null ||
-        label.trim() === '' ||
-        isHostMeshPlaceholderName(label, member.hostKey)
-      ) {
+      if (label === null || label.trim() === '') {
+        continue
+      }
+      // Why a redemption's own word ranks lowest: it is a hostname or a placeholder this host wrote itself, while a
+      // row the owner typed outranks it — an invented name must never walk back a name someone chose.
+      const invented = peerIndex.get(member.hostKey)?.redeemedLabel === label
+      if (!invented && isHostMeshPlaceholderName(label, member.hostKey)) {
         continue
       }
       names = mergeHostMeshNames(names, {
-        [member.hostKey]: { label, version: HOST_MESH_NAME_SEED_VERSION }
+        [member.hostKey]: {
+          label,
+          version: invented ? HOST_MESH_NAME_DEFAULT_VERSION : HOST_MESH_NAME_SEED_VERSION
+        }
       })
     }
     return names === state.names ? state : { ...state, names }
@@ -313,7 +318,12 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
   ): Promise<RedeemedPeer | null> {
     try {
       const peer = await deps.redeemOffer(payload.offerUrl, payload.minterHostKey, label)
-      store.recordPeer(peer.hostKey, { environmentId: peer.environmentId })
+      // Why the label is recorded: a row this host named itself is not a name the owner chose, and a later pass has
+      // to be able to tell the two apart or the invented word would outrank the typed one.
+      store.recordPeer(peer.hostKey, {
+        environmentId: peer.environmentId,
+        redeemedLabel: peer.label
+      })
       return peer
     } catch (error) {
       lastError = error instanceof Error ? error.message : 'redeem-failed'
@@ -447,8 +457,7 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
         groupId,
         epoch,
         introducedBy: hello.selfKey,
-        offerUrl,
-        ...(selfName(state) === undefined ? {} : { minterLabel: selfName(state) })
+        offerUrl
       })
     } catch (error) {
       lastError = error instanceof Error ? error.message : 'offer-mint-failed'
@@ -580,8 +589,7 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
         groupId: args.groupId,
         epoch: args.epoch,
         introducedBy: args.carrierHostKey,
-        offerUrl,
-        ...(selfName(args.state) === undefined ? {} : { minterLabel: selfName(args.state) })
+        offerUrl
       })
       if (box !== null) {
         sealed.push(box)
@@ -696,8 +704,7 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
         groupId: args.state.groupId,
         epoch,
         introducedBy: selfKey(),
-        offerUrl: minted.offerUrl,
-        ...(selfName(args.state) === undefined ? {} : { minterLabel: selfName(args.state) })
+        offerUrl: minted.offerUrl
       })
     } catch (error) {
       lastError = error instanceof Error ? error.message : 'offer-mint-failed'
@@ -959,7 +966,19 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
       return Promise.reject(new Error('host_mesh_invalid_request'))
     }
     return withLock(async () => {
-      const next = setHostMeshName(loadState(), { hostKey, label: wanted })
+      const state = loadState()
+      // Why the state is checked before the write: naming a machine outside a group would write a group file that the
+      // upgrade step then reads as "already grouped", leaving the fleet this install was paired with ungrouped.
+      if (state.groupId === '') {
+        throw new Error('host_mesh_not_in_group')
+      }
+      if (
+        hostKey !== state.selfKey &&
+        !state.members.some((member) => member.hostKey === hostKey)
+      ) {
+        throw new Error('host_mesh_invalid_request')
+      }
+      const next = setHostMeshName(state, { hostKey, label: wanted })
       saveState(next)
       await applyMemberNames(next)
       return snapshot()

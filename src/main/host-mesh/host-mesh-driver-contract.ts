@@ -120,12 +120,13 @@ export type HostMeshDriverDeps = {
   environmentIdForHostKey: (hostKey: string) => string | null
   /**
    * Renames this host's saved pairing for a machine, so the name the group agreed on is the name every surface
-   * shows.
+   * shows. Resolves true only when the row actually changed: a suffix the store chose never equals the group name,
+   * and a rename that reported success every pass would rebroadcast the catalog every minute forever.
    *
    * Why it may disambiguate: two machines can legitimately answer to one name, and a row left on a placeholder
    * because the store refused the second `Mac mini` is worse than `Mac mini (2)`.
    */
-  renameEnvironment?: (environmentId: string, name: string) => Promise<void>
+  renameEnvironment?: (environmentId: string, name: string) => Promise<boolean>
   /**
    * Every machine this install is already paired with, which is the only thing an upgrade can group.
    *

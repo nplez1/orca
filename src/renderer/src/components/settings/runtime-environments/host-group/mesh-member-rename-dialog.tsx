@@ -34,7 +34,7 @@ export function MeshMemberRenameDialog({
   const t = useTranslate()
   const [value, setValue] = useState(member.label)
   const [busy, setBusy] = useState(false)
-  const [failed, setFailed] = useState(false)
+  const [failure, setFailure] = useState<'invalid' | 'unreachable' | null>(null)
 
   // Seed on every open so a cancelled draft cannot reappear under the name the mesh has now.
   const [seededFor, setSeededFor] = useState({ open, label: member.label })
@@ -42,7 +42,7 @@ export function MeshMemberRenameDialog({
     setSeededFor({ open, label: member.label })
     if (open) {
       setValue(member.label)
-      setFailed(false)
+      setFailure(null)
     }
   }
 
@@ -52,9 +52,16 @@ export function MeshMemberRenameDialog({
       return
     }
     setBusy(true)
+    setFailure(null)
     void runHostMeshAction((api) => api.rename(member.hostKey, trimmed))
       .then(() => onOpenChange(false))
-      .catch(() => setFailed(true))
+      .catch((error: unknown) =>
+        setFailure(
+          error instanceof Error && error.message.includes('host_mesh_invalid_request')
+            ? 'invalid'
+            : 'unreachable'
+        )
+      )
       .finally(() => setBusy(false))
   }
 
@@ -90,7 +97,14 @@ export function MeshMemberRenameDialog({
             }}
           />
           <p className="font-mono text-3xs text-muted-foreground">{member.hostKey}</p>
-          {failed ? (
+          {failure === 'invalid' ? (
+            <p className="text-xs text-destructive">
+              {t(
+                'auto.components.settings.hostGroup.renameInvalid',
+                'That name cannot be used. Pick a shorter name with at least one visible character.'
+              )}
+            </p>
+          ) : failure === 'unreachable' ? (
             <p className="text-xs text-destructive">
               {t(
                 'auto.components.settings.hostGroup.renameFailed',

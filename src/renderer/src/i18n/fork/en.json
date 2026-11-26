@@ -892,6 +892,7 @@
           "renameField": "Name",
           "renameSave": "Save name",
           "renameFailed": "Orca could not reach the mesh. Try again in a moment.",
+          "renameInvalid": "That name cannot be used. Pick a shorter name with at least one visible character.",
           "leaveGroup": "Leave mesh",
           "ejectTitle": "Eject member",
           "ejectDescription": "This computer forgets the pairing in both directions and tells the member to drop it. The member keeps its own copy of the mesh.",

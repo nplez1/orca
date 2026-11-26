@@ -22,6 +22,7 @@ import {
   type PairingOfferServer
 } from '../runtime/rpc/server/pairing/pairing-offer-requests'
 import {
+  HOST_MESH_MAX_LABEL_CHARS,
   HOST_MESH_OFFER_TTL_MS,
   hostMeshPlaceholderName
 } from '../../shared/host-mesh/host-mesh-contract'
@@ -141,7 +142,7 @@ function depsFromApp(server: HostMeshRuntimeServer): HostMeshDriverDeps {
         // rather than an error, because a refused redemption would leave the pair half-joined.
         name: uniqueEnvironmentName(
           listEnvironments(userDataPath),
-          label?.trim() || hostMeshPlaceholderName(expectedHostKey)
+          usablePeerLabel(label, expectedHostKey)
         ),
         pairingCode: offerUrl
       })
@@ -162,11 +163,18 @@ function depsFromApp(server: HostMeshRuntimeServer): HostMeshDriverDeps {
         console.debug('[host-mesh] could not forget the environment', selector, error)
       })
     },
-    // Why the catalog broadcast: every surface reads the pairing store through its own cache, and a rename that
-    // nobody was told about would leave the old name on screen until the next unrelated refresh.
+    // Why the catalog broadcast is conditional: every window refetches the pairing list on it, and a pass that
+    // rebroadcast a name the store had already suffixed would do that every minute for the rest of the install.
     renameEnvironment: async (environmentId, name) => {
-      await renameEnvironment(userDataPath, environmentId, { name, disambiguate: true })
-      publishRuntimeEnvironmentCatalogChanged()
+      const renamed = await renameEnvironment(userDataPath, environmentId, {
+        name,
+        disambiguate: true
+      })
+      const changed = renamed.name === name
+      if (changed) {
+        publishRuntimeEnvironmentCatalogChanged()
+      }
+      return changed
     },
     // Why the peer index and not the pairing rows: another build may rewrite the device registry and drop
     // the fields that would have named this member's row.
@@ -233,6 +241,17 @@ function depsFromApp(server: HostMeshRuntimeServer): HostMeshDriverDeps {
     // pass is the ordinary scheduled one, so a failure lands in the link states the panel already renders.
     requestOwnSync: () => nudgeHostMeshSync()
   }
+}
+
+/**
+ * Why a reported label is checked at all: a peer on the build before this one sent the literal `this host` for
+ * itself, and storing that as a pairing's name is the placeholder problem again under a different spelling.
+ */
+function usablePeerLabel(label: string | undefined, hostKey: string): string {
+  const wanted = label?.trim() ?? ''
+  return wanted === '' || wanted === 'this host'
+    ? hostMeshPlaceholderName(hostKey)
+    : wanted.slice(0, HOST_MESH_MAX_LABEL_CHARS)
 }
 
 /**

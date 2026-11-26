@@ -129,6 +129,14 @@ export type HostMeshName = {
 }
 
 /**
+ * The highest version a name may carry.
+ *
+ * Why a cap: a member reports the version it holds, and a value near the float ceiling would leave `+1` unable to
+ * outrank it — one peer could then decide a name forever.
+ */
+export const HOST_MESH_NAME_MAX_VERSION = 1_000_000
+
+/**
  * The name the pairing store writes when nobody is present to type one.
  *
  * Why it is derived and not random: an offer carries the minter's host key, so both ends can agree that this

@@ -319,3 +319,51 @@ describe('naming a machine for the group', () => {
     expect(merged.names['key-b']?.label).toBe('Build mini')
   })
 })
+
+describe('names arriving from a member', () => {
+  function syncFrom(names: HostMeshSyncPayload['names']): HostMeshSyncPayload {
+    return {
+      version: 1,
+      groupId: 'group-1',
+      epoch: 9,
+      selfKey: 'key-a',
+      publicKeyB64: 'pk-a',
+      members: [{ hostKey: 'key-b', label: 'Laptop', addedAtEpoch: 4 }],
+      tombstones: [],
+      links: {},
+      names
+    }
+  }
+
+  it('refuses a name for a machine this group does not have', () => {
+    const merged = applyHostMeshSync(
+      withMembers(['key-a']),
+      syncFrom({ 'key-stranger': { label: 'Not in this group', version: 9 } })
+    )
+
+    expect(merged.names['key-stranger']).toBeUndefined()
+  })
+
+  it('refuses a version no owner rename could ever outrank, and a label past the cap', () => {
+    const merged = applyHostMeshSync(
+      withMembers(['key-a', 'key-b']),
+      syncFrom({
+        'key-b': { label: 'Laptop', version: 1e308 },
+        'key-a': { label: 'x'.repeat(300), version: 3 }
+      })
+    )
+
+    expect(merged.names['key-b']).toBeUndefined()
+    expect(merged.names['key-a']).toBeUndefined()
+  })
+
+  it('refuses a prototype key rather than letting it become one', () => {
+    const polluted: Record<string, { label: string; version: number }> = JSON.parse(
+      '{"__proto__": {"label": "polluted", "version": 5}}'
+    )
+    const merged = applyHostMeshSync(withMembers(['key-a', 'key-b']), syncFrom(polluted))
+
+    expect(Object.getPrototypeOf(merged.names)).toBe(Object.prototype)
+    expect(Object.keys(merged.names)).toEqual([])
+  })
+})

@@ -203,7 +203,16 @@ export function applyHostMeshSync(
       existing.publicKeyB64 = incoming.publicKeyB64
     }
   }
-  const names = mergeHostMeshNames(state.names, payload.names)
+  const names = mergeHostMeshNames(
+    state.names,
+    payload.names,
+    // Why the set: a peer may name a machine this group does not have, and a name for nothing is a row every host
+    // carries forever. A removed machine is left out too, or its name would come back with the next introduction.
+    new Set([
+      state.selfKey,
+      ...members.filter((member) => !removed.has(member.hostKey)).map((member) => member.hostKey)
+    ])
+  )
   const links: HostMeshLinkMatrix = {
     outbound: { ...state.links.outbound },
     inbound: { ...state.links.inbound }
