@@ -1,3 +1,7 @@
+import {
+  HOME_DIRECTORY_NAME,
+  LEGACY_HOME_DIRECTORY_NAME
+} from '../../../../shared/app-directory-names'
 import { WINDOWS_NATIVE_HOOK_EXECUTABLE_NAME } from './windows-native-hook-executable'
 import { isOrcaPosixCondition } from './posix-condition-clauses'
 import { HOOK_PARENT_CAPTURE } from '../scripts/hook-process-capture'
@@ -20,8 +24,16 @@ const POWERSHELL_POLICY_PREFIX =
 const POWERSHELL_ENV_ASSIGNMENT = /^\$env:[A-Za-z_][A-Za-z0-9_]*\s*=\s*'(?:[^']|'')*';\s*/i
 const POWERSHELL_TEST_PATH_BRANCH =
   /^if\s*\(\s*Test-Path\s+-LiteralPath\s+'((?:[^']|'')+)'\s+-PathType\s+Leaf\s*\)\s*\{\s*&\s*'((?:[^']|'')+)';\s*exit\s+\$LASTEXITCODE\s*\}(.*)$/i
-const POWERSHELL_RUNTIME_HOME_BRANCH =
-  /^\$homePath\s*=\s*\$env:HOME\s+-replace\s+'\^\/\(\[A-Za-z\]\)\/',\s*'\$1:\/';\s*\$scriptPath\s*=\s*Join-Path\s+\$homePath\s+'\.orca\\agent-hooks\\([^'\\]+)';\s*if\s*\(\s*Test-Path\s+-LiteralPath\s+\$scriptPath\s+-PathType\s+Leaf\s*\)\s*\{\s*&\s*\$scriptPath;\s*exit\s+\$LASTEXITCODE\s*\}(.*)$/i
+// Why derived from the shared names and not a literal `\.orca`: this build's home child is
+// `.orca-np`, so a matcher pinned to the official name stops recognising the runtime-home command
+// this build itself writes. Both names are kept for the legacy sweep the caller scopes.
+const HOME_DIRECTORY_PATTERN = `(?:${[HOME_DIRECTORY_NAME, LEGACY_HOME_DIRECTORY_NAME]
+  .map(escapeRegExp)
+  .join('|')})`
+const POWERSHELL_RUNTIME_HOME_BRANCH = new RegExp(
+  String.raw`^\$homePath\s*=\s*\$env:HOME\s+-replace\s+'\^\/\(\[A-Za-z\]\)\/',\s*'\$1:\/';\s*\$scriptPath\s*=\s*Join-Path\s+\$homePath\s+'${HOME_DIRECTORY_PATTERN}\\agent-hooks\\([^'\\]+)';\s*if\s*\(\s*Test-Path\s+-LiteralPath\s+\$scriptPath\s+-PathType\s+Leaf\s*\)\s*\{\s*&\s*\$scriptPath;\s*exit\s+\$LASTEXITCODE\s*\}(.*)$`,
+  'i'
+)
 const POSIX_WRAPPER_LEADING_PREFIXES = [
   /^:\s+orca-agent-hook-form=\d+;\s*/,
   new RegExp(`^${escapeRegExp(HOOK_PARENT_CAPTURE)}`),
@@ -208,12 +220,13 @@ function isOrcaRuntimeHomeFallback(fallback: string): boolean {
   return match !== null && isOrcaPosixFallback(match[1]) && isOrcaPosixFallback(match[2])
 }
 
+const RUNTIME_HOME_WINDOWS_BRANCH = new RegExp(
+  String.raw`^if\s+\[\s+-f\s+("\$\{HOME-\}\/${HOME_DIRECTORY_PATTERN}\/agent-hooks\/[^"]+")\s+\];\s+then\s+case\s+"\$\{HOME-\}"\s+in\s+[\s\S]+?\)\s+if\s+\[\s+-f\s+"\$\{SYSTEMROOT-\}\/System32\/WindowsPowerShell\/v1\.0\/powershell\.exe"\s+\];\s+then\s+([\s\S]+?);\s+else\s+([\s\S]+?);\s+fi\s+;;\s+\*\)\s+("\$\{HOME-\}\/${HOME_DIRECTORY_PATTERN}\/agent-hooks\/[^"]+")\s+;;\s+esac;\s+else\s+([\s\S]+?);\s+fi$`,
+  'i'
+)
+
 function isOrcaRuntimeHomeWindowsBranch(branch: string, scriptNames: ReadonlySet<string>): boolean {
-  const outer = branch
-    .trim()
-    .match(
-      /^if\s+\[\s+-f\s+("\$\{HOME-\}\/\.orca\/agent-hooks\/[^"]+")\s+\];\s+then\s+case\s+"\$\{HOME-\}"\s+in\s+[\s\S]+?\)\s+if\s+\[\s+-f\s+"\$\{SYSTEMROOT-\}\/System32\/WindowsPowerShell\/v1\.0\/powershell\.exe"\s+\];\s+then\s+([\s\S]+?);\s+else\s+([\s\S]+?);\s+fi\s+;;\s+\*\)\s+("\$\{HOME-\}\/\.orca\/agent-hooks\/[^"]+")\s+;;\s+esac;\s+else\s+([\s\S]+?);\s+fi$/
-    )
+  const outer = branch.trim().match(RUNTIME_HOME_WINDOWS_BRANCH)
   return (
     outer !== null &&
     isManagedScriptPath(outer[1], scriptNames) &&

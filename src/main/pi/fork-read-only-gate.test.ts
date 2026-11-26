@@ -40,6 +40,10 @@ const READ_PATHS = [
   'orca slack check',
   'orca bot connectors',
   'orca bot list',
+  'orca bot chats',
+  'orca bot item list',
+  'orca bot item show',
+  'orca bot work list',
   'orca linear issue',
   'orca linear search',
   'orca linear list-issues',
@@ -114,6 +118,7 @@ const REFUSED_COMMANDS = [
   'gh pr list -Rhost/o/r',
   'gh pr list --web',
   'gh pr view 1 --web',
+  'gh pr view 1 --web=false',
   'gh pr view https://example.com/x',
   'git push',
   'git commit -m x',
@@ -154,16 +159,22 @@ const OTHER_READS = [
 ]
 
 const POLICY_FILE = fileURLToPath(new URL('../bots/bot-look-around-policy.ts', import.meta.url))
+const SHELL_SYNTAX_FILE = fileURLToPath(
+  new URL('../bots/bot-look-around-shell-syntax.ts', import.meta.url)
+)
 
-/** The policy text the extension mirrors: its tables, its word splitter and the decision itself. */
+/** The policy text the extension mirrors: the syntax rules it holds a command to, then the tables, the
+ *  word splitter and the decision itself. Both modules are pinned, because the decision now reads its
+ *  words and its refusals from the syntax one. */
 function mirroredPolicy(): string {
+  const syntax = readFileSync(SHELL_SYNTAX_FILE, 'utf8')
   const source = readFileSync(POLICY_FILE, 'utf8')
   const start = source.indexOf('const READ_COMMANDS')
   const end = source.indexOf('/** Claude tools that only read')
   if (start === -1 || end <= start) {
     throw new Error('bot-look-around-policy.ts no longer reads as this test expects')
   }
-  return source.slice(start, end)
+  return `${syntax}\n${source.slice(start, end)}`
 }
 
 /**
@@ -171,7 +182,7 @@ function mirroredPolicy(): string {
  * removed, or a refused argument added, after a security report would leave the extension's copy
  * loose while every case above still agreed.
  */
-const MIRRORED_POLICY_SHA256 = '5cddd7eb690de9cb99f9ab75c39585b389c6bde4d69b66704d8620dd9af2b2b6'
+const MIRRORED_POLICY_SHA256 = 'a34c89828f74306336d691df18fa3ee64d9d809c2a1b74e590168052c1a19980'
 
 describe('the look-around gate Pi loads', () => {
   it('pins the policy text it mirrors', () => {

@@ -8,10 +8,14 @@ const at = (day: number, hour: number) => new Date(2026, 10, day, hour).getTime(
 
 describe('background runs by agent', () => {
   it.each(BOT_AGENTS)(
-    '%s runs memory upkeep; Look around only on Claude Code and Codex',
+    '%s runs memory upkeep; Look around only on Claude Code, Codex and Pi',
     (agent) => {
       expect(tidyNowRefusal({ agent, paused: false }, idle)).toBeNull()
-      expect(lookAroundSupported(agent)).toBe(agent === 'claude' || agent === 'codex')
+      // The supported set is `LOOK_AROUND_AGENTS` (src/shared/bots/bot-look-around.ts): upstream's
+      // two, plus `pi`, whose root gate is src/main/pi/fork-read-only-gate.ts.
+      expect(lookAroundSupported(agent)).toBe(
+        agent === 'claude' || agent === 'codex' || agent === 'pi'
+      )
     }
   )
 

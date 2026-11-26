@@ -154,7 +154,9 @@ describe('registerFilesystemWatcherHandlers', () => {
     const sender = createWatcherSender(1)
     const args = { worktreePath: '\\\\wsl.localhost\\Ubuntu\\home\\me\\repo' }
 
-    await expect(handlers['fs:watchWorktree']({ sender }, args)).resolves.toBeUndefined()
+    // The handler answers where the watch left this renderer (`WatchWorktreeResult`), so a root
+    // waiting on child capacity says so rather than resolving silently.
+    await expect(handlers['fs:watchWorktree']({ sender }, args)).resolves.toBe('deferred')
     expect(createWslWatcher).toHaveBeenCalledOnce()
 
     heldReservations.pop()?.()
@@ -199,9 +201,9 @@ describe('registerFilesystemWatcherHandlers', () => {
     expect(subscribeParcelWatcher).not.toHaveBeenCalled()
 
     removal.release()
-    await expect(
-      handlers['fs:watchWorktree']({ sender }, { worktreePath: '/repo' })
-    ).resolves.toBeUndefined()
+    await expect(handlers['fs:watchWorktree']({ sender }, { worktreePath: '/repo' })).resolves.toBe(
+      'watching'
+    )
     expect(subscribeParcelWatcher).toHaveBeenCalledTimes(1)
   })
 })

@@ -76,7 +76,9 @@ beforeEach(() => {
     },
     onClientEvent: (listener: (event: RuntimeClientEvent) => void) => listeners.push(listener),
     onBotsWritten: () => () => {},
-    bots: { enabled: () => true },
+    // The installer subscribes to stored Slack icons (upstream's `BotController.slackIcons`), so the
+    // fake carries the subscription it now needs, not just `enabled`.
+    bots: { enabled: () => true, slackIcons: { onStored: () => () => {} } },
     botWork: {},
     readMachineName: () => 'Studio Mac',
     machineNameReady: async () => {},

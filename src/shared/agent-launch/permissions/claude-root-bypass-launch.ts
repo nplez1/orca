@@ -5,6 +5,7 @@ import {
 } from './agent-permission-args'
 import { YOLO_TUI_AGENT_ARGS } from './tui-agent-permissions'
 import { findAgentExecutableIndex, isAgentExecutableToken } from '../startup/agent-executable-args'
+import { getRelayCliCommandNameForPlatform } from '../../cli/orca-cli-command-name'
 import { tokenizeStartupCommand, type AgentStartupShell } from '../startup/tui-agent-startup-shell'
 import { TUI_AGENT_CONFIG } from '../catalog/tui-agent-config'
 import type { TuiAgent } from '../catalog/tui-agent'
@@ -36,7 +37,13 @@ function claudeArgsStart(
     return index < 0 ? -1 : index + 1
   }
   const config = TUI_AGENT_CONFIG['claude-agent-teams']
-  const names = [config.detectCmd, ...(config.detectCmdAliases ?? [])]
+  // Why the relay name as well: a remote pane runs the SSH relay's fixed `orca` shim rather than this
+  // install's own CLI name, so a launch this build writes may lead with `orca claude-teams`.
+  const names = [
+    config.detectCmd,
+    ...(config.detectCmdAliases ?? []),
+    getRelayCliCommandNameForPlatform(process.platform)
+  ]
   const index = findAgentExecutableIndex(tokens, shell, (token) =>
     isAgentExecutableToken(token, names)
   )
