@@ -896,7 +896,7 @@
           "renameUnknownMember": "That host is no longer in the mesh with this computer, so its name cannot be changed here.",
           "leaveGroup": "Leave mesh",
           "ejectTitle": "Eject member",
-          "ejectDescription": "This computer forgets the pairing in both directions and tells the member to drop it. The member keeps its own copy of the mesh.",
+          "ejectDescription": "This computer forgets the pairing in both directions, every other member is told to forget it too, and that machine leaves the mesh on its own. It is permanent: pairing it again is the only way back.",
           "cancel": "Cancel",
           "ejectConfirm": "Eject",
           "leaveTitle": "Leave the mesh",
