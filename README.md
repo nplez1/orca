@@ -57,11 +57,13 @@ Orca NP is [stablyai/orca](https://github.com/stablyai/orca) plus a series of fo
 ### Agents
 
 - **Session summaries** — a written brief of an agent session (activity, goal, plan, blockers, timeline) in the right sidebar, with its own agent/model setting. Covers Pi, Copilot, OpenCode, and Cursor sessions as well; a session on a paired host is briefed on that host, and one on an SSH target is briefed from its streamed transcript.
+- **Ask the summary a question** — a composer under the summary pane sends it, the question appears at once as a pending row in a Questions list below the timeline, and the answer replaces it. Answers are written by the summary's own agent from the brief it already holds, so nothing is sent to the session being summarized and its transcript is untouched.
 - **More accurate agent status** — Pi rows no longer stick on "Working" or turn "Done" when a helper sub-agent finishes; Copilot CLI no longer raises "needs you" for auto-approved prompts; a Grok sub-agent waiting on you keeps its row waiting; a pane restored on another client drops the needs-input marker its dialog left behind; and a Claude sub-agent a pi session launches through the `claude` CLI stays on the pi session's row (needs a current pi-subagents plugin).
 - **Copilot's prompts are read from the screen** — a shell or URL approval and the "Copilot needs information" dialog show as prompts instead of a spinner, while a permission the CLI approved on its own stays quiet.
 - **Focus stays in the agent tab** — clicking a sidebar card, a right-sidebar activity tab, or the panel background hands the keyboard back to the agent tab, and closing a menu or dialog returns the caret too, so the next keystroke still means what it did.
 - **Clipboard follows the reader** — a copy from a pi pane watched from a paired client lands in that client's clipboard as well as the host's.
 - **One-click default agent** — the `+` button in the tab bar launches your default agent; hold it or use the chevron for the full menu.
+- **A tab you never tasked closes without asking** — closing an agent tab used to ask "Stop this agent?" whenever its PTY had a child process, even when nothing had been typed or sent. A pane this window launched, with no prompt, no input and an agent resting at its first session boundary, now closes silently; anything with real work in it still asks.
 - **Agent Dashboard as a page** — opens in the main window with back/forward, and clicking a card opens that agent's workspace.
 - **Agent session history** — "All" really lists every session, sub-agent sessions nest under their parent, and transcript indexing makes existing transcripts searchable. A paired host's history loads in pages and refreshes only what changed, so a large remote history arrives instead of failing.
 - **Usage tracking for more providers** — Copilot enterprise AI-credit budgets, DeepSeek balance, and Fireworks.ai spend in the status bar, plus a per-provider off switch that stops polling and credential reads. An expired Claude login is refreshed from the stored refresh token rather than sitting at "Updates when Claude runs", and the renewed login is saved back where Claude keeps it.
@@ -77,7 +79,19 @@ Orca NP is [stablyai/orca](https://github.com/stablyai/orca) plus a series of fo
 - **Floating workspace** — a home folder of its own, a drag handle on the titlebar, and the same agent launch control as the main tab bar.
 - **Hide auto-imported SSH hosts** from pickers and the status bar; hidden hosts stay listed under Settings.
 - **Faster, honest file filter** — the Explore filename filter searches the whole workspace from a prebuilt index and says so when results are partial instead of "no files match".
+- **Move to… and Copy to… in the Files menu** — both open an Orca folder chooser that browses through the explorer's own directory listings, so they work on SSH, paired-runtime and folder workspaces. Move runs the same per-path move as drag-and-drop (editor tabs kept, undo/redo included) and refuses an existing name or a folder moved into itself; Copy keeps the original name when it is free.
 - **Host settings replication** _(groundwork)_ — one machine's settings and provider credentials can be replicated to paired hosts.
+
+### Remote hosts and the mesh
+
+A host is a machine, not a record in one install, so every Orca NP you pair shows the same fleet and keeps the same names.
+
+- **One join pairs you with everyone** — joining a mesh group from Settings → Remote Orca Servers pairs this computer with every member in one action, in both directions, instead of one pairing per machine. Members are introduced by the host you joined through, capped at 12, and setting up a new machine is a single pairing rather than n−1.
+- **See whether a host is joined one way or both ways** — the Remote Hosts menu in the status bar draws a glyph beside each host's name: ⇄ when the pair exists in both directions, → when only one end holds it, an alert when that machine runs an older build without the mesh, and an unlink for a member with no link at all. A host you never joined shows nothing, and the glyph never replaces the connection dot.
+- **One name for a machine, everywhere** — rename a host from its row in Settings and the name is kept by the mesh, so every computer that lists it uses it too. A name you typed when pairing counts as a name, a machine's own hostname is the fallback, and the old `Mesh host 8f3ac2b1` rows from an earlier build are rewritten automatically as the fleet syncs — no re-pairing.
+- **The whole fleet, from any computer** — the status-bar count is the hosts this computer can reach plus the machines a paired host reports, each relayed row labelled `via <host>` and aged out rather than left to look reached. A work host that can call nobody still sees the fleet.
+- **Eject, or leave** — ejecting a member forgets the pairing in both directions on that machine and tells it to drop its copy, while the rest of the mesh is unaffected; leaving ends this computer's membership and keeps its own pairings.
+- **A switch, not a hidden behaviour** — mesh mode can be turned off, and with it off this computer keeps only the pairings you make yourself.
 
 ### Ephemeral environments
 
