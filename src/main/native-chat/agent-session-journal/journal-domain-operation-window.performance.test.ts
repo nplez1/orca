@@ -335,7 +335,7 @@ it('reads the newest turns with the same work however many turns came before the
   expect([own.work.rows, pinned.work.rows, whole.work.rows]).toEqual([74, 2000, 1999])
   expect(anchored.snapshot.submissions.map((send) => send.clientMessageId)).toEqual(long.sends)
   expect(snapshot.submissions.map((send) => send.clientMessageId)).toContain('m0')
-})
+}, 120_000)
 
 it('walks a family of sends linked by provider id and queued card once, however long it is', () => {
   // Send i shares a provider id with i+1 when i is even and a queued card when odd; only the newest
@@ -407,7 +407,7 @@ it('stops reading a long send family at its first member older than the newest t
   expect([extra(200, false, 'answered'), extra(500, false, 'answered')]).toEqual([74, 74])
   // Unsettled sends piled up before the newest turns: their lookup stops at the cap too.
   expect([extra(200, false, 'unsettled'), extra(500, false, 'unsettled')]).toEqual([65, 65])
-})
+}, 120_000)
 
 it('takes the whole read for a window crowded with rows rather than listing them to place its sends', () => {
   const lookups = (messages: number) => {

@@ -6360,3 +6360,44 @@ files / 158 lines and exit 1 before, exit 0 after, `--strict` still 1; and the c
 where a fork-owned `src/shared/host-mesh/` commit plus an undeclared upstream file is a problem, while the same
 diff carrying the sync-base record is not. The same change fixes a latent crash: the verbose listing read
 `seam.budget` for every touched file, which no run reached while an undeclared file exited first.
+
+### `local(test)`: the perf contract whose Windows wall clock, not its operation count, reddened the lane
+
+`fork-performance-contracts` reddened on `main` at `767c078fde1` (run
+[45683322849](https://github.com/nplez1/orca/actions/runs/45683322849), 2026-11-25): the `windows-latest`
+leg failed `src/main/native-chat/agent-session-journal/journal-domain-operation-window.performance.test.ts`
+with `Test timed out in 30000ms`, on the test at line 377. The other two legs passed, and the run before
+it (11-23) was green because the file had not reached `main` yet — it arrived with the 2026-11-24 sync's
+1350 upstream commits.
+
+**Why a timeout, and not a defect.** The contract counts rows returned to our code, never wall clock, and
+its fixture is the cost: ten separate chats of up to 500 turns, ≈3,900 turns × 3 journal applies, each DB
+created in `tmpdir()`. That is 1.6 s on this Mac and 33,065 ms on `windows-2022` in the same run — the
+file is written and re-read under Defender's real-time scan, so the per-turn cost is ~20x and nothing in
+the product is slow. The 30 s default is Vitest's, and it is the only part of that test that is a
+wall-clock budget.
+
+**What the fork changed**, in the same commit as this entry, two closing `})` lines to `}, 120_000)`:
+
+- the test at line 377 (`stops reading a long send family at its first member older than the newest
+  turns`) — the one that failed. **Upstream made this exact call in `7b6c852e2de` (#47789)**, after our
+  sync base, and that commit's own comment says the fixture is "about 30s on a Windows runner; it counts
+  work, not time". The fork takes the code line only: upstream's comment is not copied, because a fork
+  comment above upstream's code is the comment ratchet's growth (`check-upstream-file-comments`,
+  4764/4764 unchanged) and this entry is where the reason belongs. The next sync brings that commit's
+  identical line, so the hunk needs no decision then.
+- the test at line 270 (`reads the newest turns with the same work however many turns came before them`)
+  — the fork's own call, because it passed on the same runner by 3.5 s: 26,488 ms of the 30 s budget on
+  `windows-2022`, and 18,920 ms of it on `ubuntu-24.04` (63%). It is the slowest test in the lane and the
+  slowest in this file, so one slower runner reddens `fork-performance-contracts` and the nightly unit
+  lane, which runs the same `src/**/*.performance.test.*` glob. Leaving it at 88% of its budget would have
+  been a red waiting for the next bad neighbour.
+
+**Not a widened allowlist.** Nothing was added to `local/nightly-linux-known-red.json`,
+`local/unit-known-red.json` or the actions-enablement contract; the tests still run on all three legs and
+still assert the same operation counts. The anchors are the two `it(...)` titles above — an upstream edit
+to either test's body is the only thing that moves them.
+
+**Verified:** the file passes locally (7/7, 4.5 s, macOS), and the lane dispatched on the branch that
+carries this commit (`gh workflow run fork-performance-contracts.yml --ref nplez1/issue-482`) is green on
+`ubuntu-24.04`, `macos-15` and `windows-2022`.
