@@ -4,6 +4,7 @@ import { registerForkHandlers } from './register-fork-handlers'
 
 const mocks = vi.hoisted(() => ({
   registerJenkinsHandlers: vi.fn(),
+  registerHostGraphHandlers: vi.fn(),
   registerSessionSummaryHandlers: vi.fn(),
   registerUiHangDiagnosticsHandlers: vi.fn(),
   registerDeepSeekCredentialsHandlers: vi.fn(),
@@ -14,6 +15,13 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('./jenkins', () => ({
   registerJenkinsHandlers: mocks.registerJenkinsHandlers
+}))
+vi.mock('./host-mesh/host-mesh-handlers', () => ({
+  registerHostMeshHandlers: vi.fn()
+}))
+
+vi.mock('./host-graph/host-graph-handlers', () => ({
+  registerHostGraphHandlers: mocks.registerHostGraphHandlers
 }))
 vi.mock('./session-summary', () => ({
   registerSessionSummaryHandlers: mocks.registerSessionSummaryHandlers
@@ -48,6 +56,7 @@ describe('registerForkHandlers', () => {
     registerForkHandlers({ store, rateLimits: null })
 
     expect(mocks.registerJenkinsHandlers).toHaveBeenCalledOnce()
+    expect(mocks.registerHostGraphHandlers).toHaveBeenCalledOnce()
     expect(mocks.registerUiHangDiagnosticsHandlers).toHaveBeenCalledWith(store)
     expect(mocks.registerDeepSeekCredentialsHandlers).toHaveBeenCalledWith(null)
     expect(mocks.registerDeepInfraCredentialsHandlers).toHaveBeenCalledWith(null)

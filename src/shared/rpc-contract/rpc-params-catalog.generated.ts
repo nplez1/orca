@@ -571,6 +571,7 @@ import {
   GmailModifyParams,
   GmailSendParams
 } from './google-write-params'
+import { HostGraphExchangeParams } from './host-graph-params'
 import {
   AgentCliUpdateCheckParams,
   AgentCliUpdateRunParams
@@ -593,6 +594,17 @@ import {
 import { RecipeVmWakeParams } from './host-management/recipe-vm-wake-params'
 import { ClientCapabilitiesUpdate } from './host-management/runtime-client-capabilities-params'
 import { StatusGetParams } from './host-management/status-params'
+import {
+  HostMeshIntroduceParamsSchema,
+  HostMeshJoinParamsSchema,
+  HostMeshLocalJoinParamsSchema,
+  HostMeshLocalRemoveParamsSchema,
+  HostMeshLocalSnapshotParamsSchema,
+  HostMeshPendingParamsSchema,
+  HostMeshRelayParamsSchema,
+  HostMeshRemoveParamsSchema,
+  HostMeshSettingsPatchParamsSchema
+} from './host-mesh-params'
 import { ApplyHostSettingsReplicationParams } from './host-settings-params'
 import { JiraFavouriteFilterParams } from './jira/jira-favourite-filter-params'
 import {
@@ -1816,6 +1828,19 @@ export const RPC_PARAMS_BY_METHOD = {
   'host.pwsh.isAvailable': null,
   'host.wsl.isAvailable': null,
   'host.wsl.listDistros': null,
+  'hostGraph.exchange': HostGraphExchangeParams,
+  'hostMesh.introduce': HostMeshIntroduceParamsSchema,
+  'hostMesh.join': HostMeshJoinParamsSchema,
+  'hostMesh.joinGroup': HostMeshLocalJoinParamsSchema,
+  'hostMesh.leaveGroup': HostMeshLocalSnapshotParamsSchema,
+  'hostMesh.pending': HostMeshPendingParamsSchema,
+  'hostMesh.relayIntroductions': HostMeshRelayParamsSchema,
+  'hostMesh.remove': HostMeshRemoveParamsSchema,
+  'hostMesh.removeMember': HostMeshLocalRemoveParamsSchema,
+  'hostMesh.settings': HostMeshSettingsPatchParamsSchema,
+  'hostMesh.snapshot': HostMeshLocalSnapshotParamsSchema,
+  'hostMesh.sync': HostMeshPendingParamsSchema,
+  'hostMesh.syncNow': HostMeshLocalSnapshotParamsSchema,
   'hostSettings.applyReplication': ApplyHostSettingsReplicationParams,
   'hostSettings.replicationState': null,
   'hostedReview.create': HostedReviewCreate,

@@ -207,6 +207,13 @@ export const FORK_LINT_STEPS = [
     command: 'node local/check-upstream-file-comments.mjs',
     argv: ['node', 'local/check-upstream-file-comments.mjs']
   },
+  {
+    // The host group's own seam register: how many lines it costs in upstream-owned files, and which ones.
+    // Beside the comment ratchet above because the two answer the same question from opposite sides.
+    id: 'check-host-mesh-upstream-seams',
+    command: 'node local/checks/host-mesh-upstream-seams.mjs --base origin/main',
+    argv: ['node', 'local/checks/host-mesh-upstream-seams.mjs', '--base', 'origin/main']
+  },
   // Why these three are fork-only additions rather than chain steps: upstream's run-lint.mjs replaced
   // package.json's inline `lint` chain in the 2026-10-28 sync and does not know them, so taking that
   // refactor silently stopped running them.

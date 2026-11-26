@@ -19,6 +19,7 @@ import { RuntimeDefaultHostRow } from './runtime-default-host-row'
 import { RuntimeInstallServerDialog } from '../managed-servers/runtime-install-server-dialog'
 import { RuntimeServerList } from '../server-rows/runtime-server-list'
 import { RuntimeServerListHeader } from '../server-rows/runtime-server-list-header'
+import { HostGroupSection } from '../host-group/HostGroupSection'
 import { RuntimeShareComputerSection } from '../pairing/runtime-share-computer-section'
 import { useRuntimeServersPage } from '../runtime-servers-page-context'
 import { WslHostsSection } from '../../wsl/hosts/WslHostsSection'
@@ -235,6 +236,8 @@ export function RuntimeEnvironmentsPane({
           onPasteAccessLink={(trigger) => setDialog('add', trigger)}
         />
       </div>
+
+      <HostGroupSection />
 
       {managedCatalog.loadFailed ? (
         <p className="text-xs text-destructive">

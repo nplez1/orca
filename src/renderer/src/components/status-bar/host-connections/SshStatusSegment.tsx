@@ -26,6 +26,8 @@ import {
 } from '../../../../../shared/remote-runtime/host-catalog/runtime-environments'
 import { RuntimeHostStatusRow } from './RuntimeHostStatusRow'
 import { connectedHostCountLabel, moreSshHostsLabel } from './ssh-status-segment-copy'
+import { RelayedFleetStatusItems } from './RelayedFleetStatusItems'
+import { useRelayedFleetHosts } from './use-relayed-fleet-hosts'
 import { SshHostFindPopover } from './SshHostFindPopover'
 import { splitSshStatusMenuRows } from './ssh-status-menu-rows'
 import { SshTargetStatusRow } from './SshTargetStatusRow'
@@ -66,6 +68,12 @@ export function SshStatusSegment(): React.JSX.Element | null {
   const [findOpen, setFindOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const [repairTarget, setRepairTarget] = useState<{ id: string; label: string } | null>(null)
+  const {
+    relayed,
+    unavailablePeerCount,
+    unsupportedPeerCount,
+    refresh: refreshRelayed
+  } = useRelayedFleetHosts()
 
   const projectHostIds = useMemo(
     () => new Set(repos.flatMap((repo) => (repo.connectionId ? [repo.connectionId] : []))),
@@ -177,7 +185,7 @@ export function SshStatusSegment(): React.JSX.Element | null {
     [recordFeatureInteraction, readRuntimeHostStatusSnapshots]
   )
 
-  if (targets.length === 0 && runtimeHosts.length === 0) {
+  if (targets.length === 0 && runtimeHosts.length === 0 && relayed.length === 0) {
     return null
   }
 
@@ -185,7 +193,9 @@ export function SshStatusSegment(): React.JSX.Element | null {
     ...targets.map((target) => sshStatusForOverall(target.status)),
     ...runtimeHostRows.map((host) => runtimeHostStatusForOverall(host.state, host.blockedReason))
   ]
-  const connectedHostCount = statuses.filter((status) => status === 'connected').length
+  const connectedHostCount =
+    statuses.filter((status) => status === 'connected').length +
+    relayed.filter((host) => host.live).length
   const openRecovery = (host: {
     id: string
     label: string
@@ -209,6 +219,7 @@ export function SshStatusSegment(): React.JSX.Element | null {
         if (open) {
           void hydrateRuntimeEnvironmentStatuses()
           void syncSshConfigTargetsPassively()
+          refreshRelayed()
           recordFeatureInteraction('ssh')
         }
       }}
@@ -301,6 +312,12 @@ export function SshStatusSegment(): React.JSX.Element | null {
             {moreSshHostsLabel(hiddenIdleCount, t)}
           </DropdownMenuItem>
         ) : null}
+        <RelayedFleetStatusItems
+          relayed={relayed}
+          unavailablePeerCount={unavailablePeerCount}
+          unsupportedPeerCount={unsupportedPeerCount}
+          t={t}
+        />
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onSelect={() => {

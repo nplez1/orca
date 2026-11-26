@@ -80,6 +80,7 @@ describe('fork-only steps run from the gate, not from package.json', () => {
       'oxlint',
       'check-upstream-identity-literals',
       'check-upstream-file-comments',
+      'check-host-mesh-upstream-seams',
       'check:process-host-imports',
       'check:workspace-path-sync-fs-ratchet',
       'check:compat-boundary-imports'

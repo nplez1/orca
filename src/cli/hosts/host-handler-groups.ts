@@ -2,6 +2,9 @@ import type { HandlerGroup } from '../dispatch/handler-group-manifest'
 
 // The machines Orca reaches: saved hosts and paired environments, the Orca servers it manages on
 // them, and recipe VMs.
+
+import { HOST_MESH_HANDLER_GROUP } from './host-mesh-handler-group.js'
+
 export const HOST_HANDLER_GROUPS: readonly HandlerGroup[] = [
   {
     name: 'environment',
@@ -38,5 +41,6 @@ export const HOST_HANDLER_GROUPS: readonly HandlerGroup[] = [
     name: 'vm-env',
     keys: ['vm env doctor'],
     load: async () => (await import('./vm-env.js')).VM_ENV_HANDLERS
-  }
+  },
+  HOST_MESH_HANDLER_GROUP
 ]

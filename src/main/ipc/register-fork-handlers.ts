@@ -5,6 +5,8 @@ import { registerDeepInfraCredentialsHandlers } from './deepinfra-credentials'
 import { registerDeepSeekCredentialsHandlers } from './deepseek-credentials'
 import { registerFireworksCredentialsHandlers } from './fireworks-credentials'
 import { registerJenkinsHandlers } from './jenkins'
+import { registerHostGraphHandlers } from './host-graph/host-graph-handlers'
+import { registerHostMeshHandlers } from './host-mesh/host-mesh-handlers'
 import { registerSessionSummaryHandlers } from './session-summary'
 import { registerUiHangDiagnosticsHandlers } from './ui-hang-diagnostics'
 
@@ -24,6 +26,8 @@ export function registerForkHandlers({
   rateLimits: RateLimitService | null
 }): void {
   registerJenkinsHandlers()
+  registerHostGraphHandlers()
+  registerHostMeshHandlers()
   registerSessionSummaryHandlers(() => store.getSettings())
   registerUiHangDiagnosticsHandlers(store)
   registerDeepSeekCredentialsHandlers(rateLimits)

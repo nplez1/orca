@@ -860,6 +860,53 @@
           "HostFolderSettingRow": {
             "607a8e146c": "Use a full path, or one that starts with ~/."
           }
+        },
+        "hostGroup": {
+          "title": "Host group",
+          "description": "Pairing with one member of a group pairs this computer with all of them, so every host lists the same workspaces.",
+          "syncNow": "Sync now",
+          "reading": "Reading the group…",
+          "ejectMember": "Eject {{name}}",
+          "eject": "Eject",
+          "leaveGroup": "Leave group",
+          "joining": "Joining",
+          "joiningDescription": "What this computer does when a member adds another machine to the group.",
+          "allowJoins": "Allow this computer to be added to a group",
+          "allowJoinsDescription": "Off, another computer cannot put this one into a group at all, even one you have paired with. Turn it on for each computer you want to join.",
+          "autoAccept": "Auto-accept introduced members",
+          "autoAcceptDescription": "Anyone the group’s members add is paired with this computer without asking, and can then run commands on it.",
+          "acceptIntroductions": "Accept introductions",
+          "acceptIntroductionsDescription": "Let a member pair this computer with a machine it vouches for. Off leaves this computer with the pairings you make yourself.",
+          "relayIntroductions": "Relay introductions",
+          "relayIntroductionsDescription": "Forward a newcomer’s offers to the other members, so it does not have to reach each one itself.",
+          "ejectTitle": "Eject member",
+          "ejectDescription": "This computer forgets the pairing in both directions and tells the member to drop it. The member keeps its own copy of the group.",
+          "cancel": "Cancel",
+          "ejectConfirm": "Eject",
+          "leaveTitle": "Leave group",
+          "leaveDescription": "This computer stops listing the group’s members and leaves the group. The pairings with each member stay, and every member keeps its own copy of the group.",
+          "leaveConfirm": "Leave group",
+          "unavailable": "This build cannot reach the host group.",
+          "invalidRequest": "Orca sent the group an incomplete request.",
+          "actionFailed": "Orca couldn’t reach the group. Try Sync now.",
+          "pairedBothWays": "Paired both ways",
+          "needsUpdate": "Needs update",
+          "needsUpdateDetail": "This computer answers, but it is running a version without the group. It joins as soon as it updates.",
+          "oneWay": "One-way",
+          "oneWayDetail": "This computer and that one disagree about being paired: only one of them holds the pairing.",
+          "notPaired": "Not paired",
+          "notPairedDetail": "Nothing pairs this computer with that one yet.",
+          "migratedOne": "Created when this version arrived, from the computer this one was already paired with.",
+          "migratedMany": "Created when this version arrived, from the {{count}} computers this one was already paired with.",
+          "membersOne": "1 member",
+          "membersMany": "{{count}} members",
+          "completePairs": "{{count}} paired both ways",
+          "halfPairs": "{{count}} one-way",
+          "missingPairs": "{{count}} not paired",
+          "addedBy": "Added by {{label}}",
+          "atCap": "The group is full at {{count}} members.",
+          "inGroup": "Every member is paired with this computer, so each host lists the same workspaces.",
+          "notInGroup": "This computer is not in a group. Pair with a computer that is in one to join it."
         }
       },
       "sidebar": {
@@ -1001,6 +1048,15 @@
             "288a4dd177": null
           },
           "StatusBar": {},
+          "SshStatusSegment": {
+            "hostGraphOlderPeer_one": "{{count}} host can't share its host list yet",
+            "hostGraphOlderPeer_other": "{{count}} hosts can't share their host list yet",
+            "hostGraphPartial_one": "{{count}} host didn't answer",
+            "hostGraphPartial_other": "{{count}} hosts didn't answer",
+            "relayedHostStale": "not confirmed for {{minutes}} min",
+            "relayedHostVia": "via {{reporter}}",
+            "viaOtherHosts": "Via other hosts"
+          },
           "providerAllowance": {
             "unit": {
               "credit": "credits"

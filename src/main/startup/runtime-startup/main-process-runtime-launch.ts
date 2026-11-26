@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import { settleDesktopActivation } from './runtime-launch-activation'
 import { app, type BrowserWindow } from 'electron'
 import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../shared/workspace-layout/layout-owner-switch'
@@ -7,6 +8,7 @@ import {
   migrateMobilePairingDataToCanonicalUserDataPath
 } from '../../persistence/loading-store/user-data-path'
 import { OrcaRuntimeRpcServer } from '../../runtime/rpc/server/runtime-rpc'
+import { installHostMeshRuntime } from '../../host-mesh/host-mesh-startup'
 import { resolveServePinnedBindHost } from '../serve-launch/serve-pinned-bind-host'
 import { isOrcadSidecarLaunch } from '../../window/activation/foreground-activation-policy'
 import type { MainWindowOpenOptions } from '../../window/main-window/main-window-contracts'
@@ -113,6 +115,7 @@ function installRuntimeRpc(
     webClientRoot: getBundledWebClientRoot()
   })
   state.core.runtimeRpc = runtimeRpc
+  installHostMeshRuntime(runtimeRpc)
   runtime.setAgentSenderPeerKey(() => runtimeRpc.getE2EEPublicKey())
   runtimeRpc.setMobileDesktopRelayHosts(createRuntimeEnvironmentMobileRelayHosts())
   registerMobileHandlers(runtimeRpc, {

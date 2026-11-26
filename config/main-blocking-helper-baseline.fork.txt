@@ -11,6 +11,17 @@
 # The 2026-11-24 sync (7daf01d99f3) raised nine rows for the same class: upstream's new code in a file the
 # fork's graph reaches, or the fork's own in-process session search (upstream runs that store in a worker).
 # Evidence: LOCAL-PATCHES.md § local(lint): the 2026-11-24 sync's lint gate.
+# local(hosts): the fleet and the group read and write one small JSON file beside the pairing keypair, through
+# upstream's own bounded readers and secure writers, so these files are charged for helpers the fork already
+# depends on. The store is synchronous on purpose: a snapshot is rendered from it, and the file is a few hundred
+# bytes. Evidence: LOCAL-PATCHES.md § local(hosts).
+1 src/main/host-graph/host-graph-local-adjacency.ts
+2 src/main/host-graph/host-graph-self-identity.ts
+1 src/main/host-mesh/host-mesh-driver.ts
+1 src/main/host-mesh/host-mesh-rpc-service.ts
+3 src/main/host-mesh/host-mesh-runtime-deps.ts
+1 src/main/host-mesh/host-mesh-startup.ts
+18 src/main/host-mesh/host-mesh-store.ts
 # This is a RATCHET: counts may only go DOWN. Prune: node config/scripts/static-analysis/ratchets/runtime-lifecycle/check-main-blocking-helper-ratchet.mjs --prune
 1 src/main/agent-hooks/first-work/first-work-folder-rename.ts
 1 src/main/agent-hooks/installation/commands/managed-hook-command-matching.ts

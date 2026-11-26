@@ -6043,3 +6043,256 @@ Two smaller changes ride with it, from the same review: the three release legs' 
 while a `contents: write` token would otherwise sit in `.git/config`), and their electron-builder
 caches no longer `restore-keys` by prefix — a prefix match lets any `main` job, including the read-only
 ones that run those same install scripts, seed the cache a signing leg restores.
+
+### `local(hosts)`: hosts know each other, so every instance shows the same fleet
+
+The design, its trade-offs and the four capabilities it separates are `local/design/host-graph.md`; this
+records what shipped, where the anchors are, and the three places the note was wrong. The complaint this
+answers is one sentence long: **a host is a record in one install, not a machine**, so four machines paired
+into a mesh each showed only its own pairings, and a laptop that could reach nothing but the Studio showed
+nothing at all. Stage 2 (discovery) is built; stages 1, 3 and 4 are not, and this patch does not touch
+`ExecutionHostId`, so nothing about row identity, settings scope or worktree ownership changes underneath.
+
+**The mechanism, and why it is not a pull-only read.** One capability (`host.graph.adjacency.v1`) and one
+method (`hostGraph.exchange`). The method is _symmetric_: the caller sends its own adjacency and the callee
+answers with its own plus the reports its callers have left with it. A pull-only design cannot work here,
+because in this fork's own topology (`bot-host-topology.md`) a leaf has no outbound pairings and can call
+nobody — it would report zero hosts forever. Hearsay is labelled as hearsay and never re-nested, so depth is
+bounded by the payload's shape rather than by a hop decrement. Nothing is persisted: the answer is other
+machines' claims about right now, and a file would outlive the pairing it was read under.
+
+**Identity without an id migration.** A machine is named by `orcaHostKey` — the digest
+`publicRuntimeEnvironmentWithHostKey` already publishes, derived from the host's own E2EE key — with
+`sshHostKeys` beside it as the only key a non-orcad host has. `machineKey` was the note's name for it and was
+already taken by the managed-server home naming. A merge on equal `orcaHostKey` is trusted; an SSH-key match
+may complete an SSH-only entry but never join two machines that each presented a _different_ pairing key, or
+a lying peer could hide a host from the count. The viewer's own machine (`viewer` and the `own.self` it sent)
+is dropped, which is what makes the number mean "all the OTHER hosts".
+
+**What is disclosed, and what bounds it.** An adjacent host learns labels and public-key digests of every
+member machine, and the edge kinds — no endpoints, ports, usernames, device tokens, target ids or pairing
+ids. A direct caller needs `workspace`, which already implies command execution on this host, so it learns
+nothing it could not read from `orca-environments.json` itself. The genuinely new disclosure is that a
+**callee** learns upstream membership: a work host the Studio controls, holding no rights on the Studio,
+learns the laptop's name and identity. The bounds are: `ephemeral-vm` environments are never reported, the
+method is deliberately absent from both mobile allowlists so a phone cannot enumerate the fleet, heard
+reports are memory-only and aged out by the same TTL the client uses, the answer a peer returns is
+validated before it is composed (`params` bounds what this host is asked, not what it is told), every array
+and string is bounded in `host-graph-params.ts`, and relayed rows are labelled and not actionable (there is
+no connect control, because reaching one needs stage 3).
+
+**The anchors.** Six files upstream owns, each a line or two, plus one generated catalog; every reason each
+exists is this section. `src/shared/host-graph/**` is under `src/shared/`, so it is a **global input**: a PR
+carrying it needs the full unit gate, and a sync that moves it invalidates a cached verdict.
+
+| File                                                                                 | Anchor                                                    | Change                                                                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------ | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/main/runtime/rpc/methods/rpc-method-registry.ts`                                | beside `...HOST_SETTINGS_METHODS`                         | `...HOST_GRAPH_METHODS`, plus its import                                                                                                                                                                                                      |
+| `src/shared/remote-runtime/protocol/protocol-version.ts`                             | beside `HOST_SETTINGS_REPLICATION_RUNTIME_CAPABILITY`     | `HOST_GRAPH_RUNTIME_CAPABILITY`, in the same commit as the method                                                                                                                                                                             |
+| `src/renderer/src/components/status-bar/host-connections/SshStatusSegment.tsx`       | the selector block, the early return, the count, the menu | imports; `useRelayedFleetHosts()`; the early return also requires `relayed.length > 0`, or a leaf shows nothing; the count adds live relayed hosts; a `Via other hosts` section with its two failure footers; `refreshRelayed()` on menu open |
+| `src/renderer/src/components/status-bar/host-connections/ssh-status-segment-copy.ts` | end of file                                               | five copy helpers: `relayedHostViaLabel`, `relayedHostStaleLabel`, `viaOtherHostsLabel`, `hostGraphPartialLabel`, `hostGraphOlderPeerLabel`                                                                                                   |
+| `src/shared/rpc-contract/rpc-params-catalog.generated.ts`                            | generated                                                 | `pnpm generate:rpc-params-catalog`, never hand-edited                                                                                                                                                                                         |
+| `src/main/ipc/runtime-environments/runtime-environment-connection-observation.ts`    | beside the replication `observeConnection` call           | `observeHostGraphEnvironmentConnection(args)` and `invalidateHostGraphSnapshot()`, so a pairing's own liveness is known and a host attaching refreshes the fleet before the TTL                                                               |
+
+**Why the count is additive, and what it is not.** The status-bar number is the direct connected hosts plus
+the relayed machines confirmed inside `HOST_GRAPH_NODE_TTL_MS`; on a mesh of diameter two that is the same
+fleet size on every instance, which is the whole ask. It is not a claim that this client can reach them, and
+the menu says so twice: each relayed row reads `via <host>`, and a partial fan-out or a peer too old to
+answer is stated in its own footer rather than being allowed to look like hosts lost.
+
+**What the review changed, and why it is worth knowing.** The first version answered the exchange
+symmetrically but composed only the answers to the questions it had asked, so a host that is _called_ and
+never _calls_ learned nothing: on the documented hub the Studio showed two hosts, the laptop three, and the
+VM and the Windows box zero — the exact failure the requirement forbids. The driver now composes the reports
+it holds as well, which makes a machine that only ever calls this one a direct pairing in the other
+direction. Three corrections came with it: an answer's `revision` covers the hearsay as well as the
+adjacency, or a new caller stayed invisible to everyone else for as long as the caller kept asking; a failed
+host replays what it last said at its original age instead of vanishing on one bad round trip; and a
+pairing's liveness comes from its own transport rather than from an SSH tunnel it may not use. The second
+review round caught the consequence of the revision fix: because the revision ignores arrival times, a host
+that kept confirming the same answer let the hearsay inside it age out here while it was still current there,
+so an unchanged answer now re-stamps the reports it carries.
+
+**Known limits, accepted deliberately.** A machine reached both directly and through a relay whose stored
+SSH key is filed under a different hostname spelling can be counted twice, because only a pairing key can
+prove two entries are one machine. And once this client knows its own pairing key, an entry carrying only an
+SSH key is never treated as "us": VM images cloned from one template share `/etc/ssh` host keys, so a clone
+shows as its own row. That is the safer direction — a spare row, instead of a peer being able to hide a
+machine from the count by claiming our host key.
+
+### `local(hosts)`: mesh groups, so one join pairs a machine with every member
+
+The design, the three rejected mechanisms and the security reasoning are `local/design/host-mesh.md`. This
+records what shipped, every upstream file it anchors, and what is still unproven.
+
+Orca pairing is directional — the caller holds the environment record — so a fully connected group of n
+machines needs n(n−1) records and n(n−1) user actions. Three machines is six links. A group makes it n
+actions: joining one member introduces the newcomer to every other member, and every host in the group then
+lists every member's workspaces, which is the outcome the feature exists for.
+
+**The decision that shapes it: no host mints a pairing offer for another.** `pairing.createOffer` is
+`pairing-admin` and that tier is owner-only (`runtime/rpc/methods/pairing/pairing.ts`, _"paired clients and
+phones never hold pairing-admin"_). Minting on a peer's behalf would turn every pairing into a grant to widen
+that peer's access — the escalation `local/design/host-graph.md` §4 refuses. So each host mints its own offer
+with **no grants**, seals it to the one machine allowed to redeem it (`nacl.box` static-static over the domain
+`orca-mesh-offer/v1`), and the introducer is a courier for a box it cannot open, alter or relabel.
+
+**Fork-owned files** (no sync cost): `src/shared/host-mesh/*` (contract, membership reducer, admission
+rules), `src/main/host-mesh/*` (sealed offer, store, driver, RPC service, runtime façade) — with 81 unit
+tests, including a three-host simulation that drives the real protocol through a fake transport.
+
+**Upstream anchors — every one of these will need resolving at the next sync:**
+
+| Upstream file                                                                                                                                   | What the fork adds                                        |
+| ----------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `src/main/runtime/rpc/core.ts`                                                                                                                  | the `hostMesh` context field                              |
+| `src/main/runtime/rpc/methods/rpc-method-registry.ts`                                                                                           | the `HOST_MESH_METHODS` spread                            |
+| `src/main/runtime/rpc/methods/host-mesh.ts`                                                                                                     | new: twelve methods, six peer-facing and six owner-facing |
+| `src/main/runtime/rpc/dispatch/dispatcher-stream-options.ts`, `server/runtime-rpc-request-admission.ts`, `server/runtime-rpc-mobile-pairing.ts` | threading the service to the handler context              |
+| `src/shared/rpc-contract/host-mesh-params.ts`, `rpc-params-catalog.generated.ts`                                                                | the params schemas and their generated catalog            |
+| `src/main/ipc/register-fork-handlers.ts`, `.test.ts`, `src/main/ipc/host-mesh/host-mesh-handlers.ts`                                            | the renderer's six IPC channels                           |
+| `src/preload/api/{fork-preload-api,index,api-types}.ts`                                                                                         | the `window.api` surface                                  |
+| `src/renderer/src/components/settings/runtime-environments/…`                                                                                   | the Host group panel                                      |
+| `src/cli/{specs/index,hosts/host-handler-groups,dispatch/remote-selection-scope}.ts`                                                            | `orca group` registration                                 |
+| `src/main/startup/runtime-startup/main-process-runtime-launch.ts`                                                                               | the one `configureHostMeshRuntimeFromApp` call            |
+
+**Permissions, and why they are what they are.** The six peer-facing methods are `workspace` — a caller at
+that tier already runs host-user code, so learning membership is not a new capability, and every dangerous
+effect is bounded by a sealed box only the newcomer's key could have minted — except removal, which is
+`host-admin`. The six owner-facing methods are `host-admin`, so no paired desktop can widen itself.
+
+**One honest cost of auto-accept, stated on the settings row.** With introductions accepted automatically,
+one compromised member can add a machine it controls to every member, and every member gains a shell on every
+other. That is inherent in what the group is for. The bounds are attribution on every row, a notification on
+each host, a cap of 12 members, four introductions per introducer per hour, and any member able to eject.
+
+**What the unit evidence does not cover.** Endpoint reachability across LAN and Tailscale is the likeliest
+cause of a half-join and needs three real machines; loopback is refused outside tests, so an offer exchange
+between two real Electron main processes cannot be exercised on one Mac. Removal while a member sleeps is
+likewise proven only at the store level. Until that run happens, treat a group as reliable on one network and
+unproven across two.
+
+**Reviewed, and what the review changed.** Opus 5.5 at high on the combined diff found that the first join
+could not work at all (the hello carried an empty group id the params schema refused), that removal revoked
+nothing (`mintRuntimeOffer` discarded the device row id, so `forgetDevice` had nothing to delete), and that a
+pair was reported complete when only one direction existed. All three are fixed, along with redemption
+verifying the offer's own key _before_ saving an environment, a host that was ejected now acting on the
+notice, and the introduction limit actually being counted. A delta re-check found one new blocker — the
+opt-in could not be turned on, because the patch schema and the store did not name it — which is now fixed
+and pinned by a test. **That last fix has not been re-reviewed**; a third round needs the owner's approval.
+
+**Known limits, stated rather than hidden.** A relayed offer is bound to its recipient and to the machine
+that minted it, but the single-use nonce that `host-mesh-contract.ts` promises is not yet enforced, so a box
+can be replayed inside its ten-minute window. A member list arrives unauthenticated, which is the conceded
+cost of auto-pairing: one member can name a machine it controls and every member will pair with it. Any
+`workspace` caller can drain another host's pending boxes (a denial of service, since only the addressee can
+open one). The store has no lock, so two concurrent RPCs can lose an update.
+
+**Upgrading an existing install.** Nothing is rewritten: the group lives in its own `host-mesh.json`, the
+pairing table and its schema are untouched, and a build without the mesh simply ignores the new file. What
+would otherwise happen is that an existing fleet stays exactly as scattered as it was — pairings are
+directional, so every machine already holds the machines it was paired with but nothing groups them — and the
+owner would have to create a group by hand on each one.
+
+So there is one migration, at startup, and it runs once per install. It reads the pairing table (the same
+edges discovery already reports), groups this host with every machine it is already paired with, and records
+that it ran. Nothing is minted or dialled by it: every link starts awaiting its offer, so the panel shows an
+unrepaired fleet rather than a false one. A machine with no pairings has nothing to group and records that,
+which is why pairing a second machine later does not silently create a group the owner never asked for. And
+because the file is written, leaving the group is never undone by the next launch.
+
+Two machines upgrading independently cannot agree on a group id without help — each derives one from the
+fleet it can see, and a leaf sees only the hub — so `adoptHostMeshGroup` is the rule that settles it: a host
+takes on another's group when that group contains its own and every machine in it is either already paired
+here or vouched for by a member that is. The id is derived from the members rather than random so two
+machines that saw the same fleet agree outright, and containment rather than overlap so two fleets that share
+one machine never merge through it.
+
+The other half of the same gap was structural, not migration-specific: `decideIntroduce` refused a host with
+no group at all, so a machine that had never joined could not be brought in by anyone — the opposite of one
+join pairing it with everyone. It adopts instead, on the same trust rule. `hostMesh.sync` also answered a
+member whose group id differed with an empty member list, which is what kept a fleet split after an upgrade;
+membership now decides that rather than the id, and a non-member still learns nothing.
+
+Verified by a three-host simulation of the upgrade itself: three machines that only ever knew the hub each
+migrate to their own group, and after two syncs each they hold one group and know all three members.
+
+**A fleet that updates one machine at a time.** The normal case is the machine holding every pairing
+upgrading first, while the others are still on a build with no mesh in it. Handled explicitly:
+
+- An old-build peer answers `method_not_found`, and that is recorded as `unsupported` rather than
+  `unreachable`, because it is not a network fault. The panel says _Needs update_ for it, and the group
+  listing otherwise stays honest: the upgraded host knows all members, the members know only themselves
+  until they update.
+- No offer is minted for a member known to be unreachable or unsupported. `membersAwaitingNewcomerOffer`
+  returns every member whose link is not `ok`, so without that exclusion the repair would have minted a live
+  device row at a machine that cannot redeem it, on every sync.
+- A successful sync now proves the outbound link (`ok`). That is what lets a migrated group repair itself:
+  the repair needs one member that already works to carry the others' offers, and nothing else would ever
+  mark one.
+- Migration carries each peer's public key from the pairing record. Without it nothing can be sealed to that
+  member, the repair skips it silently, and the fleet never completes.
+- The store's link schema is now tested against every kind the driver can write. Adding `unsupported` to the
+  union without teaching the store made the store refuse the file its own driver had just written — which
+  reads to the owner as "move it aside to start over", in the middle of an upgrade.
+
+Verified by three simulations of exactly this rollout: the hub upgrading first mints nothing and reports both
+peers as needing an update; a leaf picked up the moment it updates converges on the hub's group and learns
+the member it had never met; and when the last machine updates, all three hold one group with every pair
+complete.
+
+### `local(hosts)`: the fleet every instance sees, and one join that pairs it with all
+
+Two features, one PR: discovery (what each host knows about the machines you own) and the group (join one
+member, be paired with every member, so the workspace list is identical everywhere). They are one patch
+because discovery without the group gives you a fleet you cannot act on, and the group without discovery
+cannot tell you which machines exist.
+
+**Upstream surface: 42 lines across 9 files.** The register is `local/checks/host-mesh-upstream-seams.mjs`,
+which is wired into `local/gate-lint.mjs`; it fails when an upstream-owned file is touched without being
+declared there, or when a seam grows past its metres. Per-seam resolution notes are in
+`local/design/host-mesh.md` § Upstream sync surface. Nothing above upstream's code: the fork's own
+`check-upstream-file-comments` ratchet measured 162 of 233 sync conflicts coming from exactly that, so this
+patch adds **zero** fork comment lines to upstream files — the register lives here and in the design note.
+
+Where a hook was unavoidable, the upstream line calls a fork-owned module (`installHostMeshRuntime`,
+`FORK_RPC_METHODS`, `HOST_MESH_HANDLER_GROUP`, `notifyHostGraphOfConnectionChange`,
+`RelayedFleetStatusItems`). Where it was avoidable it was deleted instead: the mesh service is a configured
+singleton, so threading it through `RpcContext` would have put this feature into `core.ts`, the admission
+prologue, the mobile pairing subclass and the stream options to copy a constant — all four are untouched.
+
+Fork extension points are used as designed: `register-fork-handlers.ts`, `fork-preload-api.ts`,
+`i18n/fork/en.json`. The generated RPC param catalog is regenerated, never hand-edited.
+
+**Not upstream-ready, and not proposed upstream:** the mesh assumes every member holds `host-admin` (the
+paired-desktop standard), and a group's membership list is not authenticated — the conceded premise of
+auto-pairing. Both are in the design note.
+
+**What the fork's own gates made this patch change.** Three ratchets are worth naming, because each one
+made this feature better rather than merely compliant:
+
+- `check:recurring-timer-ratchet` refused the renderer's own interval for staleness. It now uses upstream's
+  shared clock (`lib/window-activity/use-now`), so the fork adds no timer and staleness still ages.
+- `check:main-sync-fs-ratchet` refused two direct `node:fs` probes in the store: an existence check and an
+  unused `clear`. Both are gone — a missing file is the reader's ENOENT now, which is also the honest
+  reading — and the machine-identity ssh read is async, as its only caller already was.
+- `check:main-blocking-helper-ratchet` still counts the store, because it reads and writes one small JSON
+  file through **upstream's own** bounded reader and secure writer. Those rows are in
+  `config/main-blocking-helper-baseline.fork.txt` with the reason, beside the fork's other data-path rows,
+  rather than in upstream's baseline. The store stays synchronous on purpose: a snapshot renders from it and
+  the file is a few hundred bytes.
+
+**The max-lines split, and what is left of it.** The fork's `check:max-lines-ratchet` refuses a new
+`max-lines` exemption, so the store was split along its real seam — the pending-box mailbox is now
+`host-mesh-store-pending-boxes.ts` with the box reader in `host-mesh-store-boxes.ts` — and the store needs no
+exemption at all. Two files still carry one, and both are **fork-owned**, so neither can conflict with an
+upstream sync:
+
+- `host-mesh-driver.ts` — the local lifecycle of one protocol step: snapshot, join, sync, repair, removal.
+  Splitting it means threading the state accessors and the store through a context object into a transfer
+  module; that is a refactor of a tested protocol, and it is follow-up work rather than a sync risk.
+- `host-mesh-rpc-service.ts` — the peer-facing half: six methods that each run a whole pass on the same store.
+
+Both are declared in `local/lint-known-red.json` with that reason, in the same commit, which is what that file
+is for. The debt is named rather than hidden: `local/checks/host-mesh-upstream-seams.mjs` will keep the
+upstream surface small either way, and the next person to touch these files should take the split first.
