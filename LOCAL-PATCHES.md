@@ -6379,7 +6379,7 @@ only part of that test that is a wall-clock budget.
 
 **What the fork changed**, in the same commit as this entry: two closing `})` lines become `}, 120_000)`,
 and each of the two tests carries a one-line reason above it, marked `fork-comment-ok:` so the comment
-ratchet does not count it (4764/4764 unchanged). The reason comment is not decoration: the fork's
+ratchet does not count it (4763/4763 unchanged). The reason comment is not decoration: the fork's
 `test-timeout-needs-reason` ratchet refuses a per-test timeout without one, which is the right rule — it
 is what stops a timeout bump from quietly hiding a slow test.
 
@@ -6388,7 +6388,7 @@ is what stops a timeout bump from quietly hiding a slow test.
   sync base, and that commit's own comment says the fixture is "about 30s on a Windows runner; it counts
   work, not time". The fork takes the code line only: upstream's comment is not copied, because a fork
   comment above upstream's code is the comment ratchet's growth (`check-upstream-file-comments`,
-  4764/4764 unchanged) and this entry is where the reason belongs. **The next sync does collide on that
+  4763/4763 unchanged) and this entry is where the reason belongs. **The next sync does collide on that
   hunk**, and the resolution is known: `7b6c852e2de` inserts its comment immediately above the `it(...)`
   where our `fork-comment-ok:` line sits, and its `}, 120_000)` is byte-identical to ours — so keep
   upstream's comment, drop ours, keep the timeout. The collision is one line and its answer is written
@@ -6412,18 +6412,19 @@ every branch that touched an upstream file, which made the lint gate red for a w
 work. It now scopes the refusal to a diff carrying the feature's own `host-mesh` / `host-graph` /
 `host-group` path, and reports another feature's upstream edits as a note. This diff carries no hosts
 path, so it is a note — and adding a row anyway would have put a hard budget on a test file that is not
-hosts work, re-creating exactly the false red #484 removed for everyone else. The anchors below are what
-stands in its place: the two `it(...)` titles, and an upstream edit to either body is the only thing that
-moves them.
+hosts work, re-creating exactly the false red #484 removed for everyone else. Its anchors are the two
+`it(...)` titles above.
 
 **Verified:** the file passes locally (7/7, 4.5 s, macOS, `config/vitest.performance.config.ts`), and
 both ratchets this change touches are green (`test-timeout-needs-reason`, `check-upstream-file-comments`
-4764/4764). The runner that reddened is the one that decides, so the fix was dispatched on the branch
-rather than trusted from a Mac: run
-[45780910456](https://github.com/nplez1/orca/actions/runs/45780910456) at `803bad1e65f` is **green on all
-three legs** — `ubuntu-24.04` 1m51s, `macos-15` 3m45s, `windows-2022` 2m45s — with the test that reddened
-taking 26,610 ms and passing, against 33,065 ms and a 30 s cap on the red run. The two other dispatches
-agree: `45780202134` at `41a041bc6f2` green on all three legs with the same test at 26,777 ms, and
-`45779423920` at `12957a82e44` green with it at 34,636 ms. Those three numbers are also the measurement
-that says how thin the old 30 s margin was — 26.6 s, 33.1 s and 34.6 s for the same test on the same
-runner.
+4763/4763). The runner that reddened is the one that decides, so the fix was dispatched on the branch
+rather than trusted from a Mac. Run
+[45783770764](https://github.com/nplez1/orca/actions/runs/45783770764) at `449bc7d866b` — the rebased
+branch this entry ships with — is **green on all three legs**: `ubuntu-24.04` 2m7s, `macos-15` 3m45s,
+`windows-2022` 2m47s, with the test that reddened taking 26,170 ms and passing. Three dispatches before
+the rebase agree: `45780910456` at `803bad1e65f` (26,610 ms), `45780202134` at `41a041bc6f2` (26,777 ms)
+and `45779423920` at `12957a82e44` (34,636 ms), each green on all three legs.
+
+Those numbers are the measurement behind the fix. The test that reddened at 33,065 ms against a 30 s cap
+has since taken 26.2 s, 26.6 s, 26.8 s and 34.6 s on the same runner — one of four still over the old
+cap, and the margin that let the other three through is the coin flip this entry is about.
