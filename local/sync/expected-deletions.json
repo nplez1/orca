@@ -2402,6 +2402,104 @@
       "status": "expected-deletion",
       "supersededBy": "the fork name no longer appears in the merged tree; the merged file declares its own equivalent",
       "reason": "2026-11-15 sync: upstream's tree reorganisation moved or rewrote the file that declared this member. No merged file declares the name, and nothing in src/ references it, so the merge did not drop a live fork capability — the behaviour now lives in the file named in supersededBy."
+    },
+    {
+      "path": "src/main/agent-hooks/installation/commands/managed-hook-command-matching.ts",
+      "symbol": "localLegacyHomePrefix",
+      "status": "expected-deletion",
+      "supersededBy": "upstream's isOwnedManagedHookCommand in managed-hook-command-ownership.ts, plus the fork's scope wrapper in the merged file",
+      "reason": "2026-11-26 sync: upstream rewrote managed-hook ownership around managed-hook-command-ownership.ts, which matches the agent-hooks/<script> tail. The fork's home-directory scoping had no home in that shape, so it was re-expressed as a post-check in the merged file instead of the six local helpers it used to carry. The fork's pinned behaviour is preserved and tested; the helpers are not."
+    },
+    {
+      "path": "src/main/agent-hooks/installation/commands/managed-hook-command-matching.ts",
+      "symbol": "managedCommandNeedles",
+      "status": "expected-deletion",
+      "supersededBy": "upstream's isOwnedManagedHookCommand in managed-hook-command-ownership.ts, plus the fork's scope wrapper in the merged file",
+      "reason": "2026-11-26 sync: same rewrite as localLegacyHomePrefix — upstream's ownership matcher supersedes this helper, and the fork's home scoping rides on top of it as a post-check."
+    },
+    {
+      "path": "src/main/agent-hooks/installation/commands/managed-hook-command-matching.ts",
+      "symbol": "nativeHookNeedle",
+      "status": "expected-deletion",
+      "supersededBy": "upstream's isOwnedManagedHookCommand in managed-hook-command-ownership.ts, plus the fork's scope wrapper in the merged file",
+      "reason": "2026-11-26 sync: same rewrite as localLegacyHomePrefix — upstream's ownership matcher supersedes this helper, and the fork's home scoping rides on top of it as a post-check."
+    },
+    {
+      "path": "src/main/agent-hooks/installation/commands/managed-hook-command-matching.ts",
+      "symbol": "normalizeHookCommandPath",
+      "status": "expected-deletion",
+      "supersededBy": "upstream's isOwnedManagedHookCommand in managed-hook-command-ownership.ts, plus the fork's scope wrapper in the merged file",
+      "reason": "2026-11-26 sync: same rewrite as localLegacyHomePrefix — upstream's ownership matcher supersedes this helper, and the fork's home scoping rides on top of it as a post-check."
+    },
+    {
+      "path": "src/main/agent-hooks/installation/commands/managed-hook-command-matching.ts",
+      "symbol": "hookCommandLines",
+      "status": "expected-deletion",
+      "supersededBy": "upstream's isOwnedManagedHookCommand in managed-hook-command-ownership.ts, plus the fork's scope wrapper in the merged file",
+      "reason": "2026-11-26 sync: same rewrite as localLegacyHomePrefix — upstream's ownership matcher supersedes this helper, and the fork's home scoping rides on top of it as a post-check."
+    },
+    {
+      "path": "src/main/agent-hooks/installation/commands/managed-hook-command-matching.ts",
+      "symbol": "matchesManagedHook",
+      "status": "expected-deletion",
+      "supersededBy": "upstream's isOwnedManagedHookCommand in managed-hook-command-ownership.ts, plus the fork's scope wrapper in the merged file",
+      "reason": "2026-11-26 sync: same rewrite as localLegacyHomePrefix — upstream's ownership matcher supersedes this helper, and the fork's home scoping rides on top of it as a post-check."
+    },
+    {
+      "path": "src/shared/usage-providers/usage-provider-manifest.ts",
+      "symbol": "USAGE_PROVIDER_MANIFEST.gemini",
+      "status": "expected-deletion",
+      "supersededBy": "nothing — upstream removed Gemini CLI support (#48447) in the 2026-11-26 sync",
+      "reason": "The provider no longer exists upstream: RateLimitState/ProviderRateLimits lost `gemini`, so a manifest entry for it cannot typecheck. The fork inherited this row from base and added nothing of its own to it."
+    },
+    {
+      "path": "src/shared/usage-providers/usage-provider-manifest.ts",
+      "symbol": "USAGE_PROVIDER_MANIFEST.gemini.owner",
+      "status": "expected-deletion",
+      "supersededBy": "nothing — upstream removed Gemini CLI support (#48447) in the 2026-11-26 sync",
+      "reason": "Member of the deleted `gemini` row; see USAGE_PROVIDER_MANIFEST.gemini."
+    },
+    {
+      "path": "src/shared/usage-providers/usage-provider-manifest.ts",
+      "symbol": "USAGE_PROVIDER_MANIFEST.gemini.stateKey",
+      "status": "expected-deletion",
+      "supersededBy": "nothing — upstream removed Gemini CLI support (#48447) in the 2026-11-26 sync",
+      "reason": "Member of the deleted `gemini` row; see USAGE_PROVIDER_MANIFEST.gemini."
+    },
+    {
+      "path": "src/shared/usage-providers/usage-provider-manifest.ts",
+      "symbol": "USAGE_PROVIDER_MANIFEST.gemini.configuredFlags",
+      "status": "expected-deletion",
+      "supersededBy": "nothing — upstream removed Gemini CLI support (#48447) in the 2026-11-26 sync",
+      "reason": "Member of the deleted `gemini` row; see USAGE_PROVIDER_MANIFEST.gemini."
+    },
+    {
+      "path": "src/shared/usage-providers/usage-provider-manifest.ts",
+      "symbol": "USAGE_PROVIDER_MANIFEST.gemini.pendingReadout",
+      "status": "expected-deletion",
+      "supersededBy": "nothing — upstream removed Gemini CLI support (#48447) in the 2026-11-26 sync",
+      "reason": "Member of the deleted `gemini` row; see USAGE_PROVIDER_MANIFEST.gemini."
+    },
+    {
+      "path": "src/shared/usage-providers/usage-provider-manifest.ts",
+      "symbol": "USAGE_PROVIDER_MANIFEST.gemini.credentials",
+      "status": "expected-deletion",
+      "supersededBy": "nothing — upstream removed Gemini CLI support (#48447) in the 2026-11-26 sync",
+      "reason": "Member of the deleted `gemini` row; see USAGE_PROVIDER_MANIFEST.gemini."
+    },
+    {
+      "path": "src/shared/agent-hook-listener/descendant-events.ts",
+      "symbol": "DESCENDANT_PROVIDERS.gemini",
+      "status": "expected-deletion",
+      "supersededBy": "nothing — upstream removed Gemini CLI support (#48447) in the 2026-11-26 sync",
+      "reason": "The provider adapter map lost `gemini` with the feature; the record's key type no longer accepts it."
+    },
+    {
+      "path": "src/main/orca-profiles/host-sync-settings-disposition-rows-b.ts",
+      "symbol": "HOST_SYNC_DISPOSITION_ROWS_B.geminiCliOAuthEnabled",
+      "status": "expected-deletion",
+      "supersededBy": "nothing — upstream removed Gemini CLI support (#48447) in the 2026-11-26 sync",
+      "reason": "The setting itself is gone from GlobalSettings, so its host-sync disposition row cannot exist; the disposition map is typed over the settings record."
     }
   ]
 }
