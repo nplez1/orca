@@ -141,6 +141,11 @@ export const SEAMS = [
     path: 'src/renderer/src/components/status-bar/host-connections/RuntimeHostStatusRow.tsx',
     budget: 10,
     why: 'one import, one optional meshStatus prop and the glyph beside the name: the row is upstream’s, and the icon component, the hook and the status mapping are fork-owned files'
+  },
+  {
+    path: 'config/main-blocking-helper-baseline.txt',
+    budget: 1,
+    why: 'one baseline row for the fork-owned rename operation’s single store write; the ratchet charges the module that calls the helper, so the row has to live in upstream’s file'
   }
 ]
 
