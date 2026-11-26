@@ -264,6 +264,7 @@ export function AppWorkspaceShell(props: {
                 !contentTitlebarMounted &&
                   '[--content-top-controls-inset:var(--window-controls-height,0px)]'
               )}
+              data-workspace-shell-content=""
             >
               {/* An owned header means another titlebar here would leave an empty stripe. */}
               {stripeMounted ? <div className="titlebar">{titlebarMainStrip}</div> : null}

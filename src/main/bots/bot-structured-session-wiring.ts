@@ -1,5 +1,6 @@
 // A host's structured-session wiring for bots: preambles, own tools, the turn context, and look-around turns.
 import type { Bot } from '../../shared/bot-types'
+import { BoundedMap } from '../../shared/collections/bounded-map'
 import type { KnownPairedBotRoster } from './paired-bot-rosters'
 import type { StructuredAgentSessionRuntimeDeps } from '../runtime/agent-session/installation/structured-agent-session-runtime-contract'
 import { botHomeFolder, localBotHomeFilesystem } from './bot-home'
@@ -7,20 +8,22 @@ import type { BotChatRow } from '../../shared/bots/bot-chat-row'
 import { createBotLookupIndex } from '../../shared/bots/bot-lookup-index'
 import type { BotLookAroundStore } from './bot-look-around-store'
 import type { BotTurnNoteRead } from './bot-active-work'
-import { botSessionToolServers, currentBotToolsRevision } from './bot-tools-file'
-import { botLaunchRepos, type LaunchRepoStore } from './bot-launch-repos'
-import { botLaunchToolsChecks, type BotLaunchedTools } from './bot-tools-revision'
+import {
+  sessionLaunchToolsChanged,
+  sessionLaunchToolsOutdated,
+  sessionMcpLaunchTools,
+  type SessionLaunchedTools
+} from '../mcp-servers/session-mcp-launch'
+import { sessionHostMcpDelivered } from '../mcp-servers/session-host-mcp-delivery'
 import { createBotTurnContext } from './bot-turn-context'
-import type {
-  TurnEndedRows,
-  TurnEndedVerdict
-} from '../native-chat/agent-session-wire/structured-agent-session-turn-context'
 import type { BotChatJournal } from './bot-turn-rows'
 import type { BotRecentChatsSection } from './bot-recent-chats'
 import { BOT_FIRST_RUN_RULES } from './bot-preamble'
 import { linkBotOwnSkills } from './bot-own-skills'
 import { botSessionInstructions } from './bot-session-instructions'
 import { createBotSessionMentions } from './bot-session-mentions'
+import { botLaunchExtras } from './bot-tools-file'
+import { botLaunchRepos, type LaunchRepoStore } from './bot-launch-repos'
 import type { BotController } from './bot-controller'
 import type { BotWorkRecord } from './bot-work-record'
 import {
@@ -29,6 +32,10 @@ import {
   linkedSkillListing,
   linkedSkillProjects
 } from './bot-skill-projects'
+import type {
+  TurnEndedRows,
+  TurnEndedVerdict
+} from '../native-chat/agent-session-wire/structured-agent-session-turn-context'
 import {
   linkedSkillsSection,
   NO_LINKED_SKILLS,
@@ -46,6 +53,7 @@ export type WiredBot = Bot
 export function botStructuredSessionWiring(deps: {
   /** The host's bots, and its projects, which bots link for skills. */
   store: () => { getBots?: () => readonly Bot[]; getRepos: () => readonly Repo[] } & LaunchRepoStore
+  /** The folders of skills this computer shares with every bot, as Settings holds them. */
   botSkillFolders?: () => readonly string[]
   /** First-run setup's end, and each bot's MEMORY.md as Orca last recorded it. */
   bots: Pick<BotController, 'endFirstRun' | 'memory'>
@@ -56,6 +64,7 @@ export function botStructuredSessionWiring(deps: {
   lookAround: Pick<BotLookAroundStore, 'botOfLook' | 'botOfTidyUp' | 'lookTurnIsQuiet'>
   /** A turn ended: one that worked on another bot's request and left it unanswered tells that bot. */
   requestTurnEnded?: (sessionId: string, turnId: string, ended?: TurnEndedVerdict) => void
+  /** A turn ended anywhere, which a photon (iMessage) chat answers in its own thread. */
   outsideTurnEnded?: (
     sessionId: string,
     turnId: string,
@@ -100,8 +109,9 @@ export function botStructuredSessionWiring(deps: {
   }
   /** The projects each session's launch scanned, so a later link is told apart from them. */
   const launchScans = new Map<string, readonly string[] | null>()
-  /** The tools each chat's running agent launched with; a chat with none here never refreshes. */
-  const launchedTools = new Map<string, BotLaunchedTools>()
+  /** The tools each chat's running agent launched with; a chat with none here never refreshes.
+   *  Every chat that got host servers is here, so the oldest fall out past a bound. */
+  const launchedTools = new BoundedMap<string, SessionLaunchedTools>({ maxEntries: 2_000 })
   /** Chats whose agent loaded the bot's folder and rereads it: a change needs only the names. */
   const liveSkills = new Set<string>()
   const turnContext = createBotTurnContext(
@@ -135,7 +145,7 @@ export function botStructuredSessionWiring(deps: {
           botLinkedSkillsFolder(botId),
           roots
         )
-        return linkedSkillsSection(linked.projects, [])
+        return linkedSkillsSection(linked.projects, [], true)
       }
     },
     deps.recentChats,
@@ -171,12 +181,12 @@ export function botStructuredSessionWiring(deps: {
     clientName: deps.clientName
   })
   return {
-    resolveSessionInstructions: (record, launchDirectory, linkedSkills) => {
+    resolveSessionInstructions: (record, launchDirectory, linkedSkills, eachStart) => {
       const bot = botOfRecord(record)
       return botSessionInstructions(
         turnContext,
         bot ? [bot] : [],
-        record,
+        { ...record, instructionsEachStart: eachStart },
         launchDirectory,
         linkedSkills
       )
@@ -199,15 +209,24 @@ export function botStructuredSessionWiring(deps: {
         })
       }
     },
+    // Every session: a bot's own tools in its home, and the host's MCP servers where they're on.
     resolveSessionToolServers: async (record, launchDirectory) => {
-      const store = deps.store()
       const bot = botOfRecord(record)
-      const { tools, launched } = await botSessionToolServers(
-        bot ? [bot] : [],
+      // Why the fork's extras ride in: the gh shim on PATH is what the own-PR guard reads, and a
+      // project bound to the GitHub App pushes as it — neither is upstream's own tools file.
+      const launchExtras = bot
+        ? await botLaunchExtras(
+            bot,
+            record.provider,
+            launchDirectory,
+            botLaunchRepos(deps.store().getRepos(), deps.store())
+          )
+        : undefined
+      const { tools, launched } = await sessionMcpLaunchTools(
+        bot,
         record,
         launchDirectory,
-        undefined,
-        botLaunchRepos(store.getRepos(), store)
+        launchExtras ? { botLaunch: launchExtras } : {}
       )
       if (launched) {
         launchedTools.set(record.sessionId, launched)
@@ -216,10 +235,19 @@ export function botStructuredSessionWiring(deps: {
       }
       return tools
     },
-    launchTools: botLaunchToolsChecks(
-      (sessionId) => launchedTools.get(sessionId),
-      currentBotToolsRevision
-    ),
+    launchTools: {
+      changed: async (sessionId) => {
+        const launched = launchedTools.get(sessionId)
+        return (
+          launched !== undefined &&
+          (await sessionLaunchToolsChanged(launched, sessionHostMcpDelivered(sessionId)))
+        )
+      },
+      outdated: (sessionId) => {
+        const launched = launchedTools.get(sessionId)
+        return launched !== undefined && sessionLaunchToolsOutdated(launched)
+      }
+    },
     prepareSessionLinkedSkills: async (record) => {
       const bot = botOfRecord(record)
       return bot ? syncLinkedSkills(bot) : NO_LINKED_SKILLS

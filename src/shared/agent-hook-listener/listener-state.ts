@@ -19,6 +19,7 @@ import type { ClaudeLaunchedBackgroundTasks } from './providers/claude/backgroun
 import type { ClaudeSubagentRoster } from './providers/claude/lifecycle/claude-subagent-roster'
 import type { ClaudeToolRequest } from './claude-tool-request-identity'
 import type { CodexSubagentRoster } from './providers/codex/codex-subagent-roster'
+import { retireCodexPaneTranscripts } from './providers/codex/codex-pane-transcript-retirement'
 import type { CodexSubagentTranscriptState } from './providers/codex/codex-subagent-transcript'
 import type { CodexAsyncQuestions } from './providers/codex/codex-async-questions'
 import type { MusePaneState } from './providers/muse/muse-pane-state'
@@ -283,8 +284,7 @@ export function clearPaneProcessCacheState(state: HookListenerState, paneKey: st
   state.claudeActiveSessionCronPaneKeys.delete(paneKey)
   state.claudeLaunchedBackgroundTasksByPaneKey.delete(paneKey)
   state.claudeSessionOwnerByPaneKey.delete(paneKey)
-  state.codexSubagentRosterByPaneKey.delete(paneKey)
-  state.codexSubagentTranscriptByPaneKey.delete(paneKey)
+  retireCodexPaneTranscripts(state, paneKey)
   state.codexLeadStateByPaneKey.delete(paneKey)
   state.codexAsyncQuestionsByPaneKey.delete(paneKey)
   state.codexEphemeralForkSessionsByPaneKey.delete(paneKey)
@@ -347,8 +347,7 @@ export function movePaneCacheState(
   movePaneScopedSetEntries(state.claudeActiveSessionCronPaneKeys, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.claudeLaunchedBackgroundTasksByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.claudeSessionOwnerByPaneKey, fromPaneKey, toPaneKey)
-  movePaneScopedMapEntries(state.codexSubagentRosterByPaneKey, fromPaneKey, toPaneKey)
-  movePaneScopedMapEntries(state.codexSubagentTranscriptByPaneKey, fromPaneKey, toPaneKey)
+  retireCodexPaneTranscripts(state, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.codexLeadStateByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.codexAsyncQuestionsByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.codexEphemeralForkSessionsByPaneKey, fromPaneKey, toPaneKey)
@@ -402,8 +401,7 @@ export function clearAllListenerCaches(state: HookListenerState): void {
   state.claudeActiveSessionCronPaneKeys.clear()
   state.claudeLaunchedBackgroundTasksByPaneKey.clear()
   state.claudeSessionOwnerByPaneKey.clear()
-  state.codexSubagentRosterByPaneKey.clear()
-  state.codexSubagentTranscriptByPaneKey.clear()
+  retireCodexPaneTranscripts(state)
   state.codexLeadStateByPaneKey.clear()
   state.codexAsyncQuestionsByPaneKey.clear()
   state.codexEphemeralForkSessionsByPaneKey.clear()

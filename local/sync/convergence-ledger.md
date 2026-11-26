@@ -22,6 +22,72 @@ Rules for using it:
 
 ---
 
+## 2026-11-26 sync (upstream `3e227259249`, 530 commits)
+
+### The shared CLI-resolution stub carries the fork's identity _and_ upstream's new cases
+
+**Paths:** `skill-stubs/_shared/cli-resolution.md`, `skills/**/SKILL.md`
+
+**Resolution:** manual — the fork's text with upstream's additions, then regenerate
+
+**Decision:** upstream added "when it knows their executable … WSL terminals and agent chats" to the
+`ORCA_CLI_COMMAND` bullet of the shared stub, which the fork had already rewritten for Orca NP
+(`orca-np`/`orca-np-dev`, the `ORCA NP.app` quoting rule, the plain-`orca` shim exception). The stub is
+the only source: `pnpm generate:bundled-skill-guides` writes all eleven `skills/*/SKILL.md`. The
+resolution keeps the fork's three bullets and adds upstream's clause to the first, then regenerates.
+
+**Do not:** hand-resolve the eleven generated `skills/*/SKILL.md`. They are byte-identical expansions
+of the stub, and a hand edit is overwritten by the next `generate:bundled-skill-guides`.
+
+### Gemini CLI support went with upstream, and the fork's hook service with it
+
+**Paths:** `src/main/gemini/**`, `docs/site/content/docs/agents/usage-tracking.mdx`
+
+**Resolution:** take-theirs (delete)
+
+**Decision:** upstream removed Gemini CLI support (#48447) and deleted the whole `src/main/gemini/`
+tree. The fork's only delta on `gemini/hook-service.ts` was two lines, nothing at HEAD imports
+`geminiHookService`, and the agent's other entry points went with it, so the deletion stands. The
+usage-tracking list drops Gemini with upstream and keeps the fork's three extra providers (DeepSeek,
+DeepInfra, Fireworks.ai).
+
+**Do not:** keep a hook service for an agent whose support upstream removed — the file's importers left
+with the feature, so it is dead code that re-conflicts on every sync.
+
+### `package.json` is resolved centrally: upstream's file, then the fork's five rows
+
+**Paths:** `package.json`, `pnpm-lock.yaml`
+
+**Resolution:** manual — take upstream's file, re-apply the fork's rows, regenerate the lockfile
+
+**Decision:** the fork's delta on `package.json` is five rows: the `electron-builder.np.config.cjs`
+retarget in `build:unpack`, `build:win` and `build:mac:release`; the `rebuild:mac:relaunch-installed`
+and `check:workspace-path-sync-fs-ratchet` scripts; and the `parse5` + `socket.io-client`
+dependencies. A sync takes upstream's whole file and re-applies exactly those. `pnpm install
+--lockfile-only` regenerates the lockfile from the merged manifest; a lockfile is never hand-merged.
+
+**Do not:** copy the pre-sync fork `package.json` over upstream's — it drops every dependency bump
+upstream made and turns one conflict into a manifest-wide one.
+
+### The deletion manifest is re-bound per sync, not restored per sync
+
+**Paths:** `local/sync/expected-deletions.json`
+
+**Resolution:** manual — re-bind `upstreamBlob`, prune entries present on neither side
+
+**Decision:** the 2026-11-26 sync re-bound `dashboard-popout-window.ts`, `DashboardPopoutRoot.tsx` and
+`popout.tsx`, whose upstream blobs had moved again (the first is `restore`, held byte-identical; the
+other two stay `expected-deletion` under "Dashboard delivery: a content-area view"), re-bound the two
+renderer dashboard deletions, and pruned three entries no longer answerable: `spawned-pty-env-fixtures.ts`
+and `task-page-linear-refresh-test-fixtures.tsx` (both sides deleted them), and
+`runtime-store-partial-fixture.ts` (upstream re-added it, so the fork's superset merges as an add/add
+rather than a restore).
+
+**Do not:** resolve a stale entry by restoring the file. A moved `upstreamBlob` means the question is
+open again, not that the deletion was wrong.
+
+---
+
 ## 2026-11-24 sync (upstream `7daf01d99f3`, 1350 commits)
 
 ### A trigger delivery is guarded, then run: `runTriggerDelivery` is upstream's unguarded tail

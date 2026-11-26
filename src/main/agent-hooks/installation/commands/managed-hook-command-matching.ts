@@ -4,14 +4,16 @@ import {
   HOME_DIRECTORY_NAME,
   LEGACY_HOME_DIRECTORY_NAME
 } from '../../../../shared/app-directory-names'
-import {
-  getWindowsNativeHookAgent,
-  WINDOWS_NATIVE_HOOK_EXECUTABLE_NAME
-} from './windows-native-hook-executable'
+import { getWindowsNativeHookAgent } from './windows-native-hook-executable'
+import { isOwnedManagedHookCommand, NATIVE_EXE_SUFFIX } from './managed-hook-command-ownership'
 import { hasOfficialOrcaProfile } from '../../official-orca-profile'
 
 import type { HookCommandConfig, HookDefinition } from '../configuration/hook-config-schema'
 import { isPlainObject } from '../configuration/hooks-json-read'
+
+const POSIX_SIMPLE_SHELL_EXECUTABLE = /^(?:\/bin\/sh|sh|bash|cmd|cmd\.exe)$/i
+const CMD_EXECUTABLE = /^cmd(?:\.exe)?$/i
+const POWERSHELL_EXECUTABLE = /(?:^|\/)(?:powershell(?:\.exe)?|pwsh(?:\.exe)?)$/i
 
 export type ManagedCommandMatcherOptions = {
   /**
@@ -21,111 +23,49 @@ export type ManagedCommandMatcherOptions = {
   sweepLegacyHomeDirectory?: boolean
 }
 
-/**
- * Match script names so reinstalls sweep the entries this install wrote.
- *
- * Why anchored on a home-directory child: an official Orca install registers its own scripts in the
- * same provider config, under `~/.orca/agent-hooks/<script>`. Matching the bare `agent-hooks/<script>`
- * tail made each app delete the other's hooks, which only worked while exactly one install existed.
- */
+// Match only commands whose ownership by Orca is established, so user-maintained or composite
+// commands that merely reference an Orca hook are never removed.
 export function createManagedCommandMatcher(
   scriptFileName: string,
   options: ManagedCommandMatcherOptions = {}
 ): (command: unknown) => boolean {
   const scriptStem = scriptFileName.replace(/\.(?:cmd|ps1|sh)$/, '')
-  const ownNeedles = managedCommandNeedles(HOME_DIRECTORY_NAME, scriptFileName, scriptStem)
-  const ownNativeHook = nativeHookNeedle(HOME_DIRECTORY_NAME, scriptFileName)
-  const legacyNeedles = managedCommandNeedles(
-    LEGACY_HOME_DIRECTORY_NAME,
+  // Sweep every platform suffix after a platform switch.
+  const scriptNames = new Set([
     scriptFileName,
-    scriptStem
-  )
-  const legacyNativeHook = nativeHookNeedle(LEGACY_HOME_DIRECTORY_NAME, scriptFileName)
-  // Why read per call and not at construction: a service that builds its matcher at module load would
-  // otherwise freeze the answer for the life of the process, and installing or removing the official
-  // app changes it.
+    `${scriptStem}.cmd`,
+    `${scriptStem}.ps1`,
+    `${scriptStem}.sh`
+  ])
+  const agentName = getWindowsNativeHookAgent(scriptFileName)
   const explicitLegacySweep = options.sweepLegacyHomeDirectory
-  return (command) => {
-    // hooks.json is user-editable, so a command may not be a string.
-    if (typeof command !== 'string' || !command) {
-      return false
-    }
-    const lines = hookCommandLines(command)
-    if (matchesManagedHook(lines, ownNeedles, ownNativeHook)) {
-      return true
-    }
+  // hooks.json is user-editable, so a command may not be a string.
+  return (command) =>
+    typeof command === 'string' &&
+    command.trim().length > 0 &&
+    isOwnedManagedHookCommand(command, scriptNames, agentName) &&
     // Why the split: a resolved path under this user's own `~/.orca` may be an official install's,
     // while a remote host's or a frozen `${HOME}` template's `.orca` path may be this build's — the two
     // cannot be told apart from the command alone, so the remote forms are swept and the local one is not.
-    const legacyLines =
-      (explicitLegacySweep ?? !hasOfficialOrcaProfile())
-        ? lines
-        : lines.filter((line) => !line.toLowerCase().includes(localLegacyHomePrefix()))
-    return matchesManagedHook(legacyLines, legacyNeedles, legacyNativeHook)
-  }
+    // Read per call, not at construction: installing or removing the official app changes the answer.
+    ((explicitLegacySweep ?? !hasOfficialOrcaProfile()) ||
+      !namesLocalHomeDirectory(command, LEGACY_HOME_DIRECTORY_NAME) ||
+      namesLocalHomeDirectory(command, HOME_DIRECTORY_NAME))
 }
 
 /**
- * This user's own pre-rename home directory, or '' when the host cannot name one.
- *
- * Why: a resolved path under it belongs to an official install, while a remote host's or a frozen
- * `${HOME}` template's `.orca` path is this build's own registration.
+ * Whether a command names this user's own home-directory child, which only a local install writes.
  *
  * Why resolved per call and not at construction: hook installs run during startup, and a host with no
  * usable home must lose the exclusion rather than fail to install hooks at all.
  */
-function localLegacyHomePrefix(): string {
+function namesLocalHomeDirectory(command: string, directoryName: string): boolean {
   const home = homedir()
-  return typeof home === 'string' && home.length > 0
-    ? `${normalizeHookCommandPath(join(home, LEGACY_HOME_DIRECTORY_NAME))}/`.toLowerCase()
-    : ''
-}
-
-function managedCommandNeedles(
-  homeDirectoryName: string,
-  scriptFileName: string,
-  scriptStem: string
-): string[] {
-  // Sweep every platform suffix after a platform switch.
-  return [
-    `${homeDirectoryName}/agent-hooks/${scriptFileName}`,
-    `${homeDirectoryName}/agent-hooks/${scriptStem}.cmd`,
-    `${homeDirectoryName}/agent-hooks/${scriptStem}.ps1`,
-    `${homeDirectoryName}/agent-hooks/${scriptStem}.sh`
-  ]
-}
-
-/** The native executable selects its provider through argv[1]. */
-function nativeHookNeedle(homeDirectoryName: string, scriptFileName: string): string {
-  return `${homeDirectoryName}/agent-hooks/${WINDOWS_NATIVE_HOOK_EXECUTABLE_NAME} ${getWindowsNativeHookAgent(scriptFileName)} `
-}
-
-function normalizeHookCommandPath(command: string): string {
-  return command.replaceAll('\\', '/')
-}
-
-function hookCommandLines(command: string): string[] {
-  const decodedCommand = decodePowerShellEncodedCommand(command)
-  const searchText = decodedCommand ? `${command}\n${decodedCommand}` : command
-  return normalizeHookCommandPath(searchText).split('\n')
-}
-
-function matchesManagedHook(lines: string[], needles: string[], nativeHook: string): boolean {
-  return lines.some(
-    (line) => needles.some((needle) => line.includes(needle)) || `${line} `.includes(nativeHook)
-  )
-}
-
-function decodePowerShellEncodedCommand(command: string): string | null {
-  const match = command.match(/\s-EncodedCommand\s+(\S+)/i)
-  if (!match) {
-    return null
+  if (typeof home !== 'string' || home.length === 0) {
+    return false
   }
-  try {
-    return Buffer.from(match[1], 'base64').toString('utf16le')
-  } catch {
-    return null
-  }
+  const prefix = `${join(home, directoryName).replaceAll('\\', '/')}/`.toLowerCase()
+  return command.replaceAll('\\', '/').toLowerCase().includes(prefix)
 }
 
 export function removeManagedCommands(
@@ -167,7 +107,6 @@ export function removeManagedCommands(
     const hasCommandAfterCleanup =
       directCommandKeys.some((key) => typeof nextDefinition[key] === 'string') ||
       (Array.isArray(nextDefinition.hooks) && nextDefinition.hooks.length > 0)
-
     if (!hasCommandAfterCleanup) {
       return []
     }
@@ -177,11 +116,35 @@ export function removeManagedCommands(
 }
 
 function hookHasManagedCommand(hook: HookCommandConfig, matches: (value?: string) => boolean) {
-  if (!isPlainObject(hook)) {
+  if (!isPlainObject(hook) || typeof hook.command !== 'string') {
     return false
   }
   const args = Array.isArray(hook.args) ? hook.args : []
-  return matches(hook.command) || args.some((arg) => typeof arg === 'string' && matches(arg))
+  if (args.length === 0) {
+    return matches(hook.command)
+  }
+  if (!args.every((arg): arg is string => typeof arg === 'string')) {
+    return false
+  }
+  const normalizedCommand = hook.command.trim().replaceAll('\\', '/')
+  if (POSIX_SIMPLE_SHELL_EXECUTABLE.test(normalizedCommand)) {
+    if (args.length === 1) {
+      return matches(args[0])
+    }
+    const commandFlag = CMD_EXECUTABLE.test(normalizedCommand) ? '/c' : '-c'
+    if (args.length === 2 && args[0] === commandFlag) {
+      return matches(args[1])
+    }
+    if (commandFlag === '/c' && args.length === 3 && args[0] === '/d' && args[1] === '/c') {
+      return matches(args[2])
+    }
+    return false
+  }
+  if (POWERSHELL_EXECUTABLE.test(normalizedCommand) || NATIVE_EXE_SUFFIX.test(normalizedCommand)) {
+    // Joining is only faithful when each configured argument is a single token.
+    return args.every((arg) => /^\S+$/.test(arg)) && matches(`${hook.command} ${args.join(' ')}`)
+  }
+  return false
 }
 
 // Users may opt a managed hook into async; keep that choice when the hook is rewritten.

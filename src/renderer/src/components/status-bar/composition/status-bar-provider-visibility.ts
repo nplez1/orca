@@ -19,12 +19,9 @@ import {
 
 export type UsageProviderSettings = Pick<
   GlobalSettings,
-  | 'codexManagedAccounts'
-  | 'claudeManagedAccounts'
-  | 'opencodeSessionCookie'
-  | 'geminiCliOAuthEnabled'
+  'codexManagedAccounts' | 'claudeManagedAccounts' | 'opencodeSessionCookie'
 > & {
-  // Antigravity setup is a checked item plus PATH detection; agy usage needs no Gemini OAuth.
+  // Antigravity setup is a checked item plus PATH detection.
   antigravityUsageConfigured: boolean
   // Why: MiniMax/Grok sign-in live on disk, not in settings; main sets these each poll.
   minimaxCookieConfigured: boolean
@@ -40,7 +37,6 @@ export type UsageProviderSettings = Pick<
 type UsageProviderSnapshots = {
   claude: ProviderRateLimits | null | undefined
   codex: ProviderRateLimits | null | undefined
-  gemini: ProviderRateLimits | null | undefined
   opencodeGo: ProviderRateLimits | null | undefined
   kimi: ProviderRateLimits | null | undefined
   antigravity: ProviderRateLimits | null | undefined
@@ -115,16 +111,13 @@ export function hasUsageProviderSettingsForProvider(
   if (providerId === 'codex') {
     return (settings.codexManagedAccounts?.length ?? 0) > 0
   }
-  if (providerId === 'gemini') {
-    return settings.geminiCliOAuthEnabled === true
-  }
   if (providerId === 'opencode-go') {
     return (
       Boolean(settings.opencodeSessionCookie?.trim()) || hasConfiguredFlag(providerId, settings)
     )
   }
   if (providerId === 'antigravity') {
-    // The agy probe needs only the PATH-gated checked item, independent of Gemini OAuth.
+    // The agy probe needs only the PATH-gated checked item.
     return settings.antigravityUsageConfigured === true
   }
   return hasConfiguredFlag(providerId, settings)

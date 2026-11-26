@@ -8,13 +8,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { AgentIcon } from '@/components/agent/icons/AgentIcon'
 import { CopilotIcon, DeepInfraIcon, DeepSeekIcon, FireworksIcon } from '../fork-usage-providers'
-import {
-  ClaudeIcon,
-  GeminiIcon,
-  MiniMaxIcon,
-  OpenAIIcon,
-  OpenCodeGoIcon
-} from '../accounts/provider-icons'
+import { ClaudeIcon, MiniMaxIcon, OpenAIIcon, OpenCodeGoIcon } from '../accounts/provider-icons'
 import { useTranslate } from '@/i18n/use-translate'
 import { isStatusBarItemAvailable } from './status-bar-agent-gating'
 import type { StatusBarController } from './use-status-bar-controller'
@@ -68,18 +62,6 @@ export function StatusBarVisibilityMenu({
           >
             <OpenAIIcon size={14} />
             {t('auto.components.status.bar.StatusBar.c0909c686e', 'Codex Usage')}
-          </DropdownMenuCheckboxItem>
-        )}
-        {isStatusBarItemAvailable('gemini', detectedAgentIds) && (
-          <DropdownMenuCheckboxItem
-            checked={statusBarItems.includes('gemini')}
-            onCheckedChange={() => {
-              recordFeatureInteraction('usage-tracking')
-              toggleStatusBarItem('gemini')
-            }}
-          >
-            <GeminiIcon size={14} />
-            {t('auto.components.status.bar.StatusBar.c1df0d67ec', 'Gemini Usage')}
           </DropdownMenuCheckboxItem>
         )}
         {isStatusBarItemAvailable('antigravity', detectedAgentIds) && (

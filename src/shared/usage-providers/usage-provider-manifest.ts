@@ -102,15 +102,6 @@ export const USAGE_PROVIDER_MANIFEST = {
       { kind: 'tool-owned', reason: 'The Codex CLI keeps its own auth.json in its runtime home.' }
     ]
   },
-  gemini: {
-    owner: 'upstream',
-    stateKey: 'gemini',
-    configuredFlags: [],
-    pendingReadout: ['buckets'],
-    credentials: [
-      { kind: 'tool-owned', reason: 'The Gemini CLI keeps the OAuth token it was signed in with.' }
-    ]
-  },
   antigravity: {
     owner: 'upstream',
     stateKey: 'antigravity',

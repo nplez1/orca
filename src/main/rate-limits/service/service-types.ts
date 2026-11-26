@@ -31,7 +31,9 @@ export type {
 export { normalizeCodexAccountSelectionTarget } from '../../../shared/agent-accounts/codex/codex-selection-lane'
 export type { CodexRateLimitHomeResolution } from '../../codex-accounts/runtime-home/runtime-home-service-types'
 
-export type InactiveCodexHome = { kind: 'ready'; managedHomePath: string } | { kind: 'skip' }
+export type InactiveCodexHome =
+  | { kind: 'ready'; managedHomePath: string; backendUsageOnly?: boolean }
+  | { kind: 'skip' }
 
 export type InactiveCodexAccountInfo = {
   id: string
@@ -124,9 +126,6 @@ export type CopilotResolvedConfig = {
   config: CopilotRateLimitConfig
   error: string | null
 }
-
-export type GeminiCliOAuthEnabledResolver = () => boolean
-
 export type AntigravityUsageEnabledResolver = () => boolean
 
 export { USAGE_PROVIDER_STATE_KEYS } from '../../../shared/usage-providers/usage-provider-readouts'
@@ -172,7 +171,6 @@ export const DEFERRED_STARTUP_ACTIVE_REFRESH_MS = 1000
 export type InternalRateLimitState = {
   claude: ProviderRateLimits | null
   codex: ProviderRateLimits | null
-  gemini: ProviderRateLimits | null
   opencodeGo: ProviderRateLimits | null
   kimi: ProviderRateLimits | null
   antigravity: ProviderRateLimits | null

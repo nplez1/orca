@@ -28,7 +28,6 @@ import {
   type DeepInfraRateLimitConfig,
   type FireworksRateLimitConfig,
   type CopilotRateLimitConfig,
-  type GeminiCliOAuthEnabledResolver,
   USAGE_PROVIDER_STATE_KEYS,
   DEFAULT_POLL_MS
 } from './service-types'
@@ -57,7 +56,6 @@ export abstract class RateLimitServiceState {
   protected state: InternalRateLimitState = {
     claude: null,
     codex: null,
-    gemini: null,
     opencodeGo: null,
     kimi: null,
     antigravity: null,
@@ -83,7 +81,6 @@ export abstract class RateLimitServiceState {
   protected lastActiveFailureRetryAtByProvider: Record<ActiveRateLimitProvider, number> = {
     claude: 0,
     codex: 0,
-    gemini: 0,
     'opencode-go': 0,
     kimi: 0,
     minimax: 0,
@@ -101,7 +98,6 @@ export abstract class RateLimitServiceState {
   protected activeFailureStreakByProvider: Record<ActiveRateLimitProvider, number> = {
     claude: 0,
     codex: 0,
-    gemini: 0,
     'opencode-go': 0,
     kimi: 0,
     minimax: 0,
@@ -190,7 +186,6 @@ export abstract class RateLimitServiceState {
   protected copilotConfigResolver:
     | (() => CopilotRateLimitConfig | Promise<CopilotRateLimitConfig>)
     | null = null
-  protected geminiCliOAuthEnabledResolver: GeminiCliOAuthEnabledResolver | null = null
   protected claudeOAuthUsageEnabledResolver: ClaudeOAuthUsageEnabledResolver | null = null
   protected antigravityUsageEnabledResolver: AntigravityUsageEnabledResolver | null = null
   protected antigravityFetchTarget: LocalAccountRuntimeTarget = { runtime: 'host', wslDistro: null }

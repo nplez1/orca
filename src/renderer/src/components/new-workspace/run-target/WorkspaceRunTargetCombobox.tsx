@@ -15,6 +15,7 @@ import {
 } from '../run-target-clone-availability'
 import type { RunTargetAutoClone } from '../use-run-target-auto-clone'
 import type { EphemeralVmRecipeOption, RunTargetHostOption } from './run-target-options'
+import type { WslHostDistro } from '../../../../../shared/remote-runtime/wsl-hosts/wsl-host-types'
 
 export default function WorkspaceRunTargetCombobox({
   hostOptions,
@@ -47,6 +48,7 @@ export default function WorkspaceRunTargetCombobox({
   onRecipeChange?: (recipeId: string | null) => void
   onAddRemoteServer?: () => void
   onAddSshHost?: () => void
+  onAddWslDistro?: (distro: WslHostDistro) => void
 }): React.JSX.Element {
   const t = useTranslate()
   const [connectingHosts, setConnectingHosts] = useState<ReadonlySet<ExecutionHostId>>(

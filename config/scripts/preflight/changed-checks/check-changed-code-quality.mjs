@@ -119,7 +119,10 @@ const SUPPRESSED_CHANGED_LINES_DIAGNOSTICS = new Map([
       'src/main/window/clipboard-dashboard-popout-access.test.ts',
       // Upstream's own cast, in a file this fork only wraps: the one-line overlay call makes the whole
       // statement a changed hunk, so a finding present at the merge base is reported as new here.
-      'src/shared/tui-agent-config.ts'
+      'src/shared/tui-agent-config.ts',
+      // Same class, from the 2026-11-26 sync: byte-identical to upstream/main, and the fork's two
+      // WSL cutover casts carry the prescribed SAFETY suppressant that oxlint does not honour here.
+      'src/main/persistence/moving-wsl-projects/desktop-state/wsl-move-host-automations-rewrite.test.ts'
     ])
   ]
 ])

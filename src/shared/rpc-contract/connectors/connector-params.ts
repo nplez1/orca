@@ -13,8 +13,14 @@ export const CONNECTOR_REPLY_ERROR_CODES = [
   'bot_chat_reply',
   // The chat's conversation names a bot that is gone, off, or lives in another home.
   'not_this_bots_conversation',
+  // Asked with pagesAsFiles: the text holds a whole HTML page, which Slack gets as an .html file.
+  'html_document_as_file',
+  // An iMessage thread has nowhere to put a review.
   'no_review_on_imessage'
 ] as const
+
+export const CONNECTOR_REPLY_HTML_PAGE_AS_FILE =
+  'html_document_as_file' satisfies (typeof CONNECTOR_REPLY_ERROR_CODES)[number]
 
 // What a reply answers when its host can't post for anyone: an SSH relay, an older host, or connectors off or signed out.
 export const CONNECTOR_REPLY_UNAVAILABLE =
@@ -24,7 +30,9 @@ const ReplyText = {
   replyId: z.string().min(1, 'Missing reply id'),
   text: z.string().min(1, 'Missing text'),
   // Inline notes on the pull request the conversation is on; elsewhere they follow the text.
-  review: ConnectorReview.optional()
+  review: ConnectorReview.optional(),
+  // The caller can send a whole HTML page as a file; only then may Slack text holding one be refused.
+  pagesAsFiles: z.literal(true).optional()
 }
 
 /** An agent's reply to its conversation's thread, from the pane or native chat it runs in; one replyId posts at most once. */
@@ -45,6 +53,10 @@ export const ConnectorAct = z.object({
 export const ConnectorReact = z.object({
   sessionId: z.string().min(1, 'Missing session id'),
   emoji: z.string().min(1).max(100)
+})
+
+export const ConnectorLeaveThread = z.object({
+  sessionId: z.string().min(1, 'Missing session id')
 })
 
 const MirrorChat = { sessionId: z.string().min(1, 'Missing session id') }

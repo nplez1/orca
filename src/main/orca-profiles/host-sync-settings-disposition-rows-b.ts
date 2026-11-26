@@ -71,7 +71,6 @@ export const HOST_SYNC_DISPOSITION_ROWS_B = {
   minimaxUsageModels: 'replicated',
   minimaxEndpoint: 'replicated',
   zcodePlanSite: 'replicated',
-  geminiCliOAuthEnabled: 'replicated',
   disabledUsageProviders: 'replicated',
   agentDefaultArgs: 'replicated',
   agentPermissionDefault: 'replicated',

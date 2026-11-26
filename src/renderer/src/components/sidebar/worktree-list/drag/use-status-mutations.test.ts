@@ -75,7 +75,6 @@ function renderMutations() {
   useAppStore.setState({ updateWorktreesMeta })
   const mutations = renderHook(() =>
     useWorktreeStatusMutations({
-      manualOrderCatalog: { rankByKey: new Map(), orderedKeys: [] },
       workspaceStatuses: useAppStore.getState().workspaceStatuses,
       sortBy: 'recent'
     })

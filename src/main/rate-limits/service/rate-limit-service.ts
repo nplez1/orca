@@ -12,7 +12,7 @@ import { hasFireworksCredentials } from '../../fireworks/fireworks-credentials-s
 import { hasCopilotCredentials } from '../../copilot-credentials/copilot-credentials-store'
 import { getCachedCopilotGhCredentials } from '../copilot/copilot-gh-credentials'
 import { disabledUsageProviderFlagOverrides } from '../../../shared/usage-providers/usage-provider-readouts'
-import { RateLimitServiceAccountRefresh } from './service-account-refresh'
+import { RateLimitServiceTargetUsageRead } from './service-target-usage-read'
 import type { AntigravityAccountUsageRecorder } from '../providers/antigravity/antigravity-account-usage'
 import {
   type CodexAccountSelectionTarget,
@@ -33,7 +33,6 @@ import {
   type DeepInfraRateLimitConfig,
   type FireworksRateLimitConfig,
   type CopilotRateLimitConfig,
-  type GeminiCliOAuthEnabledResolver,
   type InactiveCodexAccountInfo
 } from './service-types'
 import {
@@ -44,7 +43,7 @@ import type { InactiveClaudeAccount } from '../providers/claude/claude-managed-a
 import type { RateLimitState } from '../../../shared/agent-usage/rate-limits/rate-limit-types'
 import type { NetworkProxySettings } from '../../../shared/network/network-proxy'
 
-export class RateLimitService extends RateLimitServiceAccountRefresh {
+export class RateLimitService extends RateLimitServiceTargetUsageRead {
   private lastOwnerReturnAt = Number.NEGATIVE_INFINITY
 
   refreshOnOwnerReturn(): Promise<void> {
@@ -121,10 +120,6 @@ export class RateLimitService extends RateLimitServiceAccountRefresh {
     resolver: () => CopilotRateLimitConfig | Promise<CopilotRateLimitConfig>
   ): void {
     this.copilotConfigResolver = resolver
-  }
-
-  setGeminiCliOAuthEnabledResolver(resolver: GeminiCliOAuthEnabledResolver): void {
-    this.geminiCliOAuthEnabledResolver = resolver
   }
 
   setClaudeOAuthUsageEnabledResolver(resolver: ClaudeOAuthUsageEnabledResolver): void {

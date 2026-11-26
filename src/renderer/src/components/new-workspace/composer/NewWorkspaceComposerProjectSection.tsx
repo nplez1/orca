@@ -56,6 +56,8 @@ type NewWorkspaceComposerProjectSectionProps = Pick<
   handleProjectHostSetupChange: (setupId: string) => void
   handleAddSshHost: () => void
   handleAddRemoteServer: () => void
+  /** A distro picked under Add host › WSL distro; the Add WSL distro dialog sets it up. */
+  handleAddWslDistro?: (distro: string) => void
   handleConnectRunTargetHost: (option: NeedsProjectHostOption) => Promise<void>
   handleStartClone: (option: NeedsProjectHostOption) => void
   handleUseExistingFolder: (option: NeedsProjectHostOption, initialPath?: string) => void
@@ -93,6 +95,7 @@ export function NewWorkspaceComposerProjectSection({
   onEphemeralVmRecipeChange,
   handleAddSshHost,
   handleAddRemoteServer,
+  handleAddWslDistro,
   handleConnectRunTargetHost,
   handleStartClone,
   handleUseExistingFolder,
@@ -244,6 +247,9 @@ export function NewWorkspaceComposerProjectSection({
               onRecipeChange={onEphemeralVmRecipeChange}
               onAddSshHost={handleAddSshHost}
               onAddRemoteServer={handleAddRemoteServer}
+              onAddWslDistro={
+                handleAddWslDistro ? (distro) => handleAddWslDistro(distro.name) : undefined
+              }
               onConnectHost={handleConnectRunTargetHost}
               projectKind={cloneProjectKind}
               cloneUrl={cloneUrl}

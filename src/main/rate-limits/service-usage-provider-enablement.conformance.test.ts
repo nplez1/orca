@@ -20,7 +20,6 @@ import {
 } from './service/rate-limit-service-test-harness'
 import { fetchActiveClaudeRateLimits } from './providers/claude/claude-active-usage-fetch'
 import { fetchCodexRateLimits } from './providers/codex/codex-fetcher'
-import { fetchGeminiRateLimits } from './providers/gemini/gemini-usage-fetcher'
 import { fetchKimiRateLimits } from './providers/kimi/kimi-fetcher'
 import { fetchOpenCodeGoUsage } from './providers/opencode-go/opencode-go-usage-source-selection'
 import { fetchZcodeRateLimits } from './providers/zcode/zcode-usage-fetcher'
@@ -58,10 +57,6 @@ vi.mock('./providers/claude/claude-managed-account-usage', () => ({
 vi.mock('./providers/codex/codex-fetcher', () => ({
   consumeCodexRateLimitResetCredit: vi.fn(),
   fetchCodexRateLimits: vi.fn()
-}))
-
-vi.mock('./providers/gemini/gemini-usage-fetcher', () => ({
-  fetchGeminiRateLimits: vi.fn()
 }))
 
 vi.mock('./providers/kimi/kimi-fetcher', () => ({
@@ -240,12 +235,6 @@ function providerWiring(
       query: skipped(() => vi.mocked(fetchCodexRateLimits)),
       credentialReads: [() => spies.codexHomePath]
     },
-    // Why an off-flag rather than a skip: Gemini's fetcher takes the opt-in as its own gate,
-    // so the call site always invokes it and passes the switch's state through.
-    gemini: {
-      query: { kind: 'off-flag', mock: () => vi.mocked(fetchGeminiRateLimits) },
-      credentialReads: []
-    },
     'opencode-go': {
       query: skipped(() => vi.mocked(fetchOpenCodeGoUsage)),
       credentialReads: [() => spies.openCodeGoConfig, () => spies.openCodeGoApiKey]
@@ -321,7 +310,6 @@ function configureLiveProviderAccess(service: RateLimitService, spies: Credentia
   service.setDeepInfraConfigResolver(spies.deepInfraConfig)
   service.setCopilotConfigResolver(spies.copilotConfig)
   service.setAntigravityAccountUsageRecorder(spies.antigravityAccountUsage)
-  service.setGeminiCliOAuthEnabledResolver(() => true)
   service.setAntigravityUsageEnabledResolver(() => true)
   service.setMuseUsageEnabledResolver(() => true)
 }
@@ -435,7 +423,7 @@ describe('usage provider enablement conformance', () => {
   // Why more than one: the deleted suite's only multi-provider case, and the disabled set is
   // walked in several places, so a set of one proves only the single-provider path.
   it('honours every switched-off provider at once', async () => {
-    await verifySwitchHonored(['gemini', 'cursor'])
+    await verifySwitchHonored(['deepseek', 'cursor'])
   })
 })
 

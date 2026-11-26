@@ -483,7 +483,6 @@
       },
       "settings": {
         "AccountsPane": {
-          "aa4de4475b": "Gemini CLI (legacy)",
           "340d6f7a85": null,
           "remoteScopeAuthContext": null
         },
@@ -787,11 +786,9 @@
           "search": {
             "9dc15020d7": "Claude Usage",
             "54b1acf24f": "Codex Usage",
-            "5bfb874d05": "Gemini Usage",
             "bc046e7899": "OpenCode Go Usage",
             "3a6c028ea8": "Kimi Usage",
             "931c53cd16": null,
-            "585be839e9": null,
             "20e7d30150": null,
             "40c10c4deb": null,
             "c29089716e": null
@@ -1201,10 +1198,7 @@
         }
       },
       "useComposerState": {},
-      "useIpcEvents": {},
-      "useSettingsNavigationMetadata": {
-        "b1c2f8b0ac": "Optional account switching and usage setup for Claude, Codex, Gemini, OpenCode Go, MiniMax, Grok, DeepSeek, DeepInfra, Fireworks.ai, and GitHub Copilot."
-      }
+      "useIpcEvents": {}
     },
     "lib": {
       "agent": {
@@ -1517,6 +1511,11 @@
     }
   },
   "settings": {
+    "navigation": {
+      "accounts": {
+        "description": "Optional account switching and usage setup for Claude, Codex, Antigravity, OpenCode Go, MiniMax, Grok, DeepSeek, DeepInfra, Fireworks.ai, and GitHub Copilot."
+      }
+    },
     "accounts": {
       "search": {
         "aiCreditsKeyword": "ai credits",

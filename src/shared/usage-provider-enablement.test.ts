@@ -43,8 +43,8 @@ describe('withUsageProviderDisabled', () => {
 
 describe('isUsageProviderDisabled', () => {
   it('reads the persisted disabled set, defaulting to enabled', () => {
-    expect(isUsageProviderDisabled(['gemini'], 'gemini')).toBe(true)
-    expect(isUsageProviderDisabled(['gemini'], 'cursor')).toBe(false)
+    expect(isUsageProviderDisabled(['claude'], 'claude')).toBe(true)
+    expect(isUsageProviderDisabled(['claude'], 'cursor')).toBe(false)
     expect(isUsageProviderDisabled(undefined, 'cursor')).toBe(false)
     expect(isUsageProviderDisabled(null, 'cursor')).toBe(false)
   })

@@ -15,6 +15,7 @@ export const SSH_APPLICATION_REQUESTS = [
   'ssh:needsPassphrasePrompt',
   'ssh:testConnection',
   'ssh:addPortForward',
+  'ssh:ensurePortForward',
   'ssh:updatePortForward',
   'ssh:removePortForward',
   'ssh:listPortForwards',

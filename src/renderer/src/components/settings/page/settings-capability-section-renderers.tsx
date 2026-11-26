@@ -13,10 +13,11 @@ import {
   SettingsHostScopeUnavailableNotice
 } from '../host-scope/SettingsHostScopePicker'
 import { LOCAL_SETTINGS_HOST_SCOPE, isServerScope } from '../host-scope/settings-host-scope'
+import { McpServersSettings } from '../mcp-servers/McpServersSettings'
 import { wslHostDistroForTarget } from '@/runtime/provider-accounts/ownership/wsl-host-account-owner'
 import { translate } from '@/i18n/i18n'
 import type { Translate } from '@/i18n/use-translate'
-import type { SettingsRenderContext } from './settings-render-context'
+import { getSettingsHostServerName, type SettingsRenderContext } from './settings-render-context'
 
 export function renderAgentsSettingsSection(
   context: SettingsRenderContext,
@@ -58,6 +59,40 @@ export function renderAgentsSettingsSection(
           />
         </div>
       ) : null}
+    </SettingsSection>
+  )
+}
+
+export function renderMcpServersSettingsSection(
+  context: SettingsRenderContext,
+  t: Translate = translate
+): React.JSX.Element {
+  const { model, navigation, view } = context
+  const scope = model.settingsHostScope
+  return (
+    <SettingsSection
+      id="mcp-servers"
+      title={t('settings.mcpServers.title', 'MCP servers')}
+      description={t(
+        'settings.mcpServers.description',
+        'Servers your agents can use. Changes apply to new sessions.'
+      )}
+      searchEntries={navigation.getSectionSearchEntries('mcp-servers')}
+      // A server's page draws its own header: its logo, name and address.
+      hideHeader={model.mcpServerSubPage !== null}
+    >
+      {!view.isSectionMounted('mcp-servers') ? null : !isServerScope(scope) ? (
+        <SettingsHostScopeMachineOnlyNotice hostLabel={scope.label} />
+      ) : !scope.available ? (
+        <SettingsHostScopeUnavailableNotice />
+      ) : (
+        <McpServersSettings
+          key={runtimeTargetEnvironmentId(scope.target) ?? 'local'}
+          target={scope.target}
+          subPage={model.mcpServerSubPage}
+          onSubPage={model.setMcpServerSubPage}
+        />
+      )}
     </SettingsSection>
   )
 }
@@ -169,6 +204,7 @@ export function renderDesktopCapabilitySettingsSections(
   t: Translate = translate
 ): React.JSX.Element | null {
   const { model, navigation, view } = context
+  const serverName = getSettingsHostServerName(model, t)
   return model.showDesktopOnlySettings ? (
     <>
       <SettingsSection
@@ -186,10 +222,15 @@ export function renderDesktopCapabilitySettingsSections(
       <SettingsSection
         id="voice"
         title={t('auto.components.settings.Settings.5063bb47a5', 'Voice')}
-        description={t(
-          'components.settings.voice.pageDescription',
-          'Talk instead of typing in any pane.'
-        )}
+        description={
+          serverName === null
+            ? t('components.settings.voice.pageDescription', 'Talk instead of typing in any pane.')
+            : t(
+                'components.settings.voice.localOnlyNotice',
+                'Talk instead of typing in any pane. These settings apply to this computer only; {{host}} keeps its own.',
+                { host: serverName }
+              )
+        }
         searchEntries={navigation.getSectionSearchEntries('voice')}
       >
         {view.isSectionMounted('voice') ? (

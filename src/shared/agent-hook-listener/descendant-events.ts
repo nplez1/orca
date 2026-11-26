@@ -191,7 +191,6 @@ const DESCENDANT_PROVIDERS: Record<AgentHookSource, DescendantProviderAdapter | 
   // report no children today; give one a reader here if that changes.
   omp: null,
   'prime-agent': null,
-  gemini: null,
   antigravity: null,
   amp: null,
   opencode: null,

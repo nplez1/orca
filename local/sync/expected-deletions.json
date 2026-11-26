@@ -135,22 +135,6 @@
       "reason": "Test support the two surviving structured-session login-shell suites import."
     },
     {
-      "path": "src/main/runtime/construction/test-context/runtime-store-partial-fixture.ts",
-      "commit": "a8c508f5fb7",
-      "upstreamBlob": "1cd4c9fb4c245c281a7c7e70cbf1c7cac12edc5c",
-      "class": "fork-test-support",
-      "status": "restore",
-      "reason": "Test support a surviving fork test imports; upstream retired it in the 2026-11-24 sync and nothing upstream replaces it."
-    },
-    {
-      "path": "src/main/runtime/terminal/launch/spawned-pty-env-fixtures.ts",
-      "commit": "a8c508f5fb7",
-      "upstreamBlob": "2dfff16f70e623a638420a9574ca49cb63f662c0",
-      "class": "fork-test-support",
-      "status": "expected-deletion",
-      "reason": "Deleted: nothing imports `spawnedPtyEnv`. The delta restored it against upstream's deletion on the claim that a surviving test imports it, and no test, source file or config in the tree references the module or the symbol. Upstream retired the path in this sync as well, so the entry records the decision rather than answering a conflict."
-    },
-    {
       "path": "src/main/runtime/terminal/wait/agent-transcript-replay-test-harness.ts",
       "commit": "a8c508f5fb7",
       "upstreamBlob": "5a88b6c86c78ccdbdde8f2b65ffe00222ed18267",
@@ -177,7 +161,7 @@
     {
       "path": "src/main/window/dashboard-popout-window.ts",
       "commit": "ab57bb7bbb",
-      "upstreamBlob": "bca82a47af12a958db6e0b23d8a3d1af63632438",
+      "upstreamBlob": "6fe7663e8a08b32b29577302a8303bbec37b870b",
       "class": "dashboard-delivery",
       "status": "restore",
       "reason": "Held, not used: the dashboard delivery is the fork’s content-area view, so upstream’s pop-out is rejected — but this main-process pair costs nothing to hold. It imports nothing of the fork’s, nothing imports it, and its two suites pass, so keeping upstream’s bytes removes the modify/delete conflict at no cost. The preload half of the same subsystem was NOT kept: it exists only to publish window.api.dashboard, which has no caller."
@@ -209,7 +193,7 @@
     {
       "path": "src/renderer/src/components/dashboard-popout/DashboardPopoutRoot.tsx",
       "commit": "ab57bb7bbb",
-      "upstreamBlob": "21826639e314951527f9c8959f029e642ebf38e4",
+      "upstreamBlob": "9a51da4b151219008cf54372aed6e9fe19e62e2b",
       "class": "dashboard-delivery",
       "status": "expected-deletion",
       "reason": "The popout window is never opened, and popout.tsx mounts DashboardPopoutRoot, which requires the onAckAgent/onRevealAgent props upstream added to AgentKanbanBoard. The fork's live page view is built on that same board, so restoring this means either two live dashboard implementations or changing the shipped view."
@@ -225,10 +209,10 @@
     {
       "path": "src/renderer/src/components/dashboard/AgentDashboardDrawer.tsx",
       "commit": "ab57bb7bbb",
-      "upstreamBlob": "4424becf8093fa81f973dbb23e2e41fe84bd7c2c",
+      "upstreamBlob": "cf59f9e65457ea0c5d2114d91dbf36df5cc85b50",
       "class": "dashboard-delivery",
       "status": "expected-deletion",
-      "reason": "The fork delivers the dashboard as a full-page view (#44), which is the only delivery it exposes. Upstream's drawer and sidebar host need AppState.agentDashboardDrawerOpen, which the fork removed, and upstream's newer AgentKanbanBoard props. Restoring them re-adds a second live implementation of the same surface. Settled again at the 2026-11-24 sync: upstream edited the drawer and the fork still ships the dashboard as a content-area view only, so the deletion stands."
+      "reason": "The fork delivers the dashboard as a full-page view (#44), which is the only delivery it exposes. Upstream's drawer and sidebar host need AppState.agentDashboardDrawerOpen, which the fork removed, and upstream's newer AgentKanbanBoard props. Restoring them re-adds a second live implementation of the same surface. Re-bound at the 2026-11-26 sync: upstream edited the drawer again and the fork still ships the dashboard as a content-area view only, so the deletion stands and the binding names the blob it was re-confirmed against."
     },
     {
       "path": "src/renderer/src/components/dashboard/popout-bridge/DashboardPopoutBridge.tsx",
@@ -241,10 +225,10 @@
     {
       "path": "src/renderer/src/components/dashboard/popout-bridge/useDashboardPopoutBridge.ts",
       "commit": "a8c508f5fb7",
-      "upstreamBlob": "60011f1004cb5bd968ea076d1e0bbdf66e04e211",
+      "upstreamBlob": "e85bb075b1c13060d9b64a20dd50eb657bb2646c",
       "class": "dashboard-delivery",
       "status": "expected-deletion",
-      "reason": "The fork delivers the dashboard as a full-page view (#44), which is the only delivery it exposes. Upstream's drawer and sidebar host need AppState.agentDashboardDrawerOpen, which the fork removed, and upstream's newer AgentKanbanBoard props. Restoring them re-adds a second live implementation of the same surface. Re-bound at the 2026-11-24 sync, where upstream moved the bridge pair into dashboard/popout-bridge/."
+      "reason": "The fork delivers the dashboard as a full-page view (#44), which is the only delivery it exposes. Upstream's drawer and sidebar host need AppState.agentDashboardDrawerOpen, which the fork removed, and upstream's newer AgentKanbanBoard props. Restoring them re-adds a second live implementation of the same surface. Re-bound at the 2026-11-26 sync, where upstream edited the bridge again and the deletion was re-applied."
     },
     {
       "path": "src/renderer/src/components/dashboard/sidebar/AgentDashboardSidebarHost.tsx",
@@ -284,17 +268,9 @@
       "reason": "The fork replaced the directory host-scope helper with the shared settings host-scope module; no module at HEAD references this path. Deleted in an earlier merge resolution with no commit of its own, so it was never asserted here."
     },
     {
-      "path": "src/renderer/src/components/task-page/linear/issue-refresh/task-page-linear-refresh-test-fixtures.tsx",
-      "commit": "a8c508f5fb7",
-      "upstreamBlob": "e49d377f3f49f976b98dd12f242ec428b773a687",
-      "class": "fork-test-support",
-      "status": "expected-deletion",
-      "reason": "Its only consumer, task-page-linear-refresh-lifecycle.test.tsx, is gone: upstream deleted the whole issue-refresh directory and the fork's only edits there were earlier sync resolutions. The 2026-11-24 review dropped the leftover fixture, and the fork-added drawer fixture beside it that it alone imported; no module at HEAD references either path."
-    },
-    {
       "path": "src/renderer/src/popout.tsx",
       "commit": "ab57bb7bbb",
-      "upstreamBlob": "71e9e6d55f3ab9fa4409c4585cd6567d615e25b2",
+      "upstreamBlob": "8bb7d1924271312c8fe47f5d356d0d90284139bb",
       "class": "dashboard-delivery",
       "status": "expected-deletion",
       "reason": "The popout window is never opened, and popout.tsx mounts DashboardPopoutRoot, which requires the onAckAgent/onRevealAgent props upstream added to AgentKanbanBoard. The fork's live page view is built on that same board, so restoring this means either two live dashboard implementations or changing the shipped view."

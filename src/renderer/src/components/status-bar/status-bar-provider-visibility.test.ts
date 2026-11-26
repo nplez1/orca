@@ -25,7 +25,6 @@ function allUnavailable(overrides: Partial<Snapshots> = {}): Snapshots {
   return {
     claude: snapshot('claude', 'unavailable'),
     codex: snapshot('codex', 'unavailable'),
-    gemini: snapshot('gemini', 'unavailable'),
     opencodeGo: snapshot('opencode-go', 'unavailable'),
     kimi: snapshot('kimi', 'unavailable'),
     antigravity: snapshot('antigravity', 'unavailable'),
@@ -67,7 +66,7 @@ describe('isUsageEmptyState', () => {
   })
 
   it('is false once a provider has durable setup', () => {
-    expect(isUsageEmptyState(allUnavailable(), { geminiCliOAuthEnabled: true })).toBe(false)
+    expect(isUsageEmptyState(allUnavailable(), { grokAuthConfigured: true })).toBe(false)
   })
 
   it('does not count an enable-gated provider that is switched off as pending', () => {

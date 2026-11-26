@@ -317,3 +317,41 @@ export function judgeUnhandled(headlines, entries) {
   }
   return { known, blocking }
 }
+
+/**
+ * Whether a failure line is covered by a known-red entry.
+ *
+ * Why `wholeStep` rather than "no match": a missing `match` used to mean the broadest possible entry,
+ * which also masked a new failure in that step. It is now the explicit, rarer form — the only way to
+ * allowlist a step whose output the parser could not split into lines.
+ */
+export function matchesEntry(line, entry) {
+  // Why `false` rather than a throw: the problem is reported by `entryProblem`, and a throw inside the
+  // line loop would abandon every remaining step. Why `false` rather than `true` for the match-less
+  // case: that form has to be asked for with `wholeStep`, and silently absorbing is the looseness this
+  // rule exists to remove.
+  const { regex, problem } = compileMatch(entry.match)
+  if (problem !== null) {
+    return false
+  }
+  return regex !== null && regex.test(line)
+}
+
+/** The reason an entry cannot be judged, or null. Every entry has to say exactly what it covers. */
+export function entryProblem(entry) {
+  const { problem } = compileMatch(entry.match)
+  if (problem) {
+    return `${entry.step}: ${problem}`
+  }
+  if (entry.match === undefined || entry.match === null) {
+    return entry.wholeStep === true
+      ? null
+      : `${entry.step}: a known-red entry has neither a match nor wholeStep: true, so it would allowlist the whole step`
+  }
+  // Why the pair is a problem: `wholeStep` wins in `classifyRun`, so the narrower `match` would read as
+  // a limit that is not in force.
+  if (entry.wholeStep === true) {
+    return `${entry.step}: a known-red entry has both a match and wholeStep: true, so the match does not apply`
+  }
+  return null
+}

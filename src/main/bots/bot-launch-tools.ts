@@ -4,7 +4,14 @@
 import { BotFailureError } from '../../shared/bots/bot-failure-copy'
 import type { BotToolProblem, BotToolServer } from '../../shared/bot-tools'
 import type { BotToolsCli } from './bot-tools-host'
-import { botToolRelay, type BotToolRelay } from './tool-relay/bot-tool-relay'
+import {
+  botToolRelay,
+  MCP_HOST_LIST_RELAY_OWNER,
+  type BotToolRelay
+} from './tool-relay/bot-tool-relay'
+import { SessionMcpTools, withSessionMcpToolsEnv } from '../mcp-servers/session-mcp-tools'
+import { botHostMcpAccess } from '../mcp-servers/bot-host-mcp-access'
+import { sharedMcpProcessIds } from '../mcp-servers/mcp-shared-process-servers'
 import { BOT_TOOLS_TOKEN_ENV } from '../../shared/agent-session/lifecycle/launch/agent-session-caller-env'
 import { botGhShimEnv, withBotGhShimOnPath } from './fork-gh-shim'
 const LOOPBACK_HOSTS = ['127.0.0.1', 'localhost', '::1']
@@ -39,7 +46,7 @@ export class BotLaunchTools {
       // Header values live in the credential store; one here was never migrated, so it never launches.
       throw new BotFailureError('toolValuesUnmoved')
     }
-    const { origin, token } = await relay.grant(bot.botId, bot.folder)
+    const { origin, token } = await relay.grant(bot.botId, { bot: bot.folder })
     const tokenEnv = { [BOT_TOOLS_TOKEN_ENV]: token }
     const shimEnv = await botGhShimEnv({ id: bot.botId, ...(bot.name ? { name: bot.name } : {}) })
     // Claude and Pi expand `${VAR}` in a server's headers, so their config names only the variable.
@@ -127,13 +134,29 @@ export function withBotLaunchToolsEnv(
 export async function cliWithLaunchTools(
   cli: BotToolsCli,
   servers: readonly BotToolServer[]
-): Promise<{ cli: BotToolsCli; tools: BotLaunchTools }> {
-  const tools = await BotLaunchTools.for(
-    botToolRelay,
-    { botId: cli.botId, folder: cli.folder, agent: cli.agent },
-    servers
-  )
-  return { cli: { ...cli, env: withBotLaunchToolsEnv(cli.env, tools) }, tools }
+): Promise<{ cli: BotToolsCli; tools: SessionMcpTools }> {
+  // The host list's checks run its servers as a non-bot session gets them, under the host's token.
+  const tools =
+    cli.botId === MCP_HOST_LIST_RELAY_OWNER
+      ? await SessionMcpTools.for(
+          botToolRelay,
+          { bot: null, agent: cli.agent },
+          // A shared server is checked through its one process, as sessions reach it.
+          {
+            host: {
+              folder: cli.folder,
+              servers,
+              sharedProcesses: await sharedMcpProcessIds(cli.folder)
+            }
+          }
+        )
+      : await SessionMcpTools.for(
+          botToolRelay,
+          { bot: { botId: cli.botId, folder: cli.folder }, agent: cli.agent },
+          // The bot's token is its running chats' too: a check keeps their reach to the host list.
+          { own: servers, host: botHostMcpAccess(cli.hostMcpServers === true) }
+        )
+  return { cli: { ...cli, env: withSessionMcpToolsEnv(cli.env, tools) }, tools }
 }
 
 /** A relayed tool's server that refused its saved values says so on the row. */

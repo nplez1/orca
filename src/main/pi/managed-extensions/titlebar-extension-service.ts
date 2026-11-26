@@ -1,5 +1,6 @@
 import {
   isManagedPiExtensionInPlace,
+  ORCA_MANAGED_PI_EXTENSION_MARKER,
   withOrcaManagedPiExtensionMarker,
   writeManagedPiExtension
 } from '../../../shared/managed-pi-extension-file'
@@ -23,6 +24,10 @@ import { migrateLegacyOmpOverlayState } from './legacy-omp-overlay-migration'
 import type { PiAgentKind } from '../../../shared/agent-launch/catalog/pi-agent-kind'
 
 const PI_AGENT_SUBDIR = 'agent'
+// Upstream's names for the shared marker helpers, kept for its importers. The definitions live in
+// `shared/` because the wsl-guest overlays need them in a process without Electron.
+export const ORCA_MANAGED_EXTENSION_MARKER = ORCA_MANAGED_PI_EXTENSION_MARKER
+export const withOrcaManagedExtensionMarker = withOrcaManagedPiExtensionMarker
 const OMP_MANAGED_STATUS_EXTENSION_DIR = 'omp-managed-status-extension'
 
 type PiManagedExtensionEnv = {
@@ -46,7 +51,7 @@ const AGENT_HOME_DIR_NAME: Record<PiAgentKind, string> = {
   'prime-agent': '.prime'
 }
 
-function getDefaultPiAgentDir(kind: PiAgentKind, configDirName: string | undefined): string {
+export function getDefaultPiAgentDir(kind: PiAgentKind, configDirName: string | undefined): string {
   const root = kind === 'omp' ? configDirName || AGENT_HOME_DIR_NAME.omp : AGENT_HOME_DIR_NAME[kind]
   return join(homedir(), root, PI_AGENT_SUBDIR)
 }

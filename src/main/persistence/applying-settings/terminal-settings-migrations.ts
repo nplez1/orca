@@ -128,6 +128,8 @@ type RetiredGlobalSettings = {
   pluginFullAccessEnabled?: unknown
   // Extensions left Experimental and default on; browserExtensionsEnabled replaces this.
   experimentalBrowserExtensions?: unknown
+  // Gemini CLI support was removed along with its usage credentials switch.
+  geminiCliOAuthEnabled?: unknown
 }
 
 export function stripRetiredGlobalSettings(
@@ -148,6 +150,7 @@ export function stripRetiredGlobalSettings(
     orchestrationHeartbeatIntervalMinutes: _retiredHeartbeatInterval,
     pluginFullAccessEnabled: _retiredPluginFullAccessSwitch,
     experimentalBrowserExtensions: _retiredBrowserExtensionsExperiment,
+    geminiCliOAuthEnabled: _retiredGeminiCliOAuth,
     ...rest
   } = (settings ?? {}) as Partial<GlobalSettings> & RetiredGlobalSettings
   void _retiredChatPermissionCopies
@@ -164,6 +167,7 @@ export function stripRetiredGlobalSettings(
   void _retiredHeartbeatInterval
   void _retiredPluginFullAccessSwitch
   void _retiredBrowserExtensionsExperiment
+  void _retiredGeminiCliOAuth
   return rest
 }
 

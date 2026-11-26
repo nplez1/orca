@@ -6,7 +6,6 @@ import codex from './codex.json'
 import copilot from './copilot.json'
 import cursor from './cursor.json'
 import dsh from './dsh.json'
-import gemini from './gemini.json'
 import hermes from './hermes.json'
 import omp from './omp.json'
 import opencode from './opencode.json'
@@ -42,7 +41,6 @@ export const RAW_BUNDLED_AGENT_STATE_RULE_FILES: readonly unknown[] = [
   copilot,
   cursor,
   dsh,
-  gemini,
   hermes,
   omp,
   opencode,

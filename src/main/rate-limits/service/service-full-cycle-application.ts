@@ -53,14 +53,7 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
       forkProviderCycle,
       antigravityGeneration,
       claudeFetchGated,
-      results: [
-        claudeResult,
-        codexResult,
-        geminiResult,
-        opencodeGoResult,
-        kimiResult,
-        miniMaxResult
-      ],
+      results: [claudeResult, codexResult, opencodeGoResult, kimiResult, miniMaxResult],
       grokResultPromise,
       cursorResultPromise,
       zcodeResultPromise,
@@ -73,8 +66,6 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
     const claude = providerResultSnapshot('claude', claudeResult)
 
     const codex = providerResultSnapshot('codex', codexResult)
-
-    const gemini = providerResultSnapshot('gemini', geminiResult)
 
     // Why the fallback: OpenCode Go reports its monthly window slot explicitly even when empty.
     const opencodeGo = providerResultSnapshot('opencode-go', opencodeGoResult, { monthly: null })
@@ -129,7 +120,6 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
       const home = prepared.codexHomePath
       this.rememberUsageReadingAccount('codex', codexTarget, home, codexProvenance)
     }
-    this.trackActiveFailureStreak('gemini', gemini)
     if (shouldApplyOpencode) {
       this.trackActiveFailureStreak('opencode-go', opencodeGo)
     }
@@ -149,7 +139,6 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
         : codexBecameUnavailable
           ? codexStateBeforeFetch
           : this.state.codex,
-      gemini: this.applyStalePolicy(gemini, previousState.gemini),
       opencodeGo: shouldApplyOpencode
         ? opencodeConfigChanged
           ? opencodeGo

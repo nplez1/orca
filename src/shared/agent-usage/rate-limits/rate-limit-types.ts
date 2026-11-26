@@ -105,7 +105,6 @@ export type ProviderRateLimits = {
   provider:
     | 'claude'
     | 'codex'
-    | 'gemini'
     | 'opencode-go'
     | 'kimi'
     | 'minimax'
@@ -216,7 +215,6 @@ export type CursorAccountStatus = {
 export type RateLimitState = {
   claude: ProviderRateLimits | null
   codex: ProviderRateLimits | null
-  gemini: ProviderRateLimits | null
   opencodeGo: ProviderRateLimits | null
   kimi: ProviderRateLimits | null
   antigravity: ProviderRateLimits | null
@@ -263,3 +261,16 @@ export type RateLimitState = {
   /** Saved Antigravity accounts; agy has one shared login, so only the active one is ever read. */
   antigravityAccounts: AntigravityAccountUsage[]
 }
+
+export type RuntimeTargetUsageProvider = 'claude' | 'codex'
+
+/** A reading and the account it was taken for; null is the target's System default. */
+export type AttributedProviderUsage = {
+  accountId: string | null
+  reading: ProviderRateLimits | null
+}
+
+/** One runtime target's selected-account usage; a provider is absent when its account is unknown. */
+export type RuntimeTargetUsageRead = Partial<
+  Record<RuntimeTargetUsageProvider, AttributedProviderUsage>
+>

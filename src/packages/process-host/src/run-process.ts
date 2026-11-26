@@ -1,10 +1,9 @@
 /* eslint-disable max-lines -- Why: upstream-owned and at its budget (299/300); the fork's +10-line delta rides inside it, and splitting costs a permanent sync hunk. */
 import type { ChildProcess } from 'node:child_process'
-import { spawnProcess } from './spawn-process'
+import { launchWithDefaultProcessLauncher, spawnProcess, terminateChild } from './spawn-process'
 import { createPosixGroupTermination, PROCESS_EXIT_GRACE_MS } from './posix-group-termination'
 import { forceTerminateProcessTree, signalProcessTree } from './process-tree-termination'
 import { inFlightWindowsTreeKill } from './windows-tree-kill'
-
 import { createOutputSink } from './bounded-output-sink'
 import { createChildTerminationReporter } from './child-termination-reporter'
 import { deadlineOverrunField, scheduleDeadlineKill } from './process-deadline'
@@ -31,7 +30,7 @@ export function runProcess(
     let child: ChildProcess
     let launched: LaunchedProcess | null = null
     try {
-      launched = spec.launch?.(spec) ?? null
+      launched = launchWithDefaultProcessLauncher(spec, outputCapture)
       child = launched?.child ?? spawnProcess(spec)
     } catch (error) {
       terminationReporter.report()
@@ -58,10 +57,12 @@ export function runProcess(
         markBarrierTerminationVerified()
       }
     }
+    launched?.ownedGroup?.onTerminated(onGroupTerminated)
     const nativeGroupTermination =
-      (spec.terminationBarrier === true || waitForPosixGroup) && process.platform !== 'win32'
+      launched?.ownedGroup ??
+      ((spec.terminationBarrier === true || waitForPosixGroup) && process.platform !== 'win32'
         ? createPosixGroupTermination(child, onGroupTerminated, waitForPosixGroup)
-        : undefined
+        : undefined)
 
     const settle = (act: () => void): void => {
       if (settled) {
@@ -142,7 +143,7 @@ export function runProcess(
     // Let taskkill finish reading the tree before killing the root, or descendants may be orphaned.
     const killRootUnlessTreeKillInFlight = (): void => {
       if (!inFlightWindowsTreeKill(child)) {
-        terminate(child, 'SIGKILL')
+        terminateChild(child, 'SIGKILL')
       }
     }
 
@@ -190,7 +191,7 @@ export function runProcess(
           )
         }
       } else {
-        terminate(child)
+        terminateChild(child)
       }
       graceTimer ??= setTimeout(() => {
         if (spec.terminationBarrier) {
@@ -228,14 +229,14 @@ export function runProcess(
               barrierTerminationVerified = forceTerminated
               terminationReporter.reportIf(barrierTerminationVerified)
               if (!barrierTerminationVerified) {
-                terminate(child, 'SIGKILL')
+                terminateChild(child, 'SIGKILL')
               }
               resolveBarrierIfSafe()
             }
           )
           return
         }
-        terminate(child, 'SIGKILL')
+        terminateChild(child, 'SIGKILL')
         resolveFromClose(null, null)
       }, PROCESS_EXIT_GRACE_MS)
       graceTimer.unref?.()
@@ -288,7 +289,6 @@ export function runProcess(
 
     const onAbort = (): void => requestStop()
     spec.signal?.addEventListener('abort', onAbort, { once: true })
-    // Already-aborted signals emit no event; recheck after subscribing to close the race.
     if (spec.signal?.aborted) {
       onAbort()
     }
@@ -333,14 +333,5 @@ export function runProcess(
   })
 }
 
-// Best-effort root termination; tree termination is handled separately.
-function terminate(child: ChildProcess, signal?: NodeJS.Signals): void {
-  try {
-    child.kill(signal)
-  } catch {
-    /* already gone */
-  }
-}
-
 export { runProcessSync } from './run-process-sync'
-export { spawnProcess } from './spawn-process'
+export { setDefaultProcessLauncher, spawnProcess } from './spawn-process'

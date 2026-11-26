@@ -1,6 +1,7 @@
 import { LayoutDashboard } from 'lucide-react'
 import { useAppStore } from '@/store/index'
 import { cn } from '@/lib/class-names'
+import { SIDEBAR_NAV_DIMMED_ICON_CLASS_NAME } from '@/components/sidebar/chrome/sidebar-nav-controls'
 import { AgentQuestionIcon } from '@/components/agent/status/AgentQuestionIcon'
 import {
   DASHBOARD_BUCKET_ORDER,
@@ -85,7 +86,7 @@ export default function AgentDashboardSidebarEntry(): React.JSX.Element {
       )}
     >
       <LayoutDashboard
-        className={cn('size-4 shrink-0', !active && 'text-worktree-sidebar-foreground/30')}
+        className={cn('size-4 shrink-0', !active && SIDEBAR_NAV_DIMMED_ICON_CLASS_NAME)}
         strokeWidth={active ? 2.25 : 1.75}
       />
       <span className="flex-1">{t('dashboard.sidebar.dashboardLabel', 'Agent Dashboard')}</span>

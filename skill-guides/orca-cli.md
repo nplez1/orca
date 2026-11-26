@@ -27,7 +27,7 @@ Use the CLI you resolved in the stub when Orca's running editor/runtime is the s
 the /usr/local/bin symlink. A bare `orca` is the official Orca install, which targets a different
 app and data directory.
 
-Prefer `--json` for agent-driven calls. If the CLI is missing, say so explicitly instead of inspecting source files first.
+Prefer `--json` for agent-driven calls, but run `skills get` without it so the guide stays Markdown. If the CLI is missing, say so explicitly instead of inspecting source files first.
 
 ## Full Handoffs
 
@@ -336,7 +336,7 @@ Terminal rules:
 - An older host reports a legacy `old-host` fallback for an ordinary send and refuses `--wait-submit` or `--retry-request` before input, because it cannot provide durable replay.
 - For structured coordination, invoke the `orchestration` skill; it uses `orca orchestration ...` commands for messages, task DAGs, dispatches, inbox/reply flows, and coordinator loops. A receiving agent can run `orca orchestration check --peek --format --json` to render its unread mail in agent-readable form; this checks the caller's inbox and does not remotely deliver input to another terminal.
 - Start a fresh agent with `agent launch` in the current worktree, or `worktree create --agent` for a separate checkout (see Starting agents).
-- Use `terminal wait --for tui-idle` for agent CLIs such as Claude Code, Gemini, Codex, OMP, Pi, and Grok; always pass `--timeout-ms`.
+- Use `terminal wait --for tui-idle` for agent CLIs such as Claude Code, Codex, Antigravity, OMP, Pi, and Grok; always pass `--timeout-ms`.
 - For long output, use cursor reads. After a limited tail preview, page from `oldestCursor`; after a cursor read, continue with `nextCursor` while `limited` is true and `nextCursor !== latestCursor`.
 - `--direction vertical` splits left/right. `--direction horizontal` splits top/bottom.
 

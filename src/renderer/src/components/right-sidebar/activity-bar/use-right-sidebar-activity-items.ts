@@ -5,7 +5,11 @@ import { useRepoById } from '@/store/repos/use-repository-catalog'
 import { isFolderRepo } from '../../../../../shared/repository/repo-kind'
 import { parseWorkspaceKey } from '../../../../../shared/workspace/identity/workspace-scope'
 import { getVisibleRightSidebarActivityItems } from './right-sidebar-activity-visibility'
-import { getPluginPanelActivityItems } from '../plugin-panels/plugin-panel-activity-items'
+import {
+  builtInTabNames,
+  getPluginPanelActivityItems,
+  withDistinctPluginPanelNames
+} from '../plugin-panels/plugin-panel-activity-items'
 import { getDefaultRightSidebarActivityItems } from './right-sidebar-default-activity-items'
 import {
   getPortsPanelOwnerKey,
@@ -19,27 +23,19 @@ import {
   type PluginPanelsFetchStatus
 } from '@/store/plugins/catalog/plugin-contribution-catalog'
 import { useShortcutLabel } from '@/lib/keyboard/useShortcutLabel'
+import { selectWorktreeCreationSurfaceShown } from '@/lib/workspace/creation/worktree-creation-surface'
+import { getActiveChecksStatus } from '../checks-panel/status/active-checks-status'
 import { useTranslate } from '@/i18n/use-translate'
 import { useUiLanguageRevision } from '@/i18n/use-ui-language-revision'
-import { resolveIssuePaneLinkedIssue } from '../workspace-linked-issue'
-import { providerIconComponent } from '../issue-provider-presentation'
-import { hasSessionSummaryBridge } from '../session-summary-subject'
 import type { ActivityBarItem } from './activity-bar-buttons'
 import { useBotForWorkspace, useBotGroupForWorkspace } from '../../bots/bot-workspace'
 import { useFocusedChatWorkers } from '@/lib/focused-chat-workers'
 import { useBotNeedsYouCount, useBotNow } from '../../bots/use-bot-now'
 import { usePublishedBotsNeedsYou } from '../../bots/bot-needs-you-published'
-import { useBots } from '@/lib/bot-catalog'
-import type { Bot } from '../../../../../shared/bot-types'
-import type { BotGroup } from '../../../../../shared/bots/bot-group'
-import { botGroupMemberBots } from '../../../../../shared/bots/bot-sidebar-entries'
-
-const NO_BOTS: readonly Bot[] = []
-
-function useGroupMembers(group: BotGroup | null): readonly Bot[] {
-  const bots = useBots(group !== null)
-  return useMemo(() => (group ? botGroupMemberBots(group, bots) : NO_BOTS), [group, bots])
-}
+import { useBotGroupMembers } from '../../bots/use-bot-group-members'
+import { resolveIssuePaneLinkedIssue } from '../workspace-linked-issue'
+import { providerIconComponent } from '../issue-provider-presentation'
+import { hasSessionSummaryBridge } from '../session-summary-subject'
 
 export type RightSidebarActivityItems = {
   visibleItems: ActivityBarItem[]
@@ -83,7 +79,7 @@ export function useRightSidebarActivityItems({
   const isBot = bot !== null
   const group = useBotGroupForWorkspace(isFolderWorkspace ? activeWorktreeId : null)
   const isGroupHome = group !== null
-  const groupMembers = useGroupMembers(group)
+  const groupMembers = useBotGroupMembers(group)
   const now = useBotNow(bot)
   const { needs } = now
   // A bot's first tab is Home: its badge counts Orca's asks and items in Needs you. A group's counts
@@ -114,86 +110,100 @@ export function useRightSidebarActivityItems({
     () => collectInstalledPluginTabKeys(installedPlugins),
     [installedPlugins]
   )
+  // Why here: the checks tab announces this status, so a plugin tab's name is judged against it.
+  const creatingWorktree = useAppStore(selectWorktreeCreationSurfaceShown)
+  const checksStatus = useAppStore((s) =>
+    s.rightSidebarOpen && !creatingWorktree ? getActiveChecksStatus(s) : null
+  )
 
   // A bot's page labels every tab (labeledTab): Home, Connectors, Chats, Files.
-  const activityItems = useMemo<ActivityBarItem[]>(
-    () => [
-      ...getDefaultRightSidebarActivityItems({
-        t,
-        explorerShortcut,
-        sourceControlShortcut,
-        checksShortcut,
-        portsShortcut,
-        isBot,
-        showsHomeTab,
-        needsYou,
-        connectorsNeedingOwner
-      }).flatMap((item) => {
-        // Why spliced in: the fork's own tabs sit inside upstream's default list, not after it.
-        if (item.id === 'vault' && hasSessionSummaryBridge()) {
-          return [
-            item,
-            {
-              // Why conditional: a window with no summary bridge (a component fixture, not the web
-              // client, which composes one) would leave the pane permanently on its loading state.
-              // Why: the pane summarizes an agent session in this workspace, so it sits
-              // beside Agents rather than with the source-control group.
-              id: 'summary' as const,
-              icon: StickyNote,
-              title: t('activity.sessionSummary.label', 'Session summary'),
-              shortcut: ''
-            }
-          ]
-        }
-        if (item.id === 'checks') {
-          return [
-            item,
-            {
-              id: 'issue' as const,
-              icon: linkedIssueProvider ? providerIconComponent(linkedIssueProvider) : CircleDot,
-              title: t('auto.components.right.sidebar.index.issue', 'Issue'),
-              shortcut: '',
-              linkedIssueOnly: true
-            }
-          ]
-        }
-        return [item]
-      }),
-      // Append plugin tabs to preserve built-in navigation positions.
-      ...getPluginPanelActivityItems(visiblePluginPanels, pluginPanelErrors).map((item) => ({
-        ...item,
-        labeledTab: isBot
-      }))
-    ],
-    // oxlint-disable-next-line react-hooks/exhaustive-deps -- translate() reads the UI language implicitly.
-    [
-      checksShortcut,
+  const activityItems = useMemo<ActivityBarItem[]>(() => {
+    const builtInItems = getDefaultRightSidebarActivityItems({
+      t,
       explorerShortcut,
-      linkedIssueProvider,
-      pluginPanelErrors,
-      visiblePluginPanels,
-      portsShortcut,
       sourceControlShortcut,
+      checksShortcut,
+      portsShortcut,
       isBot,
       showsHomeTab,
       needsYou,
-      connectorsNeedingOwner,
-      languageRevision,
-      t
+      connectorsNeedingOwner
+    }).flatMap((item) => {
+      // Why spliced in: the fork's own tabs sit inside upstream's default list, not after it.
+      if (item.id === 'vault' && hasSessionSummaryBridge()) {
+        return [
+          item,
+          {
+            // Why conditional: a window with no summary bridge (a component fixture, not the web
+            // client, which composes one) would leave the pane permanently on its loading state.
+            // Why: the pane summarizes an agent session in this workspace, so it sits
+            // beside Agents rather than with the source-control group.
+            id: 'summary' as const,
+            icon: StickyNote,
+            title: t('activity.sessionSummary.label', 'Session summary'),
+            shortcut: ''
+          }
+        ]
+      }
+      if (item.id === 'checks') {
+        return [
+          item,
+          {
+            id: 'issue' as const,
+            icon: linkedIssueProvider ? providerIconComponent(linkedIssueProvider) : CircleDot,
+            title: t('auto.components.right.sidebar.index.issue', 'Issue'),
+            shortcut: '',
+            linkedIssueOnly: true
+          }
+        ]
+      }
+      return [item]
+    })
+    return [
+      ...builtInItems,
+      // Append plugin tabs to preserve built-in navigation positions. Checked against every built-in
+      // label, not only the visible ones, so a plugin tab's name never depends on what is shown.
+      ...getPluginPanelActivityItems(
+        visiblePluginPanels,
+        pluginPanelErrors,
+        builtInTabNames(builtInItems, t)
+      ).map((item) => ({
+        ...item,
+        labeledTab: isBot
+      }))
     ]
-  )
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- translate() reads the UI language implicitly.
+  }, [
+    checksShortcut,
+    explorerShortcut,
+    linkedIssueProvider,
+    pluginPanelErrors,
+    visiblePluginPanels,
+    portsShortcut,
+    sourceControlShortcut,
+    isBot,
+    showsHomeTab,
+    needsYou,
+    connectorsNeedingOwner,
+    languageRevision,
+    t
+  ])
 
+  // Why after visibility: only tabs on screen together need names a screen reader can tell apart.
   const visibleItems = useMemo(
     () =>
-      getVisibleRightSidebarActivityItems(activityItems, {
-        isFolder,
-        isFolderWorkspace,
-        hasRemoteHost,
-        isBot,
-        isGroupHome,
-        hasChatWorkers,
-        hasLinkedIssue
-      }),
+      withDistinctPluginPanelNames(
+        getVisibleRightSidebarActivityItems(activityItems, {
+          isFolder,
+          isFolderWorkspace,
+          hasRemoteHost,
+          isBot,
+          isGroupHome,
+          hasChatWorkers,
+          hasLinkedIssue
+        }),
+        (item) => item.statusIndicator ?? (item.id === 'checks' ? checksStatus : null)
+      ),
     [
       activityItems,
       isFolder,
@@ -202,7 +212,8 @@ export function useRightSidebarActivityItems({
       isBot,
       isGroupHome,
       hasChatWorkers,
-      hasLinkedIssue
+      hasLinkedIssue,
+      checksStatus
     ]
   )
 

@@ -82,7 +82,7 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
 
   const refreshDetectedAgents = useAppStore((s) => s.refreshDetectedAgents)
   const handleRefresh = useCallback(async () => {
-    if (isRefreshing || (remoteOwner !== null && remoteOwner.environmentId === null)) {
+    if (isRefreshing || getUsageOwnerHostScope(remoteOwner) === null) {
       return
     }
     setIsRefreshing(true)
@@ -103,8 +103,7 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
     return null
   }
 
-  const { claude, codex, gemini, opencodeGo, kimi, antigravity, minimax, grok, cursor, zcode } =
-    rateLimits
+  const { claude, codex, opencodeGo, kimi, antigravity, minimax, grok, cursor, zcode } = rateLimits
   const muse = rateLimits.muse
 
   // Antigravity has no saved credential; the checked item and detected CLI establish setup.
@@ -125,7 +124,6 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
   }
   const visibleClaude = getVisibleUsageProvider('claude', claude, usageSettings)
   const visibleCodex = getVisibleUsageProvider('codex', codex, usageSettings)
-  const visibleGemini = getVisibleUsageProvider('gemini', gemini, usageSettings)
   const visibleKimi = getVisibleUsageProvider('kimi', kimi, usageSettings)
   const visibleAntigravity = getVisibleUsageProvider('antigravity', antigravity, usageSettings)
   const visibleMiniMax = getVisibleUsageProvider('minimax', minimax, usageSettings)
@@ -141,10 +139,6 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
     visibleCodex !== null &&
     statusBarItems.includes('codex') &&
     isStatusBarItemAvailable('codex', detectedAgentIds)
-  const showGemini =
-    visibleGemini !== null &&
-    statusBarItems.includes('gemini') &&
-    isStatusBarItemAvailable('gemini', detectedAgentIds)
   const showKimi =
     visibleKimi !== null &&
     statusBarItems.includes('kimi') &&
@@ -183,7 +177,6 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
   const hasVisibleUsageMeters =
     showClaude ||
     showCodex ||
-    showGemini ||
     showOpencodeGo ||
     showKimi ||
     showAntigravity ||
@@ -200,7 +193,6 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
   const anyFetching =
     claude?.status === 'fetching' ||
     codex?.status === 'fetching' ||
-    gemini?.status === 'fetching' ||
     opencodeGo?.status === 'fetching' ||
     kimi?.status === 'fetching' ||
     antigravity?.status === 'fetching' ||
@@ -219,7 +211,6 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
   const rosterProviders = [
     showClaude ? visibleClaude : null,
     showCodex ? visibleCodex : null,
-    showGemini ? visibleGemini : null,
     showAntigravity ? visibleAntigravity : null,
     showOpencodeGo ? visibleOpencodeGo : null,
     showKimi ? visibleKimi : null,

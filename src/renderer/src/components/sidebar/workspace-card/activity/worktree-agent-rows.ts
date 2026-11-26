@@ -12,19 +12,14 @@ import type {
   AgentStatusOrchestrationContext,
   AgentType
 } from '../../../../../../shared/agent-status/contracts/agent-status-types'
-import {
-  makePaneKey,
-  parseLegacyNumericPaneKey,
-  parsePaneKey
-} from '../../../../../../shared/workspace-layout/stable-pane-id'
 import type {
   TerminalLayoutSnapshot,
   TerminalTab
 } from '../../../../../../shared/workspace-layout/terminal-tab-types'
-import { resolveRuntimePaneTitleLeafId } from '../../../../../../shared/workspace-layout/terminal-topology/runtime-pane-title-leaf-id'
 import { resolveAgentRowState } from '../../../../../../shared/agent-status/presentation/agent-row-decay-state'
 import { tabHasLivePty } from '../../../../../../shared/workspace-layout/terminal-surfaces/tab-has-live-pty'
 import { buildTitleDerivedAgentRows } from './worktree-title-derived-agent-rows'
+import { legacyStatusTitleRowKey } from './legacy-status-title-row-key'
 import type { TitleDerivedPaneForeground } from './title-derived-pane-agent-identity'
 import { buildSubagentChildRows } from './worktree-subagent-child-rows'
 import { compareWorktreeAgentRows } from './worktree-agent-row-order'
@@ -33,61 +28,25 @@ import { agentEntrySessionStartedAt as effectiveWorktreeAgentRowStartedAt } from
 import { resolveRowAgentType } from './worktree-agent-row-type'
 import { entryWithRuntimeOrchestration } from './worktree-agent-row-orchestration'
 
-function markSeenPaneKeyForCurrentTab(args: {
-  paneKey: string | undefined
-  currentTabsById: ReadonlyMap<string, TerminalTab>
-  terminalLayoutsByTabId?: Record<string, TerminalLayoutSnapshot | undefined>
-  seenPaneKeys: Set<string>
-}): void {
-  if (!args.paneKey) {
-    return
-  }
-  const parsed = parsePaneKey(args.paneKey)
-  if (parsed) {
-    if (args.currentTabsById.has(parsed.tabId)) {
-      args.seenPaneKeys.add(args.paneKey)
-    }
-    return
-  }
-
-  const legacy = parseLegacyNumericPaneKey(args.paneKey)
-  if (!legacy || !args.currentTabsById.has(legacy.tabId)) {
-    return
-  }
-  args.seenPaneKeys.add(args.paneKey)
-  const leafId = resolveRuntimePaneTitleLeafId(
-    args.terminalLayoutsByTabId?.[legacy.tabId],
-    legacy.numericPaneId
-  )
-  if (leafId) {
-    args.seenPaneKeys.add(makePaneKey(legacy.tabId, leafId))
-  }
-}
-
-function markCompletedWorkerParentPaneKeysSeen(args: {
+function collectCompletedWorkerParentPaneKeys(args: {
   entries: AgentStatusEntry[]
   runtimeAgentOrchestrationByPaneKey?: Record<string, AgentStatusOrchestrationContext>
-  terminalLayoutsByTabId?: Record<string, TerminalLayoutSnapshot | undefined>
   currentTabsById: ReadonlyMap<string, TerminalTab>
-  seenPaneKeys: Set<string>
-}): void {
-  const markEntry = (entry: AgentStatusEntry): void => {
+}): Set<string> {
+  const parentPaneKeys = new Set<string>()
+  for (const entry of args.entries) {
     const rowEntry = entryWithRuntimeOrchestration(entry, args.runtimeAgentOrchestrationByPaneKey)
     if (rowEntry.state !== 'done') {
-      return
+      continue
     }
     // Completed workers may own a visible parent pane’s stale spinner title.
-    markSeenPaneKeyForCurrentTab({
-      paneKey: rowEntry.orchestration?.parentPaneKey,
-      currentTabsById: args.currentTabsById,
-      terminalLayoutsByTabId: args.terminalLayoutsByTabId,
-      seenPaneKeys: args.seenPaneKeys
-    })
+    const parentPaneKey = rowEntry.orchestration?.parentPaneKey
+    const parent = parseAgentStatusPaneIdentity(parentPaneKey)
+    if (parentPaneKey && parent && args.currentTabsById.has(parent.tabId)) {
+      parentPaneKeys.add(parentPaneKey)
+    }
   }
-
-  for (const entry of args.entries) {
-    markEntry(entry)
-  }
+  return parentPaneKeys
 }
 
 export function buildExplicitWorktreeAgentRows(
@@ -194,26 +153,34 @@ export function buildWorktreeAgentRows(args: {
     }
   }
 
-  markCompletedWorkerParentPaneKeysSeen({
+  const doneParentPaneKeys = collectCompletedWorkerParentPaneKeys({
     entries: args.entries,
     runtimeAgentOrchestrationByPaneKey: args.runtimeAgentOrchestrationByPaneKey,
-    terminalLayoutsByTabId: args.terminalLayoutsByTabId,
-    currentTabsById,
-    seenPaneKeys
+    currentTabsById
   })
+  for (const paneKey of doneParentPaneKeys) {
+    seenPaneKeys.add(paneKey)
+  }
 
-  rows.push(
-    ...buildTitleDerivedAgentRows({
-      ...args,
-      seenPaneKeys,
-      permissionYieldingAgentTypes: yieldingPermissionAgentTypes({
-        entries: args.entries,
-        currentTabsById,
-        now: args.now,
-        runtimeAgentOrchestrationByPaneKey: args.runtimeAgentOrchestrationByPaneKey
-      })
+  const titleRows = buildTitleDerivedAgentRows({
+    ...args,
+    seenPaneKeys,
+    permissionYieldingAgentTypes: yieldingPermissionAgentTypes({
+      entries: args.entries,
+      currentTabsById,
+      now: args.now,
+      runtimeAgentOrchestrationByPaneKey: args.runtimeAgentOrchestrationByPaneKey
     })
+  })
+  // Why: only done-worker parents hide a title row here; explicit legacy entries keep theirs as cleanup evidence.
+  const hiddenTitleRowKeys = new Set(
+    Array.from(doneParentPaneKeys, (paneKey) =>
+      legacyStatusTitleRowKey(paneKey, args.terminalLayoutsByTabId, (tabId) =>
+        titleRows.filter((row) => row.tab.id === tabId)
+      )
+    )
   )
+  rows.push(...titleRows.filter((row) => !hiddenTitleRowKeys.has(row.paneKey)))
 
   // Main can attribute workers before tabs hydrate; keep them visible without waiting for local membership.
   for (const entry of args.entries) {

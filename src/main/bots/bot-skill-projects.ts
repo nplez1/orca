@@ -11,11 +11,12 @@ import {
 } from '../../shared/execution-host/execution-host'
 import {
   SKILL_FOLDERS,
-  scanSkillsFolder as scanSkillsFolderInPlace,
+  scanSkillsFolder,
   type ScannedProject,
   type ScannedSkill
 } from './bot-skill-folder-scan'
 import { scanOwnSkills, scanSkillRoots } from './bot-skill-roots'
+import { clearSkillDiscoveryCaches } from '../skills/discovery/skill-discovery-target'
 import type { LinkedSkillListing, LinkedSkills } from '../native-chat/native-chat-skill-roots'
 import { getProfileUserDataPath } from '../orca-profiles/profile-storage-paths'
 import { retireAtRestCommandContext } from '../native-chat/agent-session-wire/options/at-rest-command-context'
@@ -23,17 +24,6 @@ import { folderWorkspaceKey } from '../../shared/workspace/identity/workspace-sc
 
 export { linkedSkillKeys, resolveSkillRoot } from './bot-skill-roots'
 export { admittedSkill, type ScannedProject, type ScannedSkill } from './bot-skill-folder-scan'
-
-/** The fork's scan, with upstream's abort: a signal is noticed at the split's boundary. */
-export async function scanSkillsFolder(
-  skillsDir: string,
-  signal?: AbortSignal
-): Promise<ScannedSkill[]> {
-  signal?.throwIfAborted()
-  const skills = await scanSkillsFolderInPlace(skillsDir, signal)
-  signal?.throwIfAborted()
-  return skills
-}
 
 /** The project's skills from .agents/skills, else .claude/skills; null when it has none. */
 export async function scanSkillProject(
@@ -62,12 +52,7 @@ export function botLinkedSkillsFolder(botId: string): string {
 function skillLinks(skills: readonly ScannedSkill[]): Map<string, string> {
   const links = new Map<string, string>()
   const taken = new Set<string>()
-  const linked = new Set<string>()
   for (const skill of skills) {
-    if (linked.has(skill.folder)) {
-      continue
-    }
-    linked.add(skill.folder)
     const base = safeName(basename(skill.folder))
     let link = base
     for (let n = 2; taken.has(link.toLowerCase()); n += 1) {
@@ -237,15 +222,24 @@ export async function linkedSkillProjects(
 }
 
 /** The bot's links changed: its open chats load the skills before their next turn, and its resting
- *  chats' `/` menus reread them. */
+ *  chats' and item comments' `/` menus reread them. */
 export function relinkBotSkills(
   bot: Pick<Bot, 'id' | 'folder' | 'skillProjects' | 'folderWorkspaceId'>,
   repos: readonly Repo[],
   roots: readonly string[] = []
-): void {
-  void linkedSkillProjects(bot, repos, botLinkedSkillsFolder(bot.id), roots)
-    .catch(() => {})
-    .finally(() => retireAtRestCommandContext(folderWorkspaceKey(bot.folderWorkspaceId)))
+): Promise<void> {
+  return linkedSkillProjects(bot, repos, botLinkedSkillsFolder(bot.id), roots)
+    .then(
+      () => {},
+      (error: unknown) => {
+        // The folder keeps its last links, which the bot's chats and `/` menus still load.
+        console.warn("[bots] the bot's linked project skills could not be relinked", bot.id, error)
+      }
+    )
+    .finally(() => {
+      clearSkillDiscoveryCaches()
+      retireAtRestCommandContext(folderWorkspaceKey(bot.folderWorkspaceId))
+    })
 }
 
 /** Projects as Settings shows them, from the same scan a chat's launch uses. */

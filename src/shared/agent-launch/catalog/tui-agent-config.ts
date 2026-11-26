@@ -166,10 +166,6 @@ const TUI_AGENT_CONFIG_SOURCE: Record<TuiAgent, TuiAgentConfigSource> = withFork
     promptInjectionMode: 'flag-prompt-interactive',
     preflightTrust: 'qoder-cn'
   },
-  gemini: {
-    detectCmd: 'gemini',
-    promptInjectionMode: 'flag-prompt-interactive'
-  },
   antigravity: {
     detectCmd: 'agy',
     promptInjectionMode: 'flag-prompt-interactive',

@@ -12,7 +12,8 @@ import {
 } from '../../shared/bots/bot-package'
 import type { BotOwnSkillsView } from '../../shared/bots/bot-skill-projects'
 import { realFolderUnderRoot } from '../filesystem/real-folder-under-root'
-import { admittedSkill, type ScannedSkill, scanSkillsFolder } from './bot-skill-projects'
+import { scanSkillsFolder } from './bot-skill-folder-scan'
+import { admittedSkill, type ScannedSkill } from './bot-skill-projects'
 
 export type BotOwnSkills = {
   skillsDir: string

@@ -269,7 +269,7 @@ export function getWorktreeStatusLabel(status: WorktreeStatus): string {
  * `hasLiveDone` are fresh hook entries ({blocked,waiting} / {working} / {done});
  * `hasRetainedDone`/`hasRetainedFailed` are retained-agent snapshots scoped to this worktreeId.
  */
-export function resolveWorktreeStatus(args: {
+type ResolveWorktreeStatusArgs = {
   tabs: readonly Pick<TerminalTab, 'id' | 'title' | 'launchAgent'>[]
   browserTabs: readonly { id: string }[]
   hasStructuredChat?: boolean
@@ -293,7 +293,13 @@ export function resolveWorktreeStatus(args: {
   /** The repo setup script is still running in this worktree. Host-observed, so
    *  it covers a worktree whose only live PTY is the setup runner. */
   setupRunning?: boolean
-}): WorktreeStatus {
+}
+
+export function resolveWorktreeStatusParts(args: ResolveWorktreeStatusArgs): {
+  /** What the terminal titles alone say, before explicit agent rows rank over it. */
+  heuristic: WorktreeStatus
+  status: WorktreeStatus
+} {
   const heuristic = getWorktreeStatus(
     args.tabs,
     args.browserTabs,
@@ -309,6 +315,14 @@ export function resolveWorktreeStatus(args: {
       permissionYieldingAgentTypes: args.permissionYieldingAgentTypes
     }
   )
+  return { heuristic, status: rankResolvedWorktreeStatus(heuristic, args) }
+}
+
+/** The shared rollup's ranking, plus the fork's `setup` and retained-agent states. */
+function rankResolvedWorktreeStatus(
+  heuristic: WorktreeStatus,
+  args: ResolveWorktreeStatusArgs
+): WorktreeStatus {
   if (args.hasPermission) {
     return 'permission'
   }
@@ -349,4 +363,8 @@ export function resolveWorktreeStatus(args: {
     return 'done'
   }
   return heuristic
+}
+
+export function resolveWorktreeStatus(args: ResolveWorktreeStatusArgs): WorktreeStatus {
+  return resolveWorktreeStatusParts(args).status
 }

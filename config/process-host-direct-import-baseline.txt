@@ -1,4 +1,3 @@
-
 # Existing production source files importing child_process at runtime outside @orca/process-host.
 # Migration debt: this list may only shrink; new callers use the package public API.
 src/cli/accounts/interactive-login-interruption.ts
@@ -45,6 +44,7 @@ src/main/macos-keychain/generic-password.ts
 src/main/macos-permissions/macos-tcc-prompt-watch.ts
 src/main/native-chat/transcript-filesystem/process/wsl-transcript-fs-process-spawn.ts
 src/main/network/macos-system-resolver-health.ts
+src/main/network/macos-tailscale-dns-diagnostic.ts
 src/main/plugins/catalog/plugin-private-marketplace-ssh-shim.cjs
 src/main/plugins/workers/parent-process/plugin-host-process.ts
 src/main/ports/port-scan-command-execution.ts

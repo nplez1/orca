@@ -25,7 +25,9 @@ import { join, resolve } from 'node:path'
 
 const repoRoot = resolve(import.meta.dirname, '..')
 const require = createRequire(join(repoRoot, 'package.json'))
-const { verifyPackagedMainRuntimeDeps } = require('./config/packaged-runtime-node-modules.cjs')
+const { verifyPackagedMainRuntimeDeps } = require(
+  join(repoRoot, 'config/packaged-runtime-node-modules.cjs')
+)
 
 const SEARCH_ROOTS = ['dist', 'release', 'out/packaged']
 const SKIP_DIRS = new Set(['node_modules', '.git', 'app.asar.unpacked'])

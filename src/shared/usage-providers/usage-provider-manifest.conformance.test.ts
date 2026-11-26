@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createEmptyRateLimitState } from '../agent-usage/rate-limits/rate-limit-state-factory'
 import type { ProviderRateLimits } from '../agent-usage/rate-limits/rate-limit-types'
-import { StatusBarItem } from '../rpc-contract/client-ui/client-ui-params'
+import { StatusBarItem } from '../rpc-contract/client-ui/client-ui-status-bar-params'
 import { DEFAULT_STATUS_BAR_ITEMS } from '../status-bar/status-bar-defaults'
 import type { StatusBarItem as StatusBarItemUnion } from '../ui-chrome/ui-chrome-types'
 import { USAGE_PROVIDER_IDS } from '../usage-provider-enablement'
@@ -50,7 +50,6 @@ const sorted = (values: Iterable<string>): string[] => [...values].sort()
 const EXPECTED_PENDING_READOUT: Record<ProviderRateLimits['provider'], object> = {
   claude: {},
   codex: {},
-  gemini: { buckets: [] },
   antigravity: { buckets: [] },
   'opencode-go': { monthly: null },
   kimi: {},

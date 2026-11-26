@@ -29,6 +29,22 @@ export function lintMarkerPath(gitCommonDir, revision) {
 }
 
 /**
+ * The revision and tree state a marker names, and the common git dir markers live under.
+ *
+ * Why the common dir and not the worktree's own git dir: a linked worktree answers the latter with
+ * `.git/worktrees/<name>`, which would split the markers per worktree and re-gate one SHA twice —the
+ * bug `gate-unit.mjs` documents around its cache dir.
+ */
+export function lintVerdictTarget(git) {
+  return {
+    revision: git(['rev-parse', '--short', 'HEAD']) ?? 'unknown',
+    fullRevision: git(['rev-parse', 'HEAD']),
+    dirty: Boolean(git(['status', '--porcelain'])),
+    gitCommonDir: git(['rev-parse', '--path-format=absolute', '--git-common-dir'])
+  }
+}
+
+/**
  * Record a full, clean run. `steps` is `[{ id, seconds, exitCode }]`; only the ids and the overall
  * outcome are kept, because the marker answers "did every step run green", not "what did it print".
  */

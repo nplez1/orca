@@ -2,6 +2,7 @@ import { ipcMain } from 'electron'
 import type { GitPushTarget } from '../../../../shared/worktree/types'
 import { gitFastForward, gitPull, gitPush } from '../../../git/remotes/remote'
 import { gitPullRebaseFromBase } from '../../../git/remotes/remote-rebase'
+import type { RebaseFromBaseResult } from '../../../../shared/git/status/git-status-types'
 import { validateGitPushTarget } from '../../../git/remotes/push-target-validation'
 import { resolveRegisteredWorktreePath } from '../../worktrees/removal/registered-worktree-roots-cache'
 import { getLocalRemoteSyncGitOptions } from '../../worktrees/local-worktree-runtime-options'
@@ -137,11 +138,11 @@ export function registerGitRemoteBranchMutationHandlers(context: FilesystemHandl
     async (
       _event,
       args: { worktreePath: string; baseRef: string; connectionId?: string }
-    ): Promise<void> => {
+    ): Promise<RebaseFromBaseResult> => {
       requireReachableGitRoute(getConnectionExecutionHostId(args.connectionId))
       const worktreePath = await resolveRegisteredWorktreePath(args.worktreePath, store)
       const gitOptions = await getLocalRemoteSyncGitOptions(store, args.worktreePath, worktreePath)
-      await gitPullRebaseFromBase(worktreePath, args.baseRef, {
+      return gitPullRebaseFromBase(worktreePath, args.baseRef, {
         ...gitOptions,
         admissionTier: 'interactive'
       })

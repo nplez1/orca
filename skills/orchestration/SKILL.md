@@ -28,8 +28,9 @@ Never substitute a non-Orca subagent tool when the user asked for Orca orchestra
 This skill drives **Orca NP**, whose own CLI installs as `orca-np`. Choose the executable once and
 reuse it for every later command:
 
-- If the `ORCA_CLI_COMMAND` environment variable is set, use its value. Orca NP exports this for the
-  sessions it manages, normally as an absolute path to its own launcher. Substitute it directly,
+- If the `ORCA_CLI_COMMAND` environment variable is set, use its value. Orca NP exports it for the
+  sessions it manages when it knows their executable — WSL terminals and agent chats — normally as
+  an absolute path to its own launcher. Substitute it directly,
   quoted — these paths contain spaces (`/Applications/Orca NP.app/…`, `…/Application Support/…`) —
   with double quotes in POSIX shells, `& "…"` in PowerShell, and `"…"` in cmd.exe.
 - Otherwise, in a dev checkout whose session exposes `ORCA_DEV_REPO_ROOT`, use `orca-np-dev`, the
@@ -52,7 +53,11 @@ PowerShell, and cmd.exe (and a path is safer run directly than through `cmd /c`,
 outer pair of quotes).
 
 If the selected executable cannot run, report its exact error and stop. Do not fall through
-to another executable, which could silently target a different Orca build.
+to another executable, which could silently target a different Orca build. Exception: on
+Windows, when `ORCA_CLI_COMMAND` or `ORCA_TERMINAL_HANDLE` is set (Orca supplied the
+executable), a sandboxed shell that reports it as not recognized or access denied before
+Orca itself runs cannot read Orca's install. Re-run that command, and later Orca commands,
+with escalated permissions before giving up.
 
 ## Load the version-matched guide before running Orca commands
 

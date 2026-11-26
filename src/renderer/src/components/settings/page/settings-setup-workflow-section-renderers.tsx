@@ -14,7 +14,7 @@ import { ShareSkillsSettingsPane } from '../skills/sharing/ShareSkillsSettingsPa
 import { SettingsSection } from '../section-layout/SettingsSection'
 import { translate } from '@/i18n/i18n'
 import type { Translate } from '@/i18n/use-translate'
-import type { SettingsRenderContext } from './settings-render-context'
+import { getSettingsHostServerName, type SettingsRenderContext } from './settings-render-context'
 import { SettingsGroup } from '../section-layout/SettingsGroup'
 import { WorkspaceCleanupSettingsPane } from '../workspace-cleanup/WorkspaceCleanupSettingsPane'
 import { isServerScope } from '../host-scope/settings-host-scope'
@@ -25,12 +25,8 @@ export function renderOrcaAccountSettingsSection(
   t: Translate = translate
 ): React.JSX.Element | null {
   const { model, navigation, view } = context
-  const { target } = model.settingsHostScope
-  const serverName =
-    target?.kind === 'environment'
-      ? (model.runtimeEnvironments.find((entry) => entry.id === target.environmentId)?.name ??
-        t('components.settings.notifications.server.fallbackHost', 'this server'))
-      : null
+  const scope = model.settingsHostScope
+  const serverName = getSettingsHostServerName(model, t)
   return model.showDesktopOnlySettings ? (
     <SettingsSection
       id="orca-account"
@@ -49,14 +45,14 @@ export function renderOrcaAccountSettingsSection(
       }
       searchEntries={navigation.getSectionSearchEntries('orca-account')}
     >
-      {!view.isSectionMounted('orca-account') ? null : !model.settingsHostScope.available ? (
+      {!view.isSectionMounted('orca-account') ? null : !scope.available ? (
         <SettingsHostScopeUnavailableNotice />
       ) : (
         <SettingsGroup bodyClassName="py-4">
-          {target === null ? (
+          {!isServerScope(scope) ? (
             <SettingsHostScopeUnavailableNotice />
-          ) : target.kind === 'environment' ? (
-            <ServerOrcaAccountPane environmentId={target.environmentId} />
+          ) : scope.target.kind === 'environment' ? (
+            <ServerOrcaAccountPane environmentId={scope.target.environmentId} />
           ) : (
             <OrcaAccountSettingsPane />
           )}
@@ -119,9 +115,9 @@ export function renderGeneralSettingsSection(
             interactions.contentScrollRef.current?.scrollTo({ top: 0 })
           }}
           settings={model.settings}
-          hostScope={model.settingsHostScope}
           updateSettings={model.updateSettings}
           updateSettingsOrThrow={model.updateSettingsOrThrow}
+          hostScope={model.settingsHostScope}
           fontSuggestions={model.terminalFontSuggestions}
           onRequestFontSuggestions={interactions.requestFontSuggestions}
           wslSupportedPlatform={terminal.localWslSupportedPlatform}

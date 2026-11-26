@@ -10,7 +10,6 @@ import { hasDeepInfraApiKey } from '../../deepinfra/deepinfra-api-key-store'
 import type { ProviderRateLimits } from '../../../shared/agent-usage/rate-limits/rate-limit-types'
 import type { RateLimitService } from './rate-limit-service'
 import { fetchCodexRateLimits } from '../providers/codex/codex-fetcher'
-import { fetchGeminiRateLimits } from '../providers/gemini/gemini-usage-fetcher'
 import { fetchKimiRateLimits } from '../providers/kimi/kimi-fetcher'
 import { fetchMiniMaxRateLimits } from '../providers/minimax/minimax-fetcher'
 import { fetchGrokRateLimits } from '../providers/grok/grok-fetcher'
@@ -110,7 +109,6 @@ export function creditsProvider(
 // individual retry lane need healthy providers minted fresh at fetch time.
 export function mockFreshBackgroundProviderFetches(): void {
   vi.mocked(fetchCodexRateLimits).mockImplementation(async () => okProvider('codex', 24))
-  vi.mocked(fetchGeminiRateLimits).mockImplementation(async () => okProvider('gemini', 0))
   vi.mocked(fetchOpenCodeGoUsage).mockImplementation(async () => okProvider('opencode-go', 0))
   vi.mocked(fetchKimiRateLimits).mockImplementation(async () => okProvider('kimi', 0))
   vi.mocked(fetchMiniMaxRateLimits).mockImplementation(async () => okProvider('minimax', 0))
@@ -139,7 +137,6 @@ export function mockFreshBackgroundProviderFetches(): void {
 function unmockedProviderModules(): string[] {
   const modules: [string, unknown][] = [
     ['./codex-fetcher', fetchCodexRateLimits],
-    ['./gemini-usage-fetcher', fetchGeminiRateLimits],
     ['./kimi-fetcher', fetchKimiRateLimits],
     ['./minimax/minimax-fetcher', fetchMiniMaxRateLimits],
     ['./deepseek/deepseek-fetcher', fetchDeepSeekRateLimits],
@@ -177,7 +174,6 @@ export function resetRateLimitProviderMocks(): void {
     )
   }
   vi.clearAllMocks()
-  vi.mocked(fetchGeminiRateLimits).mockResolvedValue(okProvider('gemini', 0, Date.now()))
   vi.mocked(fetchOpenCodeGoUsage).mockResolvedValue(okProvider('opencode-go', 0, Date.now()))
   vi.mocked(fetchKimiRateLimits).mockResolvedValue(okProvider('kimi', 0, Date.now()))
   vi.mocked(fetchMiniMaxRateLimits).mockResolvedValue(okProvider('minimax', 0, Date.now()))

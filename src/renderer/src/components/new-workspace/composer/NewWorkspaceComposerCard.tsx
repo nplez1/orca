@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Why: upstream-owned composer at its budget; the fork's clone/identity-locked delta rides inside it. */
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -112,6 +113,7 @@ export default function NewWorkspaceComposerCard(
   const projectDescriptionId = React.useId()
   const [sparseEditing, setSparseEditing] = React.useState(false)
   const [addRemoteHostMode, setAddRemoteHostMode] = React.useState<AddRemoteHostMode | null>(null)
+  const [addWslDistro, setAddWslDistro] = React.useState<string>()
   const remoteHostDialogOpenRef = React.useRef(false)
   const handleRemoteHostModeChange = React.useCallback(
     (nextMode: AddRemoteHostMode | null): void => {
@@ -357,6 +359,10 @@ export default function NewWorkspaceComposerCard(
           handleProjectHostSetupChange={(setupId) => onProjectHostSetupChange?.(setupId)}
           handleAddSshHost={() => handleRemoteHostModeChange('ssh')}
           handleAddRemoteServer={() => handleRemoteHostModeChange('server')}
+          handleAddWslDistro={(distro) => {
+            setAddWslDistro(distro)
+            handleRemoteHostModeChange('wsl')
+          }}
           handleConnectRunTargetHost={handleConnectRunTargetHost}
           handleStartClone={(option) => runTargetClone?.start(option)}
           handleUseExistingFolder={handleUseExistingFolder}
@@ -397,7 +403,11 @@ export default function NewWorkspaceComposerCard(
           />
         </div>
       ) : null}
-      <AddRemoteHostDialog mode={addRemoteHostMode} onOpenChange={handleRemoteHostModeChange} />
+      <AddRemoteHostDialog
+        mode={addRemoteHostMode}
+        onOpenChange={handleRemoteHostModeChange}
+        wslDistro={addWslDistro}
+      />
       {setLocationDialogMounted ? (
         <React.Suspense fallback={null}>
           <SetProjectLocationDialog

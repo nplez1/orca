@@ -26,10 +26,6 @@ vi.mock('./providers/codex/codex-fetcher', () => ({
   fetchCodexRateLimits: vi.fn()
 }))
 
-vi.mock('./providers/gemini/gemini-usage-fetcher', () => ({
-  fetchGeminiRateLimits: vi.fn()
-}))
-
 vi.mock('./providers/kimi/kimi-fetcher', () => ({
   fetchKimiRateLimits: vi.fn()
 }))

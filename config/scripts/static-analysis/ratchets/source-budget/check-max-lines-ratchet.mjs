@@ -17,7 +17,11 @@ const BASELINE_PATH = 'config/max-lines-baseline.txt'
 const MOBILE_CONFIG_PATH = 'mobile/.oxlintrc.json'
 // Exclude gate/fixtures containing directive text as data or scanning self-flags.
 const SELF_FILES = new Set([
-  'config/scripts/static-analysis/ratchets/source-budget/check-max-lines-ratchet.mjs'
+  'config/scripts/static-analysis/ratchets/source-budget/check-max-lines-ratchet.mjs',
+  // The exemption tool writes the directive and its test asserts on it: both carry `max-lines` in a
+  // disable comment as *data*, not as a suppression they rely on.
+  'local/max-lines-exemption.mjs',
+  'local/max-lines-exemption.test.mjs'
 ])
 
 export function defaultLimitForPath(p) {

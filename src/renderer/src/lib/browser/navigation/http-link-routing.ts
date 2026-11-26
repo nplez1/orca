@@ -140,11 +140,19 @@ export function canHttpLinkOpenInSourceGroup(
 
 /** The one renderer route to the system browser for an address already resolved for it. */
 export async function openSystemHttpLink(url: string): Promise<void> {
+  await openSystemHttpLinkReportingOutcome(url)
+}
+
+/** openSystemHttpLink for a caller that reports success: false when the launch failed, which it
+ *  has already reported. */
+export async function openSystemHttpLinkReportingOutcome(url: string): Promise<boolean> {
   try {
     // Why the explicit variant: `openUrl` relays back into this router, which would loop.
     await window.api.shell.openUrlInSystemBrowser(url)
+    return true
   } catch {
     showBrowserOpenFailure(null)
+    return false
   }
 }
 

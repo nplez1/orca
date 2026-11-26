@@ -1,7 +1,6 @@
 /* eslint-disable max-lines -- Why: upstream-owned and at its budget (286/300); the fork's +20-line delta rides inside it, and splitting costs a permanent sync hunk. */
 import { fetchActiveClaudeRateLimits } from '../providers/claude/claude-active-usage-fetch'
 import { fetchCodexRateLimits } from '../providers/codex/codex-fetcher'
-import { fetchGeminiRateLimits } from '../providers/gemini/gemini-usage-fetcher'
 import { fetchGrokRateLimits } from '../providers/grok/grok-fetcher'
 import { readGrokAuthSession } from '../providers/grok/grok-auth'
 import { fetchCursorRateLimits } from '../providers/cursor/cursor-fetcher'
@@ -118,9 +117,6 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     const previousState = this.state
     const codexStateBeforeFetch =
       previousState.codex?.status === 'fetching' ? null : previousState.codex
-    const geminiCliOAuthEnabled = disabled.has('gemini')
-      ? false
-      : (this.geminiCliOAuthEnabledResolver?.() ?? false)
     const forkProviderCycle = prepareForkProviderCycle({
       disabled,
       signal,
@@ -226,7 +222,7 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
       !this.isClaudeOAuthUsageEnabled() ||
       claudeGeneration !== this.claudeFetchGeneration ||
       (!options?.force && this.shouldSkipAutomatedFetch('claude', previousState.claude))
-    const [claudeResult, codexResult, geminiResult, opencodeGoResult, kimiResult, miniMaxResult] =
+    const [claudeResult, codexResult, opencodeGoResult, kimiResult, miniMaxResult] =
       await Promise.allSettled([
         claudeFetchGated
           ? Promise.resolve(previousState.claude as ProviderRateLimits)
@@ -249,7 +245,6 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
               networkProxySettings: this.networkProxySettingsResolver?.(),
               signal
             })),
-        fetchGeminiRateLimits(geminiCliOAuthEnabled),
         openCodeGoDisabled
           ? Promise.resolve(this.disabledUsageProviderSnapshot('opencode-go'))
           : fetchOpenCodeGoUsage({
@@ -324,14 +319,7 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
       forkProviderCycle,
       antigravityGeneration,
       claudeFetchGated,
-      results: [
-        claudeResult,
-        codexResult,
-        geminiResult,
-        opencodeGoResult,
-        kimiResult,
-        miniMaxResult
-      ],
+      results: [claudeResult, codexResult, opencodeGoResult, kimiResult, miniMaxResult],
       grokResultPromise,
       cursorResultPromise,
       zcodeResultPromise,

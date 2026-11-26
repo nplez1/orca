@@ -97,13 +97,14 @@ export function buildTitleDerivedAgentRows(args: {
         liveSlotIds.length === leafIds.length &&
         liveSlotIds.every((paneId, index) => paneId === FIRST_PANE_ID + index)
       for (const [paneId, title] of paneTitleEntries) {
+        const slot = Number(paneId)
         const leafId = resolveLeafIdForTitleFallback({
           layout,
           leafIds,
           ptyIds: ptyIdsByTabId[tab.id] ?? [],
           liveSlotIds,
           liveSlotsAreDense,
-          paneId: Number(paneId),
+          paneId: slot,
           title
         })
         if (!leafId) {
@@ -113,6 +114,7 @@ export function buildTitleDerivedAgentRows(args: {
           tab,
           leafId,
           title,
+          runtimePaneId: slot >= FIRST_PANE_ID ? slot : undefined,
           ownerAgentType: resolveTitleDerivedPaneOwner(tab, layout, leafId),
           paneForegroundAgentByPaneKey,
           now: args.now,
@@ -157,6 +159,7 @@ function buildTitleDerivedAgentRow(args: {
   tab: TerminalTab
   leafId: string
   title: string
+  runtimePaneId?: number
   ownerAgentType: AgentType | null
   paneForegroundAgentByPaneKey: Record<string, TitleDerivedPaneForeground>
   now: number
@@ -242,6 +245,7 @@ function buildTitleDerivedAgentRow(args: {
   }
   return {
     paneKey,
+    runtimePaneId: args.runtimePaneId,
     entry,
     tab: args.tab,
     agentType,

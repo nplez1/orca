@@ -17,7 +17,9 @@ inline src/main/ai-vault/parse-cache/session-parse-cache-database.ts
 inline src/main/ai-vault/runtime-hosts/runtime-session-scanner.ts
 inline src/main/ai-vault/scan-service/session-scanner-service-client-state.ts
 inline src/main/ai-vault/scan-service/session-scanner-service-client.ts
+inline src/main/bots/bot-request-view.ts
 inline src/main/bots/bot-run-results.ts
+inline src/main/bots/bot-tools-file.ts
 inline src/main/claude/hooks/hook-settings.ts
 inline src/main/daemon/executable-host/windows/daemon-host-relocation.ts
 inline src/main/filesystem/host-tree-removal.ts
@@ -26,7 +28,10 @@ inline src/main/git/command-runner/git-stream-stdout.ts
 inline src/main/git/command-runner/process-capture/exec-file-capture.ts
 inline src/main/git/worktrees/removal/windows-worktree-removal.ts
 inline src/main/github/pull-requests/refresh/pr-refresh-candidate-policy.ts
+inline src/main/host-mesh/host-mesh-driver.ts
+inline src/main/host-mesh/host-mesh-rpc-service.ts
 inline src/main/ipc/filesystem/search/filesystem-list-files.ts
+inline src/main/ipc/filesystem/watchers/filesystem-watcher-local-subscription.ts
 inline src/main/ipc/filesystem/watchers/filesystem-watcher-wsl.ts
 inline src/main/ipc/pty/spawn/spawn-options-assembly.ts
 inline src/main/ipc/repos/repo-clone-lifecycle.ts
@@ -42,6 +47,7 @@ inline src/main/runtime/agent-session/environment/runtime-account-controller.ts
 inline src/main/runtime/construction/runtime-construction.ts
 inline src/main/runtime/construction/runtime-service-state.ts
 inline src/main/runtime/orca-runtime-bots.ts
+inline src/main/runtime/rpc/methods/bots.ts
 inline src/main/runtime/rpc/methods/files/files.ts
 inline src/main/runtime/rpc/server/runtime-rpc-websocket-dispatch.ts
 inline src/main/runtime/terminal/launch/terminal-workspace-scope.ts
@@ -52,6 +58,7 @@ inline src/main/runtime/workspaces/removal/workspace-removal.ts
 inline src/main/ssh/connection/ssh-connection.ts
 inline src/main/ssh/protocol/ssh-channel-multiplexer.ts
 inline src/main/startup/main-process-ready-foundation.ts
+inline src/main/startup/runtime-startup/main-process-runtime-launch.ts
 inline src/main/updater/lifecycle/updater-setup.ts
 inline src/main/updater/releases/updater-prerelease-feed.ts
 inline src/main/worker-threads/worker-thread-request-queue.ts
@@ -63,6 +70,7 @@ inline src/renderer/src/components/editor/check-details/panel/CheckRunDetailsPan
 inline src/renderer/src/components/editor/diff/monaco-view/DiffViewer.tsx
 inline src/renderer/src/components/editor/panel/EditorEditFileSurface.tsx
 inline src/renderer/src/components/github-item-dialog/inspect-pull-request/checks-tab.tsx
+inline src/renderer/src/components/new-workspace/composer/NewWorkspaceComposerCard.tsx
 inline src/renderer/src/components/new-workspace/composer/NewWorkspaceComposerModal.tsx
 inline src/renderer/src/components/right-sidebar/checks-panel/panel/use-checks-panel-controller-state.tsx
 inline src/renderer/src/components/right-sidebar/checks-panel/presentation/active-content.tsx
@@ -70,6 +78,7 @@ inline src/renderer/src/components/right-sidebar/checks-panel/refresh/use-checks
 inline src/renderer/src/components/settings/accounts/accounts-search.ts
 inline src/renderer/src/components/settings/agents/launch/AgentLaunchSettingsCatalog.tsx
 inline src/renderer/src/components/settings/form-controls/SettingsFormControls.tsx
+inline src/renderer/src/components/settings/page/use-settings-page-effects.ts
 inline src/renderer/src/components/sidebar/project-admission/dialog/AddRepoDialog.tsx
 inline src/renderer/src/components/sidebar/workspace-actions/deletion/DeleteWorktreeDialog.tsx
 inline src/renderer/src/components/sidebar/workspace-card/activity/worktree-title-derived-agent-rows.ts
@@ -99,6 +108,4 @@ inline src/shared/agent-hook-listener/provider-dispatch.ts
 inline src/shared/agent-hook-listener/providers/claude/claude-events.ts
 inline src/shared/agent-launch/catalog/tui-agent-config.ts
 inline src/shared/remote-runtime/ssh/ssh-types.ts
-inline src/shared/rpc-contract/client-ui/client-ui-params.ts
-inline src/shared/settings/default-global-settings.ts
 inline src/shared/wsl-move/wsl-move-storage-dispositions.ts

@@ -111,7 +111,6 @@ export abstract class RateLimitServiceCycleFetchState extends RateLimitServiceAn
       codex: codexFetchGated
         ? codexStateBeforeFetch
         : this.withFetchingStatus(previousState.codex, 'codex'),
-      gemini: this.withFetchingStatus(previousState.gemini, 'gemini'),
       opencodeGo: changed.opencodeGo
         ? this.withFetchingStatus(null, 'opencode-go')
         : this.withFetchingStatus(previousState.opencodeGo, 'opencode-go'),

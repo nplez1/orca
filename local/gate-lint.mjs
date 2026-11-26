@@ -34,8 +34,10 @@
 import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
-import { writeLintVerdict } from './gate-lint-verdict.mjs'
-import { compileMatch } from './lib/known-red.mjs'
+import { lintVerdictTarget, writeLintVerdict } from './gate-lint-verdict.mjs'
+import { entryProblem, matchesEntry } from './lib/known-red.mjs'
+
+export { entryProblem, matchesEntry }
 
 const ROOT = resolve(import.meta.dirname, '..')
 const DEFAULT_ALLOWLIST = join(ROOT, 'local', 'lint-known-red.json')
@@ -330,38 +332,9 @@ export function unaccountedFailureLines(output, accounted = []) {
  *
  * Why `wholeStep` rather than "no match": a missing `match` used to mean the broadest possible entry,
  * which also masked a new failure in that step. It is now the explicit, rarer form — the only way to
- * allowlist a step whose output the parser could not split into lines.
+ * allowlist a step whose output the parser could not split into lines. Shape is validated by
+ * `entryProblem`, which the line loop must not call: a throw here would abandon every later step.
  */
-export function matchesEntry(line, entry) {
-  // Why `false` rather than a throw: the problem is reported by `entryProblem`, and a throw inside the
-  // line loop would abandon every remaining step. Why `false` rather than `true` for the match-less
-  // case: that form has to be asked for with `wholeStep`, and silently absorbing is the looseness this
-  // rule exists to remove.
-  const { regex, problem } = compileMatch(entry.match)
-  if (problem !== null) {
-    return false
-  }
-  return regex !== null && regex.test(line)
-}
-
-/** The reason an entry cannot be judged, or null. Every entry has to say exactly what it covers. */
-export function entryProblem(entry) {
-  const { problem } = compileMatch(entry.match)
-  if (problem) {
-    return `${entry.step}: ${problem}`
-  }
-  if (entry.match === undefined || entry.match === null) {
-    return entry.wholeStep === true
-      ? null
-      : `${entry.step}: a known-red entry has neither a match nor wholeStep: true, so it would allowlist the whole step`
-  }
-  // Why the pair is a problem: `wholeStep` wins in `classifyRun`, so the narrower `match` would read as
-  // a limit that is not in force.
-  if (entry.wholeStep === true) {
-    return `${entry.step}: a known-red entry has both a match and wholeStep: true, so the match does not apply`
-  }
-  return null
-}
 
 /**
  * Turn step results into a verdict.
@@ -800,13 +773,7 @@ async function main(argv = process.argv.slice(2)) {
   }
   const selected = options.only ? steps.filter((step) => options.only.includes(step.id)) : steps
 
-  const revision = git(['rev-parse', '--short', 'HEAD']) ?? 'unknown'
-  const fullRevision = git(['rev-parse', 'HEAD'])
-  const dirty = Boolean(git(['status', '--porcelain']))
-  // Why the common dir and not the worktree's own git dir: a linked worktree answers the latter with
-  // `.git/worktrees/<name>`, which would split the markers per worktree and re-gate one SHA twice —
-  // the bug `gate-unit.mjs` documents around its cache dir.
-  const gitCommonDir = git(['rev-parse', '--path-format=absolute', '--git-common-dir'])
+  const { revision, fullRevision, dirty, gitCommonDir } = lintVerdictTarget(git)
   await writeOut(
     `lint gate @${revision}${dirty ? '+dirty' : ''}: running ${selected.length}/${steps.length} steps`
   )

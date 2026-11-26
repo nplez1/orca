@@ -7,7 +7,6 @@ import { createLocalizedCatalog } from '@/i18n/localized-catalog'
 import { AgentIcon } from '@/components/agent/icons/AgentIcon'
 import {
   ClaudeIcon,
-  GeminiIcon,
   MiniMaxIcon,
   OpenAIIcon,
   OpenCodeGoIcon
@@ -30,7 +29,6 @@ import {
   getAccountsDeepInfraSearchEntries,
   getAccountsDeepSeekSearchEntries,
   getAccountsFireworksSearchEntries,
-  getAccountsGeminiSearchEntries,
   getAccountsGrokSearchEntries,
   getAccountsKimiSearchEntries,
   getAccountsMiniMaxSearchEntries,
@@ -43,7 +41,6 @@ import type { UsageCredentialHost } from './accounts/usage/usage-credential-host
 import type { UsageHostSettingsModel } from './accounts/usage/use-usage-host-settings'
 import { renderClaudeAccountsSection } from './accounts/claude/accounts-pane-claude-section'
 import { renderCodexAccountsSection } from './accounts/codex/accounts-pane-codex-section'
-import { renderGeminiAccountsSection } from './accounts/providers/accounts-pane-gemini-section'
 import { renderOpenCodeAccountsSection } from './accounts/providers/accounts-pane-opencode-section'
 import { AntigravityAccountsSection } from './accounts/providers/AntigravityAccountsSection'
 import {
@@ -132,17 +129,6 @@ export const getProviderAccountsSections = createLocalizedCatalog(
       Icon: OpenAIIcon,
       searchEntries: getAccountsCodexSearchEntries,
       renderBody: ({ model }) => renderCodexAccountsSection(model)
-    },
-    {
-      id: 'gemini',
-      title: translate('auto.components.settings.AccountsPane.aa4de4475b', 'Gemini CLI (legacy)'),
-      description: translate(
-        'auto.components.settings.AccountsPane.973741a871',
-        'Keep existing Gemini CLI sessions available. Gemini credentials do not sign you into Antigravity.'
-      ),
-      Icon: GeminiIcon,
-      searchEntries: getAccountsGeminiSearchEntries,
-      renderBody: ({ model }) => renderGeminiAccountsSection(model)
     },
     {
       id: 'antigravity',

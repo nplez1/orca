@@ -159,7 +159,7 @@ export async function registerCoreHandlers(
     registerForkHandlers({ store, rateLimits })
     registerGrokAccountHandlers(() => store.getSettings())
     registerCursorAccountHandlers(() => store.getSettings())
-    registerRateLimitHandlers(rateLimits, codexAccounts)
+    registerRateLimitHandlers(rateLimits, codexAccounts, () => store.getSettings())
     registerGitHubHandlers(store, stats, runtime)
     registerGitLabHandlers(store)
     registerHostedReviewHandlers(store, stats)

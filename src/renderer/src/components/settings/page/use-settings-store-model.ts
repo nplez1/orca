@@ -1,5 +1,6 @@
 import { useSupportedGroupHookSettings } from '@/components/settings/repository/hooks/use-supported-group-hook-settings'
 import type { GeneralSubPage } from '../general/general-sub-pages'
+import type { McpServerSubPage } from '../mcp-servers/mcp-server-sub-page'
 import { useCallback, useMemo, useState } from 'react'
 import type { OrcaHooks } from '../../../../../shared/workspace-setup/orca-yaml-hook-types'
 import type { ProjectHostSetup } from '../../../../../shared/project/project-types'
@@ -157,6 +158,7 @@ export function useSettingsStoreModel() {
   )
   const [activeSectionId, setActiveSectionId] = useState('general')
   const [generalSubPage, setGeneralSubPage] = useState<GeneralSubPage | null>(null)
+  const [mcpServerSubPage, setMcpServerSubPage] = useState<McpServerSubPage | null>(null)
   const [mountedSectionIds, setMountedSectionIds] = useState<Set<string>>(
     getInitialMountedSectionIds
   )
@@ -191,6 +193,8 @@ export function useSettingsStoreModel() {
     hookSettingsGroups,
     generalSubPage,
     setGeneralSubPage,
+    mcpServerSubPage,
+    setMcpServerSubPage,
     settings,
     keybindings,
     updateSettings,

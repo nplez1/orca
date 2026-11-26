@@ -29,7 +29,6 @@ function settled(overrides: Partial<RateLimitState> = {}): RateLimitState {
   return createEmptyRateLimitState({
     claude: unavailable('claude'),
     codex: unavailable('codex'),
-    gemini: unavailable('gemini'),
     opencodeGo: unavailable('opencode-go'),
     kimi: unavailable('kimi'),
     antigravity: unavailable('antigravity'),
