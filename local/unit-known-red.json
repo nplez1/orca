@@ -35,9 +35,9 @@
   "observedRun": {
     "kind": "full",
     "revision": "ef2897da2b",
-    "subject": "the 2026-10-29 reconciliation: eight fork-local classes added after the base gate on this machine red 80 records",
-    "failingRecords": 165,
-    "allowlisted": 50,
+    "subject": "the 2026-10-29 reconciliation: eight fork-local classes added after the base gate on this machine red 80 records; +1 on 2026-11-26 for the macOS-bound agent-cli-update-timeout case, which the release's Linux lane runs green (both counts move with the entry, per this file's note)",
+    "failingRecords": 166,
+    "allowlisted": 51,
     "upstreamQuarantined": 0,
     "fixed": 115,
     "repairedCases": [
