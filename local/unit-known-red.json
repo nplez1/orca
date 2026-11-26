@@ -647,7 +647,7 @@
   "entries": [
     {
       "file": "src/main/agent-cli-update/agent-cli-update-timeout.test.ts",
-      "test": "settles soon after the updater exits even when a child it left holds its output",
+      "test": "runAgentCliUpdate settles soon after the updater exits even when a child it left holds its output",
       "match": "expected \\d+ to be less than 30",
       "class": "foreign: upstream's own updater test, macOS-bound",
       "owner": "upstream",
