@@ -6405,11 +6405,16 @@ is what stops a timeout bump from quietly hiding a slow test.
 still assert the same operation counts. The anchors are the two `it(...)` titles above — an upstream edit
 to either test's body is the only thing that moves them.
 
-The six lines this costs in an upstream file are declared as a seam in
-`local/checks/host-mesh-upstream-seams.mjs` (budget 6, the measured size), which is the register that
-makes a fork hunk in upstream's tree visible and bounded rather than silent. That budget only shrinks:
-once the sync takes upstream's `}, 120_000)` and comment, the `stops reading a long send family` test
-costs nothing and the seam re-measures down to the one test upstream left alone.
+The six lines this costs in an upstream file are **not** declared in
+`local/checks/host-mesh-upstream-seams.mjs`, and #484 (`local(lint)`, 2026-11-26) is why: that register
+describes one feature's surface — the host group's — and from #466's merge it demanded a declaration from
+every branch that touched an upstream file, which made the lint gate red for a whole class of unrelated
+work. It now scopes the refusal to a diff carrying the feature's own `host-mesh` / `host-graph` /
+`host-group` path, and reports another feature's upstream edits as a note. This diff carries no hosts
+path, so it is a note — and adding a row anyway would have put a hard budget on a test file that is not
+hosts work, re-creating exactly the false red #484 removed for everyone else. The anchors below are what
+stands in its place: the two `it(...)` titles, and an upstream edit to either body is the only thing that
+moves them.
 
 **Verified:** the file passes locally (7/7, 4.5 s, macOS, `config/vitest.performance.config.ts`), and
 both ratchets this change touches are green (`test-timeout-needs-reason`, `check-upstream-file-comments`
