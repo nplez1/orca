@@ -53,9 +53,14 @@ const DIFF_BASE_CANDIDATES = ['origin/HEAD', 'origin/main', 'main']
  */
 export const SEAMS = [
   {
+    path: 'config/react-compiler-bailout-baseline.txt',
+    budget: 2,
+    why: 'one line of the fork-owned bailout baseline, pruned by the ratchet when this feature’s own hook stopped bailing out; the ratchet refuses to leave an improved row recorded'
+  },
+  {
     path: 'src/main/runtime/rpc/server/pairing/pairing-offer-requests.ts',
-    budget: 8,
-    why: 'one `fresh` argument on the runtime-offer path and its pass-through: upstream reuses one unused pending offer per (grants, creator), so a mesh pass that mints for two machines would hand both the same device row — one identity, and ejecting either one would cut the other’s link for good'
+    budget: 9,
+    why: 'one `fresh` and one `offerTtlMs` argument on the runtime-offer path and their pass-through: upstream reuses one unused pending offer per (grants, creator), so a mesh pass that mints for two machines would hand both the same device row — one identity, and ejecting either one would cut the other’s link for good'
   },
   {
     path: 'src/main/runtime/rpc/server/runtime-rpc-pairing.ts',

@@ -193,7 +193,7 @@ function describeFailure(failure: HostGroupFailure | null, t: Translate): string
         'auto.components.settings.hostGroup.actionFailed',
         'Orca couldn’t reach the mesh. It retries on its own in a moment.'
       )
-    default:
+    case null:
       return null
   }
 }

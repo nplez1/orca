@@ -191,7 +191,6 @@ export class RuntimeRpcPairing extends RuntimeRpcNetworkExposure {
     address?: string | null
     name?: string
     rotate?: boolean
-    // One row per call, leaving any other pending offer alone: the mesh needs a distinct credential per machine.
     fresh?: boolean
     scope?: DeviceScope
     // Persist local-only policy on grants so reconnect cannot expose every interface; other callers default to network reach (STA-2370).

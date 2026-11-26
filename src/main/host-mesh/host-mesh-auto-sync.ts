@@ -1,5 +1,3 @@
-import { syncHostMesh } from './host-mesh-runtime'
-
 /**
  * The mesh keeps itself current, so no surface needs a Sync button.
  *
@@ -23,10 +21,15 @@ const STARTUP_DELAY_MS = 10_000
 const NUDGE_DELAY_MS = 1_500
 
 export type HostMeshAutoSyncOptions = {
+  /**
+   * The pass itself.
+   *
+   * Why it is required rather than defaulted: this module is imported by the runtime that owns the pass, so
+   * reaching back for it would close an import cycle. The launch seam supplies it, and a test supplies its own.
+   */
+  run: () => Promise<HostMeshAutoSyncOutcome>
   /** First pass delay, so a caller can make a startup pass observable in a test. */
   startupDelayMs?: number
-  /** The pass itself; defaults to the real one, and a test supplies its own to avoid a peer and a clock. */
-  run?: () => Promise<HostMeshAutoSyncOutcome>
 }
 
 /**
@@ -43,10 +46,7 @@ let stopped = true
 let delay = BASE_DELAY_MS
 let inFlight = false
 let nudgedDuringPass = false
-let runPass: () => Promise<HostMeshAutoSyncOutcome> = async () => {
-  const snapshot = await syncHostMesh()
-  return { reached: snapshot.lastPassReached ?? 0, members: snapshot.members.length }
-}
+let runPass: () => Promise<HostMeshAutoSyncOutcome> = async () => undefined
 let startupDelayMs = STARTUP_DELAY_MS
 
 function schedule(ms: number): void {
@@ -94,16 +94,11 @@ async function tick(): Promise<void> {
 }
 
 /** Idempotent: a second call only replaces the first pass's timing, never adds a second chain. */
-export function startHostMeshAutoSync(options: HostMeshAutoSyncOptions = {}): void {
+export function startHostMeshAutoSync(options: HostMeshAutoSyncOptions): void {
   if (!stopped) {
     return
   }
-  runPass =
-    options.run ??
-    (async () => {
-      const snapshot = await syncHostMesh()
-      return { reached: snapshot.lastPassReached ?? 0, members: snapshot.members.length }
-    })
+  runPass = options.run
   startupDelayMs = options.startupDelayMs ?? STARTUP_DELAY_MS
   stopped = false
   delay = BASE_DELAY_MS
