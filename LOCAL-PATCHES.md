@@ -6371,13 +6371,17 @@ it (11-23) was green because the file had not reached `main` yet — it arrived 
 1350 upstream commits.
 
 **Why a timeout, and not a defect.** The contract counts rows returned to our code, never wall clock, and
-its fixture is the cost: ten separate chats of up to 500 turns, ≈3,900 turns × 3 journal applies, each DB
-created in `tmpdir()`. That is 1.6 s on this Mac and 33,065 ms on `windows-2022` in the same run — the
-file is written and re-read under Defender's real-time scan, so the per-turn cost is ~20x and nothing in
-the product is slow. The 30 s default is Vitest's, and it is the only part of that test that is a
-wall-clock budget.
+its fixture is the cost: twelve separate chats of up to 500 turns, ≈3,900 turns × 3 journal applies, each
+DB created in `tmpdir()`. That is 1.6 s on this Mac and 33,065 ms on `windows-2022` in the same run —
+most likely the temp file's writes and re-reads going through Defender's real-time scan, since nothing in
+the product is slow enough to explain a ~20x per-turn cost. The 30 s default is Vitest's, and it is the
+only part of that test that is a wall-clock budget.
 
-**What the fork changed**, in the same commit as this entry, two closing `})` lines to `}, 120_000)`:
+**What the fork changed**, in the same commit as this entry: two closing `})` lines become `}, 120_000)`,
+and each of the two tests carries a one-line reason above it, marked `fork-comment-ok:` so the comment
+ratchet does not count it (4764/4764 unchanged). The reason comment is not decoration: the fork's
+`test-timeout-needs-reason` ratchet refuses a per-test timeout without one, which is the right rule — it
+is what stops a timeout bump from quietly hiding a slow test.
 
 - the test at line 377 (`stops reading a long send family at its first member older than the newest
   turns`) — the one that failed. **Upstream made this exact call in `7b6c852e2de` (#47789)**, after our
@@ -6398,6 +6402,8 @@ wall-clock budget.
 still assert the same operation counts. The anchors are the two `it(...)` titles above — an upstream edit
 to either test's body is the only thing that moves them.
 
-**Verified:** the file passes locally (7/7, 4.5 s, macOS), and the lane dispatched on the branch that
-carries this commit (`gh workflow run fork-performance-contracts.yml --ref nplez1/issue-482`) is green on
-`ubuntu-24.04`, `macos-15` and `windows-2022`.
+**Verified:** the file passes locally (7/7, 4.5 s, macOS, `config/vitest.performance.config.ts`), and
+both ratchets this change touches are green (`test-timeout-needs-reason`, `check-upstream-file-comments`
+4764/4764). The runner that reddened is the one that decides, so the fix was dispatched on the branch
+rather than trusted from a Mac — the run and its legs are recorded in the PR body and in the commit that
+follows this one.

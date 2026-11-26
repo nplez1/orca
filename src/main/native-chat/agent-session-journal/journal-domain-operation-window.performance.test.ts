@@ -267,6 +267,7 @@ it('keeps every anchored turn when one send names its turn and another is placed
 
 // Whom a bot's newest turn acts for is read from a window of its newest turns, on every bot request,
 // Slack post and item add. Guards that read: its work stays fixed however long the chat ran before.
+// fork-comment-ok: 26s of its 30s cap on windows-2022 for a fixture this size; see LOCAL-PATCHES.md
 it('reads the newest turns with the same work however many turns came before them', () => {
   const read = (turns: number, recovered = 0) => {
     const db = chat(turns, () => true, undefined, recovered)
@@ -374,6 +375,7 @@ it('walks a family of sends linked by provider id and queued card once, however 
   ])
 })
 
+// fork-comment-ok: 33s on windows-2022, over the 30s cap; it counts work, not time — LOCAL-PATCHES.md
 it('stops reading a long send family at its first member older than the newest turns', () => {
   // Every send is in one family running back through the chat, from the newest send (unanswered or
   // not): the first older member settles the whole read, so the rest is never walked by index.
