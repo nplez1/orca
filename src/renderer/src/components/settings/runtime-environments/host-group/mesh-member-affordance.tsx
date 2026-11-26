@@ -84,7 +84,7 @@ export function MeshMemberAffordance({
             <DialogDescription>
               {t(
                 'auto.components.settings.hostGroup.ejectDescription',
-                'This computer forgets the pairing in both directions and tells the member to drop it. The member keeps its own copy of the mesh.'
+                'This computer forgets the pairing in both directions, every other member is told to forget it too, and that machine leaves the group on its own when its next pass sees the notice. It is permanent: the removal is a tombstone every member keeps, so that machine cannot be introduced back into this mesh.'
               )}
             </DialogDescription>
           </DialogHeader>
