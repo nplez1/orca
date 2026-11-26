@@ -268,8 +268,11 @@ export function auditSurface(touched, { strict = false } = {}) {
       continue
     }
     if (entry.lines > seam.budget) {
+      // Why this shape: `local/gate-lint.mjs` attributes a step's failure to a file only when the step
+      // prints `::error file=<path>::<text>`, and without it the only entry that can cover a red here is
+      // a whole-step one, which would also hide a new file's breach.
       problems.push(
-        `${entry.path}: ${entry.lines} line(s) against a budget of ${seam.budget} — ${seam.why}.\n` +
+        `::error file=${entry.path}::${entry.lines} line(s) against a budget of ${seam.budget} — ${seam.why}.\n` +
           '  Every one of these is a hunk an upstream sync pays for; put what grew behind a fork-owned module.'
       )
     }

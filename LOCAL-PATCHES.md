@@ -2011,6 +2011,49 @@ Anchors: `src/renderer/src/i18n/fork/ko.json` (the two tombstones),
 `config/focus-setting-read-baseline.fork.txt`, `config/workspace-path-sync-fs-baseline.txt`,
 `local/upstream-file-comments-baseline.json`.
 
+### `local(lint)`: the 2026-11-26 sync's lint gate — five steps, one merge-diff artifact, two recorded exemptions
+
+The sync landed 530 upstream commits and the five steps below moved with it. Four are closed in the
+tree; the fifth is a measurement artifact of scoring a merge commit and is recorded in
+`local/lint-known-red.json` with its evidence.
+
+- **`check-host-mesh-upstream-seams`** reds at 18 lines against a budget of 2, and it is not this
+  branch's: it diffs `merge-base(HEAD, origin/main)..HEAD`, and on a merge commit that range is the
+  whole 530-commit upstream delta, so upstream's own rewrite of `rpc-method-registry.ts` (12+/6-) is
+  charged to the fork. The fork's seam is exactly the two lines the budget allows —
+  `git diff 3e227259249 HEAD` on that file prints one import and one spread and nothing else. The
+  merge _had_ grown the seam to twelve by registering photon, host-settings and session-summary
+  separately; all three are fork-only domains, so they moved behind `FORK_RPC_METHODS` and the seam is
+  one import plus one spread again. The known-red entry pins that file and goes stale at the next push,
+  where the diff base becomes upstream rather than the fork's old tip.
+- **`check:main-blocking-helper-ratchet`** — the merge resolution took upstream's baseline file, which
+  is correct for the base but dropped the fork's own rows for the photon, webhook and GitHub App stores;
+  they are restored verbatim with their `# why` lines, and `bot-tools-file.ts` is raised 21 → 22 for
+  `botLaunchExtras` (the fork's launch env reads the credential store once per launch). `--prune` then
+  lowered 200-odd rows the merged tree no longer needs, six of them in the fork overlay.
+- **`check:react-compiler-compat-ratchet`** — re-taken with `--update`: 14 rows up, 23 down, as both
+  sides' renderer code met.
+- **`check:process-host-imports`** — two stale rows dropped (the Tailscale diagnostic and the Gemini
+  OAuth extractor are gone or clean).
+- **`check-upstream-file-comments`** — re-taken at base `3e227259249` with `--init --accept`: +34 fork
+  comment lines, every one a line a reviewer sees in the merge diff.
+
+**Two max-lines exemptions, by the owner's decision on 2026-11-26.** `#466` left
+`src/main/host-mesh/host-mesh-driver.ts` (721 lines) and `host-mesh-rpc-service.ts` (416) over the
+300-line cap with `-- Why:` headers and no baseline row, so `pnpm lint` had been red on `main` since
+that PR landed. Both are single large factory closures; splitting them under release pressure would
+rewrite the sealed-offer/mesh protocol with no unit coverage at that granularity. The owner chose the
+exemption: the rows are in `config/max-lines-baseline.txt` and `local/max-lines-exemption.test.mjs`
+records the two paths by name, so the rule still fails any _new_ fork-owned row. **The split is still
+owed** — these are the two rows the 2026-11-24 overlay note called "split pending", and they are the
+only fork-owned exemptions in the tree.
+
+Anchors: `config/main-blocking-helper-baseline.txt` (+10 restored rows) and its `.fork.txt` overlay,
+`config/react-compiler-bailout-baseline.txt`, `config/process-host-direct-import-baseline.txt`,
+`config/max-lines-baseline.txt`, `local/max-lines-exemption.test.mjs`,
+`local/upstream-file-comments-baseline.json`, `local/lint-known-red.json`,
+`src/main/host-mesh/fork-rpc-methods.ts`.
+
 ### `local(lint)`: two `fork-comment-ok` markers, and why they are not comments to delete
 
 `src/main/runtime/agent-session/ownership/agent-session-process-identity-probe.ts` carries two of the
