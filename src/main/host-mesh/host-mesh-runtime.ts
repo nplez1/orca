@@ -7,6 +7,7 @@ import type {
   HostMeshSnapshot
 } from './host-mesh-driver-contract'
 import type { HostMeshSettings } from '../../shared/host-mesh/host-mesh-admission'
+import { nudgeHostMeshSync } from './host-mesh-auto-sync'
 
 /**
  * The one place the mesh is reachable from, for the two callers that need it: the renderer's IPC handlers
@@ -69,10 +70,25 @@ export function leaveHostMeshGroup(): Promise<HostMeshSnapshot> {
   return requireDriver().leave()
 }
 
-export function updateHostMeshSettings(
+/** A paired machine's connection came up: a technical refusal is worth retrying at once. */
+export function noteHostMeshConnectionChange(): void {
+  if (!deps) {
+    return
+  }
+  requireDriver().noteConnectionChange()
+  nudgeHostMeshSync()
+}
+
+export async function updateHostMeshSettings(
   patch: Partial<HostMeshSettings>
 ): Promise<HostMeshSnapshot> {
-  return requireDriver().updateSettings(patch)
+  const snapshot = await requireDriver().updateSettings(patch)
+  // Why a nudge and not a wait: turning the switch on is the moment a fleet can converge, and the pass it needs is
+  // the same background one a connection change triggers.
+  if (snapshot.settings.enabled) {
+    nudgeHostMeshSync()
+  }
+  return snapshot
 }
 
 export function hostMeshRpcService(): HostMeshRpcService {

@@ -81,6 +81,16 @@ export const HostMeshPendingParamsSchema = z
   })
   .strict()
 
+export const HostMeshOfferBackParamsSchema = z
+  .object({
+    version: z.literal(HOST_MESH_PAYLOAD_VERSION),
+    groupId,
+    epoch,
+    offerer: joinerWithPublicKey,
+    sealed: HostMeshSealedOfferSchema
+  })
+  .strict()
+
 export const HostMeshRemoveParamsSchema = z
   .object({
     version: z.literal(HOST_MESH_PAYLOAD_VERSION),
@@ -103,11 +113,5 @@ export const HostMeshLocalRemoveParamsSchema = z
   .strict()
 
 export const HostMeshSettingsPatchParamsSchema = z
-  .object({
-    autoAcceptIntroducedMembers: z.boolean().optional(),
-    acceptIntroductions: z.boolean().optional(),
-    relayIntroductions: z.boolean().optional(),
-    // Off until this host's owner turns it on; without it every join is refused.
-    allowJoins: z.boolean().optional()
-  })
+  .object({ enabled: z.boolean().optional() })
   .strict()

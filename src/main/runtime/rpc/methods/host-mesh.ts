@@ -1,6 +1,7 @@
 import {
   HOST_MESH_INTRODUCE_METHOD,
   HOST_MESH_JOIN_METHOD,
+  HOST_MESH_OFFER_BACK_METHOD,
   HOST_MESH_PENDING_METHOD,
   HOST_MESH_RELAY_METHOD,
   HOST_MESH_REMOVE_METHOD,
@@ -12,6 +13,7 @@ import {
   HostMeshLocalJoinParamsSchema,
   HostMeshLocalRemoveParamsSchema,
   HostMeshLocalSnapshotParamsSchema,
+  HostMeshOfferBackParamsSchema,
   HostMeshPendingParamsSchema,
   HostMeshRelayParamsSchema,
   HostMeshRemoveParamsSchema,
@@ -92,6 +94,14 @@ export const HOST_MESH_METHODS = [
     handler: async (params, ctx) => await meshService().pending(params, meshCaller(ctx))
   }),
   defineMethod({
+    name: HOST_MESH_OFFER_BACK_METHOD,
+    // The caller already holds `workspace` here, and the box it hands over is an offer it minted for itself,
+    // so this adds no capability to the connection that carries it; this host's Mesh mode is the consent.
+    permission: 'workspace',
+    params: HostMeshOfferBackParamsSchema,
+    handler: async (params, ctx) => await meshService().offerBack(params, meshCaller(ctx))
+  }),
+  defineMethod({
     name: HOST_MESH_SYNC_METHOD,
     permission: 'workspace',
     params: HostMeshPendingParamsSchema,
@@ -107,7 +117,7 @@ export const HOST_MESH_METHODS = [
   // The local surface: what an owner's CLI or the settings pane drives, as opposed to what a peer calls.
   // Why `host-admin`: joining, syncing and ejecting change who may reach this machine. Note a paired desktop
   // also holds `host-admin` (rpc-caller-scope.ts RUNTIME_PAIRED_STANDARD), so this tier is not a barrier to
-  // it — the barrier is `allowJoins`, which no caller can set and only this host's owner can turn on.
+  // it — the barrier is this host's own Mesh mode, which no caller can set and only its owner can turn on.
   defineMethod({
     name: 'hostMesh.snapshot',
     permission: 'workspace',

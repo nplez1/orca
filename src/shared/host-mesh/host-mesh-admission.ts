@@ -16,28 +16,15 @@ import {
  */
 
 export type HostMeshSettings = {
-  /** Accept machines introduced by current members without asking this host's owner. */
-  autoAcceptIntroducedMembers: boolean
-  /** Accept introductions at all. Off means this host takes joins but admits nobody transitively. */
-  acceptIntroductions: boolean
-  /** Forward a newcomer's offers to other members on its behalf. */
-  relayIntroductions: boolean
-  /**
-   * Whether a paired machine may put this host into a group at all.
-   *
-   * Why off by default: a join is what makes this host mint offers and dial endpoints, and a join is
-   * `workspace`-tier, so a paired desktop could otherwise bootstrap this host into a group without its
-   * owner acting. Turning it on is one action per machine — the same count the feature promises.
-   */
-  allowJoins: boolean
+  enabled: boolean
 }
 
-/** Why the default is on: asking per introduction on every machine is the n(n−1) problem in another form. */
+/**
+ * Why on by default: the feature exists to make an already-paired fleet list the same workspaces everywhere, and a
+ * default of off would leave every upgrade exactly as scattered as it was. The switch is how an owner says no.
+ */
 export const DEFAULT_HOST_MESH_SETTINGS: HostMeshSettings = {
-  autoAcceptIntroducedMembers: true,
-  acceptIntroductions: true,
-  relayIntroductions: true,
-  allowJoins: false
+  enabled: true
 }
 
 export type IntroduceRefusal =
@@ -57,7 +44,6 @@ export type IntroduceRefusal =
 
 export type IntroduceDecision =
   | { kind: 'accept'; payload: HostMeshOfferPayload }
-  | { kind: 'ask'; payload: HostMeshOfferPayload }
   | { kind: 'refuse'; reason: IntroduceRefusal }
 
 export type InboundIntroduce = {
@@ -95,7 +81,7 @@ export function decideIntroduce(
   if (!state.members.some((member) => member.hostKey === invite.introducerHostKey)) {
     return { kind: 'refuse', reason: 'introducer-not-member' }
   }
-  if (!settings.acceptIntroductions) {
+  if (!settings.enabled) {
     return { kind: 'refuse', reason: 'introductions-disabled' }
   }
   if (state.tombstones.some((tombstone) => tombstone.hostKey === invite.newcomer.hostKey)) {
@@ -132,9 +118,7 @@ export function decideIntroduce(
   if (invite.introductionsThisHour >= HOST_MESH_MAX_INTRODUCTIONS_PER_HOUR) {
     return { kind: 'refuse', reason: 'rate-limited' }
   }
-  return settings.autoAcceptIntroducedMembers
-    ? { kind: 'accept', payload }
-    : { kind: 'ask', payload }
+  return { kind: 'accept', payload }
 }
 
 export type JoinRefusal =
@@ -148,7 +132,6 @@ export type JoinRefusal =
 
 export type JoinDecision =
   | { kind: 'accept'; payload: HostMeshOfferPayload }
-  | { kind: 'ask'; payload: HostMeshOfferPayload }
   | { kind: 'refuse'; reason: JoinRefusal }
 
 export type InboundJoin = {
@@ -169,7 +152,7 @@ export function decideJoin(
   settings: HostMeshSettings,
   join: InboundJoin
 ): JoinDecision {
-  if (!settings.allowJoins) {
+  if (!settings.enabled) {
     return { kind: 'refuse', reason: 'joins-not-allowed' }
   }
   if (join.joiner.hostKey === state.selfKey) {
@@ -197,9 +180,7 @@ export function decideJoin(
   if (payload.expiresAt <= join.now) {
     return { kind: 'refuse', reason: 'offer-expired' }
   }
-  return settings.autoAcceptIntroducedMembers
-    ? { kind: 'accept', payload }
-    : { kind: 'ask', payload }
+  return { kind: 'accept', payload }
 }
 
 /** Which members still need a offer from a newcomer, so a relay batch is never sent twice for one pair. */
@@ -238,4 +219,92 @@ function mapJoinOpenReason(reason: string | undefined): JoinRefusal {
 /** Kept next to the rules so a caller cannot build a box the decisions above would then refuse. */
 export function sealedOfferAddressedTo(sealed: HostMeshSealedOffer, hostKey: string): boolean {
   return sealed.recipientHostKey === hostKey
+}
+
+export type OfferBackRefusal =
+  | 'caller-not-paired'
+  | 'reverse-offers-disabled'
+  | 'self-offer'
+  | 'tombstoned'
+  | 'at-cap'
+  | 'offer-not-addressed-here'
+  | 'offer-sender-mismatch'
+  | 'offer-expired'
+  | 'group-mismatch'
+  | 'redeem-failed'
+  | 'offer-not-from-offerer'
+  | 'group-not-adoptable'
+
+export type OfferBackDecision =
+  | { kind: 'accept'; payload: HostMeshOfferPayload }
+  | { kind: 'refuse'; reason: OfferBackRefusal }
+
+export type InboundOfferBack = {
+  /** The device this host paired that made the call; absent means the call carried no such credential. */
+  callerPairedDeviceId?: string
+  offererHostKey: string
+  /** `null` when the envelope did not open; the reason travels separately so this stays pure. */
+  openedPayload: HostMeshOfferPayload | null
+  openReason?: string
+  now: number
+}
+
+/**
+ * Whether this host takes an offer from a machine that already holds a credential here.
+ *
+ * Why the paired device is the whole trust argument: the caller reached this method over a token this host
+ * issued, which is the same standing a direct pairing gives and stronger than any key it can claim. What the box
+ * adds is self-certifying — it names a minter key, and the offer inside it is an ordinary pairing offer whose own
+ * key must hash to that name — so a caller cannot present itself as a different machine. The residual limit is
+ * stated in `local/design/host-mesh.md`: a machine this host already trusts can add itself to the group.
+ */
+export function decideOfferBack(
+  state: HostMeshState,
+  settings: HostMeshSettings,
+  offer: InboundOfferBack
+): OfferBackDecision {
+  if (offer.callerPairedDeviceId === undefined) {
+    return { kind: 'refuse', reason: 'caller-not-paired' }
+  }
+  if (!settings.enabled) {
+    return { kind: 'refuse', reason: 'reverse-offers-disabled' }
+  }
+  if (offer.offererHostKey === state.selfKey) {
+    return { kind: 'refuse', reason: 'self-offer' }
+  }
+  if (state.tombstones.some((tombstone) => tombstone.hostKey === offer.offererHostKey)) {
+    return { kind: 'refuse', reason: 'tombstoned' }
+  }
+  if (
+    !state.members.some((member) => member.hostKey === offer.offererHostKey) &&
+    state.members.length >= HOST_MESH_MAX_MEMBERS
+  ) {
+    return { kind: 'refuse', reason: 'at-cap' }
+  }
+  const payload = offer.openedPayload
+  if (payload === null) {
+    return { kind: 'refuse', reason: offerBackOpenReason(offer.openReason) }
+  }
+  if (payload.recipientHostKey !== state.selfKey) {
+    return { kind: 'refuse', reason: 'offer-not-addressed-here' }
+  }
+  // Why the minter must be the caller's claimed key: the box is what binds the claim, so an offer minted by any
+  // other machine is not the one this host was promised.
+  if (payload.minterHostKey !== offer.offererHostKey) {
+    return { kind: 'refuse', reason: 'offer-sender-mismatch' }
+  }
+  if (payload.expiresAt <= offer.now) {
+    return { kind: 'refuse', reason: 'offer-expired' }
+  }
+  // Why a group is required here: this offer is what teaches a host in no group which one the machine that dials
+  // it is in, and an offer naming no group at all would put this host in one it cannot render.
+  if (payload.groupId === '') {
+    return { kind: 'refuse', reason: 'group-mismatch' }
+  }
+  return { kind: 'accept', payload }
+}
+
+/** The envelope's own words, narrowed to this refusal vocabulary rather than widened to another's. */
+function offerBackOpenReason(reason: string | undefined): OfferBackRefusal {
+  return reason === 'offer-expired' ? 'offer-expired' : 'offer-sender-mismatch'
 }

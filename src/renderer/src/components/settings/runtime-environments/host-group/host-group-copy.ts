@@ -40,7 +40,7 @@ export function hostGroupMemberStatus(
         label: t('auto.components.settings.hostGroup.needsUpdate', 'Needs update'),
         detail: t(
           'auto.components.settings.hostGroup.needsUpdateDetail',
-          'This computer answers, but it is running a version without the group. It joins as soon as it updates.'
+          'This computer answers, but it is running a version without the mesh. It joins as soon as it updates.'
         )
       }
     case 'half':
@@ -49,7 +49,7 @@ export function hostGroupMemberStatus(
         label: t('auto.components.settings.hostGroup.oneWay', 'One-way'),
         detail: t(
           'auto.components.settings.hostGroup.oneWayDetail',
-          'This computer and that one disagree about being paired: only one of them holds the pairing.'
+          'This computer and that one disagree about being paired: only one of them holds the pairing. This computer keeps retrying on its own.'
         )
       }
     case 'missing':
@@ -86,6 +86,36 @@ export function hostGroupMigrationLine(
         'auto.components.settings.hostGroup.migratedMany',
         'Created when this version arrived, from the {{count}} computers this one was already paired with.',
         { count: migration.peerCount }
+      )
+}
+
+/**
+ * Why the pane states the cadence instead of offering a button: the mesh reconciles itself in the main process, so a
+ * Sync control would ask for something already happening — and imply the automatic path does not exist.
+ */
+export function hostGroupAutoSyncLine(
+  snapshot: HostMeshSnapshot,
+  t: Translate,
+  now = Date.now()
+): string | null {
+  if (!snapshot.settings.enabled) {
+    return null
+  }
+  if (snapshot.lastSyncedAt === null) {
+    return t(
+      'auto.components.settings.hostGroup.autoSyncFirst',
+      'Checks itself on its own, and whenever a computer appears.'
+    )
+  }
+  const minutes = Math.max(0, Math.floor((now - snapshot.lastSyncedAt) / 60_000))
+  return minutes < 1
+    ? t('auto.components.settings.hostGroup.autoSyncJustNow', 'Kept current · checked just now')
+    : t(
+        'auto.components.settings.hostGroup.autoSyncMinutes',
+        'Kept current · checked {{count}}m ago',
+        {
+          count: minutes
+        }
       )
 }
 
@@ -145,20 +175,39 @@ export function hostGroupMemberDetail(
 
 export function hostGroupCapacityNote(summary: HostMeshGroupSummary, t: Translate): string | null {
   return summary.atCap
-    ? t('auto.components.settings.hostGroup.atCap', 'The group is full at {{count}} members.', {
+    ? t('auto.components.settings.hostGroup.atCap', 'The mesh is full at {{count}} members.', {
         count: HOST_MESH_MAX_MEMBERS
       })
     : null
 }
 
-export function hostGroupGroupLine(snapshot: HostMeshSnapshot, t: Translate): string {
-  return snapshot.inGroup
-    ? t(
-        'auto.components.settings.hostGroup.inGroup',
-        'Every member is paired with this computer, so each host lists the same workspaces.'
-      )
-    : t(
-        'auto.components.settings.hostGroup.notInGroup',
-        'This computer is not in a group. Pair with a computer that is in one to join it.'
-      )
+export function hostGroupGroupLine(
+  settings: { enabled: boolean },
+  snapshot: HostMeshSnapshot | null,
+  t: Translate
+): string {
+  if (!settings.enabled) {
+    return t(
+      'auto.components.settings.hostGroup.meshOff',
+      'Mesh mode is off. This computer keeps only the pairings you make yourself.'
+    )
+  }
+  if (snapshot === null || !snapshot.inGroup) {
+    return t(
+      'auto.components.settings.hostGroup.notInGroup',
+      'This computer is not in a mesh yet. A computer that has paired with it joins it on its next sync; nothing else is needed here.'
+    )
+  }
+  // Why the summary decides this sentence: "every member is paired" on a screen that also says "1 not paired"
+  // reads as a promise the panel can see it is not keeping.
+  if (snapshot.summary.completePairs < snapshot.summary.memberCount) {
+    return t(
+      'auto.components.settings.hostGroup.inGroupIncomplete',
+      'Not every pair is joined yet: each host above says which, and this computer keeps retrying on its own.'
+    )
+  }
+  return t(
+    'auto.components.settings.hostGroup.inGroup',
+    'Every member is paired with this computer, so each host lists the same workspaces.'
+  )
 }

@@ -32,6 +32,7 @@ import {
   ServerRowDetailsToggle,
   type ServerRowStatus
 } from '../../host-rows/ServerListRow'
+import { MeshMemberAffordance } from '../host-group/mesh-member-affordance'
 import { RuntimeSshAccessControl } from '../ssh-access/RuntimeSshAccessControl'
 import { RuntimeSshAccessDialog } from '../ssh-access/runtime-ssh-access-dialog'
 import {
@@ -335,6 +336,7 @@ export function RuntimeServerRow({
                 {t('auto.components.settings.serverList.sshTunnelChip', 'SSH tunnel')}
               </ServerRowChip>
             ) : null}
+            <MeshMemberAffordance environmentId={environment.id} />
           </>
         }
         meta={meta}

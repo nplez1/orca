@@ -53,6 +53,16 @@ const DIFF_BASE_CANDIDATES = ['origin/HEAD', 'origin/main', 'main']
  */
 export const SEAMS = [
   {
+    path: 'src/main/runtime/rpc/server/pairing/pairing-offer-requests.ts',
+    budget: 8,
+    why: 'one `fresh` argument on the runtime-offer path and its pass-through: upstream reuses one unused pending offer per (grants, creator), so a mesh pass that mints for two machines would hand both the same device row — one identity, and ejecting either one would cut the other’s link for good'
+  },
+  {
+    path: 'src/main/runtime/rpc/server/runtime-rpc-pairing.ts',
+    budget: 10,
+    why: 'one `fresh` argument and one branch choosing `addDevice` over the reuse paths, which is the same device-row rule at the registry boundary'
+  },
+  {
     path: 'src/main/runtime/rpc/methods/rpc-method-registry.ts',
     budget: 2,
     why: 'one import and one spread of FORK_RPC_METHODS, which aggregates this fork’s methods'
@@ -76,6 +86,11 @@ export const SEAMS = [
     path: 'src/renderer/src/components/settings/runtime-environments/catalog/RuntimeEnvironmentsPane.tsx',
     budget: 3,
     why: 'one import and one <HostGroupSection /> element'
+  },
+  {
+    path: 'src/renderer/src/components/settings/runtime-environments/server-rows/runtime-server-row.tsx',
+    budget: 2,
+    why: 'one import and one <MeshMemberAffordance /> in the chips slot, so a host row carries its mesh state and its Eject instead of the pane repeating every host in a second list'
   },
   {
     path: 'src/renderer/src/components/status-bar/host-connections/SshStatusSegment.tsx',

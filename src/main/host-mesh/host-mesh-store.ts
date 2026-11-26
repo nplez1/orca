@@ -87,10 +87,7 @@ const peerEntrySchema = z.looseObject({
 
 /** Partial on purpose: a build that adds a rule leaves this one's booleans at their defaults. */
 const settingsSchema = z.looseObject({
-  autoAcceptIntroducedMembers: z.boolean(),
-  acceptIntroductions: z.boolean(),
-  relayIntroductions: z.boolean(),
-  allowJoins: z.boolean()
+  enabled: z.boolean()
 })
 
 export type HostMeshMigrationRecord = {

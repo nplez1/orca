@@ -6226,18 +6226,18 @@ tests, including a three-host simulation that drives the real protocol through a
 
 **Upstream anchors — every one of these will need resolving at the next sync:**
 
-| Upstream file                                                                                                                                   | What the fork adds                                        |
-| ----------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| `src/main/runtime/rpc/core.ts`                                                                                                                  | the `hostMesh` context field                              |
-| `src/main/runtime/rpc/methods/rpc-method-registry.ts`                                                                                           | the `HOST_MESH_METHODS` spread                            |
-| `src/main/runtime/rpc/methods/host-mesh.ts`                                                                                                     | new: twelve methods, six peer-facing and six owner-facing |
-| `src/main/runtime/rpc/dispatch/dispatcher-stream-options.ts`, `server/runtime-rpc-request-admission.ts`, `server/runtime-rpc-mobile-pairing.ts` | threading the service to the handler context              |
-| `src/shared/rpc-contract/host-mesh-params.ts`, `rpc-params-catalog.generated.ts`                                                                | the params schemas and their generated catalog            |
-| `src/main/ipc/register-fork-handlers.ts`, `.test.ts`, `src/main/ipc/host-mesh/host-mesh-handlers.ts`                                            | the renderer's six IPC channels                           |
-| `src/preload/api/{fork-preload-api,index,api-types}.ts`                                                                                         | the `window.api` surface                                  |
-| `src/renderer/src/components/settings/runtime-environments/…`                                                                                   | the Host group panel                                      |
-| `src/cli/{specs/index,hosts/host-handler-groups,dispatch/remote-selection-scope}.ts`                                                            | `orca group` registration                                 |
-| `src/main/startup/runtime-startup/main-process-runtime-launch.ts`                                                                               | the one `configureHostMeshRuntimeFromApp` call            |
+| Upstream file                                                                                                                                   | What the fork adds                                                    |
+| ----------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `src/main/runtime/rpc/core.ts`                                                                                                                  | the `hostMesh` context field                                          |
+| `src/main/runtime/rpc/methods/rpc-method-registry.ts`                                                                                           | the `HOST_MESH_METHODS` spread                                        |
+| `src/main/runtime/rpc/methods/host-mesh.ts`                                                                                                     | new: thirteen methods, seven peer-facing and six owner-facing         |
+| `src/main/runtime/rpc/dispatch/dispatcher-stream-options.ts`, `server/runtime-rpc-request-admission.ts`, `server/runtime-rpc-mobile-pairing.ts` | threading the service to the handler context                          |
+| `src/shared/rpc-contract/host-mesh-params.ts`, `rpc-params-catalog.generated.ts`                                                                | the params schemas and their generated catalog                        |
+| `src/main/ipc/register-fork-handlers.ts`, `.test.ts`, `src/main/ipc/host-mesh/host-mesh-handlers.ts`                                            | the renderer's six IPC channels                                       |
+| `src/preload/api/{fork-preload-api,index,api-types}.ts`                                                                                         | the `window.api` surface                                              |
+| `src/renderer/src/components/settings/runtime-environments/…`                                                                                   | the Host mesh panel, its one switch, and the per-row mesh state/Eject |
+| `src/cli/{specs/index,hosts/host-handler-groups,dispatch/remote-selection-scope}.ts`                                                            | `orca group` registration                                             |
+| `src/main/startup/runtime-startup/main-process-runtime-launch.ts`                                                                               | the one `configureHostMeshRuntimeFromApp` call                        |
 
 **Permissions, and why they are what they are.** The six peer-facing methods are `workspace` — a caller at
 that tier already runs host-user code, so learning membership is not a new capability, and every dangerous
@@ -6323,6 +6323,116 @@ Verified by three simulations of exactly this rollout: the hub upgrading first m
 peers as needing an update; a leaf picked up the moment it updates converges on the hub's group and learns
 the member it had never met; and when the last machine updates, all three hold one group with every pair
 complete.
+
+**The upgrade that did not converge, and the reverse offer that fixes it (2026-11-26).** The first real
+three-machine upgrade reported the failure the simulations had not covered: a studio that dials two work hosts,
+and work hosts that hold nothing. They listed no members at all, and the studio showed both pairs _One-way_
+with `Sync now` unable to change it. Local evidence: `orca-environments.json` empty and `host-mesh.json` at
+`state: null, migration.peerCount: 0` on a work host. Three causes, all now closed:
+
+- `listPairedHostKeys` reads the environment table, so a machine that is only ever **dialled** migrates
+  nothing and records that run permanently. The migration is a one-shot and deliberately stays one (`pairing a
+  machine later must not silently create a group`), so the fix is not to widen it.
+- Every method in the protocol is a call the holder of an environment makes — `join`, `relayIntroductions`,
+  `introduce`, `sync` — so a host with nothing could neither dial a member nor be introduced by one, and
+  adoption at the far end asked for an outbound environment it did not have. The one-way badge was honest and
+  nothing could repair it.
+- The manual path the design note depends on was unreachable: `hostMesh.join` needs a local environment, the
+  renderer never called it, and `allowJoins` was not in the IPC allowlist.
+
+`hostMesh.offerBack` closes it: a machine that already holds a credential into a peer hands that peer an offer of
+its own, sealed to it, and the peer redeems it and adopts the group. No host mints on another's behalf, the box
+is single-use and expires, and the only machine that can open it is the one it was addressed to. The trust anchor
+is the device row the caller authenticated with — it reached the method over a token this host issued, so it
+already runs commands here — and the box names a minter key whose own pairing offer must hash to that name, so a
+caller cannot present itself as a different machine. The residual risk is the accepted one: a machine this host
+already trusts can add itself, bounded by attribution, `HOST_MESH_MAX_MEMBERS` and ejection.
+
+One offer per member per launch, retried no more often than `HOST_MESH_REVERSE_OFFER_RETRY_MS`, and never again
+in the launch after a refusal: an offer is a device row here, and a machine with the mesh switched off must not
+be handed ten of them. Verified by two new driver simulations — the reported fleet converges to every pair
+complete with no action on either work host, and a refusal leaves the pair honestly one-way with exactly one
+offer minted — plus six admission tests for the rule chain (no device row, mesh off, another machine's box, a
+box addressed elsewhere, a tombstoned member).
+
+**One switch, and one list of hosts.** `HostMeshSettings` is `{ enabled }`; the five per-rule booleans were a
+protocol audit dressed as a setting, and the pane's member list repeated every host already in the server list
+above it. Each host row now carries its mesh status and an Eject (one new declared seam: two lines in
+`runtime-server-row.tsx`), and the section is the switch, the summary, when it last checked itself, and _Leave
+mesh_. The only list left is a member this computer cannot reach — it has no row to hang anything on, which is the
+one case the old second list was actually for. A bridge-independent renderer store (`host-mesh-shared-state.ts`)
+feeds the section and every row from one snapshot, so an eject cannot leave one of them showing the old state.
+
+**No Sync control anywhere, and why.** The owner's next sentence was the requirement: _"I shouldn't have the push
+sync on anything. Everything should happen automatically!"_ `host-mesh-auto-sync.ts` now owns one reconcile in the
+main process — a pass ~10s after launch, on every connection-change observation, when the switch goes on, and when
+a peer pairs this host, all collapsed into a single nudge; then one pass a minute while the fleet answers, doubling
+to a 15-minute ceiling while it does not. A self-scheduling `setTimeout`, not `setInterval`, because a fixed
+cadence is exactly what the recurring-timer ratchet refuses and a closed laptop must make this quieter; the handle
+is unref'd, so it never holds the app open. The driver holds one in-flight pass, so a nudge and the scheduled pass
+cannot interleave two writes. The renderer lost `hostMesh:sync` and `window.api.hostMesh.sync` with the button; a
+pane re-reads the local snapshot on the shared 15s clock and prints `lastSyncedAt`, so it follows the passes
+instead of showing what it mounted with. `orca group sync` stays as a script's one-shot. Six fake-timer tests pin
+the cadence, the burst collapse, the backoff and its recovery, a nudge that lands mid-pass, the idempotent start and
+the stop.
+
+**What the review of this branch caught, and what it changed.** Opus 5.5 at high reasoning reviewed `R1` before the
+first push and returned two blockers and five should-fixes. Both blockers were real and both are fixed here:
+
+- _The pane had no data in the running app._ `useHostGroupSnapshot` kept every read in its own state, so the shared
+  store that the switch, the summary and every row read was only ever written by the fixture — in the app the section
+  said "Reading the mesh…" forever and no row got a badge. Each read and each action now publishes.
+- _One pass could hand two machines the same credential._ Upstream's `getOrCreatePendingDevice` reuses one unused
+  pending offer per (grants, creator) — right for a QR code shown twice, wrong for a pass that mints once per member.
+  Two members shared a device row, so both presented one identity and ejecting either revoked the other's link for
+  good while the host still recorded it as active. Each mint is now a fresh row: `createPairingOffer({ fresh })` —
+  two declared seams, `pairing-offer-requests.ts` and `runtime-rpc-pairing.ts` — with a test against the real
+  `DeviceRegistry` pinning that reuse returns one row and a fresh mint returns two, neither orphaning the other.
+
+The should-fixes, each with the reason it was one:
+
+- **Every local writer now shares one lock** (`host-mesh-write-lock.ts`, the driver and the peer-facing service). A
+  pass reads, awaits seconds of network per member, then writes; an Eject or an inbound `remove` landing in that
+  window was silently overwritten by the pass's own later write. An inbound call that waits behind a pass merely
+  retries — losing nothing — which is the trade this lock makes on purpose.
+- **A refusal is a wait, not the end of the launch**, and a transport failure is no longer recorded as a refusal. The
+  owner at that machine can turn the mesh on at any time; the retry interval bounds the minting.
+- **The backoff actually engages.** The driver catches every member failure per member, so a pass against a sleeping
+  fleet returned happily and the loop dialled those machines every minute forever. The snapshot now reports
+  `lastPassReached`, the pass doubles its wait when that is zero, and a driver test drives a sleeping fleet to prove
+  the number is 0 there and 2 once they wake.
+- **A reconnect resets the retry window** (`noteConnectionChange`), so a machine that finishes updating between
+  passes is offered again at once instead of waiting out ten minutes.
+- **An Eject on the dialled side revokes something.** `offerBack` accepted a caller over a token this host issued and
+  then never recorded that row, so ejecting the studio from a work host revoked nothing. It is recorded now.
+- **A background pass no longer widens network exposure.** Minting for network reach calls `ensureNetworkExposure`,
+  which the design note records as irreversible; that was harmless while only an owner's join minted one, and the
+  scheduled pass would have opened a loopback-only host to the LAN with no owner action. The mint now hands back an
+  offer at the reach the existing pairing already uses.
+
+The delta re-check then caught two defects those fixes had introduced, both now closed:
+
+- **Two hosts' passes could wait on each other.** Taking the lock in every peer-facing method put the pure reads
+  behind the receiving host's own pass: A's pass held A's lock and awaited B's `sync`, while B's pass held B's lock
+  and awaited A's `sync`. Both ran out the 20s call timeout, both recorded the other as unreached, and both backed off
+  in step. `sync` and `pending` read and reply with no await between them, so they are no longer locked; a driver test
+  runs both hosts' passes at once and would hang if they were.
+- **A refused offer left a live credential behind.** Fresh mints plus a retry interval means one new row per attempt,
+  and nothing revoked the row when the far side said no — a peer with the mesh switched off or on an old build would
+  add ~144 never-expiring `workspace` tokens a day. A mesh mint now carries `HOST_MESH_OFFER_TTL_MS`, an explicit
+  refusal or `method_not_found` revokes the row it just minted, and a dropped connection does not (the box may have
+  arrived and be redeeming), leaving that one to its TTL.
+
+Smaller ones taken as well: the public key is checked before minting (a keyless member got a credential nothing could
+redeem), the caller and settings checks run before the box is opened (opening spends a nonce and writes the store), a
+nudge that arrives during a pass is kept rather than overwritten by the schedule, a 15s re-read no longer disables the
+switch or clears an action's error, a row keeps its Eject when mesh mode is off (that is how an owner who switched it
+off can still end a pairing), and the copy and comments that still mentioned a Sync button are gone.
+
+**The five per-rule switches were never in a release.** `git tag --contains 1504c94a167` is empty: `#466` exists only
+on an archive branch, so no installed build carries `acceptIntroductions`/`relayIntroductions` and there is no
+consent to migrate. A fork-main build that had them reads a settings record without them and gets the one switch,
+which is the documented simplification rather than a silently widened permission.
 
 ### `local(hosts)`: the fleet every instance sees, and one join that pairs it with all
 
