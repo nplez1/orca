@@ -96,6 +96,11 @@ export const SEAMS = [
     path: 'src/cli/dispatch/remote-selection-scope.ts',
     budget: 2,
     why: 'one condition: a group is this host’s own membership, so remote routing would report another host'
+  },
+  {
+    path: 'src/main/native-chat/agent-session-journal/journal-domain-operation-window.performance.test.ts',
+    budget: 6,
+    why: 'two per-test timeouts on the file’s fixture-heavy contracts, and the one-line reason the flaky-test ratchet requires above each — LOCAL-PATCHES.md § local(test): the perf contract whose Windows wall clock, not its operation count, reddened the lane'
   }
 ]
 

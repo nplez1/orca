@@ -6402,6 +6402,12 @@ is what stops a timeout bump from quietly hiding a slow test.
 still assert the same operation counts. The anchors are the two `it(...)` titles above — an upstream edit
 to either test's body is the only thing that moves them.
 
+The six lines this costs in an upstream file are declared as a seam in
+`local/checks/host-mesh-upstream-seams.mjs` (budget 6, the measured size), which is the register that
+makes a fork hunk in upstream's tree visible and bounded rather than silent. That budget only shrinks:
+the next sync brings upstream's own `}, 120_000)` and its comment above the second test, at which point
+our line there is identical and the seam can be re-measured down to the one test upstream left alone.
+
 **Verified:** the file passes locally (7/7, 4.5 s, macOS, `config/vitest.performance.config.ts`), and
 both ratchets this change touches are green (`test-timeout-needs-reason`, `check-upstream-file-comments`
 4764/4764). The runner that reddened is the one that decides, so the fix was dispatched on the branch
