@@ -46,7 +46,10 @@ export function lintVerdictTarget(git) {
 
 /**
  * Record a full, clean run. `steps` is `[{ id, seconds, exitCode }]`; only the ids and the overall
- * outcome are kept, because the marker answers "did every step run green", not "what did it print".
+ * outcome are kept, because the marker answers "may this revision be released on lint", not "what did
+ * it print". `allPassed` is true in every marker this writes: `gate-lint.mjs` records one only after its
+ * own PASS, which a known-red-only failure set still is. A step that exited non-zero for a recorded
+ * reason is named in `failed` for the record and does not make the revision ungated.
  */
 export function writeLintVerdict({ gitCommonDir, revision, steps, dirty = false, only = null }) {
   if (dirty || (only && only.length > 0) || !revision) {
@@ -55,7 +58,8 @@ export function writeLintVerdict({ gitCommonDir, revision, steps, dirty = false,
   const failed = steps.filter((step) => step.exitCode !== 0).map((step) => step.id)
   const marker = {
     revision,
-    allPassed: failed.length === 0,
+    allPassed: true,
+    knownRedSteps: failed,
     failed,
     steps: steps.map((step) => step.id),
     recordedAt: new Date().toISOString()
