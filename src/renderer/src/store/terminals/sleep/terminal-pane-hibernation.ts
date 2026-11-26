@@ -21,6 +21,7 @@ import { resolveTerminalTeardownOwner } from './terminal-teardown-owner'
 import { settleAttentionRemovedBy } from '../../slices/workspace-attention/attention-removal-follow-up'
 import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../../shared/workspace-layout/layout-owner-switch'
 import { recordPaneSleepThroughLayoutOwner } from './terminal-sleep-layout-owner'
+import { forgetPromptFreeAgentTabLaunch } from '@/lib/agent-session/launch/new-tab/agent-tab-prompt-free-launch'
 
 export function createTerminalPaneHibernationActions(
   set: TerminalStoreSet,
@@ -33,6 +34,7 @@ export function createTerminalPaneHibernationActions(
         opts.expectedRuntimePtyId ? [opts.expectedRuntimePtyId] : []
       )
       const rendererShutdownPtyIds = [opts.ptyId]
+      forgetPromptFreeAgentTabLaunch(opts.tabId)
       const state = get()
       const worktreeOwner = resolveTerminalPtyOwner(state, worktreeId)
       const teardownOwner = resolveTerminalTeardownOwner(worktreeOwner, [opts.ptyId])

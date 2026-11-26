@@ -3,7 +3,7 @@ import { useRunningTerminalCloseConfirmStore } from '@/store/slices/tabs/closing
 import type { TerminalTabCloseReason } from '@/store/terminals/retirement/terminal-tab-retirement'
 import type { TerminalTabCloseIntent } from './terminal-tab-close-intent'
 import type { AppState } from '@/store/types'
-import { resolveBusyPtyCloseCopyKind } from './terminal-close-copy-kind'
+import { isProbeOfEmptyAgentSession, resolveBusyPtyCloseCopyKind } from './terminal-close-copy-kind'
 import { canSleepInsteadOfClosingTab } from './terminal-close-sleep-eligibility'
 import { probePtyRunningWork } from './pty-running-work-probe'
 
@@ -122,7 +122,7 @@ export function guardRunningTerminalClose(params: {
       const busyPtyIds = probes
         .filter(
           (probe) =>
-            probe.verdict === 'live' ||
+            (probe.verdict === 'live' && !isProbeOfEmptyAgentSession(terminalTabId, probe)) ||
             (probe.verdict === 'unverifiable' && boundPtyIds.has(probe.ptyId))
         )
         .map((probe) => probe.ptyId)

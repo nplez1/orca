@@ -24,6 +24,7 @@ import { isPaneReplaying } from '../snapshots/replay-guard'
 import { connectPanePty } from '../pty-connection/connect-pane-pty'
 import { completePaneSpawnPlacement } from '../layout/split/terminal-pane-spawn-placement'
 import { createQueuedStartupConsumer } from './queued-pane-startup'
+import { bindPromptFreeAgentTabLaunch } from '@/lib/agent-session/launch/new-tab/agent-tab-prompt-free-launch'
 import { resolvePaneSeedCwd } from './pane-seed-cwd'
 import { clearQueuedInitialCwdAfterFirstPane } from './queued-initial-cwd'
 import type { TerminalPaneManagerOptionsContext } from './terminal-pane-mount-context'
@@ -171,7 +172,10 @@ export function createTerminalPaneCreatedHandler(
     const onQueuedStartupSpawned = createQueuedStartupConsumer(
       ptyDeps.startup,
       startup,
-      () => useAppStore.getState().consumeTabStartupCommand(deps.tabId),
+      (ptyId) => {
+        useAppStore.getState().consumeTabStartupCommand(deps.tabId)
+        bindPromptFreeAgentTabLaunch(deps.tabId, pane.leafId, ptyId)
+      },
       () => useAppStore.getState().pendingStartupByTabId[deps.tabId] === startup
     )
     const panePtyBinding = connectPanePty(pane, manager, {

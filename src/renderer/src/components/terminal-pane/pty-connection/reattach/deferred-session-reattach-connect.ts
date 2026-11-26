@@ -1,3 +1,4 @@
+import { forgetPromptFreeAgentTabLaunch } from '@/lib/agent-session/launch/new-tab/agent-tab-prompt-free-launch'
 import {
   NOT_REOPENED,
   reopenPaneAfterMissingReattach
@@ -134,6 +135,7 @@ function connectDeferredSessionReattach(
   )
   session.beginReattachLiveDataDeferral(outputCallbacks.generation)
   session.transportConnectInFlightSince = Date.now()
+  forgetPromptFreeAgentTabLaunch(session.deps.tabId)
   const reattachPromise = session.transport.connect({
     url: '',
     cols: session.cols,

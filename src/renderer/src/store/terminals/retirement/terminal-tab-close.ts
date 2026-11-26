@@ -24,6 +24,7 @@ import { deleteNativeChatComposerDraftsForTab } from '@/components/native-chat/d
 import { dropNativeChatPendingAttachmentsForTab } from '@/components/native-chat/attachments/chips/native-chat-pending-attachment-cache'
 import { noteAgentLaunchPaneClosedByUser } from '@/lib/agent-session/launch/pane/agent-launch-pane-closes'
 import { settleAgentLaunchPaneStart } from '@/lib/agent-session/launch/pane/agent-launch-pane-start'
+import { forgetPromptFreeAgentTabLaunch } from '@/lib/agent-session/launch/new-tab/agent-tab-prompt-free-launch'
 import { settleAttentionRemovedBy } from '../../slices/workspace-attention/attention-removal-follow-up'
 import { runAsAutomaticDeselection } from '../../workspaces/selection/active-worktree-deselection-intent'
 import { recordDraft, tabBucketDraft } from '../../record-transitions/keyed-record-transitions'
@@ -68,6 +69,7 @@ export function createTerminalTabCloseActions(
           void stopLegacyRelayBridgedShellsForTab(get(), tabId, retirementPlan)
         }
       }
+      forgetPromptFreeAgentTabLaunch(tabId)
       settleAttentionRemovedBy(set, get, () =>
         set((s) => {
           // Reuse one iterable for all per-tab omissions in this close.

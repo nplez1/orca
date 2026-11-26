@@ -10,14 +10,14 @@ export function paneOwnsQueuedStartup(
 export function createQueuedStartupConsumer(
   paneStartup: PtyPaneStartup | null | undefined,
   queuedStartup: PtyPaneStartup | null | undefined,
-  consume: () => void,
+  consume: (ptyId: string) => void,
   isStillQueued: () => boolean
-): (() => void) | undefined {
+): ((ptyId: string) => void) | undefined {
   if (!paneOwnsQueuedStartup(paneStartup, queuedStartup)) {
     return undefined
   }
   let spent = false
-  return () => {
+  return (ptyId) => {
     if (spent) {
       return
     }
@@ -25,6 +25,6 @@ export function createQueuedStartupConsumer(
     if (!isStillQueued()) {
       return
     }
-    consume()
+    consume(ptyId)
   }
 }

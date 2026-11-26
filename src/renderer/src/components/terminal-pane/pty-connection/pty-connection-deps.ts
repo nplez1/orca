@@ -63,7 +63,7 @@ export type PtyConnectionDeps = {
   >
   clearTabPtyId: (tabId: string, ptyId: string) => void
   /** Consume queued startup once this pane’s first fresh PTY binds; binding does not prove command delivery, which can precede it or fail with shell startup. */
-  onQueuedStartupSpawned?: () => void
+  onQueuedStartupSpawned?: (ptyId: string) => void
   consumeSuppressedPtyExit: (ptyId: string) => boolean
   isPtyShutdownPending: (ptyId: string) => boolean
   updateTabTitle: (tabId: string, title: string) => void
