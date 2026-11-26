@@ -54,6 +54,9 @@ export type FileExplorerRowProps = {
   onStartNew: (type: 'file' | 'folder', dir: string, depth: number) => void
   onStartRename: (node: TreeNode) => void
   onDuplicate: (node: TreeNode) => void
+  onMoveTo: () => void
+  onCopyTo: () => void
+  canCopyTo: boolean
   onAddFolderAsProject: () => void
   canAddAsProject: boolean
   onOpenInTerminal: () => void
@@ -99,6 +102,9 @@ export function FileExplorerRow({
   onStartNew,
   onStartRename,
   onDuplicate,
+  onMoveTo,
+  onCopyTo,
+  canCopyTo,
   onAddFolderAsProject,
   canAddAsProject,
   onOpenInTerminal,
@@ -282,6 +288,9 @@ export function FileExplorerRow({
         onStartNew={onStartNew}
         onStartRename={onStartRename}
         onDuplicate={onDuplicate}
+        onMoveTo={onMoveTo}
+        onCopyTo={onCopyTo}
+        canCopyTo={canCopyTo}
         onAddFolderAsProject={onAddFolderAsProject}
         canAddAsProject={canAddAsProject}
         onOpenInTerminal={onOpenInTerminal}

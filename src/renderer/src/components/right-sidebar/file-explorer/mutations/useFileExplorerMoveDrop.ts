@@ -1,13 +1,19 @@
 import { useCallback } from 'react'
 import { toast } from 'sonner'
 import { basename, dirname, joinPath } from '@/lib/path'
-import { executeOpenEditorPathMove } from '@/lib/editor/file-operations/execute-open-editor-path-move'
+import {
+  EditorPathMoveRetargetError,
+  executeOpenEditorPathMove
+} from '@/lib/editor/file-operations/execute-open-editor-path-move'
+import { runtimePathExists } from '@/runtime/files/metadata/runtime-file-metadata-client'
 import { commitFileExplorerOp } from './fileExplorerUndoRedo'
 import type { FileExplorerOperationOwner } from '../tree/file-explorer-types'
 import { captureFileExplorerOperationGuard } from '../navigation/file-explorer-operation-owner'
+import { classifyMoveDestination } from './file-explorer-move-copy-paths'
+import { fileExplorerGuardContext } from './file-explorer-copy-into-dir'
 import { translate } from '@/i18n/i18n'
 
-function extractIpcErrorMessage(err: unknown, fallback: string): string {
+export function extractIpcErrorMessage(err: unknown, fallback: string): string {
   if (!(err instanceof Error)) {
     return fallback
   }
@@ -15,105 +21,150 @@ function extractIpcErrorMessage(err: unknown, fallback: string): string {
   return match ? match[1] : err.message
 }
 
-type UseFileExplorerMoveDropParams = {
+export function isPathCollisionError(err: unknown): boolean {
+  return (
+    err instanceof Error &&
+    (err.message.includes('EEXIST') ||
+      err.message.includes('ENOTEMPTY') ||
+      err.message.includes('already exists'))
+  )
+}
+
+export function pathCollisionMessage(name: string): string {
+  return translate(
+    'fileExplorer.moveCopy.collision',
+    "An item named '{{name}}' already exists in that folder.",
+    { name }
+  )
+}
+
+function describeMoveFailure(err: unknown, fileName: string): string {
+  return !(err instanceof EditorPathMoveRetargetError) && isPathCollisionError(err)
+    ? pathCollisionMessage(fileName)
+    : extractIpcErrorMessage(
+        err,
+        translate('components.toastFallbacks.fileMoveFailed', "Failed to move '{{name}}'.", {
+          name: fileName
+        })
+      )
+}
+
+export type FileExplorerMoveResult =
+  | { status: 'moved' }
+  | { status: 'skipped' }
+  | { status: 'failed'; message: string }
+
+type UseFileExplorerMovePathParams = {
   worktreePath: string | null
   activeWorktreeId: string | null
   refreshDir: (dirPath: string) => Promise<void>
   getOperationOwnerForPath: (path: string) => FileExplorerOperationOwner | undefined
+}
+
+export async function moveFileExplorerPath(
+  {
+    worktreePath,
+    activeWorktreeId,
+    refreshDir,
+    getOperationOwnerForPath
+  }: UseFileExplorerMovePathParams,
+  sourcePath: string,
+  destDir: string
+): Promise<FileExplorerMoveResult> {
+  if (!worktreePath || !activeWorktreeId) {
+    return { status: 'skipped' }
+  }
+  if (classifyMoveDestination(sourcePath, destDir) !== 'allowed') {
+    return { status: 'skipped' }
+  }
+  const fileName = basename(sourcePath),
+    sourceDir = dirname(sourcePath)
+  const newPath = joinPath(destDir, fileName)
+  const operationOwner = getOperationOwnerForPath(sourcePath)
+
+  try {
+    const operationGuard = captureFileExplorerOperationGuard(activeWorktreeId, operationOwner)
+    const context = fileExplorerGuardContext(operationGuard, activeWorktreeId, worktreePath)
+    if (await runtimePathExists(context, newPath)) {
+      return { status: 'failed', message: pathCollisionMessage(fileName) }
+    }
+    operationGuard.assertCurrent()
+    await executeOpenEditorPathMove({
+      context,
+      fromPath: sourcePath,
+      toPath: newPath,
+      worktreeId: activeWorktreeId,
+      worktreePath
+    })
+    commitFileExplorerOp({
+      undo: async () => {
+        operationGuard.assertCurrent()
+        await executeOpenEditorPathMove({
+          context,
+          fromPath: newPath,
+          toPath: sourcePath,
+          worktreeId: activeWorktreeId,
+          worktreePath
+        })
+        await Promise.all([refreshDir(destDir), refreshDir(sourceDir)])
+      },
+      redo: async () => {
+        operationGuard.assertCurrent()
+        await executeOpenEditorPathMove({
+          context,
+          fromPath: sourcePath,
+          toPath: newPath,
+          worktreeId: activeWorktreeId,
+          worktreePath
+        })
+        await Promise.all([refreshDir(sourceDir), refreshDir(destDir)])
+      }
+    })
+  } catch (err) {
+    return { status: 'failed', message: describeMoveFailure(err, fileName) }
+  }
+  await Promise.all([refreshDir(sourceDir), refreshDir(destDir)]).catch(() => {})
+  return { status: 'moved' }
+}
+
+export function useFileExplorerMovePath({
+  worktreePath,
+  activeWorktreeId,
+  refreshDir,
+  getOperationOwnerForPath
+}: UseFileExplorerMovePathParams): (
+  sourcePath: string,
+  destDir: string
+) => Promise<FileExplorerMoveResult> {
+  return useCallback(
+    (sourcePath: string, destDir: string) =>
+      moveFileExplorerPath(
+        { worktreePath, activeWorktreeId, refreshDir, getOperationOwnerForPath },
+        sourcePath,
+        destDir
+      ),
+    [worktreePath, activeWorktreeId, refreshDir, getOperationOwnerForPath]
+  )
+}
+
+type UseFileExplorerMoveDropParams = {
+  movePath: (sourcePath: string, destDir: string) => Promise<FileExplorerMoveResult>
   setDropTargetDir: (dir: string | null) => void
 }
 
 export function useFileExplorerMoveDrop({
-  worktreePath,
-  activeWorktreeId,
-  refreshDir,
-  getOperationOwnerForPath,
+  movePath,
   setDropTargetDir
 }: UseFileExplorerMoveDropParams): (sourcePath: string, destDir: string) => void {
   return useCallback(
     (sourcePath: string, destDir: string) => {
-      if (!worktreePath || !activeWorktreeId) {
-        return
-      }
-      const fileName = basename(sourcePath),
-        sourceDir = dirname(sourcePath)
-
       setDropTargetDir(null)
-
-      if (sourceDir === destDir) {
-        return
-      }
-      if (
-        destDir === sourcePath ||
-        destDir.startsWith(`${sourcePath}/`) ||
-        destDir.startsWith(`${sourcePath}\\`)
-      ) {
-        return
-      }
-
-      const newPath = joinPath(destDir, fileName)
-      const operationOwner = getOperationOwnerForPath(sourcePath)
-
-      const run = async (): Promise<void> => {
-        try {
-          const operationGuard = captureFileExplorerOperationGuard(activeWorktreeId, operationOwner)
-          const operationRoute = operationGuard.route
-          const fileContext = {
-            target: operationRoute.target,
-            worktreeId: activeWorktreeId,
-            worktreePath,
-            connectionId: operationRoute.connectionId,
-            expectedExecutionHostId: operationRoute.expectedExecutionHostId,
-            expectedSshTargetId: operationRoute.expectedSshTargetId,
-            expectedSshConnectionGeneration: operationRoute.expectedSshConnectionGeneration
-          }
-          operationGuard.assertCurrent()
-          await executeOpenEditorPathMove({
-            context: fileContext,
-            fromPath: sourcePath,
-            toPath: newPath,
-            worktreeId: activeWorktreeId,
-            worktreePath
-          })
-          commitFileExplorerOp({
-            undo: async () => {
-              operationGuard.assertCurrent()
-              await executeOpenEditorPathMove({
-                context: fileContext,
-                fromPath: newPath,
-                toPath: sourcePath,
-                worktreeId: activeWorktreeId,
-                worktreePath
-              })
-              await Promise.all([refreshDir(destDir), refreshDir(sourceDir)])
-            },
-            redo: async () => {
-              operationGuard.assertCurrent()
-              await executeOpenEditorPathMove({
-                context: fileContext,
-                fromPath: sourcePath,
-                toPath: newPath,
-                worktreeId: activeWorktreeId,
-                worktreePath
-              })
-              await Promise.all([refreshDir(sourceDir), refreshDir(destDir)])
-            }
-          })
-        } catch (err) {
-          toast.error(
-            extractIpcErrorMessage(
-              err,
-              translate('components.toastFallbacks.fileMoveFailed', "Failed to move '{{name}}'.", {
-                name: fileName
-              })
-            )
-          )
-          return
+      void movePath(sourcePath, destDir).then((result) => {
+        if (result.status === 'failed') {
+          toast.error(result.message)
         }
-        await Promise.all([refreshDir(sourceDir), refreshDir(destDir)])
-      }
-      void run()
+      })
     },
-    [worktreePath, activeWorktreeId, refreshDir, getOperationOwnerForPath, setDropTargetDir]
+    [movePath, setDropTargetDir]
   )
 }

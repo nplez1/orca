@@ -8,7 +8,11 @@ import {
 } from '@/lib/files/drop/workspace-file-drag'
 import type { FileExplorerOperationOwner } from '../tree/file-explorer-types'
 import { useFileExplorerDragEdgeScroll } from './useFileExplorerDragEdgeScroll'
-import { useFileExplorerMoveDrop } from './useFileExplorerMoveDrop'
+import {
+  useFileExplorerMoveDrop,
+  useFileExplorerMovePath,
+  type FileExplorerMoveResult
+} from './useFileExplorerMoveDrop'
 import { useFileExplorerDragExpand } from './useFileExplorerDragExpand'
 
 type UseFileExplorerDragDropParams = {
@@ -24,6 +28,7 @@ type UseFileExplorerDragDropParams = {
 
 type UseFileExplorerDragDropResult = {
   handleMoveDrop: (sourcePath: string, destDir: string) => void
+  movePath: (sourcePath: string, destDir: string) => Promise<FileExplorerMoveResult>
   handleDragExpandDir: (dirPath: string) => void
   dropTargetDir: string | null
   setDropTargetDir: (dir: string | null) => void
@@ -102,13 +107,13 @@ export function useFileExplorerDragDrop({
     }
   }, [stopAndClearDragState, stopDragEdgeScroll])
 
-  const handleMoveDrop = useFileExplorerMoveDrop({
+  const movePath = useFileExplorerMovePath({
     worktreePath,
     activeWorktreeId,
     refreshDir,
-    getOperationOwnerForPath,
-    setDropTargetDir
+    getOperationOwnerForPath
   })
+  const handleMoveDrop = useFileExplorerMoveDrop({ movePath, setDropTargetDir })
 
   const clearNativeDragState = useCallback(() => {
     // OS-drop ownership bypasses React onDrop; stop its self-rescheduling scroll loop here.
@@ -199,6 +204,7 @@ export function useFileExplorerDragDrop({
   })
   return {
     handleMoveDrop,
+    movePath,
     handleDragExpandDir,
     dropTargetDir,
     setDropTargetDir,

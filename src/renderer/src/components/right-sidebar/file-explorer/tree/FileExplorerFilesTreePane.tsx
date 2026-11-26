@@ -116,7 +116,10 @@ export function FileExplorerFilesTreePane({
     handleCollapseFolderSubtree,
     handleFindInFolder,
     handleAddFolderAsProject,
-    handleOpenInTerminal
+    handleOpenInTerminal,
+    handleMoveTo,
+    handleCopyTo,
+    canCopyTo
   } = nodeCommands
 
   // Keep the root mounted in loading/error/empty states so it can always own OS file drops.
@@ -278,6 +281,9 @@ export function FileExplorerFilesTreePane({
           onStartNew={startNew}
           onStartRename={handleStartRename}
           onDuplicate={handleDuplicate}
+          onMoveTo={handleMoveTo}
+          onCopyTo={handleCopyTo}
+          canCopyTo={canCopyTo}
           onAddFolderAsProject={handleAddFolderAsProject}
           canAddFolderAsProject={(node) => canShowAddAsProjectAction(node, activeRepo)}
           onOpenInTerminal={handleOpenInTerminal}
