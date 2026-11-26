@@ -22,6 +22,11 @@ import {
 } from '../text-generation/execution/source-control-generation-limits'
 import type { SessionFoldBrain } from './session-summary-fold'
 
+/** Matched by the question path, which names a timeout to the reader rather than relaying this. */
+export const SESSION_SUMMARY_FOLD_TIMED_OUT_MESSAGE = 'session summary fold timed out'
+/** Matched by the question path: an answer aborted on quit reads back as interrupted. */
+export const SESSION_SUMMARY_FOLD_CANCELED_MESSAGE = 'session summary fold canceled'
+
 export type AgentCliFoldBrainDeps = {
   /** The configured fold agent; null means nothing usable is selected, which fails the
    *  fold rather than substituting an agent the user did not choose. */
@@ -105,10 +110,10 @@ async function runAgent(args: {
       })
     }
     const timer = setTimeout(
-      () => fail('session summary fold timed out'),
+      () => fail(SESSION_SUMMARY_FOLD_TIMED_OUT_MESSAGE),
       SOURCE_CONTROL_GENERATION_TIMEOUT_MS
     )
-    const onAbort = (): void => fail('session summary fold canceled')
+    const onAbort = (): void => fail(SESSION_SUMMARY_FOLD_CANCELED_MESSAGE)
     signal.addEventListener('abort', onAbort, { once: true })
     child.stdout?.on('data', (data: Buffer) => {
       if (stdout.length < MAX_SOURCE_CONTROL_AGENT_OUTPUT_BYTES) {

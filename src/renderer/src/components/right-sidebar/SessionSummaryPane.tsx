@@ -5,6 +5,8 @@ import { useTranslate } from '@/i18n/use-translate'
 import { SessionSummaryLedgerView } from '@/components/activity/session-summary-ledger-view'
 import { resolveSessionSummaryHeaderState } from '@/components/activity/session-summary-presentation'
 import { useSessionSummary } from '@/components/activity/use-session-summary'
+import { useSessionSummaryQuestions } from '@/components/activity/use-session-summary-questions'
+import { SessionSummaryQuestionComposer } from '@/components/activity/session-summary-questions-view'
 import { useAppStore } from '@/store'
 import {
   useSessionSummaryExecutionHostId,
@@ -39,6 +41,7 @@ function SessionSummarySubjectBody({
     agentUpdatedAt
   )
   const { hint, folding } = resolveSessionSummaryHeaderState(snapshot)
+  const questions = useSessionSummaryQuestions(paneKey, snapshot)
 
   return (
     <>
@@ -76,9 +79,22 @@ function SessionSummarySubjectBody({
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto scrollbar-sleek">
         <div className="px-4 py-3">
-          <SessionSummaryLedgerView snapshot={snapshot} />
+          <SessionSummaryLedgerView
+            snapshot={snapshot}
+            questions={questions.questions}
+            {...(questions.canAsk ? { onRetryQuestion: questions.retry } : {})}
+          />
         </div>
       </div>
+      {/* Outside the scroll area so it does not scroll away. A window that cannot ask at all (a
+          paired browser client) shows the questions read-only and no composer. */}
+      {questions.askAvailable ? (
+        <SessionSummaryQuestionComposer
+          canAsk={questions.canAsk}
+          hasBrief={Boolean(snapshot?.ledger)}
+          onAsk={questions.ask}
+        />
+      ) : null}
     </>
   )
 }

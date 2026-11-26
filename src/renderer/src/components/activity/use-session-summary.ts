@@ -77,7 +77,8 @@ export function useSessionSummary(
         ? {
             ...(snapshotRef.current ?? next),
             ...next,
-            ledger: next.ledger ?? snapshotRef.current?.ledger ?? null
+            ledger: next.ledger ?? snapshotRef.current?.ledger ?? null,
+            questions: next.questions ?? snapshotRef.current?.questions
           }
         : next
       const ledger = merged.ledger
