@@ -10,6 +10,7 @@
 //   gate-lint:<step>            a step `local/gate-lint.mjs` runs at the release gate
 //   post-sync:<row>             a row `local/sync/post-sync.mjs` runs on the merged tip
 //   mobile-postinstall:<script> a generator `mobile/package.json` postinstall re-runs on every install
+//   review:manifest             the review record `local/release-review-gate.mjs` reads back at dispatch
 import { existsSync, readFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { FORK_LINT_STEPS, resolveGateSteps } from '../gate-lint.mjs'
@@ -84,6 +85,17 @@ export const EXCLUSIONS = [
     why: 'minified vendor output (mermaid, xterm, katex) rebuilt by the mobile postinstall',
     residual:
       'whether the file belongs in git at all: the generators write gitignored paths, so a committed copy is worth a look'
+  },
+  {
+    id: 'release-review-records',
+    // Why: a delta range that starts after a review round carries the previous round's own record —
+    // ~130 KB of the 384 KB budget on every delta from the ninth of the 2026-11-24 release, about a
+    // third of the reading. The findings that record is checked against arrive in the prompt from the
+    // manifest, so the reviewer keeps every id it has to answer for.
+    pattern: /^local\/sync\/release-review\/[^/]+\.json$/,
+    covers: fixed('review:manifest'),
+    why: 'written by the review, then read back by local/release-review-gate.mjs before dispatch',
+    residual: 'a hand-edited record passes both readers; the gate validates structure, not history'
   }
 ]
 
@@ -130,6 +142,11 @@ export function checkExists(check, context) {
   }
   if (kind === 'mobile-postinstall') {
     return Boolean(name) && context.mobilePostinstall.includes(name)
+  }
+  if (kind === 'review') {
+    // Why always available: a packet is prepared by the same tool run whose record the gate validates,
+    // so the check that covers this content is the one reading it.
+    return name === 'manifest'
   }
   return false
 }

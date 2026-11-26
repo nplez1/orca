@@ -42,6 +42,16 @@ import {
 } from './review-packets/packet.mjs'
 import { runSlices } from './review-packets/run.mjs'
 import { readReport } from './review-packets/verdict.mjs'
+import {
+  closingLine,
+  deltaRunProblems,
+  deltaStopProblems,
+  preconditionProblems,
+  recordPacketNotes,
+  short
+} from './review-packets/preconditions.mjs'
+
+export { closingLine, deltaStopProblems }
 
 const repoRoot = git(join(import.meta.dirname, '..'), ['rev-parse', '--show-toplevel']).trim()
 const MODES = ['prepare', 'run', 'status', 'print', 'write', 'record-sweep']
@@ -60,7 +70,10 @@ const VALUED = [
   'packet',
   'sweep-kb',
   'answers',
-  'reviewer'
+  'reviewer',
+  'skip-preconditions',
+  'force-delta',
+  'approve-round'
 ]
 /** Why validated: `--timeout-min x` becomes `setTimeout(NaN)`, which fires at once and kills every
  * slice, and `--concurrency x` starts no worker at all — both after paying for the packet. */
@@ -70,10 +83,9 @@ const NUMERIC = [
   'max-budget-usd',
   'max-estimate-usd',
   'timeout-min',
-  'sweep-kb'
+  'sweep-kb',
+  'approve-round'
 ]
-
-const short = (sha) => String(sha).slice(0, 12)
 
 export function parseArgs(argv) {
   const options = { mode: null }
@@ -185,6 +197,9 @@ function reportEstimate(slices, maxUsd) {
   return over ? 1 : 0
 }
 
+/** The git reader these checks use: the packet module's, so every call runs in this repository. */
+const gitText = (args) => git(repoRoot, args)
+
 function prepare(options) {
   const context = loadCoverageContext(repoRoot)
   const budgetBytes = Math.round(Number(options['budget-kb'] ?? DEFAULT_BUDGET_KB) * 1024)
@@ -211,6 +226,22 @@ function prepare(options) {
     )
     return 0
   }
+  const waiver = String(options['skip-preconditions'] ?? '').trim()
+  if (waiver) {
+    console.error(`release-review: preconditions WAIVED: ${waiver}`)
+  } else {
+    const blocked = preconditionProblems({ gitText, repoRoot })
+    if (blocked.length) {
+      for (const problem of blocked) {
+        console.error(`release-review: refusing to prepare — ${problem}`)
+      }
+      console.error(
+        '  a deliberate exception is recorded, not silent: --skip-preconditions "<why>"'
+      )
+      return 1
+    }
+  }
+  const notes = { preconditionWaiver: waiver }
   if (options.adjudicate) {
     const state = reviewState(syncDirFor(options))
     const findings = options.findings
@@ -231,6 +262,7 @@ function prepare(options) {
       merge: state.rounds[0].packet.merge,
       findings
     })
+    recordPacketNotes(dir, packet, notes)
     console.log(`adjudication: ${dir}`)
     console.log(
       `  ${packet.slices.length} packet(s), ${findings.length} finding(s) to judge, ${packet.slices.reduce((total, slice) => total + slice.files, 0)} file(s) of resolution hunks`
@@ -239,6 +271,19 @@ function prepare(options) {
   }
   if (options.delta) {
     const parentDir = syncDirFor(options)
+    const deltas = reviewState(parentDir).slices.filter((entry) => entry.kind === 'delta')
+    const stop = deltaStopProblems({
+      deltas,
+      next: deltas.length + 1,
+      force: Boolean(options['force-delta']),
+      approve: options['approve-round']
+    })
+    if (stop.length) {
+      for (const problem of stop) {
+        console.error(`release-review: refusing to prepare — ${problem}`)
+      }
+      return 1
+    }
     const findings = options.findings
       ? readFindings(options.findings)
       : openFindings(reviewState(parentDir))
@@ -250,6 +295,12 @@ function prepare(options) {
       context,
       budgetBytes
     })
+    recordPacketNotes(dir, packet, { ...notes, deltaOverride: options['force-delta'] })
+    if (String(options['force-delta'] ?? '').trim()) {
+      console.error(
+        `release-review: delta override recorded: ${String(options['force-delta']).trim()}`
+      )
+    }
     console.log(`delta packet: ${dir}`)
     console.log(
       `  ${packet.slices[0].files} file(s), ${packet.slices[0].bytes} bytes; ${findings.length} finding(s) to re-check`
@@ -266,6 +317,7 @@ function prepare(options) {
     context,
     dir: options.packet ?? null
   })
+  recordPacketNotes(dir, packet, notes)
   console.log(`packet: ${dir}`)
   console.log(
     `  remerge diff ${packet.artifact.bytes} bytes in ${packet.artifact.files} files; reviewed ${packet.reviewed.bytes} bytes in ${packet.reviewed.files}; excluded ${packet.excluded.bytes} bytes in ${packet.excluded.files}`
@@ -393,6 +445,9 @@ async function run(options) {
   const state = packetKind === 'sync' ? reviewState(syncDir) : null
   const packet = state ? state.rounds.at(-1).packet : loadPacket(syncDir)
   const blocked = runProblems(packet)
+  if (packetKind === 'delta') {
+    blocked.push(...deltaRunProblems(syncDir, options))
+  }
   if (blocked.length) {
     for (const problem of blocked) {
       console.error(`release-review: refusing to run — ${problem}`)
@@ -515,6 +570,13 @@ function print(options, write = false) {
   // routinely not HEAD, so a redirect cannot be trusted to have recorded a complete review.
   for (const problem of problems) {
     console.error(`release-review: not yet complete — ${problem}`)
+  }
+  if (!problems.length) {
+    const closing = closingLine(state, manifest)
+    if (closing) {
+      // Why stderr: `--print` is redirected into a JSON file, and this is a verdict, not the manifest.
+      console.error(closing)
+    }
   }
   return problems.length ? 1 : 0
 }

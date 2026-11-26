@@ -9,7 +9,11 @@ import { buildManifest, reviewState } from '../../local/review-packets/manifest.
 import { prepareDelta, prepareSync } from '../../local/review-packets/packet.mjs'
 import { reviewerArgs, runSlices } from '../../local/review-packets/run.mjs'
 import { parsePatch, planSlices } from '../../local/review-packets/slices.mjs'
-import { reviewCoverage } from '../../local/release-review-packets.mjs'
+import {
+  closingLine,
+  deltaStopProblems,
+  reviewCoverage
+} from '../../local/release-review-packets.mjs'
 import { readReport } from '../../local/review-packets/verdict.mjs'
 import { tempGitRepo } from '../../local/sync/lib/temp-git-repo.mjs'
 
@@ -562,6 +566,67 @@ describe('crash regressions', () => {
       .join('')
     expect(text).toContain('deleted file mode')
     expect(text).toContain('new file mode')
+  })
+})
+
+describe('where the delta loop stops', () => {
+  const round = (blockers, shouldFix, status = 'reported') => ({
+    report: { status, counts: { blockers, shouldFix, minors: 1, nits: 0 } }
+  })
+
+  // Why pinned: rounds 5-14 of the 2026-11-24 review found nothing blocking and still cost ~11 minutes
+  // each, because a MINOR was fixed and the fix opened another round.
+  it('refuses a delta after a round that reported nothing above MINOR/NIT', () => {
+    const problems = deltaStopProblems({ deltas: [round(0, 0)], next: 2 })
+    expect(problems).toHaveLength(1)
+    expect(problems[0]).toContain('MINOR/NIT are listed in the PR body, not fixed')
+    expect(problems[0]).toContain('--force-delta')
+    expect(
+      deltaStopProblems({ deltas: [round(0, 0)], next: 2, force: 'the fix changed a caller' })
+    ).toEqual([])
+  })
+
+  it('lets a delta follow a round that found a should-fix, and one that never reported', () => {
+    expect(deltaStopProblems({ deltas: [round(0, 1)], next: 2 })).toEqual([])
+    expect(deltaStopProblems({ deltas: [round(0, 0, 'no-report')], next: 2 })).toEqual([])
+    // The first delta follows round 1, which is not a delta and has no entry here.
+    expect(deltaStopProblems({ deltas: [], next: 1 })).toEqual([])
+  })
+
+  it('refuses round four and later without a recorded approval', () => {
+    // Round 3 found a should-fix, so only the round cap can refuse here.
+    const deltas = [round(1, 0), round(0, 0), round(0, 1)]
+    const problems = deltaStopProblems({ deltas, next: 4 })
+    expect(problems).toHaveLength(1)
+    expect(problems[0]).toContain('3 delta round(s) have run')
+    expect(problems[0]).toContain('the last one found 0 BLOCKER, 1 SHOULD-FIX')
+    expect(problems[0]).toContain('--approve-round 4')
+    expect(deltaStopProblems({ deltas, next: 4, approve: '4' })).toEqual([])
+    expect(deltaStopProblems({ deltas, next: 4, approve: '3' })).toHaveLength(1)
+    // Why force does not help: a fourth round is the reader's decision, not an override.
+    expect(deltaStopProblems({ deltas, next: 4, force: 'a real blocker' })).toHaveLength(1)
+  })
+
+  // Why: the gate treats only BLOCKER/SHOULD-FIX as blocking, so a loop that closes on MINOR/NIT has to
+  // say so rather than leave a reader to infer it from three counts.
+  it('says plainly that a loop closing on MINOR/NIT may proceed', () => {
+    const manifest = {
+      slices: [
+        {
+          findings: [
+            { severity: 'MINOR', status: 'open' },
+            { severity: 'NIT', status: 'open' }
+          ]
+        },
+        { findings: [{ severity: 'NIT', status: 'resolved (delta-1)' }] }
+      ]
+    }
+    expect(closingLine({ rounds: [{}, {}, {}] }, manifest)).toBe(
+      'release-review: closing at round 3 with 1 MINOR / 1 NIT recorded and unfixed — the release may proceed; list them in the PR body'
+    )
+    const blocking = { slices: [{ findings: [{ severity: 'SHOULD-FIX', status: 'open' }] }] }
+    expect(closingLine({ rounds: [{}] }, blocking)).toBeNull()
+    expect(closingLine({ rounds: [{}] }, { slices: [] })).toBeNull()
   })
 })
 
