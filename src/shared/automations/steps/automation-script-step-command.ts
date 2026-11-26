@@ -10,6 +10,17 @@ function quotePosixArg(value: string): string {
   return `'${value.replaceAll("'", `'\\''`)}'`
 }
 
+/** Printed when the guest could not make the copy runnable: the script never started. */
+export const AUTOMATION_STEP_COPY_MODE_FAILED = 'ORCA_STEP_COPY_MODE_FAILED'
+
+/** A run that ended at Orca's own mode-setting prefix, before the script, is a host refusal. */
+export function isCopyModeFailure(result: { exitCode?: number; output: string }): boolean {
+  return (
+    result.exitCode === 126 &&
+    result.output.split(/\r?\n/).some((line) => line.trim() === AUTOMATION_STEP_COPY_MODE_FAILED)
+  )
+}
+
 export type AutomationScriptStepCommand =
   | { ok: true; command: string }
   | { ok: false; error: string }
@@ -33,10 +44,13 @@ export function automationScriptStepCommand(
     }
     const from = quotePosixArg(options.modeFrom)
     const copy = quotePosixArg(executable)
-    // busybox chmod has no --reference; owner exec keeps a non-GNU guest running.
+    // busybox chmod has no --reference; owner exec keeps a non-GNU guest running. Special bits are
+    // masked like the native copy's, and a copy whose mode could not be set never runs.
     return {
       ok: true,
-      command: `{ chmod --reference=${from} ${copy} 2>/dev/null || chmod u+x ${copy}; } && ${run}`
+      command:
+        `{ chmod --reference=${from} ${copy} 2>/dev/null || chmod u+x ${copy}; } && ` +
+        `chmod u-s,g-s,o-t ${copy} || { echo ${AUTOMATION_STEP_COPY_MODE_FAILED} >&2; exit 126; }; ${run}`
     }
   }
   const lower = executable.toLowerCase()

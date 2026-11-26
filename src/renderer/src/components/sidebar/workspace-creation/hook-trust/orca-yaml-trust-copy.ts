@@ -199,6 +199,6 @@ function automationScriptTitle(repoName: string, t: Translate): string {
 function automationScriptDescription(t: Translate): string {
   return t(
     'automations.scriptSteps.trustBody',
-    'An automation step runs this committed file on its host, unattended, with the arguments above. Approval covers this exact file and these arguments only, not files it runs or sources; any change needs approval again. Orca runs a copy beside the file, named .orca-step- plus a random id and its own name, and excluded from Git; ORCA_AUTOMATION_STEP_SCRIPT names the original. Only approve if you trust <repo/>.'
+    'An automation step runs this committed file on its host, unattended, with the arguments above. Approval covers this exact file and these arguments only, not files it runs or sources; any change needs approval again. Orca runs a copy beside the file, named .orca-step- plus a random id and its own name; in a Git repository it adds a .orca-step-* line to .git/info/exclude. ORCA_AUTOMATION_STEP_SCRIPT names the original. Only approve if you trust <repo/>.'
   )
 }

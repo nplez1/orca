@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto'
 import {
   appendFile,
   chmod,
+  lstat,
   mkdir,
   readdir,
   readFile,
@@ -21,7 +22,10 @@ import {
   type AutomationStepResult
 } from '../../../shared/automations/steps/automation-step-results'
 import { MAX_AUTOMATION_SCRIPT_STEP_TIMEOUT_SECONDS } from '../../../shared/automations/steps/automation-steps'
-import { automationScriptStepCommand } from '../../../shared/automations/steps/automation-script-step-command'
+import {
+  automationScriptStepCommand,
+  isCopyModeFailure
+} from '../../../shared/automations/steps/automation-script-step-command'
 import { getHookCommandShellKind, runHookCommand } from '../../workspace-hooks/hooks'
 import {
   getHookWslContext,
@@ -136,6 +140,10 @@ async function excludeCopiesFromGit(dir: string, wslDistro: string | undefined):
     return
   }
   const exclude = windowsFsPath(join(commonDir, 'info', 'exclude'))
+  if ((await lstat(exclude).catch(() => null))?.isSymbolicLink()) {
+    console.warn('[automations] info/exclude is a symlink; script step copies stay unexcluded.')
+    return
+  }
   const current = await readFile(exclude, 'utf8').catch(() => '')
   if (current.split(/\r?\n/).includes(AUTOMATION_STEP_COPY_PATTERN)) {
     return
@@ -256,6 +264,14 @@ export function createAutomationScriptStepExecutor(
         runtimeTarget: host.runtimeTarget,
         timeoutMs: step.timeoutSeconds * 1000
       })
+      if (!outcome.timedOut && isCopyModeFailure(outcome)) {
+        return stepResult(step, timing, {
+          outcome: 'unverifiable',
+          contentHash,
+          output: outcome.output,
+          error: `${step.script}: the host could not make Orca's verified copy runnable.`
+        })
+      }
       return stepResult(step, timing, {
         // Timeout first: the exit code of something we stopped is not evidence it finished (#19334).
         outcome: outcome.timedOut ? 'cut_off' : outcome.success ? 'succeeded' : 'failed',

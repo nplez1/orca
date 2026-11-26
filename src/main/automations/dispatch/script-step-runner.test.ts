@@ -20,6 +20,11 @@ import {
   runAutomationScriptSteps
 } from '../../../shared/automations/steps/automation-step-results'
 import { automationScriptStepPin } from './script-step-pin'
+import { runHookCommand } from '../../workspace-hooks/hooks'
+import {
+  automationScriptStepCommand,
+  isCopyModeFailure
+} from '../../../shared/automations/steps/automation-script-step-command'
 import { createAutomationScriptStepExecutor } from './script-step-runner'
 
 describe.skipIf(process.platform === 'win32')('automation script steps on this host', () => {
@@ -200,6 +205,32 @@ describe.skipIf(process.platform === 'win32')('automation script steps on this h
     await expect(stat(stale)).rejects.toThrow()
     await expect(stat(fresh)).resolves.toBeTruthy()
     await rm(fresh)
+  })
+
+  it('treats a copy the guest could not make runnable as never run, not as the script failing', async () => {
+    const run = (modeFrom: string, copy: string) => {
+      const command = automationScriptStepCommand(copy, ['x'], 'posix', { modeFrom })
+      if (!command.ok) {
+        throw new Error(command.error)
+      }
+      return runHookCommand({
+        hookName: 'mode test',
+        script: command.command,
+        cwd,
+        pathEnv: {},
+        timeoutMs: 10_000
+      })
+    }
+    const broken = await run(join(cwd, 'gone.sh'), join(cwd, 'also-gone.sh'))
+    expect(broken).toMatchObject({ success: false, exitCode: 126 })
+    expect(isCopyModeFailure({ exitCode: broken.exitCode, output: broken.output })).toBe(true)
+
+    await writeFile(join(cwd, 'plain.sh'), '#!/bin/sh\necho "ran $1"\nexit 126\n')
+    await chmod(join(cwd, 'plain.sh'), 0o644)
+    const ran = await run(join(cwd, 'ok.sh'), join(cwd, 'plain.sh'))
+    // The script's own 126 stays a failure of the script.
+    expect(ran.output).toContain('ran x')
+    expect(isCopyModeFailure({ exitCode: ran.exitCode, output: ran.output })).toBe(false)
   })
 
   it('persists results without the handoff stdout', async () => {

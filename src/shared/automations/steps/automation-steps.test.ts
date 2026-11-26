@@ -96,7 +96,8 @@ describe('automationScriptStepCommand', () => {
     ).toEqual({
       ok: true,
       command:
-        "{ chmod --reference='/home/u/r/run.sh' '/home/u/r/.orca-step-1-run.sh' 2>/dev/null || chmod u+x '/home/u/r/.orca-step-1-run.sh'; } && '/home/u/r/.orca-step-1-run.sh' 'a b'"
+        "{ chmod --reference='/home/u/r/run.sh' '/home/u/r/.orca-step-1-run.sh' 2>/dev/null || chmod u+x '/home/u/r/.orca-step-1-run.sh'; } && " +
+        "chmod u-s,g-s,o-t '/home/u/r/.orca-step-1-run.sh' || { echo ORCA_STEP_COPY_MODE_FAILED >&2; exit 126; }; '/home/u/r/.orca-step-1-run.sh' 'a b'"
     })
   })
 
