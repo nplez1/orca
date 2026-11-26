@@ -267,6 +267,7 @@ it('keeps every anchored turn when one send names its turn and another is placed
 
 // Whom a bot's newest turn acts for is read from a window of its newest turns, on every bot request,
 // Slack post and item add. Guards that read: its work stays fixed however long the chat ran before.
+// fork-comment-ok: 26s of its 30s cap on windows-2022 for a fixture this size; see LOCAL-PATCHES.md
 it('reads the newest turns with the same work however many turns came before them', () => {
   const read = (turns: number, recovered = 0) => {
     const db = chat(turns, () => true, undefined, recovered)
@@ -335,7 +336,7 @@ it('reads the newest turns with the same work however many turns came before the
   expect([own.work.rows, pinned.work.rows, whole.work.rows]).toEqual([74, 2000, 1999])
   expect(anchored.snapshot.submissions.map((send) => send.clientMessageId)).toEqual(long.sends)
   expect(snapshot.submissions.map((send) => send.clientMessageId)).toContain('m0')
-})
+}, 120_000)
 
 it('walks a family of sends linked by provider id and queued card once, however long it is', () => {
   // Send i shares a provider id with i+1 when i is even and a queued card when odd; only the newest
@@ -374,6 +375,7 @@ it('walks a family of sends linked by provider id and queued card once, however 
   ])
 })
 
+// fork-comment-ok: 33s on windows-2022, over the 30s cap; it counts work, not time — LOCAL-PATCHES.md
 it('stops reading a long send family at its first member older than the newest turns', () => {
   // Every send is in one family running back through the chat, from the newest send (unanswered or
   // not): the first older member settles the whole read, so the rest is never walked by index.
@@ -407,7 +409,7 @@ it('stops reading a long send family at its first member older than the newest t
   expect([extra(200, false, 'answered'), extra(500, false, 'answered')]).toEqual([74, 74])
   // Unsettled sends piled up before the newest turns: their lookup stops at the cap too.
   expect([extra(200, false, 'unsettled'), extra(500, false, 'unsettled')]).toEqual([65, 65])
-})
+}, 120_000)
 
 it('takes the whole read for a window crowded with rows rather than listing them to place its sends', () => {
   const lookups = (messages: number) => {

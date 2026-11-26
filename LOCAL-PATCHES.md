@@ -6360,3 +6360,71 @@ files / 158 lines and exit 1 before, exit 0 after, `--strict` still 1; and the c
 where a fork-owned `src/shared/host-mesh/` commit plus an undeclared upstream file is a problem, while the same
 diff carrying the sync-base record is not. The same change fixes a latent crash: the verbose listing read
 `seam.budget` for every touched file, which no run reached while an undeclared file exited first.
+
+### `local(test)`: the perf contract whose Windows wall clock, not its operation count, reddened the lane
+
+`fork-performance-contracts` reddened on `main` at `767c078fde1` (run
+[45683322849](https://github.com/nplez1/orca/actions/runs/45683322849), 2026-11-25): the `windows-latest`
+leg failed `src/main/native-chat/agent-session-journal/journal-domain-operation-window.performance.test.ts`
+with `Test timed out in 30000ms`, on the test at line 377. The other two legs passed, and the run before
+it (11-23) was green because the file had not reached `main` yet — it arrived with the 2026-11-24 sync's
+1350 upstream commits.
+
+**Why a timeout, and not a defect.** The contract counts rows returned to our code, never wall clock, and
+its fixture is the cost: twelve separate chats of up to 500 turns, ≈3,900 turns × 3 journal applies, each
+DB created in `tmpdir()`. That is 1.6 s on this Mac and 33,065 ms on `windows-2022` in the same run —
+most likely the temp file's writes and re-reads going through Defender's real-time scan, since nothing in
+the product is slow enough to explain a ~20x per-turn cost. The 30 s default is Vitest's, and it is the
+only part of that test that is a wall-clock budget.
+
+**What the fork changed**, in the same commit as this entry: two closing `})` lines become `}, 120_000)`,
+and each of the two tests carries a one-line reason above it, marked `fork-comment-ok:` so the comment
+ratchet does not count it (4763/4763 unchanged). The reason comment is not decoration: the fork's
+`test-timeout-needs-reason` ratchet refuses a per-test timeout without one, which is the right rule — it
+is what stops a timeout bump from quietly hiding a slow test.
+
+- the test at line 377 of the red run (`stops reading a long send family at its first member older than the newest
+  turns`) — the one that failed. **Upstream made this exact call in `7b6c852e2de` (#47789)**, after our
+  sync base, and that commit's own comment says the fixture is "about 30s on a Windows runner; it counts
+  work, not time". The fork takes the code line only: upstream's comment is not copied, because a fork
+  comment above upstream's code is the comment ratchet's growth (`check-upstream-file-comments`,
+  4763/4763 unchanged) and this entry is where the reason belongs. **The next sync does collide on that
+  hunk**, and the resolution is known: `7b6c852e2de` inserts its comment immediately above the `it(...)`
+  where our `fork-comment-ok:` line sits, and its `}, 120_000)` is byte-identical to ours — so keep
+  upstream's comment, drop ours, keep the timeout. The collision is one line and its answer is written
+  here; that is cheaper than the comment ratchet growth an unmarked copy would have cost today.
+- the test at line 270 of the red run (`reads the newest turns with the same work however many turns came before them`)
+  — the fork's own call, because it passed on the same runner by 3.5 s: 26,488 ms of the 30 s budget on
+  `windows-2022`, and 18,920 ms of it on `ubuntu-24.04` (63%). It is the slowest test in the lane and the
+  slowest in this file, so one slower runner reddens `fork-performance-contracts` and the nightly unit
+  lane, which runs the same `src/**/*.performance.test.*` glob. Leaving it at 88% of its budget would have
+  been a red waiting for the next bad neighbour.
+
+**Not a widened allowlist.** Nothing was added to `local/nightly-linux-known-red.json`,
+`local/unit-known-red.json` or the actions-enablement contract; the tests still run on all three legs and
+still assert the same operation counts. The anchors are the two `it(...)` titles above — an upstream edit
+to either test's body is the only thing that moves them.
+
+The six lines this costs in an upstream file are **not** declared in
+`local/checks/host-mesh-upstream-seams.mjs`, and #484 (`local(lint)`, 2026-11-26) is why: that register
+describes one feature's surface — the host group's — and from #466's merge it demanded a declaration from
+every branch that touched an upstream file, which made the lint gate red for a whole class of unrelated
+work. It now scopes the refusal to a diff carrying the feature's own `host-mesh` / `host-graph` /
+`host-group` path, and reports another feature's upstream edits as a note. This diff carries no hosts
+path, so it is a note — and adding a row anyway would have put a hard budget on a test file that is not
+hosts work, re-creating exactly the false red #484 removed for everyone else. Its anchors are the two
+`it(...)` titles above.
+
+**Verified:** the file passes locally (7/7, 4.5 s, macOS, `config/vitest.performance.config.ts`), and
+both ratchets this change touches are green (`test-timeout-needs-reason`, `check-upstream-file-comments`
+4763/4763). The runner that reddened is the one that decides, so the fix was dispatched on the branch
+rather than trusted from a Mac. Run
+[45783770764](https://github.com/nplez1/orca/actions/runs/45783770764) at `449bc7d866b` — the rebased
+branch this entry ships with — is **green on all three legs**: `ubuntu-24.04` 2m7s, `macos-15` 3m45s,
+`windows-2022` 2m47s, with the test that reddened taking 26,170 ms and passing. Three dispatches before
+the rebase agree: `45780910456` at `803bad1e65f` (26,610 ms), `45780202134` at `41a041bc6f2` (26,777 ms)
+and `45779423920` at `12957a82e44` (34,636 ms), each green on all three legs.
+
+Those numbers are the measurement behind the fix. The test that reddened at 33,065 ms against a 30 s cap
+has since taken 26.2 s, 26.6 s, 26.8 s and 34.6 s on the same runner — one of four still over the old
+cap, and the margin that let the other three through is the coin flip this entry is about.
