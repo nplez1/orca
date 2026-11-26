@@ -8,13 +8,19 @@
 // describes the shape of a conflict, it is not the resolution. `local/sync/convergence-ledger.md` is
 // the binding record, and it is read, never written.
 //
-//   node local/sync/conflicts.mjs [--summary | --json | --verify]
+// Every default and --summary run opens with one progress line — unmerged paths by status code, how
+// many the merge has already staged, how many fixes are written but unstaged, and each
+// `--batch <label>=<file>`'s resolved/total — because a resolver round otherwise re-derives those
+// counts with one `git status | grep -c` per question. --apply-proven ends with the same line.
+//
+//   node local/sync/conflicts.mjs [--summary [--batch a=paths.txt]] [--json | --verify]
 //   node local/sync/conflicts.mjs --propose --json > decision.json && --apply-proven decision.json
 //   node local/sync/conflicts.mjs --merge-tree <base> <other>
 //   node local/sync/conflicts.mjs --help
 
 import { spawnSync } from 'node:child_process'
 import { existsSync, lstatSync, readFileSync, writeFileSync } from 'node:fs'
+import path from 'node:path'
 import process from 'node:process'
 import {
   classifyFile,
@@ -31,18 +37,22 @@ import {
   treeModuleOracle,
   workspaceSourceLookup
 } from './lib/conflict-index.mjs'
+import {
+  indexStatus,
+  liveProgress,
+  progressLine,
+  treeProgress,
+  unmergedPaths
+} from './lib/conflict-progress.mjs'
 import { proposeAll } from './lib/conflict-propose.mjs'
 import { renameForecast } from './lib/fork-surface-git.mjs'
-import { renderForecast } from './lib/rename-forecast.mjs'
 import { classCounts, renderSummary, renderText } from './lib/conflict-report.mjs'
 import { liveSides, readState, singleMergeBase } from './lib/conflict-state.mjs'
+import { runVerify } from './lib/conflict-verify.mjs'
+import { renderForecast } from './lib/rename-forecast.mjs'
 
 const LEDGER_URL = new URL('./convergence-ledger.md', import.meta.url)
 const DELETIONS_URL = new URL('./expected-deletions.json', import.meta.url)
-const UNMERGED = new Set(['DD', 'AU', 'UD', 'UA', 'DU', 'AA', 'UU'])
-// Labelled markers only: a bare `=======` line is a diff separator in .patch files and a rule in
-// licence text, both of which this repo tracks.
-const MARKER_PATTERN = '^(<<<<<<<|\\|\\|\\|\\|\\|\\|\\|) |^>>>>>>> '
 const MESSAGE = /^(Auto-merging|CONFLICT|Warning:|fatal:|error:|Failed to merge)/
 const OID = /^[0-9a-f]{40}([0-9a-f]{24})?$/
 // Merged text per path, kept out of the classified file so --json does not carry every file twice.
@@ -55,6 +65,7 @@ const HELP = `conflict triage for an upstream sync stop — advisory only
 usage
   node local/sync/conflicts.mjs                             live state: rebase, merge, cherry-pick
   node local/sync/conflicts.mjs --summary                   counts by class, one line per file
+  node local/sync/conflicts.mjs --batch a=batch-a.txt       add a resolver batch to the progress line
   node local/sync/conflicts.mjs --json                      machine-readable, for other tools
   node local/sync/conflicts.mjs --verify                    exit 1 if conflict markers remain
   node local/sync/conflicts.mjs --propose                   what the fork has already decided, per path
@@ -66,7 +77,20 @@ usage
   node local/sync/conflicts.mjs --help
 
 --summary and --json compose with --merge-tree and --propose; --verify runs alone and --apply needs
-the worktree.
+the worktree. --batch composes with --summary and the default report.
+
+every default and --summary run opens with one progress line, so a resolver round is read from one
+line instead of a \`git status | grep -c\` per question:
+
+  unmerged 102 (UU 98, UD 3, DU 1) · staged since merge 221 · proven-unstaged 0 · batches a 13/14 b 5/7
+
+unmerged counts the index's unmerged paths by status code. staged since merge counts what the index
+holds that HEAD does not, so during a merge it is everything the merge staged. proven-unstaged counts
+paths git still calls unmerged whose worktree copy has no conflict markers left — a fix written and
+not yet staged, whatever wrote it — so the next command is \`git add\`, not another count. --batch
+takes a file of paths, one per line (\`#\` comments ignored), and reports how many of them git no
+longer calls unmerged; the segment is omitted when no --batch is given. A --merge-tree run has no
+index, so those two facts read \`n/a\`. --apply-proven ends with the same line.
 
 --propose prints only what the fork has settled twice over: a \`Resolution:\` verb in the ledger, or a
 settled entry in \`expected-deletions.json\`. A verb is a whole-file decision, so a hunk-level one (the
@@ -160,38 +184,26 @@ const indexOracle = () =>
     historyFor(liveSides(liveState(), rev, gitText), stagesAt)
   )
 
-const unmergedPaths = () =>
-  (gitText(['diff', '--name-only', '--diff-filter=U', '-z']) ?? '').split('\u0000').filter(Boolean)
-
-function unmergedStatuses() {
-  const statuses = new Map()
-  let extraPath = false
-  for (const record of (gitText(['status', '--porcelain=v1', '-z']) ?? '').split('\u0000')) {
-    if (record === '' || extraPath) {
-      // A rename record is followed by its original path, which has no status code.
-      extraPath = false
-      continue
-    }
-    const code = record.slice(0, 2)
-    if (UNMERGED.has(code)) {
-      statuses.set(record.slice(3), code)
-    }
-    extraPath = code.startsWith('R') || code.startsWith('C')
-  }
-  return statuses
-}
-
 // HEAD's oid too: a rebase step and a later merge onto the same upstream share everything else.
 const liveState = () => ({
   ...readState(gitText(['rev-parse', '--git-dir'])),
   headOid: gitText(['rev-parse', 'HEAD'])
 })
 
+// `label=file`, or a bare path whose label comes from its own name.
+function parseBatch(value) {
+  const at = value.indexOf('=')
+  if (at > 0 && !value.slice(0, at).includes('/')) {
+    return { label: value.slice(0, at), file: value.slice(at + 1) }
+  }
+  return { label: path.basename(value).replace(/\.[^.]*$/, ''), file: value }
+}
+
 // ------------------------------------------------------------------ adapters
 
 function readLive() {
-  const statuses = unmergedStatuses()
-  const files = [...new Set([...statuses.keys(), ...unmergedPaths()])].map((path) =>
+  const { statuses } = indexStatus(gitText)
+  const files = [...new Set([...statuses.keys(), ...unmergedPaths(gitText)])].map((path) =>
     classifyFile({
       path,
       status: statuses.get(path) ?? null,
@@ -376,7 +388,7 @@ function applyProposals(proposals) {
 function runApplyProven(decisionPath) {
   const plan = planApplyProven(JSON.parse(readFileSync(decisionPath, 'utf8')), {
     readText: worktreeText,
-    unmerged: new Set(unmergedPaths()),
+    unmerged: new Set(unmergedPaths(gitText)),
     moduleExists: indexOracle(),
     readStages: indexStages,
     state: liveState(),
@@ -398,70 +410,9 @@ function runApplyProven(decisionPath) {
     }
   }
   console.log(renderApplyPlan(plan, written))
+  // The remaining count, so the next command is not a `git status | grep -c` re-derivation.
+  console.log(progressLine(liveProgress({ gitText, worktreeText })))
   return plan.refused.length === 0 ? 0 : 1
-}
-
-// ------------------------------------------------------------------ verify
-
-// A scan that could not run is never a clean tree: the operator has to see the command's own error.
-function verifyFailed(what, stderr, maxLines = 10) {
-  console.log(`verify: FAIL — ${what}`)
-  const lines = String(stderr ?? '')
-    .trimEnd()
-    .split('\n')
-    .filter((line) => line !== '')
-  for (const line of lines.slice(0, maxLines)) {
-    console.log(`  ${line}`)
-  }
-  if (lines.length > maxLines) {
-    console.log(`  ... ${lines.length - maxLines} more line(s)`)
-  }
-  return 1
-}
-
-function runVerify() {
-  let paths
-  try {
-    paths = unmergedPaths()
-  } catch (error) {
-    return verifyFailed(
-      'the unmerged-path scan (git diff --diff-filter=U) could not run',
-      error.message
-    )
-  }
-  const grep = git(['grep', '-I', '-l', '-E', MARKER_PATTERN, '--', '.'])
-  if (grep.error) {
-    return verifyFailed('git grep could not be spawned', grep.error.message ?? grep.error)
-  }
-  // git grep exits 1 for "no match", which is the pass case; any other non-zero status is the scan
-  // itself failing, and reporting that as clean would hide the files it never read.
-  if (grep.status !== 0 && grep.status !== 1) {
-    return verifyFailed(
-      `the conflict-marker scan could not run (git grep exit ${grep.status})`,
-      (grep.stderr ?? '') + (grep.stdout ?? '')
-    )
-  }
-  const markers = (grep.stdout ?? '').split('\n').filter(Boolean)
-  const rows = []
-  if (paths.length > 0) {
-    rows.push(`${paths.length} unmerged path(s) in the index: ${paths.join(', ')}`)
-  }
-  if (markers.length > 0) {
-    rows.push(
-      `${markers.length} worktree file(s) still contain conflict-marker lines: ${markers.join(', ')}`
-    )
-  }
-  if (rows.length === 0) {
-    console.log(
-      'verify: clean — no unmerged paths, no conflict-marker lines in tracked worktree files'
-    )
-    return 0
-  }
-  console.log('verify: conflicts remain —')
-  for (const row of rows) {
-    console.log(`  ${row}`)
-  }
-  return 1
 }
 
 // ------------------------------------------------------------------ main
@@ -477,6 +428,7 @@ function parseArgs(argv) {
     apply: false,
     applyProven: null,
     forecast: null,
+    batches: [],
     base: null,
     other: null
   }
@@ -499,6 +451,15 @@ function parseArgs(argv) {
       if (options.base === null || options.other === null) {
         throw new Error('--merge-tree needs <base> <other>')
       }
+      continue
+    }
+    if (flag === '--batch') {
+      const value = argv[index + 1] ?? null
+      index += 1
+      if (value === null) {
+        throw new Error('--batch needs <label>=<file>')
+      }
+      options.batches.push(parseBatch(value))
       continue
     }
     if (flag === '--summary' || flag === '--json') {
@@ -568,7 +529,7 @@ function main() {
   }
   try {
     if (options.verify) {
-      return runVerify()
+      return runVerify({ git, gitText })
     }
     if (options.applyProven) {
       return runApplyProven(options.applyProven)
@@ -672,6 +633,14 @@ function main() {
       console.log(JSON.stringify(payload, null, 2))
       return 0
     }
+    console.log(
+      progressLine(
+        options.source === 'live'
+          ? liveProgress({ gitText, worktreeText })
+          : treeProgress(result.files),
+        options.batches
+      )
+    )
     console.log(
       options.output === 'summary' ? renderSummary(result, ledger) : renderText(result, ledger)
     )
