@@ -99,6 +99,7 @@ export async function requestRuntimePairingOffer(
   args: {
     address?: string
     rotate?: boolean
+    fresh?: boolean
     reach?: RuntimePairingReach
     grants?: readonly RuntimeDeviceGrant[]
     offerTtlMs?: number
@@ -127,6 +128,7 @@ export async function requestRuntimePairingOffer(
   return server.createPairingOffer({
     address: ip,
     rotate: args.rotate,
+    fresh: args.fresh,
     name: `Runtime ${new Date().toLocaleDateString()}`,
     scope: 'runtime',
     // Persist local reach so local authentication cannot expose the next launch to the LAN.
@@ -141,7 +143,10 @@ export async function createOwnerPairingOffer(
   server: PairingOfferServer,
   params: PairingCreateOfferParams,
   lookup?: DefaultRouteInterfaceLookup,
-  createdByDeviceId?: string
+  createdByDeviceId?: string,
+  // Why a separate argument: the wire schema is upstream's, and a caller that needs one row per recipient
+  // (the mesh hands a different machine its own offer) cannot express that as "rotate", which drops the rest.
+  options: { fresh?: boolean; offerTtlMs?: number } = {}
 ): Promise<PairingCreateOfferResult> {
   if (params.scope === 'mobile') {
     const offer = await requestMobilePairingOffer(
@@ -174,6 +179,8 @@ export async function createOwnerPairingOffer(
     {
       address: params.address,
       rotate: params.rotate,
+      fresh: options.fresh,
+      offerTtlMs: options.offerTtlMs,
       grants: params.grantDesktopControl ? ['desktop-control'] : [],
       createdByDeviceId
     },

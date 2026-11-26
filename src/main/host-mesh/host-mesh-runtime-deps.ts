@@ -16,9 +16,12 @@ import {
   createOwnerPairingOffer,
   type PairingOfferServer
 } from '../runtime/rpc/server/pairing/pairing-offer-requests'
+import { HOST_MESH_OFFER_TTL_MS } from '../../shared/host-mesh/host-mesh-contract'
 import type { HostMeshDriverDeps } from './host-mesh-driver-contract'
+import { createHostMeshWriteLock } from './host-mesh-write-lock'
 import { createHostMeshDriver } from './host-mesh-driver'
 import { createHostMeshRpcService } from './host-mesh-rpc-service'
+import { nudgeHostMeshSync } from './host-mesh-auto-sync'
 import { __installHostMeshDriver, configureHostMeshRuntime } from './host-mesh-runtime'
 import { createHostMeshStore } from './host-mesh-store'
 
@@ -34,6 +37,34 @@ import { createHostMeshStore } from './host-mesh-store'
 
 /** How long one call to a member may take. The driver records the failure as a link state, not a hang. */
 const SEND_TIMEOUT_MS = 20_000
+
+/**
+ * The reach the pairing this host already holds for a member uses, so an offer back cannot widen exposure.
+ *
+ * Why this matters: minting a runtime offer for network reach calls `ensureNetworkExposure`, which the design note
+ * records as irreversible. That was harmless when only an owner's join minted one; the scheduled pass mints on its
+ * own, so a host paired over loopback (an SSH tunnel, another account on the same machine) would be opened to the
+ * network by a background loop with no owner action. Handing back an offer at the reach the pairing already uses
+ * keeps the pair possible and the exposure unchanged.
+ */
+async function reachOfExistingPairing(
+  environmentId: string
+): Promise<{ address: string; reach: 'this-computer' } | Record<string, never>> {
+  if (environmentId === '') {
+    return {}
+  }
+  try {
+    const offer = await resolveEnvironmentPairingOffer(getCanonicalUserDataPath(), environmentId)
+    const host = new URL(offer.endpoint).hostname
+    return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]'
+      ? { address: host, reach: 'this-computer' }
+      : {}
+  } catch {
+    // Why the permissive branch: an endpoint this build cannot read is not a reason to refuse the pair, and the
+    // existing pairing already reaches that machine, so its exposure is already what it is.
+    return {}
+  }
+}
 
 export type HostMeshRuntimeServer = PairingOfferServer & {
   /** The full revoke: settles queued asks and drops live sockets, not only the row. */
@@ -64,10 +95,26 @@ function depsFromApp(server: HostMeshRuntimeServer): HostMeshDriverDeps {
   return {
     userDataPath,
     now: () => Date.now(),
+    // One writer at a time across the driver and the peer-facing service: they share this store.
+    lock: createHostMeshWriteLock(),
     ownKeypair: () => loadOrCreateE2EEKeypair(userDataPath),
     // No `grantDesktopControl`: an introduced member gets `workspace` and nothing more.
-    mintRuntimeOffer: async () => {
-      const offer = await createOwnerPairingOffer(server, { scope: 'runtime' })
+    mintRuntimeOffer: async ({ environmentId }) => {
+      const offer = await createOwnerPairingOffer(
+        server,
+        { scope: 'runtime', ...(await reachOfExistingPairing(environmentId)) },
+        undefined,
+        undefined,
+        {
+          // Why fresh: upstream reuses one unused pending runtime offer per (grants, creator), so a pass that mints
+          // for two machines would hand both the same device row — one identity, and ejecting one would cut the
+          // other's link for good. A row per recipient is the only shape removal can revoke truthfully.
+          fresh: true,
+          // Why a TTL as well: a refused or unreachable member is retried, and without an expiry each attempt would
+          // leave a live credential with no end. The offer's own lifetime is the bound.
+          offerTtlMs: HOST_MESH_OFFER_TTL_MS
+        }
+      )
       if (!offer.available) {
         throw new Error(offer.reason)
       }
@@ -104,6 +151,11 @@ function depsFromApp(server: HostMeshRuntimeServer): HostMeshDriverDeps {
     },
     // Why the peer index and not the pairing rows: another build may rewrite the device registry and drop
     // the fields that would have named this member's row.
+    revokeMintedRow: (deviceId) => {
+      if (!server.revokeRuntimeAccess(deviceId)) {
+        server.getDeviceRegistry()?.removeDevice(deviceId)
+      }
+    },
     forgetDevice: (hostKey) => {
       for (const deviceRowId of store.readPeerIndex().get(hostKey)?.deviceRowIds ?? []) {
         // The registry's plain remove is the fallback for a row recorded under another scope, which the
@@ -155,7 +207,10 @@ function depsFromApp(server: HostMeshRuntimeServer): HostMeshDriverDeps {
       return response.result
     },
     settings: () => store.readSettings(),
-    saveSettings: (settings) => store.writeSettings(settings)
+    saveSettings: (settings) => store.writeSettings(settings),
+    // Why deferred: the peer that just paired this host is waiting for the reply, and its call has a timeout. The
+    // pass is the ordinary scheduled one, so a failure lands in the link states the panel already renders.
+    requestOwnSync: () => nudgeHostMeshSync()
   }
 }
 

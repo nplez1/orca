@@ -9,10 +9,12 @@ import {
   DEFAULT_HOST_MESH_SETTINGS,
   decideIntroduce,
   decideJoin,
+  decideOfferBack,
   membersAwaitingNewcomerOffer,
   type HostMeshSettings,
   type InboundIntroduce,
-  type InboundJoin
+  type InboundJoin,
+  type InboundOfferBack
 } from './host-mesh-admission'
 import {
   addHostMeshMember,
@@ -61,8 +63,8 @@ function inviteOf(overrides: Partial<InboundIntroduce> = {}): InboundIntroduce {
 }
 
 function settingsOf(overrides: Partial<HostMeshSettings> = {}): HostMeshSettings {
-  // Joins are opt-in per host, so every case that expects a join to be considered turns them on.
-  return { ...DEFAULT_HOST_MESH_SETTINGS, allowJoins: true, ...overrides }
+  // One switch governs joins, introductions, relays and reverse offers together.
+  return { ...DEFAULT_HOST_MESH_SETTINGS, ...overrides }
 }
 
 describe('admitting an introduced machine', () => {
@@ -106,12 +108,8 @@ describe('admitting an introduced machine', () => {
     ).toEqual({ kind: 'refuse', reason: 'introducer-not-member' })
   })
 
-  it('refuses every introduction when the host does not accept them', () => {
-    const decision = decideIntroduce(
-      groupOf(['key-a']),
-      settingsOf({ acceptIntroductions: false }),
-      inviteOf()
-    )
+  it('refuses every introduction when the host is not in mesh mode', () => {
+    const decision = decideIntroduce(groupOf(['key-a']), settingsOf({ enabled: false }), inviteOf())
 
     expect(decision).toEqual({ kind: 'refuse', reason: 'introductions-disabled' })
   })
@@ -211,16 +209,6 @@ describe('admitting an introduced machine', () => {
 
     expect(decision).toEqual({ kind: 'refuse', reason: 'rate-limited' })
   })
-
-  it('asks instead of admitting when the host wants a decision per member', () => {
-    const decision = decideIntroduce(
-      groupOf(['key-a']),
-      settingsOf({ autoAcceptIntroducedMembers: false }),
-      inviteOf()
-    )
-
-    expect(decision).toEqual({ kind: 'ask', payload: payloadFor() })
-  })
 })
 
 describe('admitting a join', () => {
@@ -268,16 +256,83 @@ describe('admitting a join', () => {
     })
   })
 
-  it('refuses any join when this host has not opted in, which is the default', () => {
-    const decision = decideJoin(groupOf(['key-a']), DEFAULT_HOST_MESH_SETTINGS, joinOf())
+  it('refuses any join when this host is not in mesh mode', () => {
+    const decision = decideJoin(groupOf(['key-a']), settingsOf({ enabled: false }), joinOf())
 
     expect(decision).toEqual({ kind: 'refuse', reason: 'joins-not-allowed' })
   })
 
-  it('still admits a join when this host does not relay, because joining is not relaying', () => {
-    expect(
-      decideJoin(groupOf(['key-a']), settingsOf({ relayIntroductions: false }), joinOf()).kind
-    ).toBe('accept')
+  it('admits a join on a host in mesh mode', () => {
+    expect(decideJoin(groupOf(['key-a']), settingsOf(), joinOf()).kind).toBe('accept')
+  })
+})
+
+describe('an offer handed back by a machine that already reaches this host', () => {
+  function offerBackOf(overrides: Partial<InboundOfferBack> = {}): InboundOfferBack {
+    return {
+      callerPairedDeviceId: 'device-1',
+      offererHostKey: 'key-new',
+      openedPayload: payloadFor({ introducedBy: 'key-new' }),
+      now: NOW,
+      ...overrides
+    }
+  }
+
+  it('admits it, and learns the group from the machine that dialled it', () => {
+    expect(decideOfferBack(groupOf([]), settingsOf(), offerBackOf())).toEqual({
+      kind: 'accept',
+      payload: payloadFor({ introducedBy: 'key-new' })
+    })
+  })
+
+  it('refuses it from a machine this host never issued a credential to', () => {
+    const decision = decideOfferBack(
+      groupOf([]),
+      settingsOf(),
+      offerBackOf({ callerPairedDeviceId: undefined })
+    )
+
+    expect(decision).toEqual({ kind: 'refuse', reason: 'caller-not-paired' })
+  })
+
+  it('refuses every one of them when mesh mode is off', () => {
+    expect(decideOfferBack(groupOf([]), settingsOf({ enabled: false }), offerBackOf())).toEqual({
+      kind: 'refuse',
+      reason: 'reverse-offers-disabled'
+    })
+  })
+
+  it('refuses a box another machine minted, however it was slipped in', () => {
+    const decision = decideOfferBack(
+      groupOf([]),
+      settingsOf(),
+      offerBackOf({ openedPayload: payloadFor({ minterHostKey: 'key-mallory' }) })
+    )
+
+    expect(decision).toEqual({ kind: 'refuse', reason: 'offer-sender-mismatch' })
+  })
+
+  it('refuses a box addressed to another machine', () => {
+    const decision = decideOfferBack(
+      groupOf([]),
+      settingsOf(),
+      offerBackOf({ openedPayload: payloadFor({ recipientHostKey: 'key-other' }) })
+    )
+
+    expect(decision).toEqual({ kind: 'refuse', reason: 'offer-not-addressed-here' })
+  })
+
+  it('refuses one after the group this host ejected it from', () => {
+    const removed = removeHostMeshMember(groupOf(['key-new']), {
+      hostKey: 'key-new',
+      removedBy: SELF,
+      epoch: 5
+    })
+
+    expect(decideOfferBack(removed, settingsOf(), offerBackOf())).toEqual({
+      kind: 'refuse',
+      reason: 'tombstoned'
+    })
   })
 })
 

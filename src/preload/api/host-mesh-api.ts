@@ -29,6 +29,10 @@ export type HostMeshSnapshot = {
   settings: HostMeshSettings
   /** A line a surface can show verbatim when the last pass failed, or null. */
   lastError: string | null
+  /** When this launch last completed a pass; the mesh keeps itself current, so no surface has a Sync button. */
+  lastSyncedAt: number | null
+  /** How many members answered the last pass, or null before one ran: the signal the backoff keys on. */
+  lastPassReached: number | null
   /** Where the group came from when an upgrade created it, or null when the owner made it. */
   migration: { appliedAt: number; peerCount: number } | null
 }
@@ -41,7 +45,6 @@ export type HostMeshApi = {
   read: () => Promise<HostMeshSnapshot>
   /** Pair this host with every member of the group the given paired environment belongs to. */
   join: (environmentId: string) => Promise<HostMeshJoinOutcome>
-  sync: () => Promise<HostMeshSnapshot>
   remove: (hostKey: string) => Promise<HostMeshSnapshot>
   leave: () => Promise<HostMeshSnapshot>
   settings: (patch: Partial<HostMeshSettings>) => Promise<HostMeshSnapshot>

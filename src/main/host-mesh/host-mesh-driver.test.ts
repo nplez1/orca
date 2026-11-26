@@ -6,12 +6,14 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   HOST_MESH_INTRODUCE_METHOD,
   HOST_MESH_JOIN_METHOD,
+  HOST_MESH_OFFER_BACK_METHOD,
   HOST_MESH_PENDING_METHOD,
   HOST_MESH_RELAY_METHOD,
   HOST_MESH_REMOVE_METHOD,
   HOST_MESH_SYNC_METHOD,
   type HostMeshIntroduceRequest,
   type HostMeshJoinRequest,
+  type HostMeshOfferBackRequest,
   type HostMeshPendingRequest,
   type HostMeshRelayRequest,
   type HostMeshRemoveRequest
@@ -22,6 +24,7 @@ import {
 } from '../../shared/host-mesh/host-mesh-admission'
 import { orcaHostKeyOf } from '../host-graph/host-graph-self-identity'
 import { createHostMeshDriver, createHostMeshRpcService } from './host-mesh-driver'
+import { createHostMeshWriteLock } from './host-mesh-write-lock'
 import type {
   HostMeshDriver,
   HostMeshDriverDeps,
@@ -52,8 +55,16 @@ type FakeHost = {
   settings: HostMeshSettings
   /** A machine still on a build without the mesh: it answers, but not these methods. */
   oldBuild: boolean
+  /** A connection that drops mid-call, which is what makes an offer back fail for a reason no refusal explains. */
+  dropOfferBack: boolean
+  /** A machine whose lid is closed: it is a member with an environment, and nothing answers on it. */
+  asleep: boolean
+  /** Machines this host issued a device credential to: who may reach it, which is one half of a pairing. */
+  devices: Set<string>
   /** Offers this host has minted, which is what an unreachable peer would make it waste. */
   minted: number
+  /** Device rows this host revoked again because the offer they belonged to was never taken. */
+  revokedRows: string[]
 }
 
 const cleanups: string[] = []
@@ -67,6 +78,8 @@ afterEach(() => {
 class Mesh {
   readonly hosts = new Map<string, FakeHost>()
   now = 1_700_000_000_000
+  /** Hosts that asked for a pass of their own, which the real deps defer to a tick. */
+  readonly ownSyncs: FakeHost[] = []
 
   add(name: string): FakeHost {
     const keypair = nacl.box.keyPair()
@@ -87,9 +100,13 @@ class Mesh {
       rpc: null as unknown as HostMeshRpcService,
       environments: new Map(),
       labels: new Map(),
-      settings: { ...DEFAULT_HOST_MESH_SETTINGS, allowJoins: true },
+      settings: { ...DEFAULT_HOST_MESH_SETTINGS },
       oldBuild: false,
-      minted: 0
+      dropOfferBack: false,
+      asleep: false,
+      devices: new Set(),
+      minted: 0,
+      revokedRows: []
     }
     const deps = this.depsFor(host, userDataPath)
     host.driver = createHostMeshDriver(deps)
@@ -102,6 +119,17 @@ class Mesh {
   seedPairing(left: FakeHost, right: FakeHost): void {
     this.pairOneWay(left, right)
     this.pairOneWay(right, left)
+  }
+
+  /**
+   * The pairing this fork's own fleet has: the caller holds the environment, the callee holds a device row.
+   *
+   * Why this is the case worth simulating: it is what a studio dialling two work hosts leaves behind, and it is
+   * the shape every real upgrade has — a spoke can call nobody, so nothing but an offer handed to it can pair it.
+   */
+  seedPairingFromCaller(caller: FakeHost, callee: FakeHost): void {
+    this.pairOneWay(caller, callee)
+    callee.devices.add(caller.hostKey)
   }
 
   private pairOneWay(holder: FakeHost, peer: FakeHost): void {
@@ -121,6 +149,10 @@ class Mesh {
   private depsFor(host: FakeHost, userDataPath: string): HostMeshDriverDeps {
     return {
       userDataPath,
+      // The real app shares ONE lock per host between the driver and the peer-facing service, so a test that did not
+      // would miss the cycle two hosts can form: A's pass holds A's lock while calling B, whose handler waits on B's
+      // pass, which is waiting on A.
+      lock: createHostMeshWriteLock(),
       now: () => this.now,
       ownKeypair: () => ({
         publicKey: nacl.box.keyPair.fromSecretKey(host.secretKey).publicKey,
@@ -150,6 +182,9 @@ class Mesh {
           hostKey: offer.hostKey,
           label: peer?.name ?? offer.hostKey
         }
+      },
+      revokeMintedRow: (deviceId: string) => {
+        host.revokedRows.push(deviceId)
       },
       forgetEnvironment: (selector) => {
         for (const [environmentId, hostKey] of host.environments) {
@@ -183,6 +218,22 @@ class Mesh {
       settings: () => host.settings,
       saveSettings: (settings) => {
         host.settings = settings
+      },
+      requestOwnSync: () => {
+        this.ownSyncs.push(host)
+      }
+    }
+  }
+
+  /** Runs every pass a host asked for after being paired, until nothing asks again. */
+  async drainOwnSyncs(rounds = 4): Promise<void> {
+    for (let round = 0; round < rounds; round += 1) {
+      const pending = this.ownSyncs.splice(0)
+      if (pending.length === 0) {
+        return
+      }
+      for (const host of pending) {
+        await host.driver.sync()
       }
     }
   }
@@ -198,11 +249,18 @@ class Mesh {
     if (target === undefined) {
       throw new Error(`${from.name} cannot reach ${environmentId}`)
     }
+    if (target.asleep) {
+      throw new Error('connection-closed')
+    }
     // The real transport answers an unknown method with this code, and the driver reads it as such.
     if (target.oldBuild) {
       throw new Error('method_not_found')
     }
-    const caller = { fingerprint: from.publicKeyB64 }
+    const caller = {
+      fingerprint: from.publicKeyB64,
+      // Why from the callee's own registry: a token this host issued is the whole trust anchor for an offer back.
+      ...(target.devices.has(from.hostKey) ? { pairedDeviceId: `device-${from.name}` } : {})
+    }
 
     switch (method) {
       case HOST_MESH_SYNC_METHOD:
@@ -220,6 +278,13 @@ class Mesh {
       case HOST_MESH_PENDING_METHOD:
         // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the caller built this payload from HostMeshPendingRequest
         return target.rpc.pending(params as HostMeshPendingRequest, caller) as Promise<T>
+      case HOST_MESH_OFFER_BACK_METHOD:
+        if (target.dropOfferBack) {
+          // The transport failing, not the machine refusing: no reply, so nothing about its mind is known.
+          throw new Error('connection-closed')
+        }
+        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the caller built this payload from HostMeshOfferBackRequest
+        return target.rpc.offerBack(params as HostMeshOfferBackRequest, caller) as Promise<T>
       case HOST_MESH_REMOVE_METHOD:
         // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the caller built this payload from HostMeshRemoveRequest
         return target.rpc.remove(params as HostMeshRemoveRequest, caller) as Promise<T>
@@ -316,12 +381,8 @@ describe('one join pairs a machine with every member', () => {
     mesh.seedPairing(laptop, studio)
     await laptop.driver.join(mesh.environmentFor(laptop, studio))
 
-    // The laptop refuses the introduction, so the VM's arrival leaves it holding no credential for the VM.
-    laptop.settings = {
-      ...DEFAULT_HOST_MESH_SETTINGS,
-      allowJoins: true,
-      acceptIntroductions: false
-    }
+    // The laptop is out of mesh mode, so the VM's arrival leaves it holding no credential for the VM.
+    laptop.settings = { ...DEFAULT_HOST_MESH_SETTINGS, enabled: false }
     mesh.seedPairing(vm, studio)
     await vm.driver.join(mesh.environmentFor(vm, studio))
 
@@ -329,7 +390,7 @@ describe('one join pairs a machine with every member', () => {
     expect(statusOf(await laptop.driver.snapshot(), vm.hostKey)).not.toBe('complete')
 
     // One sync both learns the VM exists and repairs the pair, because the repair relays through a member.
-    laptop.settings = { ...DEFAULT_HOST_MESH_SETTINGS, allowJoins: true }
+    laptop.settings = { ...DEFAULT_HOST_MESH_SETTINGS }
     await laptop.driver.sync()
     await vm.driver.sync()
 
@@ -502,6 +563,62 @@ describe('an existing fleet upgrading to this build', () => {
       [studio.hostKey, vm.hostKey].sort()
     )
   })
+
+  it('pairs a work host back when only the studio ever held the pairing', async () => {
+    const mesh = new Mesh()
+    const studio = mesh.add('studio')
+    const laptop = mesh.add('laptop')
+    const vm = mesh.add('vm')
+    // The reported fleet: the studio dials both work hosts, and neither of them holds anything to dial back.
+    mesh.seedPairingFromCaller(studio, laptop)
+    mesh.seedPairingFromCaller(studio, vm)
+    expect(studio.driver.migrateFromPairings()).toEqual({ kind: 'grouped', peerCount: 2 })
+    expect(laptop.driver.migrateFromPairings()).toEqual({ kind: 'nothing-to-group' })
+
+    // One sync from the studio: it holds the credential, so it hands each work host an offer of its own.
+    await studio.driver.sync()
+
+    for (const spoke of [laptop, vm]) {
+      const view = await spoke.driver.snapshot()
+      expect(view.inGroup).toBe(true)
+      expect(view.groupId).toBe((await studio.driver.snapshot()).groupId)
+      // Paired both ways on the first pass, not merely reachable: this is the half the report was stuck on.
+      expect(statusOf(view, studio.hostKey)).toBe('complete')
+    }
+    expect(statusOf(await studio.driver.snapshot(), laptop.hostKey)).toBe('complete')
+
+    // The machine that paired them runs one pass, and each of them then runs its own without being asked.
+    await mesh.drainOwnSyncs()
+    for (const host of [studio, laptop, vm]) {
+      const view = await host.driver.snapshot()
+      expect(memberKeys(view)).toEqual(
+        [studio.hostKey, laptop.hostKey, vm.hostKey].filter((key) => key !== view.selfKey).sort()
+      )
+      expect(view.summary.completePairs).toBe(2)
+    }
+  })
+
+  it('does not keep handing offers to a machine that will not take one', async () => {
+    const mesh = new Mesh()
+    const studio = mesh.add('studio')
+    const laptop = mesh.add('laptop')
+    mesh.seedPairingFromCaller(studio, laptop)
+    laptop.settings = { ...DEFAULT_HOST_MESH_SETTINGS, enabled: false }
+    studio.driver.migrateFromPairings()
+
+    await studio.driver.sync()
+    const mintedOnce = studio.minted
+    await studio.driver.sync()
+    await studio.driver.sync()
+
+    // One offer, then nothing until the retry interval: a refusal is not asked about again on every pass.
+    expect(mintedOnce).toBe(1)
+    expect(studio.minted).toBe(1)
+    // And the credential it minted is revoked rather than left live: the far side answered, and its answer was no.
+    expect(studio.revokedRows).toHaveLength(1)
+    // And the pair stays honestly one-way rather than claiming the offer was taken.
+    expect(statusOf(await studio.driver.snapshot(), laptop.hostKey)).toBe('half')
+  })
 })
 
 describe('a fleet that updates one machine at a time', () => {
@@ -553,7 +670,9 @@ describe('a fleet that updates one machine at a time', () => {
     // pair; the studio, which is paired with it, is the one that can say why.
     expect(statusOf(await laptop.driver.snapshot(), vm.hostKey)).toBe('missing')
     expect(statusOf(await studio.driver.snapshot(), vm.hostKey)).toBe('needsUpdate')
-    expect(studio.minted).toBe(0)
+    // One offer for the laptop, which answered as a build without the method and is left alone afterwards;
+    // the machine that has not updated is never offered anything, because it cannot be reached at all.
+    expect(studio.minted).toBe(1)
   })
 
   it('completes the fleet when the last machine updates', async () => {
@@ -587,16 +706,86 @@ describe('a fleet that updates one machine at a time', () => {
       expect(view.summary.completePairs).toBe(2)
     }
   })
+
+  it('re-offers the moment the machine reconnects, not when a retry window expires', async () => {
+    const mesh = new Mesh()
+    const studio = mesh.add('studio')
+    const laptop = mesh.add('laptop')
+    mesh.seedPairingFromCaller(studio, laptop)
+    studio.driver.migrateFromPairings()
+
+    // The offer reaches the laptop's connection while that connection is dropping, which is what a machine
+    // restarting into the new build looks like from here. Nothing about its mind can be inferred.
+    laptop.dropOfferBack = true
+    await studio.driver.sync()
+    expect(statusOf(await studio.driver.snapshot(), laptop.hostKey)).toBe('half')
+    const mintedOnFailure = studio.minted
+
+    // Its connection comes back on a build that can take the offer. No clock advance, so only the reset that a
+    // reconnect performs can explain the second attempt.
+    laptop.dropOfferBack = false
+    studio.driver.noteConnectionChange()
+    await studio.driver.sync()
+
+    expect(studio.minted).toBe(mintedOnFailure + 1)
+    expect(statusOf(await studio.driver.snapshot(), laptop.hostKey)).toBe('complete')
+  })
 })
 
-describe('consent: a peer cannot put this host in a group', () => {
-  it('refuses a join on a host whose owner never allowed being joined', async () => {
+describe('two passes that meet in the middle', () => {
+  it('both finish, instead of each waiting for the other', async () => {
     const mesh = new Mesh()
     const studio = mesh.add('studio')
     const laptop = mesh.add('laptop')
     mesh.seedPairing(laptop, studio)
-    // The default: a paired machine may not bootstrap this host into a group by asking.
-    studio.settings = { ...DEFAULT_HOST_MESH_SETTINGS }
+    studio.driver.migrateFromPairings()
+    laptop.driver.migrateFromPairings()
+    await studio.driver.sync()
+
+    // The target state for a reconnect: both hosts nudge, both passes start, and each one calls the other. If an
+    // inbound read waited on the receiving host's own pass lock, this would never resolve — each pass would hold its
+    // lock and wait for a call the other could not answer.
+    const [studioView, laptopView] = await Promise.all([studio.driver.sync(), laptop.driver.sync()])
+
+    expect(studioView.lastPassReached).toBe(1)
+    expect(laptopView.lastPassReached).toBe(1)
+  })
+})
+
+describe('a fleet whose machines are asleep', () => {
+  it('says it reached nobody, which is what a backoff needs to see', async () => {
+    const mesh = new Mesh()
+    const studio = mesh.add('studio')
+    const laptop = mesh.add('laptop')
+    const vm = mesh.add('vm')
+    mesh.seedPairing(laptop, studio)
+    mesh.seedPairing(vm, studio)
+    studio.driver.migrateFromPairings()
+
+    laptop.asleep = true
+    vm.asleep = true
+    await studio.driver.sync()
+
+    // Two members, nothing answered. Every failure is caught per member, so without this number the scheduled pass
+    // could not tell this from a healthy fleet and would dial these machines every minute for the life of the app.
+    const sleeping = await studio.driver.snapshot()
+    expect(sleeping.members).toHaveLength(2)
+    expect(sleeping.lastPassReached).toBe(0)
+
+    laptop.asleep = false
+    vm.asleep = false
+    await studio.driver.sync()
+    expect((await studio.driver.snapshot()).lastPassReached).toBe(2)
+  })
+})
+
+describe('consent: mesh mode is this host’s own decision', () => {
+  it('refuses a join on a host whose owner turned the mesh off', async () => {
+    const mesh = new Mesh()
+    const studio = mesh.add('studio')
+    const laptop = mesh.add('laptop')
+    mesh.seedPairing(laptop, studio)
+    studio.settings = { ...DEFAULT_HOST_MESH_SETTINGS, enabled: false }
 
     const joined = await laptop.driver.join(mesh.environmentFor(laptop, studio))
 
@@ -607,6 +796,21 @@ describe('consent: a peer cannot put this host in a group', () => {
     expect((await studio.driver.snapshot()).inGroup).toBe(false)
     // Nothing was minted or dialled on the studio's behalf.
     expect(studio.environments.size).toBe(1)
+  })
+
+  it('refuses an offer back from a machine it never issued a credential to', async () => {
+    const mesh = new Mesh()
+    const studio = mesh.add('studio')
+    const laptop = mesh.add('laptop')
+    // A reachable path is not consent: the studio can dial the laptop, and the laptop never paired it back.
+    mesh.seedPairingFromCaller(studio, laptop)
+    laptop.devices.clear()
+    studio.driver.migrateFromPairings()
+
+    await studio.driver.sync()
+
+    expect((await laptop.driver.snapshot()).inGroup).toBe(false)
+    expect(laptop.environments.size).toBe(0)
   })
 })
 

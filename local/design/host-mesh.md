@@ -1,9 +1,8 @@
 # Host mesh groups: one join, everyone paired
 
-**Status:** design note, 2026-11-25. **Partly built** on `nplez1/host-mesh` — the group contract, the
-membership reducer, the sealed-offer envelope and the on-disk store. **The pairing side is not wired**: no
-offer is minted, relayed or redeemed yet, so nothing in a running app can join a group. See § "What is built,
-and what is not".
+**Status:** design note, 2026-11-25; **the pairing side shipped in #466 on 2026-11-26**, and the first real
+three-machine upgrade proved it insufficient — see § "What the first real upgrade proved wrong", which records the
+reverse offer (`hostMesh.offerBack`), the one switch that replaced five, and the two things this note got wrong.
 **Why:** Orca pairing is directional. The caller holds a `KnownRuntimeEnvironment` for the callee, so a fully
 connected set of n machines needs **n(n−1)** records and n(n−1) user actions. Three machines is six links;
 four is twelve. The user's requirement, verbatim: _"If I pair to a host, I want it paired the other way too.
@@ -88,14 +87,93 @@ on every host, and ejection are the bounds. They limit the damage; they do not p
   a machine it controls to every member. Bounds — attribution on the row, a notification on every host, any
   member can eject, `HOST_MESH_MAX_MEMBERS` is 12, and an introducer may forward at most
   `HOST_MESH_MAX_INTRODUCTIONS_PER_HOUR` per hour.
-- **"Ask before adding members" is a per-host setting, default off.** A host that turns it on lands
-  introductions as pending approvals in Settings.
+- **One switch, not five.** `HostMeshSettings` is `{ enabled }`; the per-rule booleans (`allowJoins`,
+  `acceptIntroductions`, `relayIntroductions`, `autoAcceptIntroducedMembers`, and the reverse offer's own) were a
+  protocol audit dressed as a setting. Off refuses joins, introductions, relays and reverse offers together, and
+  stops the repair pass, which is the whole of what an owner can meaningfully decide here.
 - **Introduced links get the least authority that works**: `workspace`, never `desktop-control`, never
-  `pairing-admin`. A new permission tier (`mesh-member`) is what the mesh methods check, and ordinary paired
-  clients do not hold it.
+  `pairing-admin`. Ordinary paired clients hold `workspace` and nothing more.
 - **Joining widens the network.** Minting a runtime offer can call `ensureNetworkExposure()`, and that
-  widening does not reverse. The copy on the join tick says so; a loopback-only host is never widened
-  silently by an introduction.
+  widening does not reverse. A loopback-only host is never widened silently by an introduction.
+
+## What the first real upgrade proved wrong
+
+A studio plus two work hosts, all upgraded at once, listed nothing on the two work hosts and showed both pairs
+one-way on the studio, and "Sync now" could not change it. The local evidence was decisive:
+`orca-environments.json` empty on a work host, one device row in `orca-devices.json`, and `host-mesh.json` with
+`state: null` and `migration.peerCount: 0`. Three defects, in the order they bite:
+
+1. **The upgrade could only see outbound pairings.** `listPairedHostKeys` reads `listEnvironments`, so a machine the
+   studio dials — the fork's own topology — migrates nothing and records `peerCount: 0` forever.
+2. **Every repair path was a call the holder of an environment makes.** `join`, `relayIntroductions`,
+   `introduce` and `sync` are all issued by a host that can dial, so a host with nothing could neither dial a
+   member nor be introduced by one, and adoption at the far end required an outbound environment it did not have.
+   The one-way badge was truthful; nothing in the protocol could close it.
+3. **The designed manual path was unreachable.** `hostMesh.join` needs a local environment, the renderer never
+   called it, and `allowJoins` — which `decideJoin` requires — was not even in the IPC allowlist, so the one tick
+   the note's § "The join" depends on could not be given.
+
+**The fix, and why it is the smallest one that converges:** a machine that already holds a credential into a peer
+hands that peer an offer of **its own**, sealed to it (`hostMesh.offerBack`). The peer opens the box with its own
+key, redeems the offer — so the credential now exists in the direction that was missing — adopts the group, and
+reports `outbound: ok` on its next sync, which is the evidence the other end needs for `inbound: active`. The
+relay batches that follow are the ones already built, so a mesh of spokes completes without a new join path.
+
+**The trust anchor, stated plainly:** the caller must hold a device row this host issued — it reached the method
+over a token this host minted, so it already runs commands here. The box is self-certifying in the other
+respects: it names a minter key and carries an ordinary pairing offer whose own key must hash to that name, so a
+caller cannot present itself as a different machine, and only the recipient's key can open it. The residual risk
+is the one this note already accepted for introductions: **a machine this host already trusts can add itself to
+the group**, which is why attribution, a bounded member count and ejection remain the bounds rather than
+authentication.
+
+**Why nothing is minted twice:** an offer is a device row on the sender, so the driver remembers the attempt per
+member per launch, retries at most every `HOST_MESH_REVERSE_OFFER_RETRY_MS`, and stops for the rest of the launch
+after a refusal — a machine with the mesh off is not asked again ten times.
+
+**What the settings pane became:** the group is a property of a host the owner already paired, so the pane no
+longer repeats every host in a second list, offers no Sync button, and keeps one switch. Each host row carries its
+mesh status and an Eject, and the section is the switch, the group's summary, a line saying when it last checked
+itself, and Leave mesh. The only list left is for a member this computer cannot reach, which has no row to hang
+anything on.
+
+## Nothing is pushed: the mesh reconciles itself
+
+The owner's requirement, verbatim: _"I shouldn't have the push sync on anything. Everything should happen
+automatically!"_ So there is no Sync control in Settings and no periodic pass owned by a surface. `host-mesh-auto-sync.ts`
+schedules one reconcile in the main process:
+
+- **Event first.** A pass ~10s after launch, on every connection-change observation (`notifyHostGraphOfConnectionChange`),
+  when the switch is turned on, and when a peer pairs this host (`requestOwnSync` from `hostMesh.offerBack`). Those
+  nudges collapse into one pass 1.5s later, so three connections coming up cost one pass.
+- **Then a slow reconcile.** One pass a minute while the fleet answers, doubling to a 15-minute ceiling while it does
+  not. Why a self-scheduling `setTimeout` and not `setInterval`: a fixed cadence is what the recurring-timer ratchet
+  exists to refuse — it asks at full rate whether or not anything moved — and a laptop that closed its lid must make
+  this quieter, not louder. The handle is unref'd, so a background reconcile never keeps the app alive. Why the
+  driver has to report `lastPassReached`: every member failure is caught per member, so a pass against a sleeping
+  fleet returns happily, and a backoff keyed on a thrown error would never engage.
+- **One pass at a time, and one writer at a time.** The driver holds a single in-flight promise, so a peer-triggered
+  pass and the scheduled one cannot overlap; and every local writer — the pass, `join`, an Eject, a leave, and each
+  inbound RPC — takes one lock over `host-mesh.json` (`host-mesh-write-lock.ts`). A narrower lock around only the
+  write would let two paths derive a mutation from the same read and lose one of them; the cost of the wide lock is
+  that an inbound call may wait behind a pass and retry at its caller, which loses nothing. The one exception is the
+  two methods that read and reply with no await in between (`sync`, `pending`): locking those is what would deadlock
+  two hosts, each pass holding its own lock and waiting on the other's read.
+- **A credential nothing redeems is revoked.** Every offer is a fresh device row with an `offerTtlMs`, and a refusal
+  or an unknown method revokes the row it just minted; a dropped connection does not, because the box may have arrived
+  and be redeeming. Otherwise a peer with the mesh switched off would accumulate a never-expiring token per retry.
+- **A reconnect resets the retry window.** `noteConnectionChange` clears the attempts that failed for technical
+  reasons, so a machine that finishes updating between passes is offered again within seconds rather than waiting out
+  the ten-minute interval. A refusal on the merits is left alone: a connection coming up does not change a machine's
+  mind about consent.
+- **A pane only reads.** The settings surface re-reads the local snapshot on the shared 15s clock and after each
+  action, publishes it to the shared store every row reads, and shows `lastSyncedAt`, so an open pane follows the
+  passes rather than showing what it mounted with. Nothing in the renderer can start a pass: `hostMesh:sync` and
+  `window.api.hostMesh.sync` were deleted with the button. `orca group sync` stays as a script's one-shot (it is not a
+  control a person is asked to press).
+
+`migrateFromPairings` deliberately still runs once and unrecorded when mesh mode is off, so an owner who turns the
+mesh on later still upgrades the fleet that was already paired.
 
 ## Leaving, and why this half matters more
 
@@ -141,6 +219,7 @@ is for this feature's own branches, where that note is the sprawl the check was 
 | Upstream file                                                        | Lines | What it is                                                          | If a sync conflicts                                                                                                                                                             |
 | -------------------------------------------------------------------- | ----- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `status-bar/host-connections/SshStatusSegment.tsx`                   | 21    | the relayed-fleet menu block                                        | keep our call site, the hook destructure, and the two counts (`relayed` in the early return, `relayed` in `connectedHostCount`); the JSX lives in `RelayedFleetStatusItems.tsx` |
+| `settings/.../server-rows/runtime-server-row.tsx`                    | 2     | one import and `<MeshMemberAffordance />` in the chips slot         | keep both; a host row carries its mesh state and its Eject, so the pane does not repeat every host in a second list                                                             |
 | `cli/hosts/host-handler-groups.ts`                                   | 6     | one import and `HOST_MESH_HANDLER_GROUP`                            | keep both; the entry itself is in `host-mesh-handler-group.ts`                                                                                                                  |
 | `startup/runtime-startup/main-process-runtime-launch.ts`             | 3     | import, `installHostMeshRuntime(runtimeRpc)`, `max-lines` directive | keep all three; the directive is only there because upstream's file sits exactly at the 300-line cap                                                                            |
 | `settings/.../RuntimeEnvironmentsPane.tsx`                           | 3     | one import and `<HostGroupSection />`                               | keep both                                                                                                                                                                       |

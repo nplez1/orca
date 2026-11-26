@@ -3,15 +3,20 @@ import { randomUUID } from 'node:crypto'
 import nacl from 'tweetnacl'
 import {
   HOST_MESH_JOIN_METHOD,
+  HOST_MESH_OFFER_BACK_METHOD,
   HOST_MESH_OFFER_TTL_MS,
   HOST_MESH_PAYLOAD_VERSION,
   HOST_MESH_PENDING_METHOD,
   HOST_MESH_RELAY_METHOD,
   HOST_MESH_REMOVE_METHOD,
+  HOST_MESH_REVERSE_OFFER_RETRY_MS,
   HOST_MESH_SYNC_METHOD,
   hostMeshPairStatus,
   type HostMeshJoinReply,
   type HostMeshJoinRequest,
+  type HostMeshMember,
+  type HostMeshOfferBackReply,
+  type HostMeshOfferBackRequest,
   type HostMeshOfferPayload,
   type HostMeshPendingReply,
   type HostMeshPendingRequest,
@@ -39,6 +44,7 @@ import {
 } from '../../shared/host-mesh/host-mesh-membership'
 import { orcaHostKeyOf } from '../host-graph/host-graph-self-identity'
 import { createHostMeshStore, type HostMeshStore } from './host-mesh-store'
+import { createHostMeshWriteLock } from './host-mesh-write-lock'
 import { HOST_MESH_MIGRATION_VERSION, planHostMeshMigration } from './host-mesh-migration'
 import { createHostMeshRpcService } from './host-mesh-rpc-service'
 
@@ -87,7 +93,22 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
   const keypair = () => deps.ownKeypair()
   const selfKey = () => orcaHostKeyOf(keypair().publicKeyB64)
 
+  const withLock = deps.lock ?? createHostMeshWriteLock()
+
   let lastError: string | null = null
+  /** In memory on purpose: "kept current" is a fact about this launch, not about the group. */
+  let lastSyncedAt: number | null = null
+  /** How many members answered the last pass, or null before one ran: the signal a backoff needs. */
+  let lastPassReached: number | null = null
+
+  /**
+   * The offers this launch has already made to members that held nothing back to here.
+   *
+   * Why in memory and not in the store: each attempt mints a device row on this host, so the only thing worth
+   * remembering is "do not mint another one this minute" — and a fresh launch retrying once is the behaviour a
+   * fleet that was asleep when the first offer was made needs.
+   */
+  const reverseOffers = new Map<string, { at: number; refused: string | null }>()
 
   /** Read once per snapshot, and never allowed to fail a snapshot: it only annotates one. */
   function storedMigration(): { appliedAt: number; peerCount: number } | null {
@@ -191,10 +212,13 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
   }
 
   /** Mints an offer for one recipient and records the device row it created, which is what removal revokes. */
-  async function mintFor(recipientHostKey: string): Promise<string> {
-    const minted = await deps.mintRuntimeOffer()
-    store.recordPeer(recipientHostKey, { deviceRowId: minted.deviceId })
-    return minted.offerUrl
+  async function mintFor(args: {
+    environmentId: string
+    recipientHostKey: string
+  }): Promise<{ offerUrl: string; deviceId: string }> {
+    const minted = await deps.mintRuntimeOffer(args)
+    store.recordPeer(args.recipientHostKey, { deviceRowId: minted.deviceId })
+    return minted
   }
 
   /** Redeems one box from a peer: the only place this host gains an outbound credential. */
@@ -216,6 +240,11 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
    * that quietly creates a group would fire from any RPC — including one a peer is driving.
    */
   function migrateFromPairings(): HostMeshMigrationOutcome {
+    // Why unrecorded when mesh mode is off: recording the run would make the owner's later switch-on a step that
+    // never groups the fleet it was installed for. Nothing is written, so the next launch still has the option.
+    if (!deps.settings().enabled) {
+      return { kind: 'nothing-to-group' }
+    }
     if (store.readMigration() !== null) {
       return { kind: 'already-recorded' }
     }
@@ -263,6 +292,8 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
       summary: summarizeHostMesh(state),
       settings: deps.settings(),
       lastError,
+      lastSyncedAt,
+      lastPassReached,
       migration: storedMigration()
     }
   }
@@ -283,7 +314,15 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
         }
   }
 
-  async function join(environmentId: string): Promise<HostMeshJoinOutcome> {
+  function join(environmentId: string): Promise<HostMeshJoinOutcome> {
+    return withLock(() => joinLocked(environmentId))
+  }
+
+  async function joinLocked(environmentId: string): Promise<HostMeshJoinOutcome> {
+    if (!deps.settings().enabled) {
+      lastError = 'mesh-disabled'
+      return { kind: 'refused', reason: 'mesh-disabled', snapshot: await snapshot() }
+    }
     let state = loadState()
     const own = keypair()
     const label = deps.labelForHostKey(selfKey()) ?? 'this host'
@@ -311,7 +350,7 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
 
     let sealedForIntroducer: HostMeshSealedOffer | null = null
     try {
-      const offerUrl = await mintFor(hello.selfKey)
+      const offerUrl = (await mintFor({ environmentId, recipientHostKey: hello.selfKey })).offerUrl
       sealedForIntroducer = sealTo({
         recipientHostKey: hello.selfKey,
         recipientPublicKeyB64: hello.publicKeyB64,
@@ -405,8 +444,9 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
     saveState(state)
 
     // Why one more pass: a join leaves this host holding credentials whose counterparts only exist as the
-    // members' own records, and a sync is what turns those into a truthful per-pair status.
-    await sync()
+    // members' own records, and a sync is what turns those into a truthful per-pair status. It runs inside the
+    // lock this operation already holds, which is why it is not the public `sync`.
+    await runSyncLocked()
     // Why not cleared: a join that reached the introducer but not every member is a half-join, and the
     // surface has to be able to say so rather than reporting a clean group.
     return { kind: 'joined', snapshot: await snapshot(), muted }
@@ -438,7 +478,8 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
       }
       let offerUrl: string
       try {
-        offerUrl = await mintFor(hostKey)
+        offerUrl = (await mintFor({ environmentId: args.environmentId, recipientHostKey: hostKey }))
+          .offerUrl
       } catch {
         continue
       }
@@ -516,11 +557,117 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
   }
 
   /**
+   * Hands a member this host's own offer when that member holds no credential back to here.
+   *
+   * Why this is the only call that repairs an upgraded fleet: every other method in this protocol is a call the
+   * holder of an environment makes, and a work host the studio dials holds none — so it can neither dial a
+   * member nor be introduced by one. The side with the credential hands over an offer of its own, sealed to the
+   * member, and the member redeems it and dials back. Neither host mints for the other.
+   */
+  async function offerBackTo(args: {
+    state: HostMeshState
+    member: HostMeshMember
+    environmentId: string
+  }): Promise<HostMeshState> {
+    const { member } = args
+    const known = reverseOffers.get(member.hostKey)
+    // Why a refusal is a wait and not an end: the owner at that machine can turn the mesh on at any time, and this
+    // launch will not restart to notice. The wait is the retry interval, which is what bounds the minting.
+    if (known !== undefined && deps.now() - known.at < HOST_MESH_REVERSE_OFFER_RETRY_MS) {
+      return args.state
+    }
+    // Why the key is checked before minting: a member with no public key can never receive a sealed offer, so
+    // minting one for it would leave a live credential behind that nothing could ever redeem.
+    if (toBytes(member.publicKeyB64 ?? '') === null) {
+      reverseOffers.set(member.hostKey, { at: deps.now(), refused: 'no-public-key' })
+      return args.state
+    }
+    reverseOffers.set(member.hostKey, { at: deps.now(), refused: null })
+
+    const epoch = epochAfter(args.state.epoch)
+    let sealed: HostMeshSealedOffer | null = null
+    let mintedRowId: string | null = null
+    try {
+      const minted = await mintFor({
+        environmentId: args.environmentId,
+        recipientHostKey: member.hostKey
+      })
+      mintedRowId = minted.deviceId
+      sealed = sealTo({
+        recipientHostKey: member.hostKey,
+        recipientPublicKeyB64: member.publicKeyB64,
+        groupId: args.state.groupId,
+        epoch,
+        introducedBy: selfKey(),
+        offerUrl: minted.offerUrl
+      })
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : 'offer-mint-failed'
+      return args.state
+    }
+    // A member with no public key cannot be sealed a box, so there is nothing to try until a sync brings one.
+    if (sealed === null) {
+      return args.state
+    }
+
+    const request: HostMeshOfferBackRequest = {
+      version: HOST_MESH_PAYLOAD_VERSION,
+      groupId: args.state.groupId,
+      epoch,
+      offerer: {
+        hostKey: selfKey(),
+        label: deps.labelForHostKey(selfKey()) ?? 'this host',
+        publicKeyB64: keypair().publicKeyB64
+      },
+      sealed
+    }
+    try {
+      const reply = await deps.send<HostMeshOfferBackReply>(
+        args.environmentId,
+        HOST_MESH_OFFER_BACK_METHOD,
+        request
+      )
+      if (reply.kind !== 'accepted') {
+        reverseOffers.set(member.hostKey, { at: deps.now(), refused: reply.reason })
+        // Why the row is revoked: the far side answered, and its answer was no — so this credential can never be
+        // redeemed and is pure residue. A timeout below is different: a queued call may still be redeemed.
+        if (mintedRowId !== null) {
+          deps.revokeMintedRow(mintedRowId)
+        }
+        return args.state
+      }
+    } catch (error) {
+      // A machine on a build without this method, and a transport that dropped mid-call, are both "no answer
+      // yet" rather than a refusal. The retry interval is what stops either from minting an offer per pass.
+      const reason = error instanceof Error ? error.message : 'offer-back-failed'
+      if (reason !== 'method_not_found') {
+        lastError = reason
+      }
+      // Why this one row is revoked even though the call failed: an unknown method means the box was never read, so
+      // the credential is dead weight on a machine that will keep being retried. A dropped connection is not the same
+      // fact — the box may have arrived and be redeeming — so that row is left to its TTL.
+      if (reason === 'method_not_found' && mintedRowId !== null) {
+        deps.revokeMintedRow(mintedRowId)
+      }
+      reverseOffers.set(member.hostKey, { at: deps.now(), refused: null })
+      return args.state
+    }
+    // Why the inbound link is taken from the reply: the member answered `accepted` only after redeeming the
+    // offer this host minted, so it now holds a working link back here — and waiting for its own report would
+    // leave a pair that is joined both ways reading "one-way" until that member next synced.
+    return setHostMeshInboundLink(args.state, {
+      hostKey: member.hostKey,
+      link: { kind: 'active' }
+    })
+  }
+
+  /**
    * Asks every reachable member what it holds, which is the only way this host learns the direction a
    * member owns TO it — no amount of local bookkeeping can establish that.
    */
   async function pullMemberViews(start: HostMeshState): Promise<HostMeshState> {
     let state = start
+    let reached = 0
     for (const member of state.members) {
       const environmentId = deps.environmentIdForHostKey(member.hostKey)
       if (environmentId === null) {
@@ -533,6 +680,7 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
           hostKey: selfKey()
         } satisfies HostMeshPendingRequest)
         if (confirmKey(payload.selfKey, payload.publicKeyB64)) {
+          reached += 1
           // Why a reply proves the outbound link: the peer authenticated this host and answered on a
           // credential this host holds, which is exactly what `ok` claims. Leaving it at `awaitingOffer`
           // would also mean a migrated group can never start repairing itself — the repair needs one member
@@ -560,6 +708,11 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
             state = adoption.state
           }
           state = applyHostMeshSync(state, payload)
+          // Why after the merge and not before: a member that reported a working link back here is already
+          // paired, and one that reported nothing is exactly the half this pass exists to close.
+          if (state.links.inbound[member.hostKey]?.kind !== 'active') {
+            state = await offerBackTo({ state, member, environmentId })
+          }
         }
       } catch (error) {
         // A peer from before this feature answers `method_not_found`: it is not a broken network, it is a
@@ -573,12 +726,46 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
         })
       }
     }
+    lastPassReached = reached
     return state
   }
 
-  async function sync(): Promise<HostMeshSnapshot> {
+  /**
+   * A member's connection came up, so the wait that bounds re-offering is no longer the truth.
+   *
+   * Why this exists for a staggered upgrade: an update restarts a machine, which drops and re-establishes its
+   * connection — the one moment this host can know an offer it was refused on technical grounds is worth making
+   * again. A refusal on the merits is kept, because a connection does not change that machine's mind.
+   */
+  function noteConnectionChange(): void {
+    for (const [hostKey, entry] of reverseOffers) {
+      if (entry.refused === null) {
+        reverseOffers.delete(hostKey)
+      }
+    }
+  }
+
+  /** One pass at a time: a peer-triggered pass and a scheduled one must not interleave two writes. */
+  let syncing: Promise<HostMeshSnapshot> | null = null
+
+  function sync(): Promise<HostMeshSnapshot> {
+    if (syncing !== null) {
+      return syncing
+    }
+    // Why the pass takes the write lock: it reads the store, then spends seconds per member on the network, then
+    // writes. Without the lock an Eject or an inbound removal landing in that window is silently overwritten.
+    const run = withLock(runSyncLocked).finally(() => {
+      syncing = null
+    })
+    syncing = run
+    return run
+  }
+
+  async function runSyncLocked(): Promise<HostMeshSnapshot> {
     let state = loadState()
-    if (state.groupId === '') {
+    // Why mesh mode gates the pass itself: off means this computer neither dials a member nor mints an offer, and
+    // a sync that still did either would be the one thing that switch is supposed to stop.
+    if (state.groupId === '' || !deps.settings().enabled) {
       return snapshot()
     }
     const membersBefore = new Set(state.members.map((member) => member.hostKey))
@@ -639,6 +826,7 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
       state = collected.state
     }
     saveState(state)
+    lastSyncedAt = deps.now()
 
     // Why twice: the repair above changes what members hold, and a status read before it settles would call
     // a pair one-way that is now joined both ways.
@@ -655,61 +843,65 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
     return snapshot()
   }
 
-  async function removeMember(hostKey: string): Promise<HostMeshSnapshot> {
-    let state = loadState()
-    const member = state.members.find((entry) => entry.hostKey === hostKey)
-    const environmentId = deps.environmentIdForHostKey(hostKey)
-    state = removeHostMeshMember(state, {
-      hostKey,
-      removedBy: selfKey(),
-      epoch: epochAfter(state.epoch)
-    })
-    const removal = {
-      version: HOST_MESH_PAYLOAD_VERSION,
-      groupId: state.groupId,
-      hostKey,
-      removedBy: selfKey(),
-      epoch: state.epoch
-    } satisfies HostMeshRemoveRequest
+  function removeMember(hostKey: string): Promise<HostMeshSnapshot> {
+    return withLock(async () => {
+      let state = loadState()
+      const member = state.members.find((entry) => entry.hostKey === hostKey)
+      const environmentId = deps.environmentIdForHostKey(hostKey)
+      state = removeHostMeshMember(state, {
+        hostKey,
+        removedBy: selfKey(),
+        epoch: epochAfter(state.epoch)
+      })
+      const removal = {
+        version: HOST_MESH_PAYLOAD_VERSION,
+        groupId: state.groupId,
+        hostKey,
+        removedBy: selfKey(),
+        epoch: state.epoch
+      } satisfies HostMeshRemoveRequest
 
-    // Why the removed machine is told before anything is deleted: once its environment is gone this host
-    // cannot reach it, so it would only learn at its own next sync — or never, if it never syncs.
-    if (member !== undefined && environmentId !== null) {
-      await deps.send(environmentId, HOST_MESH_REMOVE_METHOD, removal).catch(() => undefined)
-    }
-    tearDownPeer(hostKey)
-    saveState(state)
-
-    // Best effort for the rest: a member that is asleep learns at its next sync, and tombstones win there.
-    for (const other of state.members) {
-      const otherEnvironment = deps.environmentIdForHostKey(other.hostKey)
-      if (otherEnvironment === null) {
-        continue
-      }
-      await deps.send(otherEnvironment, HOST_MESH_REMOVE_METHOD, removal).catch(() => undefined)
-    }
-    return snapshot()
-  }
-
-  async function leave(): Promise<HostMeshSnapshot> {
-    const current = loadState()
-    const removal = {
-      version: HOST_MESH_PAYLOAD_VERSION,
-      groupId: current.groupId,
-      hostKey: selfKey(),
-      removedBy: selfKey(),
-      epoch: epochAfter(current.epoch)
-    } satisfies HostMeshRemoveRequest
-    for (const member of current.members) {
-      const environmentId = deps.environmentIdForHostKey(member.hostKey)
-      if (environmentId !== null) {
+      // Why the removed machine is told before anything is deleted: once its environment is gone this host
+      // cannot reach it, so it would only learn at its own next sync — or never, if it never syncs.
+      if (member !== undefined && environmentId !== null) {
         await deps.send(environmentId, HOST_MESH_REMOVE_METHOD, removal).catch(() => undefined)
       }
-      tearDownPeer(member.hostKey)
-    }
-    const state = leaveHostMeshGroup(current, { epoch: epochAfter(current.epoch) })
-    saveState(state)
-    return snapshot()
+      tearDownPeer(hostKey)
+      saveState(state)
+
+      // Best effort for the rest: a member that is asleep learns at its next sync, and tombstones win there.
+      for (const other of state.members) {
+        const otherEnvironment = deps.environmentIdForHostKey(other.hostKey)
+        if (otherEnvironment === null) {
+          continue
+        }
+        await deps.send(otherEnvironment, HOST_MESH_REMOVE_METHOD, removal).catch(() => undefined)
+      }
+      return snapshot()
+    })
+  }
+
+  function leave(): Promise<HostMeshSnapshot> {
+    return withLock(async () => {
+      const current = loadState()
+      const removal = {
+        version: HOST_MESH_PAYLOAD_VERSION,
+        groupId: current.groupId,
+        hostKey: selfKey(),
+        removedBy: selfKey(),
+        epoch: epochAfter(current.epoch)
+      } satisfies HostMeshRemoveRequest
+      for (const member of current.members) {
+        const environmentId = deps.environmentIdForHostKey(member.hostKey)
+        if (environmentId !== null) {
+          await deps.send(environmentId, HOST_MESH_REMOVE_METHOD, removal).catch(() => undefined)
+        }
+        tearDownPeer(member.hostKey)
+      }
+      const state = leaveHostMeshGroup(current, { epoch: epochAfter(current.epoch) })
+      saveState(state)
+      return await snapshot()
+    })
   }
 
   async function updateSettings(patch: Partial<HostMeshSettings>): Promise<HostMeshSnapshot> {
@@ -717,5 +909,14 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
     return snapshot()
   }
 
-  return { snapshot, join, sync, removeMember, leave, updateSettings, migrateFromPairings }
+  return {
+    snapshot,
+    join,
+    sync,
+    noteConnectionChange,
+    removeMember,
+    leave,
+    updateSettings,
+    migrateFromPairings
+  }
 }

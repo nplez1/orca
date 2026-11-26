@@ -64,16 +64,16 @@ describe('the group in a running app', () => {
 
   it('keeps the group’s settings in the pairing store, not the app’s settings', async () => {
     configureHostMeshRuntimeFromApp(fakeServer())
-    await updateHostMeshSettings({ acceptIntroductions: false })
+    await updateHostMeshSettings({ enabled: false })
 
     const stored: unknown = JSON.parse(readFileSync(hostMeshStorePath(state.userDataPath), 'utf-8'))
     expect(stored).toMatchObject({
-      settings: { ...DEFAULT_HOST_MESH_SETTINGS, acceptIntroductions: false }
+      settings: { ...DEFAULT_HOST_MESH_SETTINGS, enabled: false }
     })
 
     // A second startup pass reads them back rather than starting over at the defaults.
     configureHostMeshRuntimeFromApp(fakeServer())
-    expect((await readHostMeshSnapshot()).settings.acceptIntroductions).toBe(false)
+    expect((await readHostMeshSnapshot()).settings.enabled).toBe(false)
   })
 
   it('leaves no file behind for a host that never joined', () => {

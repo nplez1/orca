@@ -1,4 +1,5 @@
 import type { RemoteRuntimeSharedConnectionDiagnostics } from '../../shared/remote-runtime/control/remote-runtime-shared-control-types'
+import { noteHostMeshConnectionChange } from '../host-mesh/host-mesh-runtime'
 import { observeHostGraphEnvironmentConnection } from './host-graph-connection-state'
 import { invalidateHostGraphSnapshot } from './host-graph-driver'
 
@@ -19,4 +20,7 @@ export function notifyHostGraphOfConnectionChange(args: {
     state: args.diagnostics.state
   })
   invalidateHostGraphSnapshot()
+  // Why the mesh is told from here: a host that just came up is the moment a one-way pair can be closed, and this
+  // is the one place that already knows a connection changed.
+  noteHostMeshConnectionChange()
 }

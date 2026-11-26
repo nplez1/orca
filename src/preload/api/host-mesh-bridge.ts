@@ -6,7 +6,6 @@ export const hostMeshApi = {
   read: (): Promise<HostMeshSnapshot> => ipcRenderer.invoke('hostMesh:read'),
   join: (environmentId: string): Promise<HostMeshJoinOutcome> =>
     ipcRenderer.invoke('hostMesh:join', environmentId),
-  sync: (): Promise<HostMeshSnapshot> => ipcRenderer.invoke('hostMesh:sync'),
   remove: (hostKey: string): Promise<HostMeshSnapshot> =>
     ipcRenderer.invoke('hostMesh:remove', hostKey),
   leave: (): Promise<HostMeshSnapshot> => ipcRenderer.invoke('hostMesh:leave'),

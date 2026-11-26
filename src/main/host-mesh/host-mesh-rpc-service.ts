@@ -9,6 +9,8 @@ import {
   type HostMeshIntroduceRequest,
   type HostMeshJoinReply,
   type HostMeshJoinRequest,
+  type HostMeshOfferBackReply,
+  type HostMeshOfferBackRequest,
   type HostMeshPendingReply,
   type HostMeshPendingRequest,
   type HostMeshRelayRequest,
@@ -18,21 +20,28 @@ import {
   type HostMeshSyncPayload
 } from '../../shared/host-mesh/host-mesh-contract'
 import { adoptHostMeshGroup } from '../../shared/host-mesh/host-mesh-adoption'
-import { decideIntroduce, decideJoin } from '../../shared/host-mesh/host-mesh-admission'
+import {
+  decideIntroduce,
+  decideJoin,
+  decideOfferBack
+} from '../../shared/host-mesh/host-mesh-admission'
 import {
   addHostMeshMember,
   createHostMeshState,
   removeHostMeshMember,
+  setHostMeshInboundLink,
   setHostMeshOutboundLink
 } from '../../shared/host-mesh/host-mesh-membership'
 import { orcaHostKeyOf } from '../host-graph/host-graph-self-identity'
 import { createHostMeshStore } from './host-mesh-store'
 import { openHostMeshSealedOffer, sealHostMeshOffer } from './host-mesh-sealed-offer'
 import type {
+  HostMeshCaller,
   HostMeshDriverDeps,
   HostMeshRpcService,
   RedeemedPeer
 } from './host-mesh-driver-contract'
+import type { HostMeshWriteLock } from './host-mesh-write-lock'
 
 function toBytes(base64: string): Uint8Array | null {
   const decoded = Buffer.from(base64, 'base64')
@@ -41,7 +50,7 @@ function toBytes(base64: string): Uint8Array | null {
     : null
 }
 
-/** The six methods a peer calls. Each is one whole pass on this host's own store. */
+/** The methods a peer calls. Each is one whole pass on this host's own store. */
 export function createHostMeshRpcService(deps: HostMeshDriverDeps): HostMeshRpcService {
   const store = createHostMeshStore({ userDataPath: deps.userDataPath })
   const selfKey = () => orcaHostKeyOf(deps.ownKeypair().publicKeyB64)
@@ -108,7 +117,12 @@ export function createHostMeshRpcService(deps: HostMeshDriverDeps): HostMeshRpcS
   // The peer index is what removal later keys on, so every commit re-states it from the environment table.
   /** Mints for one recipient, recording the device row so removal has something to revoke. */
   async function mintFor(recipientHostKey: string): Promise<string> {
-    const minted = await deps.mintRuntimeOffer()
+    const minted = await deps.mintRuntimeOffer({
+      // Empty when this host holds no environment for the recipient, which is the ordinary inbound case: whoever is
+      // calling reached this host, so this host's own reach is already what that machine can dial.
+      environmentId: deps.environmentIdForHostKey(recipientHostKey) ?? '',
+      recipientHostKey
+    })
     store.recordPeer(recipientHostKey, { deviceRowId: minted.deviceId })
     return minted.offerUrl
   }
@@ -123,7 +137,7 @@ export function createHostMeshRpcService(deps: HostMeshDriverDeps): HostMeshRpcS
     }
   }
 
-  return {
+  const service: HostMeshRpcService = {
     join: async (params: HostMeshJoinRequest): Promise<HostMeshJoinReply> => {
       let state = loadState()
       const opened = openFrom(params.sealedForIntroducer, params.joiner.publicKeyB64)
@@ -135,10 +149,6 @@ export function createHostMeshRpcService(deps: HostMeshDriverDeps): HostMeshRpcS
       })
       if (decision.kind === 'refuse') {
         return { kind: 'refused', reason: decision.reason }
-      }
-      if (decision.kind === 'ask') {
-        // No pending-approval surface yet, so this is refused rather than silently held forever.
-        return { kind: 'refused', reason: 'awaiting-approval' }
       }
       // Why adoption here: the first join is what creates the group, so a host in no group takes the
       // joiner's identity for it rather than minting a second one beside it.
@@ -201,6 +211,9 @@ export function createHostMeshRpcService(deps: HostMeshDriverDeps): HostMeshRpcS
 
     relayIntroductions: async (params: HostMeshRelayRequest) => {
       const state = loadState()
+      if (!deps.settings().enabled) {
+        return { forwarded: 0, refused: ['mesh-disabled'] }
+      }
       if (state.groupId !== params.groupId) {
         return { forwarded: 0, refused: ['group-mismatch'] }
       }
@@ -283,9 +296,6 @@ export function createHostMeshRpcService(deps: HostMeshDriverDeps): HostMeshRpcS
       if (decision.kind === 'refuse') {
         return { kind: 'refused', reason: decision.reason }
       }
-      if (decision.kind === 'ask') {
-        return { kind: 'refused', reason: 'awaiting-approval' }
-      }
       let peer: RedeemedPeer
       try {
         peer = await deps.redeemOffer(decision.payload.offerUrl, decision.payload.minterHostKey)
@@ -343,6 +353,100 @@ export function createHostMeshRpcService(deps: HostMeshDriverDeps): HostMeshRpcS
       // A box can only be opened by the machine it is addressed to, so a caller that collects another
       // machine's box denies it delivery rather than gaining anything from it.
       return { sealed: store.takePendingBoxes(params.hostKey) }
+    },
+
+    /**
+     * The reverse direction: a machine that already holds a credential here hands this host an offer of its own.
+     *
+     * Why this is the one method that makes an upgraded fleet converge without its owner touching each machine:
+     * the side that paired by hand holds every environment, and a spoke holds none — so a spoke can neither dial
+     * a member nor be introduced by one, because introductions travel to a member that already has a group. This
+     * is the only call a host with nothing can answer.
+     */
+    offerBack: async (
+      params: HostMeshOfferBackRequest,
+      caller: HostMeshCaller
+    ): Promise<HostMeshOfferBackReply> => {
+      let state = loadState()
+      // Why the cheap refusals come before opening the box: opening spends a nonce and writes the store, so a caller
+      // that was never paired here, on a host with the mesh off, must be turned away before it costs that.
+      if (caller.pairedDeviceId === undefined) {
+        return { kind: 'refused', reason: 'caller-not-paired' }
+      }
+      if (!deps.settings().enabled) {
+        return { kind: 'refused', reason: 'reverse-offers-disabled' }
+      }
+      const opened = openFrom(params.sealed, params.offerer.publicKeyB64)
+      const decision = decideOfferBack(state, deps.settings(), {
+        ...(caller.pairedDeviceId === undefined
+          ? {}
+          : { callerPairedDeviceId: caller.pairedDeviceId }),
+        offererHostKey: params.offerer.hostKey,
+        openedPayload: opened.payload,
+        ...(opened.reason === undefined ? {} : { openReason: opened.reason }),
+        now: deps.now()
+      })
+      if (decision.kind === 'refuse') {
+        return { kind: 'refused', reason: decision.reason }
+      }
+      const epoch = Math.max(state.epoch, params.epoch) + 1
+      // Why adoption is decided before the redemption: a group this host will not take must not leave an
+      // environment record behind, which is a credential this host would then hold for no group at all.
+      const adoption = adoptHostMeshGroup(
+        state,
+        {
+          groupId: decision.payload.groupId,
+          epoch,
+          hostKeys: [state.selfKey, params.offerer.hostKey]
+        },
+        {
+          // Why the offerer needs no local environment: it reached this method over a device token this host
+          // issued, which is a pairing made in the other direction, and `decideOfferBack` is what checked it.
+          isTrusted: (hostKey) => hostKey === params.offerer.hostKey
+        }
+      )
+      if (adoption.kind === 'refuse') {
+        return { kind: 'refused', reason: 'group-not-adoptable' }
+      }
+      let peer: RedeemedPeer
+      try {
+        peer = await deps.redeemOffer(decision.payload.offerUrl, decision.payload.minterHostKey)
+      } catch {
+        return { kind: 'refused', reason: 'redeem-failed' }
+      }
+      if (peer.hostKey !== params.offerer.hostKey) {
+        return { kind: 'refused', reason: 'offer-not-from-offerer' }
+      }
+      if (adoption.kind === 'adopt') {
+        state = adoption.state
+      }
+      state = addHostMeshMember(state, {
+        hostKey: params.offerer.hostKey,
+        label: params.offerer.label,
+        publicKeyB64: params.offerer.publicKeyB64,
+        epoch
+      }).state
+      state = setHostMeshOutboundLink(state, {
+        hostKey: params.offerer.hostKey,
+        link: { kind: 'ok' }
+      })
+      // Why the inbound link IS marked here, where an introduction deliberately leaves it absent: this call
+      // arrived over a credential this host issued to the offerer, so the offerer demonstrably holds a working
+      // link in this direction. An introduction only proves a box was minted.
+      state = setHostMeshInboundLink(state, {
+        hostKey: params.offerer.hostKey,
+        link: { kind: 'active' }
+      })
+      state = { ...state, epoch }
+      commit(state)
+      // Why the caller's own device row is recorded: the offerer authenticated with a token THIS host issued, so that
+      // row is the credential to revoke — and an Eject on this side that revoked nothing would leave the other machine
+      // still holding workspace access to this one.
+      store.recordPeer(params.offerer.hostKey, { deviceRowId: caller.pairedDeviceId })
+      // Why a pass of this host's own: the pairs with the *other* members were never this host's to mint, so the
+      // one moment they can be offered is now — and the machine that just paired this one cannot do it for it.
+      deps.requestOwnSync?.()
+      return { kind: 'accepted', groupId: state.groupId, epoch }
     },
 
     sync: async (params: HostMeshPendingRequest): Promise<HostMeshSyncPayload> => {
@@ -412,5 +516,27 @@ export function createHostMeshRpcService(deps: HostMeshDriverDeps): HostMeshRpcS
       commit(state)
       return { applied: true }
     }
+  }
+
+  // Why the lock is at this boundary: the methods below read the store, await something, and write it back, and the
+  // scheduled pass on this host does the same. Serialising only the pass would leave an inbound removal or offer open
+  // to being overwritten by it — and an inbound call that waits behind a pass merely retries, which loses nothing.
+  //
+  // Why the two pure reads are NOT locked: they read and reply with no await in between, so a lock protects nothing
+  // there — while holding one deadlocks two hosts. A's pass holds A's lock and awaits B's read; B's pass holds B's lock
+  // and awaits A's read. Both would wait out the 20s call timeout, both would record the other as unreached, and both
+  // would back off in step toward fifteen minutes.
+  return deps.lock === undefined ? service : lockService(service, deps.lock)
+}
+
+function lockService(service: HostMeshRpcService, lock: HostMeshWriteLock): HostMeshRpcService {
+  return {
+    join: (params, caller) => lock(() => service.join(params, caller)),
+    relayIntroductions: (params, caller) => lock(() => service.relayIntroductions(params, caller)),
+    introduce: (params, caller) => lock(() => service.introduce(params, caller)),
+    pending: service.pending,
+    offerBack: (params, caller) => lock(() => service.offerBack(params, caller)),
+    sync: service.sync,
+    remove: (params, caller) => lock(() => service.remove(params, caller))
   }
 }

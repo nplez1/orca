@@ -3,6 +3,8 @@ import type {
   HostMeshIntroduceRequest,
   HostMeshJoinReply,
   HostMeshJoinRequest,
+  HostMeshOfferBackReply,
+  HostMeshOfferBackRequest,
   HostMeshPairStatus,
   HostMeshPendingReply,
   HostMeshPendingRequest,
@@ -44,6 +46,19 @@ export type HostMeshSnapshot = {
   /** A line a surface can show verbatim when the last pass failed, or null. */
   lastError: string | null
   /**
+   * When this launch last completed a pass, so a pane can say the mesh is being kept current rather than offering a
+   * button for it. Null before the first pass of this launch finishes.
+   */
+  lastSyncedAt: number | null
+  /**
+   * How many members answered the last pass, or null before one ran.
+   *
+   * Why it is in the snapshot: every member failure is caught per member, so a pass against a sleeping fleet looks
+   * exactly like a healthy one from the outside. This is what lets the scheduled pass see that it reached nobody
+   * and slow down instead of dialling the same unreachable machines every minute forever.
+   */
+  lastPassReached: number | null
+  /**
    * Where this group came from, when an upgrade created it from existing pairings.
    *
    * Why a surface needs it: the group appears without the owner asking for it, so the panel has to be able to
@@ -56,19 +71,38 @@ export type HostMeshJoinOutcome =
   | { kind: 'joined'; snapshot: HostMeshSnapshot; muted: string[] }
   | { kind: 'refused'; reason: string; snapshot: HostMeshSnapshot }
 
+import type { HostMeshWriteLock } from './host-mesh-write-lock'
+
 export type HostMeshDriverDeps = {
   userDataPath: string
   now: () => number
+  /** One writer at a time over this host's store; shared by the driver and the peer-facing service. */
+  lock?: HostMeshWriteLock
   /** This profile's own X25519 host keypair; the same one pairing and push authentication use. */
   ownKeypair: () => { publicKey: Uint8Array; secretKey: Uint8Array; publicKeyB64: string }
   /**
    * Mints a runtime offer on THIS host with no grants, so the newcomer gets `workspace` and nothing more.
    *
+   * Why the recipient comes in: each one needs its OWN fresh device row. Upstream's offer registry reuses one
+   * unused pending offer per (grants, creator), so minting twice in a pass would hand two machines the same
+   * credential — one identity, and ejecting either one would cut the other's link for good.
+   *
    * Why the device id comes back with it: minting creates the device row the redeemer will use, and that
    * row is the only thing removal can revoke. Discarding it leaves a removed member still able to run
    * commands here.
    */
-  mintRuntimeOffer: () => Promise<{ offerUrl: string; deviceId: string }>
+  mintRuntimeOffer: (args: {
+    environmentId: string
+    recipientHostKey: string
+  }) => Promise<{ offerUrl: string; deviceId: string }>
+  /**
+   * Revokes one device row this host minted, when the machine it was minted for did not take the offer.
+   *
+   * Why one row and not the member: the row that was just minted is a live, never-expiring credential the far side
+   * may never redeem, and every retry mints another. A member that already holds a working credential from an earlier
+   * pairing must keep it, so this names the row rather than the member.
+   */
+  revokeMintedRow: (deviceId: string) => void
   /**
    * Redeems an offer minted by a peer; returns what the store now holds for it.
    *
@@ -91,6 +125,15 @@ export type HostMeshDriverDeps = {
   labelForHostKey: (hostKey: string) => string | null
   /** One call to a peer this host is paired with. Rejects only on transport failure. */
   send: <T>(environmentId: string, method: string, params: unknown) => Promise<T>
+  /**
+   * Asks this host to run a pass of its own, after a peer has just joined it.
+   *
+   * Why the receiving side needs it: a machine the studio dials never starts a sync, so the pairs between it and
+   * the *other* members would wait for its owner to press a button. Nobody mints an offer on another's behalf, so
+   * only its own pass can hand those offers over — and it has to happen here, because the peer that just paired it
+   * cannot do it for it. Fired and not awaited: the caller is mid-request and owes that peer a prompt answer.
+   */
+  requestOwnSync?: () => void
   settings: () => HostMeshSettings
   saveSettings: (settings: HostMeshSettings) => void
 }
@@ -118,6 +161,8 @@ export type HostMeshDriver = {
   join: (environmentId: string) => Promise<HostMeshJoinOutcome>
   /** Re-read every member: sync membership, collect offers addressed to us, retry abandoned links. */
   sync: () => Promise<HostMeshSnapshot>
+  /** A member's connection came up, so an offer refused on technical grounds is worth making again. */
+  noteConnectionChange: () => void
   removeMember: (hostKey: string) => Promise<HostMeshSnapshot>
   leave: () => Promise<HostMeshSnapshot>
   updateSettings: (patch: Partial<HostMeshSettings>) => Promise<HostMeshSnapshot>
@@ -140,6 +185,11 @@ export type HostMeshRpcService = {
     caller: HostMeshCaller
   ) => Promise<HostMeshIntroduceReply>
   pending: (params: HostMeshPendingRequest, caller: HostMeshCaller) => Promise<HostMeshPendingReply>
+  /** A machine that already holds a credential here hands this host an offer of its own. */
+  offerBack: (
+    params: HostMeshOfferBackRequest,
+    caller: HostMeshCaller
+  ) => Promise<HostMeshOfferBackReply>
   sync: (params: HostMeshPendingRequest, caller: HostMeshCaller) => Promise<HostMeshSyncPayload>
   remove: (params: HostMeshRemoveRequest, caller: HostMeshCaller) => Promise<{ applied: boolean }>
 }

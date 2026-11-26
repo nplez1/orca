@@ -5,15 +5,10 @@ import {
   leaveHostMeshGroup,
   readHostMeshSnapshot,
   removeHostMeshMember,
-  syncHostMesh,
   updateHostMeshSettings
 } from '../../host-mesh/host-mesh-runtime'
 
-const SETTING_KEYS = [
-  'autoAcceptIntroducedMembers',
-  'acceptIntroductions',
-  'relayIntroductions'
-] as const
+const SETTING_KEYS = ['enabled'] as const
 
 /**
  * The renderer's whole access to the mesh.
@@ -26,7 +21,6 @@ export function registerHostMeshHandlers(): void {
   ipcMain.handle('hostMesh:join', (_event, environmentId: unknown) =>
     joinHostMesh(readId(environmentId))
   )
-  ipcMain.handle('hostMesh:sync', () => syncHostMesh())
   ipcMain.handle('hostMesh:remove', (_event, hostKey: unknown) =>
     removeHostMeshMember(readId(hostKey))
   )

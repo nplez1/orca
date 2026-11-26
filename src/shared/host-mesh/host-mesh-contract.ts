@@ -24,6 +24,24 @@ export const HOST_MESH_RELAY_METHOD = 'hostMesh.relayIntroductions'
 export const HOST_MESH_INTRODUCE_METHOD = 'hostMesh.introduce'
 /** Late answers: an offer minted for a newcomer that has not collected it yet. */
 export const HOST_MESH_PENDING_METHOD = 'hostMesh.pending'
+/**
+ * A machine that holds a credential into a peer hands over an offer of its OWN, so the peer can dial back.
+ *
+ * Why this direction exists at all: the side that paired by hand holds the credential and the other side holds
+ * nothing, so a fleet paired the way this fork's own topology pairs it (the studio dials its work hosts) is
+ * one-way in the store before the mesh ever sees it. Every other method here is a call the *callee* makes, and
+ * a host with no environment cannot make one — so without this a spoke can never be told the group exists.
+ */
+export const HOST_MESH_OFFER_BACK_METHOD = 'hostMesh.offerBack'
+
+/**
+ * How often this host re-offers to a member that has not taken it up.
+ *
+ * Why not every sync: minting is a device row on this host, and one nobody redeems is a live credential for a
+ * pairing that may never happen. A refusal is remembered for the rest of the launch, so this bounds the waste
+ * to one offer per member per ten minutes while a member is reachable but not yet paired back.
+ */
+export const HOST_MESH_REVERSE_OFFER_RETRY_MS = 10 * 60_000
 /** Members, tombstones and per-link state, so every host renders the same group. */
 export const HOST_MESH_SYNC_METHOD = 'hostMesh.sync'
 /** Removal and self-removal. */
@@ -236,6 +254,27 @@ export type HostMeshPendingRequest = {
 }
 
 export type HostMeshPendingReply = { sealed: HostMeshSealedOffer[] }
+
+/**
+ * `hostMesh.offerBack`: the machine holding the credential hands the other side an offer of its own.
+ *
+ * Why the offer is still the offerer's own: this method mints nothing on the recipient's behalf. It carries a
+ * credential the offerer issued, addressed to a machine only that machine can open it with, which is the same
+ * "nobody mints for another" rule the join follows from the other end.
+ */
+export type HostMeshOfferBackRequest = {
+  version: typeof HOST_MESH_PAYLOAD_VERSION
+  groupId: string
+  epoch: number
+  /** The machine offering, as it claims to be. The box is what binds the claim, not this field. */
+  offerer: { hostKey: string; label: string; publicKeyB64: string }
+  /** The offerer's own offer, sealed to the recipient. */
+  sealed: HostMeshSealedOffer
+}
+
+export type HostMeshOfferBackReply =
+  | { kind: 'accepted'; groupId: string; epoch: number }
+  | { kind: 'refused'; reason: string }
 
 export type HostMeshRemoveRequest = {
   version: typeof HOST_MESH_PAYLOAD_VERSION
