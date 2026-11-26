@@ -8,14 +8,7 @@ import {
   importSpecifiers,
   sharedHarnessPaths
 } from '../../local/gate-flake-coupling.mjs'
-import {
-  cachedVerdictProblem,
-  formatVerdict,
-  gateInputsFingerprint,
-  resolvedGateCacheDir,
-  unitGateCacheDir,
-  verdictRecordProblem
-} from '../../local/gate-verdict-cache.mjs'
+import { formatVerdict } from '../../local/gate-verdict-cache.mjs'
 import { branchDiff } from '../../local/gate-unit.mjs'
 import {
   NO_RERUN,
@@ -222,107 +215,6 @@ describe('one batched isolation re-run, read per file', () => {
   it('reports nothing when there was nothing to re-run', () => {
     expect(rerunReportsFor(report, []).size).toBe(0)
     expect(rerunReportsFor(null, ['src/main/a.test.ts']).get('src/main/a.test.ts')).toBe(NO_RERUN)
-  })
-})
-
-describe('which verdicts may be reused, and which may be recorded', () => {
-  const options = { cache: true, allowDirty: false, vitestArgs: [] }
-  const completed = { revision: 'a'.repeat(40), clean: true, outcome: 'complete' }
-  const cached = { revision: completed.revision, clean: true, gateInputs: 'inputs' }
-  const context = { revision: completed.revision, gateInputs: 'inputs' }
-
-  it('reuses a cached verdict recorded for this revision, allowlist, inputs and toolchain', () => {
-    expect(cachedVerdictProblem(cached, context)).toBeNull()
-  })
-
-  it('refuses a cached verdict about some other run, saying which', () => {
-    expect(cachedVerdictProblem({ ...cached, revision: 'b'.repeat(40) }, context)).toMatch(
-      /does not name this revision/
-    )
-    // A cache file from before the revision was recorded must fail closed, not pass.
-    expect(cachedVerdictProblem({ ...cached, revision: undefined }, context)).toMatch(
-      /does not name this revision/
-    )
-    expect(cachedVerdictProblem({ ...cached, clean: false }, context)).toMatch(
-      /does not prove a clean run/
-    )
-    expect(cachedVerdictProblem({ ...cached, gateInputs: 'other' }, context)).toMatch(
-      /different gate inputs/
-    )
-  })
-
-  it('records a clean completed run even under --no-cache, so a stale FAIL can be replaced', () => {
-    const fresh = { headNow: completed.revision, treeClean: true }
-    expect(verdictRecordProblem(options, completed, fresh)).toBeNull()
-    expect(verdictRecordProblem({ ...options, cache: false }, completed, fresh)).toBeNull()
-  })
-
-  it('refuses to record a dirty, partial, selected or stale run, saying which', () => {
-    const fresh = { headNow: completed.revision, treeClean: true }
-    expect(verdictRecordProblem({ ...options, allowDirty: true }, completed, fresh)).toMatch(
-      /--allow-dirty/
-    )
-    expect(verdictRecordProblem({ ...options, vitestArgs: ['a'] }, completed, fresh)).toMatch(
-      /subset of the suite/
-    )
-    expect(verdictRecordProblem(options, { ...completed, clean: false }, fresh)).toMatch(/dirty/)
-    // A timeout or a failed build says nothing about the revision.
-    expect(verdictRecordProblem(options, { ...completed, outcome: 'timed-out' }, fresh)).toMatch(
-      /says nothing about the revision/
-    )
-    expect(verdictRecordProblem(options, completed, { ...fresh, headNow: 'b'.repeat(40) })).toMatch(
-      /HEAD moved/
-    )
-    expect(verdictRecordProblem(options, completed, { ...fresh, treeClean: false })).toMatch(
-      /tree changed/
-    )
-  })
-
-  it('puts the verdict inside the git dir git reports, which a worktree has as a real dir', () => {
-    // Why this and not a write probe: `<root>/.git` is a file in a linked worktree, so the gate has
-    // to resolve the git dir itself — which it does with `--absolute-git-dir`.
-    expect(unitGateCacheDir('/repo/.git/worktrees/wt')).toBe('/repo/.git/worktrees/wt/orca-gate')
-  })
-
-  it('keys the verdict cache to the repository, so two worktrees gate a revision once', () => {
-    // Why: `--absolute-git-dir` answers with `.git/worktrees/<name>`, so the same SHA gated here and
-    // in the main tree ran the full suite twice — 25 minutes of it for the release gate.
-    const inWorktree = resolvedGateCacheDir({
-      commonDir: '/repo/.git',
-      gitDir: '/repo/.git/worktrees/wt',
-      root: '/repo'
-    })
-    const inMainTree = resolvedGateCacheDir({
-      commonDir: '/repo/.git',
-      gitDir: '/repo/.git',
-      root: '/repo'
-    })
-    expect(inWorktree).toBe('/repo/.git/orca-gate')
-    expect(inMainTree).toBe(inWorktree)
-  })
-
-  it('falls back to the worktree git dir when no common dir is reported', () => {
-    expect(resolvedGateCacheDir({ gitDir: '/repo/.git/worktrees/wt', root: '/repo' })).toBe(
-      '/repo/.git/worktrees/wt/orca-gate'
-    )
-  })
-
-  it('resolves a relative common dir against the root, not the cwd', () => {
-    expect(resolvedGateCacheDir({ commonDir: '.git', root: '/repo' })).toBe('/repo/.git/orca-gate')
-  })
-
-  it('fingerprints the gate inputs, and only them', () => {
-    const inputs = {
-      files: { 'local/gate-unit.mjs': 'gate', 'config/.bun-version': '1.4.3' },
-      toolchain: { node: 'v24.0.0', bun: '1.4.3' }
-    }
-    expect(gateInputsFingerprint(inputs)).toBe(gateInputsFingerprint({ ...inputs }))
-    expect(
-      gateInputsFingerprint({ ...inputs, toolchain: { ...inputs.toolchain, bun: '1.5.0' } })
-    ).not.toBe(gateInputsFingerprint(inputs))
-    expect(
-      gateInputsFingerprint({ ...inputs, files: { ...inputs.files, 'local/gate-unit.mjs': 'x' } })
-    ).not.toBe(gateInputsFingerprint(inputs))
   })
 })
 

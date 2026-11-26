@@ -23,10 +23,16 @@
  * reviewed commit while CI publishes a newer tip. The same SHA is passed to the workflow as
  * `expected_sha`, so the run itself refuses if `main` moves again between the dispatch and the build.
  *
+ * Two of those are about the revision being tagged rather than about the review, and no script checked
+ * them: a cached unit-gate PASS and a lint PASS marker, each neutral-aware so the manifest commit that
+ * follows a green run does not void it. On 2026-11-24 lint first ran 8.7 h after the merge and failed
+ * five steps, which is what "gate the revision that will be tagged" is supposed to prevent.
+ *
  *   node local/dispatch-release.mjs                          gate, then dispatch
  *   node local/dispatch-release.mjs --dry-run                 report the preconditions, dispatch nothing
  *   node local/dispatch-release.mjs -f version_suffix=np.50    pin the suffix above the newest tag
  *   node local/dispatch-release.mjs --waive-review "<reason>"  dispatch with the review gate waived
+ *   node local/dispatch-release.mjs --waive-verdicts "<reason>"  dispatch without the unit/lint verdicts
  *
  * Why `--waive-review` records rather than silently passes: the same reason as `open-pr.mjs`'s
  * `--waive-gate` — a waiver a reader cannot find is not recorded. It prints the reason, writes it to
@@ -37,6 +43,11 @@
  */
 import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
+import {
+  lintVerdictProblem,
+  resolvedGateCacheDir,
+  unitVerdictProblem
+} from './gate-verdict-cache.mjs'
 
 const repoRoot = join(import.meta.dirname, '..')
 const WORKFLOW = 'fork-release.yml'
@@ -59,13 +70,16 @@ function tryRun(command, args) {
 }
 
 function parse(argv) {
-  const options = { dryRun: false, waiver: '', suffix: '', repo: DEFAULT_REPO }
+  const options = { dryRun: false, waiver: '', verdictWaiver: '', suffix: '', repo: DEFAULT_REPO }
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i]
     if (arg === '--dry-run') {
       options.dryRun = true
     } else if (arg === '--waive-review') {
       options.waiver = argv[i + 1] ?? ''
+      i += 1
+    } else if (arg === '--waive-verdicts') {
+      options.verdictWaiver = argv[i + 1] ?? ''
       i += 1
     } else if (arg === '-f' || arg === '--version-suffix') {
       options.suffix = argv[i + 1] ?? ''
@@ -108,6 +122,41 @@ function preconditions(options) {
       problems.push(
         `HEAD ${head.out.slice(0, 12)} is not the remote's main ${tipSha.slice(0, 12)}; push or pull first`
       )
+    }
+  }
+
+  // Why the verdicts come before the review gate: they are local file reads, and a release on an
+  // ungated revision is refused here rather than after two node spawns.
+  if (head.ok) {
+    if (options.verdictWaiver.trim()) {
+      notes.push(`unit and lint verdicts WAIVED: ${options.verdictWaiver.trim()}`)
+    } else {
+      const commonDir = tryRun('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'])
+      if (!commonDir.ok) {
+        problems.push(
+          `cannot resolve the git dir, so no unit or lint verdict can be found: ${commonDir.out}`
+        )
+      } else {
+        const git = (args) => run('git', args)
+        const lint = lintVerdictProblem({ commonDir: commonDir.out, revision: head.out, git })
+        const unit = unitVerdictProblem({
+          cacheDir: resolvedGateCacheDir({ commonDir: commonDir.out, root: repoRoot }),
+          revision: head.out,
+          allowlistPath: join(repoRoot, 'local/unit-known-red.json'),
+          git
+        })
+        if (lint) {
+          problems.push(lint)
+        }
+        if (unit) {
+          problems.push(unit)
+        }
+        if (!lint && !unit) {
+          notes.push(
+            `unit gate and lint both PASS for ${head.out.slice(0, 12)} (or a docs-only ancestor)`
+          )
+        }
+      }
     }
   }
 

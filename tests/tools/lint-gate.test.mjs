@@ -14,6 +14,7 @@ import {
   runSteps,
   unaccountedFailureLines
 } from '../../local/gate-lint.mjs'
+import { readLintVerdict, writeLintVerdict } from '../../local/gate-lint-verdict.mjs'
 import { readWorkflow } from './workflow-file.mjs'
 
 const REPO_ROOT = join(import.meta.dirname, '..', '..')
@@ -365,6 +366,155 @@ describe('a failure the parser could only partly attribute', () => {
       ])
     ).toEqual([])
     expect(unaccountedFailureLines('panel note: nothing to do here')).toEqual([])
+  })
+})
+
+// The 48-minute hang in #446: `pnpm run` puts the linter one level down, so a timeout aimed at the
+// direct child left a grandchild holding the output pipe and the gate waited for a stream that could
+// not close — with the step never named, because the gate printed a step only after it finished.
+
+const FULL_SHA = '4f3a9c1e7b2d8a05c6e1f9b3d7a2c4e6f8b0d1a3'
+
+/** Drive `finalize` with a real marker writer over a throwaway git common dir, and collect its output. */
+async function recordPass(options = {}) {
+  const gitCommonDir = mkdtempSync(join(tmpdir(), 'lint-gate-verdict-'))
+  const lines = []
+  const calls = []
+  const out = async (line) => lines.push({ stream: 'out', line })
+  const err = async (line) => lines.push({ stream: 'err', line })
+  try {
+    const code = await finalize(
+      [{ id: 'oxlint', exitCode: 0, output: '', seconds: 1.5 }],
+      [],
+      ['oxlint'],
+      {
+        revision: FULL_SHA.slice(0, 7),
+        fullRevision: FULL_SHA,
+        out,
+        err,
+        // Why the real writer behind a spy: the call args are one claim, the file on disk is the other.
+        recordVerdict: (verdict) => {
+          calls.push(verdict)
+          return writeLintVerdict({ ...verdict, gitCommonDir })
+        },
+        ...options
+      }
+    )
+    return { code, calls, lines, marker: readLintVerdict(gitCommonDir, FULL_SHA) }
+  } finally {
+    rmSync(gitCommonDir, { recursive: true, force: true })
+  }
+}
+
+describe('the verdict a full clean pass records', () => {
+  it('writes a marker keyed by the full sha, while the label stays the short one', async () => {
+    const { code, calls, lines, marker } = await recordPass()
+    expect(code).toBe(0)
+    expect(calls).toHaveLength(1)
+    expect(calls[0].revision).toBe(FULL_SHA)
+    expect(marker?.revision).toBe(FULL_SHA)
+    expect(marker.allPassed).toBe(true)
+    expect(marker.steps).toEqual(['oxlint'])
+    expect(lines.map(({ line }) => line)).toContainEqual(
+      expect.stringContaining(`lint gate @${FULL_SHA.slice(0, 7)}: PASS`)
+    )
+  })
+
+  // Why: the marker names a commit, and a tree with edits in it is not that commit.
+  it('writes none when the tree is dirty', async () => {
+    const { code, marker } = await recordPass({ dirty: true })
+    expect(code).toBe(0)
+    expect(marker).toBeNull()
+  })
+
+  // Why: a subset says nothing about the steps it skipped, so it cannot stand for the revision.
+  it('writes none for an --only subset', async () => {
+    const { code, marker } = await recordPass({ only: ['oxlint'] })
+    expect(code).toBe(0)
+    expect(marker).toBeNull()
+  })
+
+  // Why: a marker keyed by a short sha, or by `unknown` when git is unavailable, answers for nothing.
+  it('writes none when the caller resolved no full sha', async () => {
+    const { code, calls, marker } = await recordPass({ fullRevision: null })
+    expect(code).toBe(0)
+    expect(calls[0].revision).toBeNull()
+    expect(marker).toBeNull()
+  })
+
+  it('writes none for a FAIL, which is not a verdict', async () => {
+    const gitCommonDir = mkdtempSync(join(tmpdir(), 'lint-gate-verdict-'))
+    const calls = []
+    try {
+      const code = await finalize(
+        [{ id: 'oxlint', exitCode: 1, output: '::error::boom', seconds: 1 }],
+        [],
+        ['oxlint'],
+        {
+          revision: FULL_SHA.slice(0, 7),
+          fullRevision: FULL_SHA,
+          out: async () => {},
+          err: async () => {},
+          recordVerdict: (verdict) => calls.push(verdict)
+        }
+      )
+      expect(code).toBe(1)
+      expect(calls).toEqual([])
+      expect(readLintVerdict(gitCommonDir, FULL_SHA)).toBeNull()
+    } finally {
+      rmSync(gitCommonDir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('the FAIL footer a reader can act on', () => {
+  const knownEntry = entry({ step: 'check:known', match: '^entry a$' })
+  const run = async (results) => {
+    const lines = []
+    const out = async (line) => lines.push({ stream: 'out', line })
+    const err = async (line) => lines.push({ stream: 'err', line })
+    const code = await finalize(
+      results,
+      [knownEntry],
+      results.map((result) => result.id),
+      { revision: 'abc1234', out, err }
+    )
+    return { code, lines: lines.map(({ stream, line }) => ({ stream, line })) }
+  }
+  const errLines = (lines) => lines.filter(({ stream }) => stream === 'err').map(({ line }) => line)
+
+  it('names the new reds to re-run and the known reds apart from them', async () => {
+    const { code, lines } = await run([
+      { id: 'oxlint', exitCode: 0, output: '', seconds: 1 },
+      { id: 'check:known', exitCode: 1, output: '::error::entry a', seconds: 1 },
+      { id: 'check:new', exitCode: 1, output: '::error::entry b', seconds: 1 }
+    ])
+    const errors = errLines(lines)
+    expect(code).toBe(1)
+    expect(errors).toContain('re-run what failed: node local/gate-lint.mjs --only check:new')
+    expect(errors).toContain('known reds (recorded, not a fix): check:known')
+    // The ::error:: prefix is what the CI runner reads as a failure, so it stays.
+    expect(errors).toContain('::error::new lint red check:new: entry b')
+  })
+
+  // Why: a step that carries both a known red and a new one is a step to re-run, not one to skip.
+  it('re-runs a step that fails on a known red and a new one at once', async () => {
+    const { lines } = await run([
+      { id: 'check:known', exitCode: 1, output: '::error::entry a\n::error::entry b', seconds: 1 }
+    ])
+    expect(errLines(lines)).toContain(
+      're-run what failed: node local/gate-lint.mjs --only check:known'
+    )
+  })
+
+  it('puts a timed-out step in the re-run list, never among the known reds', async () => {
+    const { lines } = await run([
+      { id: 'check:known', exitCode: 1, output: '::error::entry a', seconds: 1 },
+      { id: 'check:hang', exitCode: 1, output: 'step started', timedOut: true, seconds: 10 }
+    ])
+    const errors = errLines(lines)
+    expect(errors).toContain('re-run what failed: node local/gate-lint.mjs --only check:hang')
+    expect(errors).toContain('known reds (recorded, not a fix): check:known')
   })
 })
 

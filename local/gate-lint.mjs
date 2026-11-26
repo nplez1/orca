@@ -24,11 +24,17 @@
  *   --prune    drop entries that no longer reproduce and the steps that no longer exist.
  *   --timeout-ms N   per-step deadline, default 10 minutes; an overrun fails the gate.
  *
+ * A full, clean PASS also records a verdict marker under the git common dir (see
+ * `local/gate-lint-verdict.mjs`), so "did lint pass for revision X" is answerable without re-running
+ * all 54 steps. A FAIL is not a verdict and a `--only` or dirty run names no commit, so neither
+ * records one.
+ *
  * Exit: 0 pass, 1 new red or a step that timed out, 2 usage or environment problem.
  */
 import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
+import { writeLintVerdict } from './gate-lint-verdict.mjs'
 import { compileMatch } from './lib/known-red.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
@@ -55,10 +61,7 @@ const MAX_TIMEOUT_MS = 2147483647
  * kills the step still has it in the log.
  */
 function writer(stream) {
-  return (line) =>
-    new Promise((done) => {
-      stream.write(`${line}\n`, () => done())
-    })
+  return (line) => new Promise((done) => stream.write(`${line}\n`, () => done()))
 }
 
 const writeOut = writer(process.stdout)
@@ -66,11 +69,8 @@ const writeErr = writer(process.stderr)
 
 /** The last lines a hung step managed to print, which is all the `::error::` line can quote. */
 export function tailLines(output, limit = TAIL_LINES) {
-  return output
-    .split('\n')
-    .map((line) => line.trimEnd())
-    .filter((line) => line.trim().length > 0)
-    .slice(-limit)
+  const lines = output.split('\n').map((line) => line.trimEnd())
+  return lines.filter((line) => line.trim().length > 0).slice(-limit)
 }
 
 function usage() {
@@ -96,10 +96,8 @@ function parseArgs(argv) {
         .filter(Boolean)
     } else if (arg === '--timeout-ms') {
       options.timeoutMs = Number(argv[(index += 1)])
-    } else if (arg === '--prune') {
-      options.prune = true
-    } else if (arg === '--verbose') {
-      options.verbose = true
+    } else if (arg === '--prune' || arg === '--verbose') {
+      options[arg.slice(2)] = true
     } else if (arg === '--help' || arg === '-h') {
       console.log(usage())
       process.exit(0)
@@ -128,11 +126,11 @@ function parseArgs(argv) {
  * what a reader of `pnpm lint` recognises.
  */
 export function resolveLintSteps(scripts) {
-  const chain = scripts.lint
-    ?.split('&&')
+  const chain = (scripts.lint ?? '')
+    .split('&&')
     .map((step) => step.trim())
     .filter(Boolean)
-  if (!chain) {
+  if (chain.length === 0) {
     throw new Error('package.json has no lint script')
   }
   return chain.map((command) => {
@@ -697,10 +695,17 @@ export async function finalize(
   chainSteps,
   {
     revision = 'unknown',
+    // Why separate from `revision`: the printed label is the short sha a reader recognises, and the
+    // marker has to be keyed by the full one so it can be compared with `rev-parse HEAD`.
+    fullRevision = null,
     dirty = false,
+    only = null,
     prune = false,
     allowlist = DEFAULT_ALLOWLIST,
     manifest = {},
+    // Why injected: `finalize` is unit-tested with no repository behind it, so the real writer is
+    // wired in `main` and a test passes a spy or nothing at all.
+    recordVerdict = null,
     out = writeOut,
     err = writeErr
   } = {}
@@ -762,22 +767,31 @@ export async function finalize(
         'A new red is a real failure to fix, or a foreign one: record it in local/lint-known-red.json with its evidence and a LOCAL-PATCHES.md line, in the same commit.'
       )
     }
+    // Why the ids and not just the count: #1539 printed only a tail, so #1541 re-ran all 54 steps on
+    // the same revision with the same red. A known red is not a failure to fix, so it is named but
+    // never re-run; a timed-out step is never a known red, so it always lands in the re-run list.
+    const knownRedSteps = [...new Set(known.map((row) => row.step))]
+    const rerunSteps = [...new Set(unexpected.map((row) => row.step))]
+    if (knownRedSteps.length > 0) {
+      await err(`known reds (recorded, not a fix): ${knownRedSteps.join(', ')}`)
+    }
+    if (rerunSteps.length > 0) {
+      await err(`re-run what failed: node local/gate-lint.mjs --only ${rerunSteps.join(',')}`)
+    }
     return 1
   }
-  if (staleEntries.length > 0) {
-    await out(`${revisionLabel}: PASS (stale entries: run --prune) — ${summary}`)
-    return 0
-  }
-  await out(`${revisionLabel}: PASS — ${summary}`)
+  const staleNote = staleEntries.length > 0 ? ' (stale entries: run --prune)' : ''
+  await out(`${revisionLabel}: PASS${staleNote} — ${summary}`)
+  // Why only the full sha: a marker keyed by a short sha or by `unknown` would answer for nothing.
+  await recordVerdict?.({ revision: fullRevision, dirty, only, steps: results })
   return 0
 }
 
 async function main(argv = process.argv.slice(2)) {
   const options = parseArgs(argv)
   const manifest = readManifest(options.allowlist)
-  const steps = resolveGateSteps(
-    JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).scripts
-  )
+  const scripts = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).scripts
+  const steps = resolveGateSteps(scripts)
   const entries = Array.isArray(manifest.entries) ? manifest.entries : []
   const unknownOnly = (options.only ?? []).filter((id) => !steps.some((step) => step.id === id))
   if (unknownOnly.length > 0) {
@@ -787,7 +801,12 @@ async function main(argv = process.argv.slice(2)) {
   const selected = options.only ? steps.filter((step) => options.only.includes(step.id)) : steps
 
   const revision = git(['rev-parse', '--short', 'HEAD']) ?? 'unknown'
+  const fullRevision = git(['rev-parse', 'HEAD'])
   const dirty = Boolean(git(['status', '--porcelain']))
+  // Why the common dir and not the worktree's own git dir: a linked worktree answers the latter with
+  // `.git/worktrees/<name>`, which would split the markers per worktree and re-gate one SHA twice —
+  // the bug `gate-unit.mjs` documents around its cache dir.
+  const gitCommonDir = git(['rev-parse', '--path-format=absolute', '--git-common-dir'])
   await writeOut(
     `lint gate @${revision}${dirty ? '+dirty' : ''}: running ${selected.length}/${steps.length} steps`
   )
@@ -802,10 +821,13 @@ async function main(argv = process.argv.slice(2)) {
     steps.map((step) => step.id),
     {
       revision,
+      fullRevision,
       dirty,
+      only: options.only,
       prune: options.prune,
       allowlist: options.allowlist,
       manifest,
+      recordVerdict: (verdict) => gitCommonDir && writeLintVerdict({ ...verdict, gitCommonDir }),
       out: writeOut,
       err: writeErr
     }

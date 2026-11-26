@@ -2,10 +2,16 @@
 // and two readers depend on it: `local/gate-unit.mjs`, which writes and reuses it, and
 // `local/open-pr.mjs`, which refuses to open a PR for a revision with no PASS on record. A verdict
 // only one script can find is advisory, which is what this file exists to stop.
-import { spawnSync } from 'node:child_process'
+//
+// Both verdicts are read the same way here: a verdict keyed by exact revision is voided by the manifest
+// commit that follows a review, so a lookup walks back over the commits the review gate already calls
+// neutral — docs and the review's own record. The lint gate records its markers beside these.
+import { execFileSync, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { join, isAbsolute, resolve } from 'node:path'
+import { lintVerdictRevisions, readLintVerdict } from './gate-lint-verdict.mjs'
+import { reviewNeutralOnly } from './release-review-gate.mjs'
 
 /**
  * What a verdict depends on besides the revision and the allowlist: the scripts that decide it, the
@@ -72,9 +78,15 @@ export function gateInputsFingerprint({ files, toolchain }) {
  * Why a cached verdict is refused: it has to be about this revision, recorded on a clean tree, and
  * against the same toolchain. `--allow-dirty` and a forwarded selector never reach here — the cache
  * is not read at all in those modes.
+ *
+ * `behind` is the path list from `governingCachedVerdict`: a verdict on a docs-only ancestor is a
+ * verdict on this revision, the same rule the review and lint gates apply to their own records.
  */
-export function cachedVerdictProblem(cached, { revision, gateInputs }) {
-  if (cached?.revision !== revision) {
+export function cachedVerdictProblem(cached, { revision, gateInputs, behind = null }) {
+  const governs =
+    cached?.revision === revision ||
+    (Array.isArray(behind) && behind.length > 0 && reviewNeutralOnly(behind))
+  if (!governs) {
     return 'it does not name this revision'
   }
   if (cached?.clean !== true) {
@@ -92,7 +104,11 @@ export function cachedVerdictProblem(cached, { revision, gateInputs }) {
  * someone passes --no-cache), and a commit or edit made during the run leaves a verdict that describes
  * neither HEAD nor the tree it claims.
  */
-export function verdictRecordProblem({ allowDirty, vitestArgs }, result, { headNow, treeClean }) {
+export function verdictRecordProblem(
+  { allowDirty, vitestArgs },
+  result,
+  { headNow, treeClean, behind = null }
+) {
   if (allowDirty) {
     return '--allow-dirty was passed'
   }
@@ -105,7 +121,10 @@ export function verdictRecordProblem({ allowDirty, vitestArgs }, result, { headN
   if (result.outcome !== 'complete') {
     return `the run ended as "${result.outcome}", which says nothing about the revision`
   }
-  if (headNow !== result.revision) {
+  // Why neutral commits are exempt: a manifest or doc committed mid-run (session entry #709) voided a
+  // completed 25-minute run and forced the re-run this cache exists to prevent.
+  const neutral = Array.isArray(behind) && behind.length > 0 && reviewNeutralOnly(behind)
+  if (headNow !== result.revision && !neutral) {
     return 'HEAD moved during the run'
   }
   if (!treeClean) {
@@ -129,6 +148,172 @@ export function readCachedVerdict(cacheDir, revision, fingerprint) {
   } catch {
     return null
   }
+}
+
+/** The default git reader: every caller passes its own so the lookup runs in the tree it means. */
+function gitText(args) {
+  return execFileSync('git', args, { encoding: 'utf8', maxBuffer: 1 << 24 })
+}
+
+/** Why bounded: a gate is never more than a day of commits behind the revision it cleared. */
+const NEUTRAL_WALK_DEPTH = 25
+
+/** `revision`'s ancestors, newest first, or [] when git cannot answer. */
+export function recentRevisions(git, revision, depth = NEUTRAL_WALK_DEPTH) {
+  let out
+  try {
+    out = git(['rev-list', `--max-count=${String(depth)}`, revision])
+  } catch {
+    return []
+  }
+  return typeof out === 'string' ? out.split('\n').filter(Boolean).slice(1) : []
+}
+
+/** The paths `git diff --name-only from to`, or null when git cannot answer (a revision it lacks). */
+export function pathsBetweenRevisions(git, from, to) {
+  if (!from || !to) {
+    return null
+  }
+  if (from === to) {
+    return []
+  }
+  let out
+  try {
+    out = git(['diff', '--name-only', from, to])
+  } catch {
+    return null
+  }
+  return typeof out === 'string' ? out.split('\n').filter(Boolean) : null
+}
+
+/**
+ * The newest of `candidates` whose commits to `revision` are all review-neutral, with the paths behind.
+ *
+ * Why the walk lives in this module: a verdict is cached per revision, so deciding whether an older one
+ * still governs is a question about this cache, and the git readers it needs are here. The predicate is
+ * `reviewNeutralOnly` from `release-review-gate.mjs`, so the review, lint and unit gates cannot drift
+ * apart on what "neutral" means.
+ */
+export function neutralReachable({ revision, candidates, pathsBetween }) {
+  if (!revision) {
+    return null
+  }
+  for (const candidate of candidates) {
+    if (!candidate || candidate === revision) {
+      continue
+    }
+    const behind = pathsBetween(candidate, revision)
+    if (behind === null || !reviewNeutralOnly(behind)) {
+      continue
+    }
+    return { revision: candidate, behind }
+  }
+  return null
+}
+
+/**
+ * Why the body is checked and not just the file name: a cache file whose `revision` field names another
+ * revision is a damaged record, and reusing it would certify a run that is not this one.
+ */
+function verdictNamed(cacheDir, revision, fingerprint) {
+  const verdict = readCachedVerdict(cacheDir, revision, fingerprint)
+  return verdict && verdict.revision === revision ? verdict : null
+}
+
+/**
+ * The cached verdict that governs `revision`: its own, or the newest neutral ancestor's.
+ * `{ verdict, behind }`, or null when nothing governs it.
+ *
+ * Why: verdicts are keyed by exact revision, so committing the manifest after a 25-minute suite voided
+ * it and forced a re-run — while the review gate already accepts that same class of commit.
+ */
+export function governingCachedVerdict({
+  cacheDir,
+  revision,
+  fingerprint,
+  git = gitText,
+  depth = NEUTRAL_WALK_DEPTH
+}) {
+  if (!cacheDir || !revision || !fingerprint) {
+    return null
+  }
+  const own = verdictNamed(cacheDir, revision, fingerprint)
+  if (own) {
+    return { verdict: own, behind: [] }
+  }
+  const candidates = recentRevisions(git, revision, depth).filter(
+    (sha) => verdictNamed(cacheDir, sha, fingerprint) !== null
+  )
+  const reachable = neutralReachable({
+    revision,
+    candidates,
+    pathsBetween: (ancestor, head) => pathsBetweenRevisions(git, ancestor, head)
+  })
+  if (!reachable) {
+    return null
+  }
+  const verdict = verdictNamed(cacheDir, reachable.revision, fingerprint)
+  return verdict ? { verdict, behind: reachable.behind } : null
+}
+
+/** Why one message for both boundaries: the review prepare and the dispatch refuse for these reasons. */
+export function unitGatePassProblem(verdict) {
+  if (!verdict) {
+    return 'no cached unit-gate verdict'
+  }
+  if (verdict.clean !== true) {
+    return `the cached verdict @${String(verdict.revision).slice(0, 10)} was recorded on a dirty tree`
+  }
+  if (verdict.exitCode !== 0) {
+    return `the cached verdict @${String(verdict.revision).slice(0, 10)} FAILED (${verdict.counts?.failed ?? '?'} failing case(s))`
+  }
+  return null
+}
+
+/**
+ * Why a refusal and not a crash: a gate that has not run is the failure this boundary exists to catch,
+ * so the answer names the one command that fixes it.
+ */
+export function unitVerdictProblem({ cacheDir, revision, allowlistPath, git = gitText }) {
+  let fingerprint
+  try {
+    fingerprint = allowlistFingerprint(readFileSync(allowlistPath))
+  } catch (error) {
+    return `cannot read ${allowlistPath}, so no unit verdict can be checked: ${error.message}`
+  }
+  const problem = unitGatePassProblem(
+    governingCachedVerdict({ cacheDir, revision, fingerprint, git })?.verdict
+  )
+  return problem
+    ? `${problem} for ${revision.slice(0, 12)} or a docs-only ancestor; run it first: orca-queue node local/gate-unit.mjs`
+    : null
+}
+
+/**
+ * The same question for lint's markers: a full, clean PASS for `revision` or for a neutral ancestor.
+ * Null when it is green, otherwise the reason plus the command.
+ */
+export function lintVerdictProblem({ commonDir, revision, git = gitText }) {
+  const own = readLintVerdict(commonDir, revision)
+  if (own?.allPassed === true) {
+    return null
+  }
+  if (own) {
+    return `lint FAILED on ${revision.slice(0, 12)} (${(own.failed ?? []).join(', ') || 'no step ids recorded'}); fix it, then: orca-queue node local/gate-lint.mjs`
+  }
+  const passing = new Set(
+    lintVerdictRevisions(commonDir).filter(
+      (sha) => readLintVerdict(commonDir, sha)?.allPassed === true
+    )
+  )
+  const reachable = neutralReachable({
+    revision,
+    candidates: recentRevisions(git, revision).filter((sha) => passing.has(sha)),
+    pathsBetween: (ancestor, head) => pathsBetweenRevisions(git, ancestor, head)
+  })
+  return reachable
+    ? null
+    : `no green lint verdict for ${revision.slice(0, 12)} or a docs-only ancestor; run it first: orca-queue node local/gate-lint.mjs`
 }
 
 /** One line, the shape a PR body quotes. */

@@ -41,10 +41,11 @@ import { FORK_TEST_INCLUDE, forkTestFiles } from './run-fork-tests.mjs'
 import {
   GATE_INPUT_PATHS,
   allowlistFingerprint,
-  cachedVerdictPath,
   cachedVerdictProblem,
   formatVerdict,
   gateInputsFingerprint,
+  governingCachedVerdict,
+  pathsBetweenRevisions,
   toolchainVersions,
   resolvedGateCacheDir,
   verdictRecordProblem
@@ -534,23 +535,36 @@ function main() {
     gitDir: git(['rev-parse', '--absolute-git-dir']),
     root: ROOT
   })
-  const cachePath = revision ? cachedVerdictPath(cacheDir, revision, allowlistHash) : null
   // Why the reuse guard is here and not inside the check: `--no-cache` is the documented way out of a
   // damaged cache file, so it must not parse one to refuse it, and `--allow-dirty` asks about the tree
   // rather than about HEAD, so a verdict recorded for HEAD cannot answer it.
   const mayReuse = options.cache && options.vitestArgs.length === 0 && !options.allowDirty
 
-  if (mayReuse && cachePath && existsSync(cachePath)) {
-    const cached = readJsonFile(cachePath, 'cached verdict')
-    const problem = cachedVerdictProblem(cached, { revision, gateInputs })
-    if (problem) {
+  if (mayReuse) {
+    // Why the neutral walk: committing a manifest or a doc after the run used to void a verdict keyed
+    // by exact revision, and the re-run cost the 25 minutes this cache exists to save.
+    const found = governingCachedVerdict({
+      cacheDir,
+      revision,
+      fingerprint: allowlistHash,
+      git
+    })
+    const problem = found
+      ? cachedVerdictProblem(found.verdict, { revision, gateInputs, behind: found.behind })
+      : null
+    if (found && problem) {
       console.log(`gate-unit: ignoring the cached verdict — ${problem}`)
-    } else {
+    } else if (found) {
+      if (found.behind.length) {
+        console.log(
+          `gate-unit: ${String(found.behind.length)} doc/review-record commit(s) since ${found.verdict.revision.slice(0, 12)}, which do not void the verdict`
+        )
+      }
       console.log(
         'gate-unit: cached verdict for this revision, allowlist and gate inputs (pass --no-cache to re-run)'
       )
-      reportResult(cached)
-      process.exit(cached.exitCode)
+      reportResult(found.verdict)
+      process.exit(found.verdict.exitCode)
     }
   }
   if (options.allowDirty) {
@@ -573,11 +587,13 @@ function main() {
   // Why re-read HEAD and the tree: the suite takes twenty minutes, and a commit or edit made in that
   // window would otherwise be recorded as a verdict on the revision it replaced. Why `--no-cache`
   // still records: a stale or environmental FAIL in the cache could otherwise never be replaced.
+  const headNow = git(['rev-parse', 'HEAD'])
   const recordProblem =
     result.revision === revision
       ? verdictRecordProblem(options, result, {
-          headNow: git(['rev-parse', 'HEAD']),
-          treeClean: git(['status', '--porcelain']) === ''
+          headNow,
+          treeClean: git(['status', '--porcelain']) === '',
+          behind: pathsBetweenRevisions(git, result.revision, headNow)
         })
       : 'HEAD moved before the run recorded its revision'
   if (recordProblem) {

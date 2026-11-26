@@ -42,7 +42,7 @@ import {
   allowlistFingerprint,
   formatVerdict,
   gateInputsFingerprint,
-  readCachedVerdict,
+  governingCachedVerdict,
   resolvedGateCacheDir,
   toolchainVersions
 } from './gate-verdict-cache.mjs'
@@ -240,8 +240,17 @@ export function unitGateVerdict(
     return { ok: false, reason: 'cannot resolve the git dir, so no cached verdict can be found' }
   }
   const cacheDir = resolvedGateCacheDir({ commonDir, gitDir, root: process.cwd() })
-  const verdict = readCachedVerdict(cacheDir, head, fingerprint)
-  if (!verdict || verdict.revision !== head) {
+  // Why the neutral walk: the verdict names the revision the suite ran on, and a manifest or doc
+  // committed afterwards does not make it a verdict on another revision. Why `runRaw`: a lookup that
+  // misses must not print git's stderr, and a revision this clone lacks is a miss.
+  const found = governingCachedVerdict({
+    cacheDir,
+    revision: head,
+    fingerprint,
+    git: (args) => runRaw('git', args)
+  })
+  const verdict = found?.verdict ?? null
+  if (!verdict) {
     return {
       ok: false,
       reason:
@@ -274,12 +283,12 @@ export function unitGateVerdict(
     return {
       ok: false,
       reason:
-        `gate 1 FAILED on ${head.slice(0, 10)}: ${verdict.counts?.failed ?? '?'} failing case(s), ` +
+        `gate 1 FAILED on ${verdict.revision.slice(0, 10)}: ${verdict.counts?.failed ?? '?'} failing case(s), ` +
         `${verdict.unexpected?.length ?? '?'} of them unexpected.\n` +
         `Fix them, or record the red set in local/unit-known-red.json with its evidence line.`
     }
   }
-  return { ok: true, verdict }
+  return { ok: true, verdict, behind: found.behind }
 }
 
 export function requireUnitGate(head, options) {
@@ -317,7 +326,12 @@ export function evaluateGates({
       } else {
         const result = unitGateVerdict(head, gateOne)
         if (result.ok) {
-          passes.push(`gate 1 PASS — ${formatVerdict(result.verdict)}`)
+          // Why the count: a verdict reached across a docs commit is not a verdict on HEAD, and the
+          // reader of a PR body should see that before quoting the line.
+          const behind = result.behind?.length
+            ? ` (${String(result.behind.length)} doc/review-record commit(s) since)`
+            : ''
+          passes.push(`gate 1 PASS — ${formatVerdict(result.verdict)}${behind}`)
         } else {
           problems.push(`${result.reason}\n(${scope.why})`)
         }
