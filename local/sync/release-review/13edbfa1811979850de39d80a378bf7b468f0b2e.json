@@ -1,0 +1,1265 @@
+{
+  "revision": "13edbfa1811979850de39d80a378bf7b468f0b2e",
+  "base": "f9895f13436a2875f35bde0770430b23430ba661",
+  "upstream": "3e227259249d2daa02ce89f927036bb931fcd1b1",
+  "mergeCommit": "b6bc8137f5e3c5f4bb3f0c2334ed9afecc14b225",
+  "reviewer": {
+    "provider": "claude",
+    "alias": "opus",
+    "name": "Opus 5.5",
+    "thinking": "high"
+  },
+  "generatedBy": "node local/release-review-packets.mjs --write",
+  "artifact": {
+    "kind": "remerge-diff",
+    "path": "orca-review/sync-b6bc8137f5e3/remerge-diff.patch",
+    "bytes": 809754,
+    "files": 160,
+    "reviewedBytes": 541884,
+    "excluded": {
+      "files": 7,
+      "bytes": 267870,
+      "rules": [
+        {
+          "id": "renderer-locales",
+          "covers": ["post-sync:locale-drift", "gate-lint:verify:localization-catalogs"],
+          "files": 1,
+          "bytes": 1419,
+          "why": "upstream owns every catalog byte-for-byte (LOCAL-PATCHES.md § local(i18n)); the fork strings live in i18n/fork/",
+          "residual": null
+        },
+        {
+          "id": "ratchet-baselines",
+          "covers": [
+            "gate-lint:check:main-blocking-helper-ratchet",
+            "gate-lint:check:max-lines-ratchet",
+            "gate-lint:check:process-host-imports"
+          ],
+          "files": 3,
+          "bytes": 17711,
+          "why": "a list of known offenders; its ratchet fails when the tree grows past it",
+          "residual": "an edit that raises an allowance still passes; the +/- counts show whether a list grew"
+        },
+        {
+          "id": "rpc-params-catalog",
+          "covers": ["gate-lint:verify:rpc-params-catalog"],
+          "files": 1,
+          "bytes": 1396,
+          "why": "generated from the RPC param schemas; the verifier regenerates and compares",
+          "residual": null
+        },
+        {
+          "id": "skill-bundle-manifest",
+          "covers": ["gate-lint:verify:skill-bundle-manifest"],
+          "files": 2,
+          "bytes": 247344,
+          "why": "both are written by generate-skill-bundle-manifest.mjs from skills/**",
+          "residual": null
+        }
+      ]
+    },
+    "uncovered": [
+      {
+        "path": "config/react-compiler-bailout-baseline.txt",
+        "rule": "ratchet-baselines",
+        "reason": "no covering check found"
+      }
+    ]
+  },
+  "note": "2 slice(s) over the remerge diff of b6bc8137f5e, 541884 of 809754 bytes reviewed (267870 bytes in 7 files left to their verifying checks). Round 1: 0 BLOCKER, 0 SHOULD-FIX, 2 MINOR, 5 NIT. Sweep: 28 fine slice(s) by Opus 5.5, 33 finding(s): 4 BLOCKER, 4 SHOULD-FIX, 8 MINOR, 17 NIT. Adjudication: 3 packet(s) by Opus 5.5, 33 judgment(s) and 0 BLOCKER, 0 SHOULD-FIX, 0 MINOR, 2 NIT the sweep missed. 3 delta round(s) (delta b6bc8137f5e3..181a62f479da; delta 181a62f479da..13edbfa18119; delta 13edbfa18119..13edbfa18119): 0 BLOCKER, 1 SHOULD-FIX, 2 MINOR, 3 NIT. 8/8 slices reported; $24.00 total.",
+  "slices": [
+    {
+      "id": "A",
+      "round": "R1",
+      "scope": "{config,docs,local}, mobile/src/bots/connectors/connector-entry-rows.tsx, {package.json,pnpm-lock.yaml}, resources/skills/released-digests.json, skill-stubs/_shared/cli-resolution.md, skills",
+      "files": 30,
+      "bytes": 230204,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 1,
+      "nits": 2,
+      "unresolved": 0,
+      "costUsd": 3.083888600000001,
+      "coverage": "Read all 2179 lines of slice-A.patch (the long JSON baseline body partly through targeted reads and a grep of every added line) and checked the hunks against the tree: package.json, electron-builder.np.config.cjs, build-mac-local.mjs, the node-pty patch blobs, MobileConnectorSourceIcon.tsx, the mcp-servers identity strings, orchestration-cli-command.ts, the expected-deletion blobs and the react-compiler ratchet script; I could not confirm the regenerated bailout counts without running the ratchet.",
+      "findings": [
+        {
+          "id": "A-1",
+          "severity": "MINOR",
+          "file": "config/react-compiler-bailout-baseline.txt",
+          "summary": "The baseline looks regenerated with --update on the merged tree: it adds allowances neither parent recorded (use-task-page-composer-actions.ts 10, ai-vault-session-refresh.ts 8, EphemeralVmRuntimesSection.tsx 4, useAiCommitPrSettings.ts 3, among others), and the conflicted rows took upstream's higher counts over the fork's lower ones.",
+          "status": "open"
+        },
+        {
+          "id": "A-2",
+          "severity": "NIT",
+          "file": "local/max-lines-exemption.test.mjs",
+          "summary": "FORK_OWNED_EXCEPTIONS for the two host-mesh files is a policy change committed inside the sync merge rather than in its own commit.",
+          "status": "open"
+        },
+        {
+          "id": "A-3",
+          "severity": "NIT",
+          "file": "local/sync/upstream-deleted-fork-tests-baseline.json",
+          "summary": "The new accepted text says '20 fork-modified test files from the 7daf01d99f range' while the baseline it replaces listed 167, and that baseline's 'coverage owed' notes leave this file.",
+          "status": "resolved (delta-1)"
+        }
+      ]
+    },
+    {
+      "id": "B",
+      "round": "R1",
+      "scope": "src",
+      "files": 123,
+      "bytes": 311680,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 1,
+      "nits": 3,
+      "unresolved": 0,
+      "costUsd": 5.4461366,
+      "coverage": "Read all 6462 lines of slice-B.patch and checked the risky hunks against HEAD 181a62f (hook matcher/ownership, bot launch tools, session wiring, skill scan, shell IPC, mutation retry, settings host scope, workspace-card template, runtime store fixture, updater, usage-provider normalization); the three issues already fixed by 940c52bf977 (gh shim PATH, App identity checks, Queued-for copy) are not counted.",
+      "findings": [
+        {
+          "id": "B-1",
+          "severity": "MINOR",
+          "file": "src/main/bots/bot-skill-folder-scan.ts",
+          "summary": "The cancellation check after findSkillFiles that both parents had (upstream inside scanSkillsFolder, the fork in its wrapper) was dropped when the fork's wrapper was deleted and bot-own-skills was pointed at the folder-scan version.",
+          "status": "open"
+        },
+        {
+          "id": "B-2",
+          "severity": "NIT",
+          "file": "src/shared/agent-usage/rate-limits/rate-limit-types.ts",
+          "summary": "The merge kept the fork's 'Gemini models' wording for buckets; upstream's updated 'Antigravity models' was dropped.",
+          "status": "open"
+        },
+        {
+          "id": "B-3",
+          "severity": "NIT",
+          "file": "src/main/rate-limits/service/service-result-policy.ts",
+          "summary": "The merge kept the fork's 'Only Claude's lapsed token renews itself' comment, but the condition below it also covers Codex.",
+          "status": "open"
+        },
+        {
+          "id": "B-4",
+          "severity": "NIT",
+          "file": "src/main/bots/bot-tools-file.ts",
+          "summary": "The resolution put the closing */ of the doc comment and 'export async function botSessionToolServers(' on the same line.",
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "id": "adj-1",
+      "round": "adj-1",
+      "scope": "adjudication 1 of 3",
+      "files": 7,
+      "bytes": 139371,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 0,
+      "nits": 0,
+      "unresolved": 0,
+      "costUsd": 2.9813168,
+      "coverage": "Read all six resolution files in adj-1.patch and checked them against the tree: gate-lint/known-red exports and their test importers, lintVerdictTarget, max-lines-exemption.mjs/.test.mjs plus the baseline and LOCAL-PATCHES:2041, the identity baseline's readers and the shipped sources whose counts grew, the deleted-fork-tests range binding and the 2026-11-24 precedent, the LOCAL-PATCHES and ledger citations, and nightly-linux-known-red.json; I did not recompute the identity totals or rerun either baseline tool.",
+      "findings": []
+    },
+    {
+      "id": "adj-2",
+      "round": "adj-2",
+      "scope": "adjudication 2 of 3",
+      "files": 10,
+      "bytes": 179196,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 0,
+      "nits": 1,
+      "unresolved": 0,
+      "costUsd": 4.0070836000000005,
+      "coverage": "Read all 10 resolution hunks in adj-2.patch and the current tree for each named file plus session-mcp-tools.ts, session-mcp-launch.ts, bot-tools-revision.ts, bot-gh-app-identity.ts, fork-gh-shim.ts, managed-hook-command-ownership.ts, bot-reply-format.ts, MobileConnectorSourceIcon.tsx and the pre-sync callers of withBotLaunchToolsEnv; checked 9 of the 17 deleted test blobs against 7daf01d99f3; could not reproduce the baseline's '20 files' figure with read-only git (no git diff) and did not inspect live Gemini spool behaviour.",
+      "findings": [
+        {
+          "id": "adj-2-1",
+          "severity": "NIT",
+          "file": "src/main/bots/bot-tools-file.ts",
+          "summary": "Line 365 joins the end of a doc comment and `export async function botSessionToolServers(` on one line.",
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "id": "adj-3",
+      "round": "adj-3",
+      "scope": "adjudication 3 of 3",
+      "files": 9,
+      "bytes": 15527,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 0,
+      "nits": 1,
+      "unresolved": 0,
+      "costUsd": 2.2630784,
+      "coverage": "Read all 15 resolution hunks in adj-3.patch and checked each against the current tree: the shim env path (fork-gh-shim, bot-launch-tools, bot-tools-file botLaunchExtras/botSessionToolServers, bot-structured-session-wiring), the pre-sync callers via git grep at f9895f13436, the own-PR guard, terminal relayEnv, settings host-scope helpers and every MachineOnlyNotice sibling, runtimeTargetEnvironmentId, the shared rankWorktreeStatus, the max-lines baseline, and remerge-diff --stat for the two named files; did not open the four launch-resolution files beyond their withSessionMcpToolsEnv call sites, and ran nothing.",
+      "findings": [
+        {
+          "id": "adj-3-1",
+          "severity": "NIT",
+          "file": "src/renderer/src/components/settings/page/use-settings-page-effects.ts",
+          "summary": "A host with no Orca server now gets the same null settingsHostKey as the local scope, so an open MCP-server subpage survives switching from local to such a host and reappears when switching back.",
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "id": "delta-1",
+      "round": "delta-1",
+      "scope": "delta b6bc8137f5e3..181a62f479da",
+      "files": 34,
+      "bytes": 104927,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 1,
+      "minors": 2,
+      "nits": 2,
+      "unresolved": 0,
+      "costUsd": 3.8829645999999998,
+      "coverage": "Read the whole delta patch, checked every BLOCKER/SHOULD-FIX fix against the tree (fork-gh-shim, session-mcp-tools and every withSessionMcpToolsEnv caller, session-mcp-launch types, bot-gh-app-identity, bot-tools-revision, bot-reply-format, ledger against the superseded baseline at b6bc8137^1), and spot-checked the gate tools, RPC registry move, hook matchers, and the shell consumers of the Claude hook pattern.",
+      "findings": [
+        {
+          "id": "delta-1-1",
+          "severity": "SHOULD-FIX",
+          "file": "src/shared/agent-hook-listener/providers/claude/claude-hook-plugin.ts",
+          "summary": "CLAUDE_MANAGED_HOOK_COMMAND_PATTERN now starts with a (?:...) group, but claude-shell-function.ts:25 feeds it to `grep -qsE`, which does not support (?:.",
+          "status": "resolved (delta-3)"
+        },
+        {
+          "id": "delta-1-2",
+          "severity": "MINOR",
+          "file": "local/sync/convergence-ledger.md",
+          "summary": "The 'still owed' list omits two debts the superseded baseline recorded and that still have no test: the six setTargetHidden SSH-target cases and the ~20-case pane-screen prompt/dialog reader spec; LOCAL-PATCHES.md:3590 and :3662 still point at the empty baseline.",
+          "status": "open"
+        },
+        {
+          "id": "delta-1-3",
+          "severity": "MINOR",
+          "file": "src/main/bots/bot-structured-session-wiring.ts",
+          "summary": "No test pins launchTools.changed/outdated returning true when the GitHub App identity is outdated.",
+          "status": "open"
+        },
+        {
+          "id": "delta-1-4",
+          "severity": "NIT",
+          "file": "src/main/agent-hooks/installation/commands/managed-hook-command-ownership.ts",
+          "summary": "RUNTIME_HOME_WINDOWS_BRANCH gained an 'i' flag that upstream's original literal did not have.",
+          "status": "open"
+        },
+        {
+          "id": "delta-1-5",
+          "severity": "NIT",
+          "file": "local/upstream-file-comments-baseline.json",
+          "summary": "The accepted text says 'Seven fork comment lines' for the three review-fix files, which carry eight (3+3+2), and cites a LOCAL-PATCHES section that describes a different +34 re-take.",
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "id": "delta-3",
+      "round": "delta-3",
+      "scope": "delta 181a62f479da..13edbfa18119",
+      "files": 5,
+      "bytes": 8114,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 0,
+      "nits": 1,
+      "unresolved": 0,
+      "costUsd": 1.2891398000000003,
+      "coverage": "Read the full 5-file delta, the current claude-hook-plugin.ts against its 3e22725 base, all three shell consumers of the pattern, the convergence-ledger section, LOCAL-PATCHES.md § local(lint), and the prior deleted-tests record at 3d4721be0c8.",
+      "findings": [
+        {
+          "id": "delta-3-1",
+          "severity": "NIT",
+          "file": "local/upstream-file-comments-baseline.json",
+          "summary": "The rewritten accept reason cites 'Evidence: LOCAL-PATCHES.md § local(lint)', but that section has no record of the 4822 or 4828 re-takes; its only check-upstream-file-comments line for this base is the +34 merge re-take.",
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "id": "delta-3",
+      "round": "delta-3",
+      "scope": "delta 13edbfa18119..13edbfa18119",
+      "files": 0,
+      "bytes": 0,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 0,
+      "nits": 0,
+      "unresolved": 0,
+      "costUsd": 1.0494362,
+      "coverage": "Read the fix commit 13edbfa1811 (the delta file is empty because R1 equals R2), the current claude-hook-plugin.ts, its test, the three consumers in claude-shell-function.ts, the home-name constants, and the upstream-file-comments baseline hunk.",
+      "findings": []
+    }
+  ],
+  "sweep": {
+    "reviewer": {
+      "name": "cheap-tier"
+    },
+    "budgetBytes": 24576,
+    "slices": [
+      {
+        "id": "A",
+        "scope": "{config,docs}, local/gate-lint-verdict.mjs",
+        "files": 6,
+        "bytes": 24096,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 2,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-A-1",
+            "severity": "NIT",
+            "file": "config/scripts/preflight/changed-checks/check-changed-code-quality.mjs",
+            "summary": "The new suppression's comment blames 'the fork's two WSL cutover casts', but that test file is upstream-owned.",
+            "status": "open"
+          },
+          {
+            "id": "S-A-2",
+            "severity": "NIT",
+            "file": "local/gate-lint-verdict.mjs",
+            "summary": "The added doc comment reads 're-gate one SHA twice —the bug' with a stray space and no sentence break.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "B",
+        "scope": "local/gate-lint.mjs, local/lib/known-red.mjs, local/max-lines-exemption.test.mjs, local/sync/{convergence-ledger.md,expected-deletions.json}",
+        "files": 5,
+        "bytes": 19901,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 2,
+        "nits": 1,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-B-1",
+            "severity": "MINOR",
+            "file": "local/gate-lint.mjs",
+            "summary": "The hunk moved matchesEntry and entryProblem into local/lib/known-red.mjs but left their JSDoc block in gate-lint.mjs, attached to nothing.",
+            "status": "open"
+          },
+          {
+            "id": "S-B-2",
+            "severity": "MINOR",
+            "file": "local/max-lines-exemption.mjs",
+            "summary": "The tool's help still says the fork's rule is to split a fork-owned file because local/max-lines-exemption.test.mjs fails on that row, which this change made false for the two exempted paths.",
+            "status": "open"
+          },
+          {
+            "id": "S-B-3",
+            "severity": "NIT",
+            "file": "local/max-lines-exemption.test.mjs",
+            "summary": "FORK_OWNED_EXCEPTIONS adds a hand-maintained allowlist to a ratchet whose header says the list may only shrink, and the split debt lives only in prose.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "C",
+        "scope": "local/sync/identity-sweep-baseline.json",
+        "files": 1,
+        "bytes": 13390,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 1,
+        "nits": 1,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-C-1",
+            "severity": "MINOR",
+            "file": "local/sync/identity-sweep-baseline.json",
+            "summary": "\"base\" still names 7daf01d99f while merge-base(HEAD, upstream/main) is now 3e227259249, so the frozen counts are attributed to the previous sync's upstream base.",
+            "status": "open"
+          },
+          {
+            "id": "S-C-2",
+            "severity": "NIT",
+            "file": "local/sync/identity-sweep-baseline.json",
+            "summary": "The reason says the claude-teams adapter executables list still needs the local(identity) pass, but src/main/mcp-servers/terminal/terminal-mcp-claude-adapters.ts:52 already lists orca-np and orca-np-dev.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "D",
+        "scope": "local/sync/upstream-deleted-fork-tests-baseline.json (part 1 of 5)",
+        "files": 1,
+        "bytes": 24234,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": []
+      },
+      {
+        "id": "E",
+        "scope": "local/sync/upstream-deleted-fork-tests-baseline.json (part 2 of 5)",
+        "files": 1,
+        "bytes": 24150,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 1,
+        "minors": 0,
+        "nits": 1,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-E-1",
+            "severity": "SHOULD-FIX",
+            "file": "local/sync/upstream-deleted-fork-tests-baseline.json",
+            "summary": "These hunks drop the last in-tree record of the 2026-11-20/2026-11-24 coverage losses, including the per-case 'coverage owed' reasons, while LOCAL-PATCHES.md:3590 and :3673 still cite this file as their home.",
+            "status": "resolved (delta-1)"
+          },
+          {
+            "id": "S-E-2",
+            "severity": "NIT",
+            "file": "local/sync/upstream-deleted-fork-tests-baseline.json",
+            "summary": "The reason says 'the 20 fork-modified test files from the 7daf01d99f range', but the measured window is 7daf01d99f3..f9895f13436 — the fork's own work after that upstream commit, not the 1,350-commit 7daf01d99f sync.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "F",
+        "scope": "local/sync/upstream-deleted-fork-tests-baseline.json (part 3 of 5)",
+        "files": 1,
+        "bytes": 24543,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 1,
+        "minors": 0,
+        "nits": 1,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-F-1",
+            "severity": "SHOULD-FIX",
+            "file": "local/sync/upstream-deleted-fork-tests-baseline.json",
+            "summary": "These hunks erase the last in-tree evidence for the previous two syncs' 167 lost files and 237 fork-added cases, while LOCAL-PATCHES.md:3590 and :3673 still name this file as where that is recorded.",
+            "status": "resolved (delta-1)"
+          },
+          {
+            "id": "S-F-2",
+            "severity": "NIT",
+            "file": "local/sync/upstream-deleted-fork-tests-baseline.json",
+            "summary": "The accepted reason says 'the 20 fork-modified test files from the 7daf01d99f range', but the window actually measured is 7daf01d99f3..f9895f13436, i.e. the fork's own commits after that upstream commit.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "G",
+        "scope": "local/sync/upstream-deleted-fork-tests-baseline.json (part 4 of 5)",
+        "files": 1,
+        "bytes": 24159,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 1,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-G-1",
+            "severity": "NIT",
+            "file": "local/sync/upstream-deleted-fork-tests-baseline.json",
+            "summary": "Deleting the previous range's entries removes the only in-tree 'Coverage owed' notes for the REST-list update-delay resolver, the orca-np claude-teams pane detection and the servesLocally webhook card, and the two update-delay titles now survive only as stale entries in local/nightly-linux-known-red.json.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "H",
+        "scope": "local/sync/upstream-deleted-fork-tests-baseline.json, local/verify-packaged-bundle.mjs, mobile/src/bots/connectors/connector-entry-rows.tsx (part 5 of 5)",
+        "files": 3,
+        "bytes": 23449,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 1,
+        "nits": 1,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-H-1",
+            "severity": "MINOR",
+            "file": "mobile/src/bots/connectors/connector-entry-rows.tsx",
+            "summary": "Keeping the fork's 'photon' source while taking upstream's MobileConnectorLogo paints the photon/iMessage mark in Discord's blurple, where the fork previously drew it neutral.",
+            "status": "open"
+          },
+          {
+            "id": "S-H-2",
+            "severity": "NIT",
+            "file": "local/sync/upstream-deleted-fork-tests-baseline.json",
+            "summary": "The accepted reason's '20 fork-modified test files' figure cannot be reproduced from the recorded range, although the empty set it justifies is correct.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "I",
+        "scope": "{package.json,pnpm-lock.yaml}, resources/skills/released-digests.json, skill-stubs/_shared/cli-resolution.md, skills/jira-tickets/SKILL.md",
+        "files": 5,
+        "bytes": 22532,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": []
+      },
+      {
+        "id": "J",
+        "scope": "skills/linear-tickets/SKILL.md, skills/orca-cli/SKILL.md, skills/orca-computer-use/SKILL.md, skills/orca-emulator-android/SKILL.md, skills/orca-emulator/SKILL.md, skills/orca-jira/SKILL.md, skills/orca-linear/SKILL.md",
+        "files": 7,
+        "bytes": 21539,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": []
+      },
+      {
+        "id": "K",
+        "scope": "skills/orca-per-workspace-env/SKILL.md, skills/orca-plugin-authoring/SKILL.md, skills/orchestration/SKILL.md, src/cli",
+        "files": 6,
+        "bytes": 16738,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 1,
+        "minors": 0,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-K-1",
+            "severity": "SHOULD-FIX",
+            "file": "src/cli/bots/bot-reply.ts",
+            "summary": "The fork's `Queued for ${place}.` reply wording was dropped rather than re-applied where upstream moved formatReply, so queued replies again claim Orca Cloud will post them.",
+            "status": "resolved (delta-1)"
+          }
+        ]
+      },
+      {
+        "id": "L",
+        "scope": "src/main/agent-hooks/installation/commands/managed-hook-command-matching.ts, src/main/ai-vault/discovery/session-scanner-agent-sources.ts, src/main/bots/{bot-launch-tools.ts,bot-own-skills.ts,bot-request-view.ts,bot-run-results.ts}",
+        "files": 6,
+        "bytes": 23514,
+        "verdict": "reported",
+        "blockers": 1,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 1,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-L-1",
+            "severity": "BLOCKER",
+            "file": "src/main/bots/bot-launch-tools.ts",
+            "summary": "The fork's gh-shim PATH step (`withBotGhShimOnPath`, LOCAL-PATCHES `bot-launch-tools.ts:75`) now has no production caller, so bot sessions get ORCA_BOT_GH_SHIM_DIR in env but the shim folder is never put on PATH.",
+            "status": "resolved (delta-1)"
+          },
+          {
+            "id": "S-L-2",
+            "severity": "NIT",
+            "file": "src/main/agent-hooks/installation/commands/managed-hook-command-matching.ts",
+            "summary": "The resolution deleted a blank line above `if (!hasCommandAfterCleanup)` in upstream-owned code unrelated to the conflict.",
+            "status": "dismissed (adj-2)"
+          }
+        ]
+      },
+      {
+        "id": "M",
+        "scope": "src/main/bots/{bot-skill-projects.ts,bot-structured-session-wiring.ts,bot-tools-file.test.ts}",
+        "files": 3,
+        "bytes": 15742,
+        "verdict": "reported",
+        "blockers": 1,
+        "shouldFix": 1,
+        "minors": 1,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-M-1",
+            "severity": "BLOCKER",
+            "file": "src/main/bots/bot-structured-session-wiring.ts",
+            "summary": "Routing the fork's launch extras through sessionMcpLaunchTools({ botLaunch }) loses the gh-shim PATH hoist, so a bot's `gh` no longer runs the marker shim.",
+            "status": "resolved (delta-1)"
+          },
+          {
+            "id": "S-M-2",
+            "severity": "SHOULD-FIX",
+            "file": "src/main/bots/bot-structured-session-wiring.ts",
+            "summary": "Replacing botLaunchToolsChecks with upstream's sessionLaunchToolsChanged/Outdated drops the GitHub App identity-outdated check.",
+            "status": "resolved (delta-1)"
+          },
+          {
+            "id": "S-M-3",
+            "severity": "MINOR",
+            "file": "src/main/bots/bot-tools-file.test.ts",
+            "summary": "The surviving gh-shim test still drives botSessionToolServers, which production no longer calls, and the new botLaunch.extraEnv path has no test.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "N",
+        "scope": "src/main/bots/bot-tools-file.ts, src/main/connector-cloud, src/main/droid/hook-service.ts",
+        "files": 4,
+        "bytes": 20126,
+        "verdict": "reported",
+        "blockers": 1,
+        "shouldFix": 0,
+        "minors": 1,
+        "nits": 1,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-N-1",
+            "severity": "BLOCKER",
+            "file": "src/main/bots/bot-tools-file.ts",
+            "summary": "botLaunchExtras returns the gh shim as ORCA_BOT_GH_SHIM_DIR in extraEnv, and no surviving consumer turns that into a PATH prefix, so the bot's marker shim never runs.",
+            "status": "resolved (delta-1)"
+          },
+          {
+            "id": "S-N-2",
+            "severity": "MINOR",
+            "file": "src/main/bots/bot-tools-file.ts",
+            "summary": "A new eslint-disable max-lines plus a new max-lines ratchet-baseline entry keeps an oversized file alive around the now production-dead botSessionToolServers/BotLaunchTools path.",
+            "status": "open"
+          },
+          {
+            "id": "S-N-3",
+            "severity": "NIT",
+            "file": "src/main/connector-cloud/connector-thread-mute-saves.ts",
+            "summary": "The ConnectorConversation to ConversationKey swap widens the accepted source set to include webhook threads, which can never carry a mute.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "O",
+        "scope": "src/main/gemini/hook-service.ts, src/main/ipc",
+        "files": 5,
+        "bytes": 19093,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 1,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-O-1",
+            "severity": "NIT",
+            "file": "src/main/gemini/hook-service.ts",
+            "summary": "Deleting the service leaves previously installed Gemini managed-hook registrations with no removal path.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "P",
+        "scope": "src/main/mcp-servers, src/main/native-chat/agent-session-journal/journal-domain-operation-window.performance.test.ts, src/main/orca-profiles/host-sync-settings-disposition-rows-b.ts, src/main/pi/managed-extensions/titlebar-extension-service.ts, src/main/providers/accounts/provider-account-services.ts, src/main/rate-limits/{fork … service-usage-provider-enablement.conformance.test.ts} (6)",
+        "files": 15,
+        "bytes": 19873,
+        "verdict": "reported",
+        "blockers": 1,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 1,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-P-1",
+            "severity": "BLOCKER",
+            "file": "src/main/mcp-servers/session-mcp-tools.ts",
+            "summary": "The fork's gh shim reaches the child env only as the raw ORCA_BOT_GH_SHIM_DIR variable, and nothing converts it into a PATH entry, so the bot gh shim and its own-PR marker never run.",
+            "status": "resolved (delta-1)"
+          },
+          {
+            "id": "S-P-2",
+            "severity": "NIT",
+            "file": "src/main/mcp-servers/session-mcp-launch.ts",
+            "summary": "deps.botLaunch is spread wholesale into the sources parameter, carrying appIdentity into a type that does not declare it.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "Q",
+        "scope": "src/main/rate-limits/service",
+        "files": 8,
+        "bytes": 24142,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 1,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-Q-1",
+            "severity": "NIT",
+            "file": "src/main/rate-limits/service/service-result-policy.ts",
+            "summary": "The resolution kept the fork's older stale-policy comment and dropped upstream's reworded one.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "R",
+        "scope": "src/main/runtime, src/main/skills/discovery/bot-linked-skills-discovery.test.ts, src/main/updater/releases/updater-prerelease-feed.ts, src/preload",
+        "files": 11,
+        "bytes": 19186,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": []
+      },
+      {
+        "id": "S",
+        "scope": "src/renderer/src/app-shell, src/renderer/src/components/bots/bot-sidebar-attention.ts, src/renderer/src/components/browser-pane",
+        "files": 6,
+        "bytes": 11972,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": []
+      },
+      {
+        "id": "T",
+        "scope": "src/renderer/src/components/dashboard",
+        "files": 3,
+        "bytes": 23205,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": []
+      },
+      {
+        "id": "U",
+        "scope": "src/renderer/src/components/{new-workspace,right-sidebar}",
+        "files": 6,
+        "bytes": 15243,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": []
+      },
+      {
+        "id": "V",
+        "scope": "src/renderer/src/components/settings/{accounts,appearance-status-bar-provider-toggles.ts}",
+        "files": 3,
+        "bytes": 15077,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": []
+      },
+      {
+        "id": "W",
+        "scope": "src/renderer/src/components/settings/appearance/appearance-status-bar-search.ts, src/renderer/src/components/settings/navigation",
+        "files": 3,
+        "bytes": 15681,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": []
+      },
+      {
+        "id": "X",
+        "scope": "src/renderer/src/components/settings/{page,provider-accounts-sections.tsx}",
+        "files": 6,
+        "bytes": 13537,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 1,
+        "nits": 1,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-X-1",
+            "severity": "MINOR",
+            "file": "src/renderer/src/components/settings/page/settings-setup-workflow-section-renderers.tsx",
+            "summary": "The Orca Account pane renders SettingsHostScopeUnavailableNotice for a machine-only scope, while every sibling section in this slice renders SettingsHostScopeMachineOnlyNotice.",
+            "status": "open"
+          },
+          {
+            "id": "S-X-2",
+            "severity": "NIT",
+            "file": "src/renderer/src/components/settings/page/use-settings-page-effects.ts",
+            "summary": "The merge buys the fork's nullable-host-scope guards with a new max-lines exemption, adding a row to the shrink-only ratchet baseline.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "Y",
+        "scope": "src/renderer/src/components/sidebar",
+        "files": 5,
+        "bytes": 11378,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 1,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-Y-1",
+            "severity": "NIT",
+            "file": "src/renderer/src/components/sidebar/workspace-card/template/card-identity-parts.tsx",
+            "summary": "The MetaRepoBadge part stays registered while no template references it any more.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "Z",
+        "scope": "src/renderer/src/components/status-bar",
+        "files": 8,
+        "bytes": 16975,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": []
+      },
+      {
+        "id": "AA",
+        "scope": "src/renderer/src/components/tab-bar/strip/tab-bar-surface.tsx, src/renderer/src/components/tab-group/TabGroupPanel.tsx, src/renderer/src/i18n",
+        "files": 14,
+        "bytes": 22734,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": []
+      },
+      {
+        "id": "AB",
+        "scope": "src/renderer/src/lib, src/shared",
+        "files": 14,
+        "bytes": 16783,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 1,
+        "nits": 2,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-AB-1",
+            "severity": "MINOR",
+            "file": "src/shared/usage-provider-enablement.ts",
+            "summary": "The module docstring still names Gemini auth files among the sources a disabled provider skips, three lines above the array this hunk edited to remove gemini.",
+            "status": "open"
+          },
+          {
+            "id": "S-AB-2",
+            "severity": "NIT",
+            "file": "src/shared/agent-usage/rate-limits/rate-limit-types.ts",
+            "summary": "The buckets doc keeps the fork's wording (Gemini models, Cursor plan pools) where upstream renamed it to Antigravity models.",
+            "status": "open"
+          },
+          {
+            "id": "S-AB-3",
+            "severity": "NIT",
+            "file": "src/renderer/src/lib/workspace/activity/worktree-status.ts",
+            "summary": "The resolution inlines the shared rankWorktreeStatus ordering into rankResolvedWorktreeStatus, so this renderer path no longer consumes the shared rollup function.",
+            "status": "open"
+          }
+        ]
+      }
+    ],
+    "costUsd": 0
+  },
+  "adjudication": {
+    "reviewer": {
+      "provider": "claude",
+      "alias": "opus",
+      "name": "Opus 5.5",
+      "thinking": "high"
+    },
+    "slices": [
+      {
+        "id": "adj-1",
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "costUsd": 2.9813168,
+        "judged": 12,
+        "missing": 0
+      },
+      {
+        "id": "adj-2",
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 1,
+        "costUsd": 4.0070836000000005,
+        "judged": 12,
+        "missing": 0
+      },
+      {
+        "id": "adj-3",
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 1,
+        "costUsd": 2.2630784,
+        "judged": 9,
+        "missing": 0
+      }
+    ],
+    "judged": [
+      {
+        "id": "S-A-1",
+        "real": true,
+        "severity": "NIT",
+        "why": "The file has no fork commits in 7daf01d99f3..f9895f13436, and its blob is the same at b6bc8137 and 3e227259249 (0ba51bc64ed), so the casts are upstream's. There are also four, not two (lines 57, 83, 136, 151). Fix: reword the comment to say upstream's four casts.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-A-2",
+        "real": true,
+        "severity": "NIT",
+        "why": "Reflowing the comment fused 'twice —' with 'the bug'; cosmetic only. Fix: 'twice — the bug …'.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-B-1",
+        "real": true,
+        "severity": "MINOR",
+        "why": "local/gate-lint.mjs:330-337 is a JSDoc block attached to nothing; it names entryProblem, which moved to known-red.mjs:341. No behaviour impact; re-exports keep the tests resolving. Fix: delete the orphan and add its last sentence to known-red.mjs:321-327.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-B-2",
+        "real": true,
+        "severity": "NIT",
+        "why": "The help text (max-lines-exemption.mjs:45-46) and ownershipWarning (:167) are a warning on --add, not a refusal, and the file is not a resolution hunk. The text is only inaccurate for the two host-mesh paths, which already have rows. Fix: mention the FORK_OWNED_EXCEPTIONS list in the warning text.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-B-3",
+        "real": true,
+        "severity": "NIT",
+        "why": "This is a hand-kept allowlist in a shrink-only ratchet, but it is the owner's recorded decision (LOCAL-PATCHES.md:2041-2049, 'the split is still owed'), and the new test requires each path's -- Why: header. No fix: correct as an owner-approved exception.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-C-1",
+        "real": true,
+        "severity": "NIT",
+        "why": "identity-sweep.mjs:429 writes mergeBase(), but neither identity-sweep.mjs nor lib/identity-baseline.mjs reads `base` (compareIdentityBaseline uses only rules and total). The resolution left that line unchanged. Fix: set it to 3e227259249 on the next --baseline-init.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-C-2",
+        "real": true,
+        "severity": "NIT",
+        "why": "terminal-mcp-claude-adapters.ts:49-52 already lists orca-np and orca-np-dev with a fork comment, so the 'needs the local(identity) pass' prose is stale. Fix: reword it to say the fork names are present and upstream's are kept.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-E-1",
+        "real": true,
+        "severity": "MINOR",
+        "why": "Re-binding to 3e227259249..f9895f13436 is by design (deleted-fork-tests.mjs:86 ignores a baseline bound to another range), and the 2026-11-24 sync replaced the 2026-11-20 record the same way. Still, LOCAL-PATCHES.md:3590 and :3662 (not :3673) now point at an empty map. No release behaviour changes. Fix: one ledger/LOCAL-PATCHES line pointing at `git show f9895f13436:local/sync/upstream-deleted-fork-tests-baseline.json`.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-E-2",
+        "real": true,
+        "severity": "NIT",
+        "why": "'from the 7daf01d99f range' is ambiguous; the measured window is the fork's work 7daf01d99f3..f9895f13436, bound as base 3e227259249 / tip f9895f13436. Fix: name the window explicitly in the accepted reason.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-F-1",
+        "real": true,
+        "severity": "MINOR",
+        "why": "Duplicate of S-E-1: same hunks, same citations, same fix.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-F-2",
+        "real": true,
+        "severity": "NIT",
+        "why": "Duplicate of S-E-2: same wording, same fix.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-G-1",
+        "real": true,
+        "severity": "MINOR",
+        "why": "The ledger restates only setTargetHidden, bots.list localWebhooks, zcode and remote identity (convergence-ledger.md:2974-2977). The servesLocally webhook cases, the REST-first update-delay resolver, and also the keybindings-under-~/.orca-np and orcad ORCA_USER_DATA precedence cases are now unrecorded in the tree (updater-fork-feed.test.ts has no delay case). The nightly half is wrong: both update-delay titles sit in prunedSince, and `entries` is []. Fix: fold these debts into the S-E-1 ledger hunk.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-H-1",
+        "real": true,
+        "severity": "MINOR",
+        "why": "connector-entry-rows.tsx:265 renders mark('photon') through MobileConnectorLogo, whose fill chain (MobileConnectorSourceIcon.tsx:122-123) gives every non-github/linear source Discord's #5865F2; the fork previously drew it with colors.textSecondary. Fix: a photon branch (neutral fill) in MobileConnectorLogo, one hunk.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-H-2",
+        "real": true,
+        "severity": "NIT",
+        "why": "The empty files/cases map is correct (spot-checked deleted tests are byte-identical at 7daf01d99f3 and f9895f13436, so none was fork-modified); only the prose count is unverifiable, and the sweep's own '0 M files' claim is itself wrong. No fix needed beyond optionally rewording the reason.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-K-1",
+        "real": true,
+        "severity": "SHOULD-FIX",
+        "why": "aaa3c4b5481 changed the queued line to `Queued for ${place}.` because photon-connector-reply.ts queues locally; the resolution took upstream's deletion in bot-reply.ts and never re-applied it in upstream's new bot-reply-format.ts:33-36, which again says 'Orca Cloud will post it'. Fix: re-apply the one-line wording in bot-reply-format.ts formatReply.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-L-1",
+        "real": true,
+        "severity": "BLOCKER",
+        "why": "Pre-sync, all four structured launch resolutions called withBotLaunchToolsEnv (→ withBotGhShimOnPath); at HEAD they call withSessionMcpToolsEnv, which merges extraEnv raw, and withBotLaunchToolsEnv/BotLaunchTools.for have no production caller, so the shim folder never reaches PATH. Fix: apply withBotGhShimOnPath to both returns of withSessionMcpToolsEnv, delete the dead BotLaunchTools path, update LOCAL-PATCHES rows.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-L-2",
+        "real": false,
+        "severity": "NIT",
+        "why": "Upstream 3e227259249's managed-hook-command-matching.ts has no blank line above `if (!hasCommandAfterCleanup)`; the resolution removed the fork's stray line and so reduced divergence rather than adding a sync hunk. No fix.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-M-1",
+        "real": true,
+        "severity": "BLOCKER",
+        "why": "Same defect as S-L-1 seen from bot-structured-session-wiring.ts:213-237: botLaunchExtras' ORCA_BOT_GH_SHIM_DIR rides into SessionMcpTools.env and no consumer hoists it onto PATH, so bot-written GitHub bodies lose the marker. Same fix as S-L-1.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-M-2",
+        "real": true,
+        "severity": "SHOULD-FIX",
+        "why": "launchTools now uses sessionLaunchToolsChanged/Outdated (session-mcp-launch.ts:137-183), which never read launched.bot.appIdentity; botGithubAppIdentityOutdated is reachable only via the now-uncalled botLaunchToolsChecks, so an expiring or disconnected App token is never refreshed mid-chat. Fix: OR `launched.bot && botGithubAppIdentityOutdated(launched.bot.appIdentity)` into both checks in the wiring.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-M-3",
+        "real": true,
+        "severity": "MINOR",
+        "why": "bot-tools-file.test.ts:74-88 exercises the production-dead botSessionToolServers and only asserts the env key, not PATH; no test covers sessionMcpLaunchTools with botLaunch extras through withSessionMcpToolsEnv. Fix: rewrite that test on the live path and assert PATH starts with the shim folder.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-N-1",
+        "real": true,
+        "severity": "BLOCKER",
+        "why": "Same root cause as S-L-1 from bot-tools-file.ts:333-362: botLaunchExtras emits ORCA_BOT_GH_SHIM_DIR and SessionMcpTools.for (session-mcp-tools.ts:122-127) copies it verbatim; grep finds no other reader of the key. Same fix as S-L-1.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-N-2",
+        "real": true,
+        "severity": "MINOR",
+        "why": "The new inline max-lines disable and config/max-lines-baseline.txt:22 entry exist only because the dead botSessionToolServers (lines 364-409) was kept. Fix: delete it with the BotLaunchTools cleanup and drop both allowances.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-N-3",
+        "real": true,
+        "severity": "NIT",
+        "why": "ConnectorConversation→ConversationKey in connector-thread-mute-saves.ts is type-only; idOf/readThreadMute behave the same at runtime. No fix: correct as written.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-O-1",
+        "real": true,
+        "severity": "NIT",
+        "why": "Upstream retired Gemini hooks and the resolution followed it; nothing in src or local/ still references gemini/hook-service, so only pre-existing ~/.gemini/settings.json registrations remain. No fix in the resolution; a cleanup-pass note.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-P-1",
+        "real": true,
+        "severity": "SHOULD-FIX",
+        "why": "Pre-sync, all four launch resolutions merged through withBotLaunchToolsEnv, which runs withBotGhShimOnPath; at HEAD they use withSessionMcpToolsEnv, which never converts ORCA_BOT_GH_SHIM_DIR, and nothing else in src reads that key, so the shim never runs and bot bodies post unmarked. Not a BLOCKER because the head-branch isBotWork check and the 5-per-15-min cap still limit own-PR loops. Fix: pass the merged env through withBotGhShimOnPath inside withSessionMcpToolsEnv (terminal relayEnv picks only NO_PROXY and the token, so it is unaffected), and rewrite bot-tools-file.test.ts:74-88 to drive sessionMcpLaunchTools and assert PATH starts with the shim dir, since botSessionToolServers has only test callers.",
+        "by": "adj-3"
+      },
+      {
+        "id": "S-P-2",
+        "real": true,
+        "severity": "NIT",
+        "why": "Spread properties escape excess-property checks and SessionMcpTools.for never reads appIdentity, so nothing breaks; passing only extraEnv and extraCommandEnv is a one-hunk tidy-up.",
+        "by": "adj-3"
+      },
+      {
+        "id": "S-Q-1",
+        "real": true,
+        "severity": "NIT",
+        "why": "The comment above a condition that also covers isCodexUsageWaitingForCodex names only Claude. Taking upstream's line fixes it and removes one divergent line from the next sync; no behaviour change.",
+        "by": "adj-3"
+      },
+      {
+        "id": "S-X-1",
+        "real": true,
+        "severity": "MINOR",
+        "why": "For a null target with available true, the section shows the 'no longer saved' notice where every sibling section shows SettingsHostScopeMachineOnlyNotice. The pre-sync fork had the same branch, so the merge carried it rather than introduced it, but it is still wrong for a saved machine-only host. One hunk: render <SettingsHostScopeMachineOnlyNotice hostLabel={scope.label} />.",
+        "by": "adj-3"
+      },
+      {
+        "id": "S-X-2",
+        "real": true,
+        "severity": "NIT",
+        "why": "The exemption is real (the file is over budget) and uses the sanctioned inline shape, matching config/max-lines-baseline.txt:81; it only records growth. No fix.",
+        "by": "adj-3"
+      },
+      {
+        "id": "S-Y-1",
+        "real": true,
+        "severity": "NIT",
+        "why": "remerge-diff shows the resolution did not touch card-identity-parts.tsx, and keeping MetaRepoBadge registered keeps saved templates that name it loading. No fix.",
+        "by": "adj-3"
+      },
+      {
+        "id": "S-AB-1",
+        "real": true,
+        "severity": "NIT",
+        "why": "Stale docstring only: nothing under src/main/rate-limits reads a .gemini path any more, and normalizeDisabledUsageProviders quietly drops a stored 'gemini', so no persisted profile breaks. One-word comment edit.",
+        "by": "adj-3"
+      },
+      {
+        "id": "S-AB-2",
+        "real": true,
+        "severity": "NIT",
+        "why": "Comment only. Taking upstream's 'Antigravity models' wording reduces sync divergence.",
+        "by": "adj-3"
+      },
+      {
+        "id": "S-AB-3",
+        "real": true,
+        "severity": "NIT",
+        "why": "Compared line by line with shared rankWorktreeStatus: same order, plus setup and the retained states in the commented positions. The only risk is drift from future upstream changes. No fix now.",
+        "by": "adj-3"
+      }
+    ]
+  },
+  "waiver": null
+}
