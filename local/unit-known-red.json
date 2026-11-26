@@ -644,7 +644,17 @@
       "match": "^Unknown Error: BuildMessage: ModuleNotFound resolving \"http://localhost:3000/.*monaco-editor.*ts\\.worker\\.js\\?worker_file&type=module\" \\(entry point\\)$"
     }
   ],
-  "entries": [],
+  "entries": [
+    {
+      "file": "src/main/agent-cli-update/agent-cli-update-timeout.test.ts",
+      "test": "settles soon after the updater exits even when a child it left holds its output",
+      "match": "expected \\d+ to be less than 30",
+      "class": "foreign: upstream's own updater test, macOS-bound",
+      "owner": "upstream",
+      "flaky": true,
+      "evidence": "LOCAL-PATCHES.md § local(lint): the 2026-11-26 sync's release gates. Upstream's #48850 test and upstream's agent-cli-updater-process.ts are byte-identical to 3e227259249 (empty `git diff 3e227259249 HEAD -- src/main/agent-cli-update/`), and the release's Linux lane runs it green. On this Mac it settles at ~36 fake seconds against the <30 bound in 2 of 3 local runs and passes in isolation: the fake updater leaves `sleep 100000 &` holding stdout, so the 5 s AFTER_EXIT_MS grace plus @orca/process-host's termination barrier on darwin lands past the bound. The `match` pins the assertion so a different failure under the same title is still a new red."
+    }
+  ],
   "prunedSince": [
     {
       "file": "config/scripts/ci-managed-ssh-execution.test.mjs",

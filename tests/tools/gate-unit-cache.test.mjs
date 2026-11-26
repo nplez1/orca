@@ -228,11 +228,13 @@ describe('which cached verdict governs a revision', () => {
     expect(at(docs)).toBeNull()
     expect(at(code)).toContain('no green lint verdict')
 
-    writeLintVerdict({
-      gitCommonDir: join(repo.dir, '.git'),
-      revision: code,
-      steps: [{ id: 'lint:types', exitCode: 1 }]
-    })
+    // Why by hand: `writeLintVerdict` only ever records a gate PASS (a known-red-only failure set is
+    // one), so a failed marker is exactly what a damaged or older file looks like. The reader has to
+    // refuse it, and nothing in this tool writes it.
+    writeFileSync(
+      join(repo.dir, '.git', 'orca-lint', `${code.slice(0, 12)}.json`),
+      `${JSON.stringify({ revision: code, allPassed: false, failed: ['lint:types'] }, null, 2)}\n`
+    )
     expect(at(code)).toContain('lint FAILED')
   })
 })
