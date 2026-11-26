@@ -7,6 +7,7 @@ import { writeFileAtomically } from '../../filesystem/atomic-file-publication'
 import { grantCodexProjectTrustOffMain } from '../../codex/trust/project-trust/codex-project-trust-worker-client'
 import { runExclusivelyForCodexTrustConfig } from '../../codex/trust/toml/codex-trust-config-mutation-queue'
 import { recordOrcaCreatedAntigravityTrust } from './antigravity-workspace-trust-ownership'
+import { appendAgentTrustEntry, parseAgentTrustConfig } from './agent-trust-config-jsonc'
 import type { TuiAgentConfig } from '../../../shared/agent-launch/catalog/tui-agent-config-types'
 
 export type AgentTrustPreset = NonNullable<TuiAgentConfig['preflightTrust']>
@@ -116,23 +117,33 @@ type TrustedEntryConfig = {
 
 const trustedConfigWriteQueue = new Map<string, Promise<void>>()
 
-/** The config as a plain object, `{}` when absent, or null when it cannot be extended as one. */
-function readTrustedConfig(configPath: string): Record<string, unknown> | null {
+type TrustedConfigSource = { text: string | null; config: Record<string, unknown> }
+
+/** The config and its text (null when absent), or null when it cannot be extended as an object. */
+function readTrustedConfig(configPath: string): TrustedConfigSource | null {
   if (!existsSync(configPath)) {
-    return {}
+    return { text: null, config: {} }
   }
   try {
-    const parsed: unknown = JSON.parse(readFileSync(configPath, 'utf-8'))
+    const text = readFileSync(configPath, 'utf-8')
     // Why null and not `{}`: a top level that is not an object is not a config this path can extend,
-    // and writing over it would drop whatever the agent keeps there.
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? Object.fromEntries(Object.entries(parsed))
-      : null
+    // and writing over it would drop whatever the agent keeps there. A corrupted config is the
+    // user's to fix; the agent rewrites the file itself after the user accepts the prompt.
+    const config = parseAgentTrustConfig(text)
+    return config ? { text, config } : null
   } catch {
-    // Why: a corrupted config is the user's to fix — refuse to overwrite it from this
-    // side-effect path. The agent rewrites the file itself after the user accepts the prompt.
     return null
   }
+}
+
+function withTrustedEntry(
+  source: TrustedConfigSource,
+  key: TrustedEntryConfig['key'],
+  entry: string
+): string | null {
+  return source.text === null
+    ? `${JSON.stringify({ [key]: [entry] }, null, 2)}\n`
+    : appendAgentTrustEntry(source.text, key, entry)
 }
 
 function trustedEntries(config: Record<string, unknown>, key: TrustedEntryConfig['key']): string[] {
@@ -159,27 +170,27 @@ async function appendTrustedConfigEntry(args: TrustedEntryConfig): Promise<void>
     return
   }
   // Why one at a time: entries on a dead mount would otherwise pin every libuv fs thread at once.
-  for (const entry of trustedEntries(initial, args.key)) {
+  for (const entry of trustedEntries(initial.config, args.key)) {
     if ((await canonicalize(entry)) === absPath) {
       return
     }
   }
   await runKeyedSerializedOperation(trustedConfigWriteQueue, args.configPath, async () => {
-    const config = readTrustedConfig(args.configPath)
-    if (!config) {
+    const source = readTrustedConfig(args.configPath)
+    if (!source) {
       return
     }
-    const existing = trustedEntries(config, args.key)
-    if (existing.includes(absPath)) {
+    const existing = trustedEntries(source.config, args.key)
+    const nextText = existing.includes(absPath) ? null : withTrustedEntry(source, args.key, absPath)
+    if (nextText === null) {
       return
     }
-    config[args.key] = [...existing, absPath]
     if (!existsSync(args.configDir)) {
       mkdirSync(args.configDir, { recursive: true })
     }
     writeFileAtomically(
       args.configPath,
-      `${JSON.stringify(config, null, 2)}\n`,
+      nextText,
       args.mode === undefined ? undefined : { mode: args.mode }
     )
     // Why gated: the ownership ledger is Antigravity's; a Copilot trustedFolders write must not land in it.
