@@ -6388,8 +6388,11 @@ is what stops a timeout bump from quietly hiding a slow test.
   sync base, and that commit's own comment says the fixture is "about 30s on a Windows runner; it counts
   work, not time". The fork takes the code line only: upstream's comment is not copied, because a fork
   comment above upstream's code is the comment ratchet's growth (`check-upstream-file-comments`,
-  4764/4764 unchanged) and this entry is where the reason belongs. The next sync brings that commit's
-  identical line, so the hunk needs no decision then.
+  4764/4764 unchanged) and this entry is where the reason belongs. **The next sync does collide on that
+  hunk**, and the resolution is known: `7b6c852e2de` inserts its comment immediately above the `it(...)`
+  where our `fork-comment-ok:` line sits, and its `}, 120_000)` is byte-identical to ours — so keep
+  upstream's comment, drop ours, keep the timeout. The collision is one line and its answer is written
+  here; that is cheaper than the comment ratchet growth an unmarked copy would have cost today.
 - the test at line 270 (`reads the newest turns with the same work however many turns came before them`)
   — the fork's own call, because it passed on the same runner by 3.5 s: 26,488 ms of the 30 s budget on
   `windows-2022`, and 18,920 ms of it on `ubuntu-24.04` (63%). It is the slowest test in the lane and the
@@ -6405,11 +6408,16 @@ to either test's body is the only thing that moves them.
 The six lines this costs in an upstream file are declared as a seam in
 `local/checks/host-mesh-upstream-seams.mjs` (budget 6, the measured size), which is the register that
 makes a fork hunk in upstream's tree visible and bounded rather than silent. That budget only shrinks:
-the next sync brings upstream's own `}, 120_000)` and its comment above the second test, at which point
-our line there is identical and the seam can be re-measured down to the one test upstream left alone.
+after the sync takes upstream's `}, 120_000)` and comment, the second test costs nothing and the seam
+re-measures down to the one test upstream left alone.
 
 **Verified:** the file passes locally (7/7, 4.5 s, macOS, `config/vitest.performance.config.ts`), and
 both ratchets this change touches are green (`test-timeout-needs-reason`, `check-upstream-file-comments`
 4764/4764). The runner that reddened is the one that decides, so the fix was dispatched on the branch
-rather than trusted from a Mac — the run and its legs are recorded in the PR body and in the commit that
-follows this one.
+rather than trusted from a Mac: run
+[45780910456](https://github.com/nplez1/orca/actions/runs/45780910456) at `803bad1e65f` is **green on all
+three legs** — `ubuntu-24.04` 1m51s, `macos-15` 3m45s, `windows-2022` 2m45s — with the test that reddened
+taking 26,610 ms and passing, against 33,065 ms and a 30 s cap on the red run. The two earlier dispatches
+agree (`45779423920` at `12957a82e44`: green, the same test at 34,636 ms), which is also the measurement
+that says how thin the old 30 s margin was: the same test on the same runner has now taken 26.6 s, 33.1 s
+and 34.6 s.
