@@ -900,7 +900,7 @@
           "cancel": "Cancel",
           "ejectConfirm": "Eject",
           "leaveTitle": "Leave the mesh",
-          "leaveDescription": "This computer stops listing the mesh’s members and leaves it. The pairings with each member stay, and every member keeps its own copy.",
+          "leaveDescription": "This computer leaves the group and drops its pairings with the members: each one is told, and this computer forgets the reach in both directions. Pairings with machines outside the group are untouched.",
           "leaveConfirm": "Leave mesh",
           "unavailable": "This build cannot reach the host mesh.",
           "invalidRequest": "Orca sent the mesh an incomplete request.",
