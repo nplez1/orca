@@ -43,7 +43,6 @@ import { USAGE_CREDENTIAL_METHODS } from './accounts/usage-credentials'
 import { PREFLIGHT_METHODS } from './preflight/preflight'
 import { COMPUTER_METHODS } from './computer/computer'
 import { SESSION_TAB_METHODS } from './session-tabs/session-tabs'
-import { SESSION_SUMMARY_RPC_METHODS } from './session-summary'
 import { NATIVE_CHAT_METHODS } from './native-chat/native-chat'
 import { FILE_METHODS } from './files/files'
 import { GIT_METHODS } from './source-control/git/git'
@@ -71,7 +70,6 @@ import { PLUGIN_INSTALL_METHODS } from './plugins/plugin-install-methods'
 import { SKILL_METHODS } from './skills/skills'
 import { CLIPBOARD_METHODS } from './clipboard/clipboard'
 import { HOST_CAPABILITY_METHODS } from './host-management/host-capabilities'
-import { HOST_SETTINGS_METHODS } from './host-settings'
 import { MOBILE_WEB_BUNDLE_METHODS } from './mobile-delivery/mobile-web-bundle'
 import { RUNTIME_CLIENT_CAPABILITY_METHODS } from './client-events/runtime-client-capabilities'
 import { EMULATOR_METHODS } from './emulator/emulator'
@@ -119,7 +117,6 @@ import { BOT_IMPORT_METHODS } from './bots-import'
 import { BOT_SHARE_METHODS } from './bots-share'
 import { BOT_SHARE_RECEIVE_METHODS } from './bots-share-receive'
 import { BOT_CONNECTORS_METHOD } from './bots-connectors'
-import { BOT_PHOTON_METHODS } from './bots-photon'
 import { BOT_TOOLS_METHODS } from './bots-tools'
 import { BOT_TOOLS_HOST_MCP_METHODS } from './bots-tools-host-mcp'
 import { BOT_TOOLS_OWNED_SIGN_IN_METHODS } from './bots-tools-owned-sign-in'
@@ -179,7 +176,6 @@ const BOT_RPC_METHODS = [
   ...BOT_LINEAR_METHODS,
   ...BOT_GITHUB_METHODS,
   ...BOT_CONNECT_METHODS,
-  ...BOT_PHOTON_METHODS,
   ...BOT_LOOK_AROUND_METHODS,
   ...BOT_TIDY_UP_METHODS,
   ...BOT_WORK_METHODS,
@@ -237,7 +233,6 @@ const SERVICE_RPC_METHODS = [
   ...PREFLIGHT_METHODS,
   ...COMPUTER_METHODS,
   ...SESSION_TAB_METHODS,
-  ...SESSION_SUMMARY_RPC_METHODS,
   ...WORKSPACE_LAYOUT_METHODS,
   // Switch point: a window-owned build registers no layout command.
   ...(ORCA_LAYOUT_OWNER_IS_MAIN ? [...LAYOUT_APPLY_METHODS, ...LAYOUT_VIEW_REPORT_METHODS] : []),
@@ -265,7 +260,6 @@ const SERVICE_RPC_METHODS = [
   ...SKILL_METHODS,
   ...CLIPBOARD_METHODS,
   ...HOST_CAPABILITY_METHODS,
-  ...HOST_SETTINGS_METHODS,
   ...MOBILE_WEB_BUNDLE_METHODS,
   ...RUNTIME_CLIENT_CAPABILITY_METHODS,
   ...CLIENT_EVENT_METHODS,

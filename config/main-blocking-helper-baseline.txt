@@ -89,7 +89,7 @@
 3 src/main/bots/bot-tool-details.ts # +1 botToolDetailsOf: readBotToolDetails split so the host MCP list masks one id-keyed read
 3 src/main/bots/bot-tool-secret-scrub.ts
 3 src/main/bots/bot-tools-claude.ts # claudeOwnServerNames: one read of the account config for its user and per-folder servers, once per chat launch that has host servers
-21 src/main/bots/bot-tools-file.ts # +1 changeBotToolEntries: the same tools-file write changeBotToolServers now wraps, adding per-server extra keys; +1 botOwnTools and changeSnapshot: one credential store read per list and write instead of one per row
+22 src/main/bots/bot-tools-file.ts # +1 botLaunchExtras: the fork launch env (gh shim on PATH, GitHub App credentials) reads the credential store at launch; +1 changeBotToolEntries: the same tools-file write changeBotToolServers now wraps, adding per-server extra keys; +1 botOwnTools and changeSnapshot: one credential store read per list and write instead of one per row
 14 src/main/bots/bot-tools-host.ts # +1 botOwnTools and botToolCredentialsReader: one credential store read per tools list and check instead of one per row
 4 src/main/bots/bot-tools-removal.ts
 5 src/main/bots/bot-tools-sign-in.ts
@@ -1575,3 +1575,13 @@
 13 src/shared/shell/command-resolution/node-cli-command-resolution.ts
 1 src/shared/shell/command-resolution/nvm-version-directories.ts
 1 src/shared/shell/launch/startup-command-staging.ts
+2 src/main/github/app/github-app-connection.ts # connect/disconnect once per user action; the only sync step is writeSecureFileAsync's fenced renameSync inside src/shared
+1 src/main/github/app/github-app-credentials.ts # same write path as the connection above: writeSecureFileAsync, whose sync step is shared hardening
+1 src/main/webhooks/local/local-webhook-listener.ts # once per start, publishing the endpoint file: writeSecureFileAsync's only synchronous step on POSIX is its publishing renameSync, and on win32 the helper is wholly synchronous — nothing here runs per delivery
+1 src/main/webhooks/local/local-webhook-store.ts # per delivery, twice (the body, then the index): writeSecureFileAsync has no fence check here, so on POSIX only its publishing renameSync blocks; on win32 the helper writes, chmods and fsyncs synchronously, so both are blocking durable writes
+1 src/main/bots/photon/photon-cursor.ts # per delivery and per turn end, through writePhotonJson: on POSIX only writeSecureFileAsync's publishing renameSync blocks, and on win32 the helper writes, chmods and fsyncs synchronously; every read here is node:fs/promises, and LOCAL-PATCHES § `local(bots)` carries the measurement
+1 src/main/bots/photon/photon-files.ts # per delivery and per turn end, through writePhotonJson: on POSIX only writeSecureFileAsync's publishing renameSync blocks, and on win32 the helper writes, chmods and fsyncs synchronously; every read here is node:fs/promises, and LOCAL-PATCHES § `local(bots)` carries the measurement
+1 src/main/bots/photon/photon-inbox.ts # per delivery and per turn end, through writePhotonJson: on POSIX only writeSecureFileAsync's publishing renameSync blocks, and on win32 the helper writes, chmods and fsyncs synchronously; every read here is node:fs/promises, and LOCAL-PATCHES § `local(bots)` carries the measurement
+1 src/main/bots/photon/photon-outbox.ts # per delivery and per turn end, through writePhotonJson: on POSIX only writeSecureFileAsync's publishing renameSync blocks, and on win32 the helper writes, chmods and fsyncs synchronously; every read here is node:fs/promises, and LOCAL-PATCHES § `local(bots)` carries the measurement
+2 src/main/bots/photon/photon-store.ts # per delivery and per turn end, through writePhotonJson: on POSIX only writeSecureFileAsync's publishing renameSync blocks, and on win32 the helper writes, chmods and fsyncs synchronously; every read here is node:fs/promises, and LOCAL-PATCHES § `local(bots)` carries the measurement
+1 src/main/bots/photon/photon-thread-map.ts # per delivery and per turn end, through writePhotonJson: on POSIX only writeSecureFileAsync's publishing renameSync blocks, and on win32 the helper writes, chmods and fsyncs synchronously; every read here is node:fs/promises, and LOCAL-PATCHES § `local(bots)` carries the measurement

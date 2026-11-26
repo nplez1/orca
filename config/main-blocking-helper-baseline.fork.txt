@@ -17,20 +17,15 @@
 # upstream's own bounded readers and secure writers, so these files are charged for helpers the fork already
 # depends on. The store is synchronous on purpose: a snapshot is rendered from it, and the file is a few hundred
 # bytes. Evidence: LOCAL-PATCHES.md § local(hosts).
-1 src/main/host-graph/host-graph-local-adjacency.ts
-2 src/main/host-graph/host-graph-self-identity.ts
-1 src/main/host-mesh/host-mesh-driver.ts
-1 src/main/host-mesh/host-mesh-rpc-service.ts
-3 src/main/host-mesh/host-mesh-runtime-deps.ts
-1 src/main/host-mesh/host-mesh-startup.ts
-18 src/main/host-mesh/host-mesh-store.ts
-# This is a RATCHET: counts may only go DOWN. Prune: node config/scripts/static-analysis/ratchets/runtime-lifecycle/check-main-blocking-helper-ratchet.mjs --prune
 1 src/main/agent-hooks/first-work/first-work-folder-rename.ts
 1 src/main/agent-hooks/installation/commands/managed-hook-command-matching.ts
 1 src/main/agent-hooks/official-orca-profile.ts
 1 src/main/agent-hooks/server/pi-claude-child-parent-marker.ts
 2 src/main/agent-hooks/server/server-status-hook-lifecycle.ts
 1 src/main/agent-hooks/server/server-status-update.ts
+7 src/main/agent-launch/trust/agent-trust-presets.ts
+4 src/main/agent-launch/trust/agent-workspace-trust.ts
+11 src/main/agent-launch/trust/execution-host-workspace-trust.ts
 0 src/main/ai-vault-search/storage/session-search-schema.ts
 12 src/main/ai-vault/parse-cache/session-parse-cache-database.ts
 1 src/main/antigravity/hooks-json-bundle.ts
@@ -42,6 +37,7 @@
 3 src/main/claude-accounts/claude-oauth-credential-store.ts
 24 src/main/claude-accounts/claude-oauth-pending-rotations.ts
 12 src/main/claude-accounts/claude-oauth-token-refresh.ts
+12 src/main/claude/configuration/claude-folder-trust-file.ts
 4 src/main/claude/hooks/hook-settings.ts
 7 src/main/codex/hooks/installation/codex-hook-managed-strip.ts
 1 src/main/codex/hooks/installation/codex-hook-remote-install.ts
@@ -49,7 +45,10 @@
 13 src/main/codex/hooks/reconciliation/codex-real-home-hook-install.ts
 5 src/main/codex/hooks/reconciliation/codex-real-home-hook-sweep.ts
 2 src/main/codex/structured/launch/codex-structured-orca-hooks-off.ts
+13 src/main/codex/trust/hooks/codex-hook-hash-lookup.ts
+1 src/main/codex/trust/hooks/codex-hook-trust-derivation.ts
 16 src/main/codex/trust/hooks/hook-trust-promotion.ts
+0 src/main/codex/trust/toml/config-toml-project-trust.ts
 17 src/main/codex/trust/toml/config-toml-trust.ts
 8 src/main/command-code/hook-service.ts
 1 src/main/composio/composio-key-store.ts
@@ -74,10 +73,16 @@
 23 src/main/ephemeral-vm/runtime-service.ts
 1 src/main/fireworks/fireworks-credentials-store.ts
 2 src/main/floating-workspace-launch-directory.ts
-9 src/main/gemini/hook-service.ts
 1 src/main/grok/grok-hook-config-cleanup.ts
 1 src/main/grok/grok-hook-config.ts
 12 src/main/home-directory-migration.ts
+1 src/main/host-graph/host-graph-local-adjacency.ts
+2 src/main/host-graph/host-graph-self-identity.ts
+1 src/main/host-mesh/host-mesh-driver.ts
+1 src/main/host-mesh/host-mesh-rpc-service.ts
+3 src/main/host-mesh/host-mesh-runtime-deps.ts
+1 src/main/host-mesh/host-mesh-startup.ts
+18 src/main/host-mesh/host-mesh-store.ts
 5 src/main/host-sync/host-settings-api-key-ports.ts
 1 src/main/host-sync/host-settings-credential-ports.ts
 7 src/main/host-sync/host-settings-jenkins-port.ts
@@ -90,6 +95,7 @@
 16 src/main/ipc/filesystem/access/filesystem-auth.ts
 1 src/main/ipc/filesystem/filesystem-path-search-handler.ts
 1 src/main/ipc/filesystem/search/filesystem-search-handlers.ts
+5 src/main/ipc/filesystem/source-control/filesystem-git-status-handlers.ts
 2 src/main/ipc/filesystem/workspace-path-index-ipc.ts
 6 src/main/ipc/jenkins.ts
 1 src/main/ipc/pty/host-env/spawn-cwd.ts
@@ -116,19 +122,20 @@
 1 src/main/kiro/hook-settings.ts
 1 src/main/minimax/minimax-api-key-store.ts
 1 src/main/muse/hook-settings.ts
-0 src/main/native-chat/transcript-read-cache.ts
-0 src/main/native-chat/transcript-reader.ts
-0 src/main/native-chat/transcript-tail-reader.ts
-0 src/main/native-chat/transcript-watch.ts
+1 src/main/native-chat/transcript-filesystem/wsl-transcript-fs-access.ts
 1 src/main/native-chat/wsl-transcript-gated-fs.ts
+0 src/main/network/macos-tailscale-dns-diagnostic.ts
 1 src/main/opencode/accounts/opencode-go-api-key-store.ts
 10 src/main/orcad/credentials/orcad-plaintext-credential-migration.ts
 1 src/main/perf-notices/perf-notice-signals.ts # the fork's getWorktreePathSettings probes readdirSync in ipc/project-folder-placement.ts
 7 src/main/pi/managed-extensions/titlebar-extension-service.ts
 1 src/main/project-folder-relocation.ts
-3 src/main/providers/accounts/provider-account-services.ts
+1 src/main/providers/accounts/provider-account-services.ts
+5 src/main/providers/local-pty/local-pty-spawn.ts
 2 src/main/rate-limits/fork/claude-cli-usage-probe.ts
 2 src/main/rate-limits/providers/claude/claude-active-usage-fetch.ts
+7 src/main/rate-limits/providers/codex/codex-fetcher.ts
+0 src/main/rate-limits/providers/codex/codex-rpc-rate-limit-probe.ts
 1 src/main/rate-limits/service/rate-limit-service.ts
 3 src/main/runtime/orca-runtime-get-status.ts
 12 src/main/runtime/orchestration/db/orchestration-db.ts
@@ -145,6 +152,12 @@
 1 src/main/speech/openai-compatible-speech-provider-store.ts
 2 src/main/startup/main-process-ipc-bootstrap.ts
 2 src/main/startup/open-routing/os-opened-documents.ts
+1 src/main/text-generation/execution/source-control-local-process.ts
+0 src/main/text-generation/execution/source-control-remote-generation.ts
+0 src/main/text-generation/failures/kimi-generation-failure.ts
+0 src/main/text-generation/failures/source-control-agent-failure.ts
+0 src/main/text-generation/models/commit-message-model-discovery-policy.ts
+3 src/main/text-generation/models/commit-message-model-discovery.ts
 1 src/main/window/main-window/main-window-visual-lifecycle.ts
 2 src/main/window/ui-hang-window-observer.ts
 2 src/main/workspace-path-index/workspace-path-index-runtime.ts
