@@ -161,3 +161,16 @@
 1 src/shared/ephemeral-vm-recipe-extend-runner.ts
 1 src/shared/managed-pi-extension-file.ts
 6 src/shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-doctor.ts
+
+# local(bots): the Discord channel's six store modules write through the same sanctioned helper the photon
+# and local-webhook stores do, so they are charged for `writeSecureFileAsync`'s publishing `renameSync`, which
+# is synchronous on purpose so a sign-out's clear cannot land between the check and the publish. One row per
+# module — the identical shape LOCAL-PATCHES § `local(lint)`: the iMessage channel's work records for the
+# same helper — and every read in all six is `node:fs/promises`, so `check:main-sync-fs-ratchet` charges them
+# nothing. Evidence: LOCAL-PATCHES.md § `local(bots)`: a Discord channel with no Orca account.
+1 src/main/bots/discord-direct/discord-files.ts
+1 src/main/bots/discord-direct/discord-inbox.ts
+1 src/main/bots/discord-direct/discord-outbox.ts
+1 src/main/bots/discord-direct/discord-secrets.ts
+1 src/main/bots/discord-direct/discord-store.ts
+1 src/main/bots/discord-direct/discord-thread-map.ts

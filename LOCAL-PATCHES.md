@@ -6334,3 +6334,45 @@ upstream sync:
 Both are declared in `local/lint-known-red.json` with that reason, in the same commit, which is what that file
 is for. The debt is named rather than hidden: `local/checks/host-mesh-upstream-seams.mjs` will keep the
 upstream surface small either way, and the next person to touch these files should take the split first.
+
+### `local(bots)`: a Discord channel with no Orca account
+
+The design is `local/design/discord-channel.md`; this records what shipped, its anchors, and what it could
+not prove. Slack, Linear and GitHub all route through Orca Cloud, so a host signed out of it cannot be talked
+to at all; iMessage answered that for one channel with the owner's own Photon credentials, and this is the
+second. Discord is outbound — a bot connects to its gateway WebSocket, needs no public endpoint, no tunnel
+and no relay — which is the only shape an inbound channel can have on a host that listens on nothing.
+
+**All of it is new code under `src/main/bots/discord-direct/`**, named so an upstream cloud Discord connector
+a syncs into this feature in as few lines as possible: `discord-contract.ts` (the protocol tables, each value
+citing the page it came from), `discord-gateway.ts` (heartbeat with jitter and zombie detection, identify with
+three non-privileged intents, resume with a sequence number, the close-code table), `discord-rest.ts`,
+`discord-chunk.ts`, `discord-store.ts`, `discord-thread-map.ts`, `discord-inbox.ts`, `discord-outbox.ts`,
+`discord-secrets.ts` and `discord-files.ts`, with 14 test files and a scripted fake gateway beside them.
+
+**Hand-rolled on `ws`, deliberately.** `ws` is already a dependency, already a packaged runtime root, and
+already used in main. `discord.js` would add `@discordjs/ws`, `@discordjs/rest`, `undici` and optional native
+codecs — each another packaged root, and a release has already broken once on a missing root — while caching
+every guild in memory. The state machine this needs is about 350 lines.
+
+**The failure table is the code**: a rejected token (`4004`) and a REST `401` stop with zero retries, because
+retrying is how an IP gets banned; `429` waits `ceil(retry_after × 1000)` and a `global` 429 blocks every
+route for that token; a gateway with no ACK closes `4000` and **resumes** rather than re-identifying, because
+the identify budget is 1000/day. A mid-turn disconnect does not affect the turn, which runs in Orca, so the
+answer waits in the outbox.
+
+**What the fork's own gates made this patch change.** `check:main-blocking-helper-ratchet` charges every
+caller of `writeSecureFileAsync`, so six rows went into `config/main-blocking-helper-baseline.fork.txt` — one
+per store module, with the reason — rather than into upstream's baseline or into a refactor that would dodge
+the sanctioned writer. Every read in all six is `node:fs/promises`, so `check:main-sync-fs-ratchet` charges
+them nothing. `check:code-quality:changed` and the targeted tests are green; the full unit gate is not needed
+for the code path, but the baseline row is a **global input**, so the PR carries the release gate's verdict.
+
+**What is not proven, and cannot be from here.** No bot token existed, so no live handshake, no real
+`MESSAGE_CREATE` and no real `429` was ever observed: the gateway is tested against a scripted socket, REST
+against a fake `fetch`, and the protocol constants are transcribed from Discord's documentation rather than a
+capture. The multipart upload framing is the documented field shape, unexercised. `MESSAGE_CONTENT` is
+deliberately not requested — requiring it would make setup an application review queue instead of a paste —
+so the cost, stated on the owner's card, is that a follow-up in a thread has to mention the bot. The first
+real run should be a throwaway bot on a private server: DM it, mention it in a channel, watch the thread,
+reply, then reset the token and watch the card say it is invalid.
