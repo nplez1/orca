@@ -6287,8 +6287,8 @@ because discovery without the group gives you a fleet you cannot act on, and the
 cannot tell you which machines exist.
 
 **Upstream surface: 42 lines across 9 files.** The register is `local/checks/host-mesh-upstream-seams.mjs`,
-which is wired into `local/gate-lint.mjs`; it fails when an upstream-owned file is touched without being
-declared there, or when a seam grows past its metres. Per-seam resolution notes are in
+which is wired into `local/gate-lint.mjs`; it fails when a declared seam grows past its budget, and reports an
+upstream-owned file it does not declare as a note. Per-seam resolution notes are in
 `local/design/host-mesh.md` § Upstream sync surface. Nothing above upstream's code: the fork's own
 `check-upstream-file-comments` ratchet measured 162 of 233 sync conflicts coming from exactly that, so this
 patch adds **zero** fork comment lines to upstream files — the register lives here and in the design note.
@@ -6334,3 +6334,29 @@ upstream sync:
 Both are declared in `local/lint-known-red.json` with that reason, in the same commit, which is what that file
 is for. The debt is named rather than hidden: `local/checks/host-mesh-upstream-seams.mjs` will keep the
 upstream surface small either way, and the next person to touch these files should take the split first.
+
+**Why an undeclared upstream file is a note for another feature and a red for this one (2026-11-26).** The
+register was failing on _any_ upstream-owned file a diff touched, and `local/gate-lint.mjs` runs it on every pull
+request, so from #466's merge the lint gate was red on every branch that fixes an upstream bug — the first one
+to run was #471 (`nplez1/issue-96-empty-tabs-state`), whose eight upstream files are a workspace state fix and
+not the host group at all. A register cannot demand declarations from features it does not describe, so the
+refusal is now scoped to a diff that touches this feature's own code: a `host-mesh`, `host-graph` or `host-group`
+path segment that upstream's tree does not have and that is not under `local/` (the ledgers are not shipped code,
+and the measured surface ignores them already). That is the only evidence available that a branch is hosts
+work, and such a diff still reds on an upstream file it has not declared — the sprawl the check exists to catch —
+while another feature's upstream edits are notes. A declared seam over budget fails hard either way.
+
+Three limits worth knowing. A sync **never** derives that strictness, because a sync's diff is upstream's own
+work and its resolution touches feature files routinely — `--strict` is how a sync, or a seam-only change
+carrying no feature file, is judged. Budgets and seams are measured **per diff**, not cumulatively, so a later
+branch can spend a seam's budget again: the register bounds one branch's sprawl, not the fork's total. And the
+first cut of this fix keyed on three directory prefixes, which missed `src/shared/host-mesh/`,
+`src/main/ipc/host-graph/`, `src/cli/specs/host-mesh.ts` and the renderer's `host-group/` directory — the join
+with upstream ownership is what makes a segment check safe, since `host-groups` is one of upstream's own file
+names.
+
+Evidence: `node local/checks/host-mesh-upstream-seams.mjs --base origin/main` on #471's tree reported 8 upstream
+files / 158 lines and exit 1 before, exit 0 after, `--strict` still 1; and the check's own suite builds a fixture
+where a fork-owned `src/shared/host-mesh/` commit plus an undeclared upstream file is a problem, while the same
+diff carrying the sync-base record is not. The same change fixes a latent crash: the verbose listing read
+`seam.budget` for every touched file, which no run reached while an undeclared file exited first.

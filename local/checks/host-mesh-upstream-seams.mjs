@@ -16,14 +16,26 @@
  * measured, so the next person adding one to a fork-owned file instead is the easy path and adding it here is
  * the deliberate one.
  *
- * Usage: node local/checks/host-mesh-upstream-seams.mjs [--base <ref>] [--quiet]
- * Exit: 0 pass, 1 the surface grew or an undeclared upstream file is touched, 2 the base or the upstream
- * ruler could not be resolved here — a clone that cannot answer must not pass.
+ * Why an undeclared upstream file is a note for another feature and a red for this one: this register governs
+ * ONE feature's surface, and `local/gate-lint.mjs` runs it on every pull request. Failing on any upstream-owned
+ * file a diff touches made the lint gate red for every branch that fixes an upstream bug — #471's workspace fix
+ * touches eight such files and is not the host group at all. So the refusal is scoped to a diff that touches the
+ * feature's own files (a `host-mesh` or `host-graph` path upstream does not have), which is the only evidence
+ * available that this is hosts work: such a diff still reds on an upstream file it has not declared, which is the
+ * sprawl this check exists to catch, while another feature's upstream edits are reported as notes. `--strict`
+ * forces that red for a diff carrying no feature file of its own (a seam-only fix), a sync never derives it — its
+ * diff is upstream's own work — and the budget of a declared seam fails hard either way.
+ *
+ * Usage: node local/checks/host-mesh-upstream-seams.mjs [--base <ref>] [--strict] [--quiet]
+ * Exit: 0 pass, 1 a declared seam outgrew its budget, or an undeclared upstream file was touched by this feature's
+ * own diff (or under --strict); 2 the base or the upstream ruler could not be resolved here — a clone that cannot
+ * answer must not pass.
  */
 import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import { resolvePullRequestDiffBase } from '../../config/scripts/git/pr-diff-base/git-pull-request-diff-base.mjs'
 import {
+  SYNC_BASE_RECORD,
   commitExists,
   commitHasPath,
   fetchCommandFor,
@@ -198,17 +210,61 @@ export function measureSurface(base, root = ROOT) {
   return touched
 }
 
-/** Every way the surface can be wrong, as lines to print. */
-export function auditSurface(touched) {
+/**
+ * The feature's own path segment. A diff touching one of these is that feature's PR — its fork-owned code is what
+ * tells it apart from a branch fixing an upstream bug — so an upstream file such a diff does not declare is the
+ * sprawl this register exists to catch. `host-groups` (upstream's own file name) does not match: the segment ends
+ * the name or is followed by a separator.
+ */
+const FEATURE_SEGMENT = /(?:^|[/\\])(?:host-mesh|host-graph|host-group)(?:$|[-./\\])/
+
+/** Every path the diff changes, before the upstream-ownership filter — the feature's own files are fork-owned. */
+export function changedPaths(base, root = ROOT) {
+  return git(['diff', '--name-only', `${base}..HEAD`], root)
+    .trim()
+    .split('\n')
+    .filter(Boolean)
+}
+
+/** Whether a changed path is one of this feature's own files, which upstream's tree answers: absent there, ours. */
+export function isFeaturePath(changed, isUpstreamOwned) {
+  // `local/` is the fork's own ledgers — this register and its design note — not code the feature ships, and
+  // measureSurface skips it, so judging strictness by it could only add reds no seam could ever satisfy.
+  return !changed.startsWith('local/') && FEATURE_SEGMENT.test(changed) && !isUpstreamOwned(changed)
+}
+
+/**
+ * Whether a diff is this feature's own work, which is what makes an undeclared upstream file a red rather than a
+ * note. `--strict` overrides it for a diff carrying no feature file of its own (a seam-only change), and a sync
+ * never derives it: a sync's diff is upstream's own work, so the feature's files inside it say nothing about what
+ * this feature declares.
+ */
+export function resolveStrict(paths, { strictFlag = false, isUpstreamOwned = () => false } = {}) {
+  if (strictFlag) {
+    return true
+  }
+  if (paths.includes(SYNC_BASE_RECORD)) {
+    return false
+  }
+  return paths.some((changed) => isFeaturePath(changed, isUpstreamOwned))
+}
+
+/** Every way the surface can be wrong, as lines to print, and the undeclared files it only reports. */
+export function auditSurface(touched, { strict = false } = {}) {
   const declared = new Map(SEAMS.map((seam) => [seam.path, seam]))
   const problems = []
+  const notes = []
   for (const entry of touched) {
     const seam = declared.get(entry.path)
     if (seam === undefined) {
-      problems.push(
-        `${entry.path}: an upstream file this feature has no declared seam for (${entry.lines} line(s)).\n` +
-          '  Move the code into a fork-owned file, or declare the seam here and in LOCAL-PATCHES.md.'
-      )
+      const line = `${entry.path}: an upstream file this register does not declare (${entry.lines} line(s)).`
+      if (strict) {
+        problems.push(
+          `${line}\n  Move the code into a fork-owned file, or declare the seam here and in LOCAL-PATCHES.md.`
+        )
+      } else {
+        notes.push(line)
+      }
       continue
     }
     if (entry.lines > seam.budget) {
@@ -218,21 +274,29 @@ export function auditSurface(touched) {
       )
     }
   }
-  return problems
+  return { problems, notes }
 }
 
 function main(argv) {
   const verbose = !argv.includes('--quiet')
+  let base
   let touched
+  let strict
   try {
-    touched = measureSurface(resolveBase(argv))
+    base = resolveBase(argv)
+    touched = measureSurface(base)
+    const ruler = resolveUpstreamRuler()
+    strict = resolveStrict(changedPaths(base), {
+      strictFlag: argv.includes('--strict'),
+      isUpstreamOwned: (changed) => commitHasPath(ROOT, ruler, changed)
+    })
   } catch (error) {
     // Why an exit code and one line: a gate that cannot resolve its ruler must say so, not print a stack
     // whose last line is the only thing the lint gate's summary can quote.
     console.error(`host-mesh seams: ${error.message}`)
     process.exit(2)
   }
-  const problems = auditSurface(touched)
+  const { problems, notes } = auditSurface(touched, { strict })
   if (problems.length > 0) {
     for (const problem of problems) {
       console.error(problem)
@@ -243,11 +307,18 @@ function main(argv) {
   if (verbose) {
     const total = touched.reduce((sum, entry) => sum + entry.lines, 0)
     console.log(
-      `host-mesh seams: ${touched.length} upstream file(s), ${total} line(s) — all declared and within budget`
+      `host-mesh seams: ${touched.length} upstream file(s), ${total} line(s), every declared seam within budget` +
+        `${strict ? ' (undeclared files counted as reds)' : ''}`
     )
     for (const entry of touched) {
       const seam = SEAMS.find((candidate) => candidate.path === entry.path)
+      if (seam === undefined) {
+        continue
+      }
       console.log(`  ${String(entry.lines).padStart(3)}/${seam.budget}  ${entry.path}`)
+    }
+    for (const note of notes) {
+      console.log(`  note: ${note}`)
     }
   }
 }

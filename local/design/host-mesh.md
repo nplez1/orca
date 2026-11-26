@@ -134,8 +134,9 @@ run happens, a group is proven on one network and unproven across two.
 ## Upstream sync surface
 
 This feature is 10k lines, and 42 of them are in files upstream owns. That ratio is deliberate and it is
-checked: `node local/checks/host-mesh-upstream-seams.mjs` (wired into `local/gate-lint.mjs`) fails when an
-upstream-owned file is touched without being declared, or when a declared seam grows past its budget.
+checked: `node local/checks/host-mesh-upstream-seams.mjs` (wired into `local/gate-lint.mjs`) fails when a
+declared seam grows past its budget, and reports an upstream file it does not declare as a note — `--strict`
+is for this feature's own branches, where that note is the sprawl the check was built to catch.
 
 | Upstream file                                                        | Lines | What it is                                                          | If a sync conflicts                                                                                                                                                             |
 | -------------------------------------------------------------------- | ----- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -165,5 +166,9 @@ Rules this follows, each learned the expensive way:
   the preload bridge through `fork-preload-api.ts`, strings through `i18n/fork/en.json`. A sync never has to
   reconcile those.
 
-Verification for a sync: `node local/checks/host-mesh-upstream-seams.mjs` and
-`node local/check-upstream-file-comments.mjs` both green, then `pnpm test src/main/host-mesh src/shared/host-mesh`.
+Verification for a sync: `node local/checks/host-mesh-upstream-seams.mjs` (every declared seam still within
+budget) and `node local/check-upstream-file-comments.mjs` (the fork-comment baseline re-measured) both green,
+then `pnpm test src/main/host-mesh src/shared/host-mesh`. This feature's own branches are judged strictly without
+a flag — a diff touching a fork-owned `host-mesh`/`host-graph`/`host-group` path must declare every upstream file
+it touches. A sync never derives that, because its diff is upstream's own work, so `--strict` is how a sync or a
+seam-only change is judged by the same rule.

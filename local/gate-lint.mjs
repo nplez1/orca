@@ -210,6 +210,9 @@ export const FORK_LINT_STEPS = [
   {
     // The host group's own seam register: how many lines it costs in upstream-owned files, and which ones.
     // Beside the comment ratchet above because the two answer the same question from opposite sides.
+    // It decides strictness from the diff itself (a branch touching this feature's own files must declare every
+    // upstream file it touches) because no flag here would ever be passed — #471's workspace fix touches eight
+    // upstream files and no feature file, and it is the diff case that has to stay green.
     id: 'check-host-mesh-upstream-seams',
     command: 'node local/checks/host-mesh-upstream-seams.mjs --base origin/main',
     argv: ['node', 'local/checks/host-mesh-upstream-seams.mjs', '--base', 'origin/main']
