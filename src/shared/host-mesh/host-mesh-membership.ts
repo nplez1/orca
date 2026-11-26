@@ -7,7 +7,7 @@ import {
   type HostMeshState,
   type HostMeshSyncPayload
 } from './host-mesh-contract'
-
+import { mergeHostMeshNames } from './host-mesh-names'
 /**
  * The group's rules, as a pure reducer.
  *
@@ -32,7 +32,8 @@ export function createHostMeshState(args: {
     selfKey: args.selfKey,
     members: [],
     tombstones: [],
-    links: { outbound: {}, inbound: {} }
+    links: { outbound: {}, inbound: {} },
+    names: {}
   }
 }
 
@@ -133,13 +134,15 @@ export function removeHostMeshMember(
   }
   const { [hostKey]: _outbound, ...outbound } = state.links.outbound
   const { [hostKey]: _inbound, ...inbound } = state.links.inbound
+  const { [hostKey]: _name, ...names } = state.names
   return {
     groupId: state.groupId,
     epoch: Math.max(state.epoch, args.epoch),
     selfKey: state.selfKey,
     members,
     tombstones,
-    links: { outbound, inbound }
+    links: { outbound, inbound },
+    names
   }
 }
 
@@ -153,7 +156,13 @@ export function leaveHostMeshGroup(state: HostMeshState, args: { epoch: number }
     // Why no self-tombstone: a tombstone naming this host is read as "this host was ejected", and one
     // written on the way out would make every future rejoin look like that. The members keep their own.
     tombstones: [],
-    links: { outbound: {}, inbound: {} }
+    links: { outbound: {}, inbound: {} },
+    // Why this host's own name survives: it is what the group calls this machine, and a rejoin would
+    // otherwise reintroduce it under a placeholder.
+    names:
+      state.names[state.selfKey] === undefined
+        ? {}
+        : { [state.selfKey]: state.names[state.selfKey] }
   }
 }
 
@@ -194,6 +203,16 @@ export function applyHostMeshSync(
       existing.publicKeyB64 = incoming.publicKeyB64
     }
   }
+  const names = mergeHostMeshNames(
+    state.names,
+    payload.names,
+    // Why the set: a peer may name a machine this group does not have, and a name for nothing is a row every host
+    // carries forever. A removed machine is left out too, or its name would come back with the next introduction.
+    new Set([
+      state.selfKey,
+      ...members.filter((member) => !removed.has(member.hostKey)).map((member) => member.hostKey)
+    ])
+  )
   const links: HostMeshLinkMatrix = {
     outbound: { ...state.links.outbound },
     inbound: { ...state.links.inbound }
@@ -213,12 +232,21 @@ export function applyHostMeshSync(
       links.inbound[hostKey] = normalizeInbound(inbound)
     }
   }
+  // Why the winning name is mirrored onto the member rows: an introduction carries `member.label`, so a row left
+  // holding the name it arrived with would reintroduce the machine under a name the group has already replaced.
+  for (const member of members) {
+    const name = names[member.hostKey]
+    if (name !== undefined) {
+      member.label = name.label
+    }
+  }
   return {
     ...state,
     epoch: Math.max(state.epoch, payload.epoch),
     members: members.filter((member) => !removed.has(member.hostKey)),
     tombstones,
-    links
+    links,
+    names
   }
 }
 

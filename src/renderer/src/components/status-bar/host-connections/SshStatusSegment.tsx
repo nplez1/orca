@@ -27,6 +27,7 @@ import {
 import { RuntimeHostStatusRow } from './RuntimeHostStatusRow'
 import { RelayedFleetStatusItems } from './RelayedFleetStatusItems'
 import { useRelayedFleetHosts } from './use-relayed-fleet-hosts'
+import { useHostMeshPairStatuses } from './use-host-mesh-pair-statuses'
 import { moreSshHostsLabel } from './ssh-status-segment-copy'
 import { SshHostFindPopover } from './SshHostFindPopover'
 import { splitSshStatusMenuRows } from './ssh-status-menu-rows'
@@ -74,6 +75,7 @@ export function SshStatusSegment(): React.JSX.Element | null {
     unsupportedPeerCount,
     refresh: refreshRelayed
   } = useRelayedFleetHosts()
+  const meshPairStatuses = useHostMeshPairStatuses(menuOpen)
 
   const projectHostIds = useMemo(
     () => new Set(repos.flatMap((repo) => (repo.connectionId ? [repo.connectionId] : []))),
@@ -261,6 +263,7 @@ export function SshStatusSegment(): React.JSX.Element | null {
             detail={runtimeHostConnectionDetail(host.remoteControl, t)}
             diagnostics={host.remoteControl}
             blocked={host.blocked}
+            meshStatus={meshPairStatuses.get(host.id) ?? null}
             onConnect={() => connectRuntimeHost(host.id)}
             onDisconnect={() => disconnectRuntimeHost(host.id)}
             onRecover={() => openRecovery(host)}
@@ -282,6 +285,7 @@ export function SshStatusSegment(): React.JSX.Element | null {
             detail={runtimeHostConnectionDetail(host.remoteControl, t)}
             diagnostics={host.remoteControl}
             blocked={host.blocked}
+            meshStatus={meshPairStatuses.get(host.id) ?? null}
             onConnect={() => connectRuntimeHost(host.id)}
             onDisconnect={() => disconnectRuntimeHost(host.id)}
             onRecover={() => openRecovery(host)}

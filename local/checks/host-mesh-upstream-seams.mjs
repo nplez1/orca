@@ -116,6 +116,36 @@ export const SEAMS = [
     path: 'src/cli/dispatch/remote-selection-scope.ts',
     budget: 2,
     why: 'one condition: a group is this host’s own membership, so remote routing would report another host'
+  },
+  {
+    path: 'src/shared/remote-runtime/host-store/runtime-environment-store-operations.ts',
+    budget: 7,
+    why: 'one re-export of the fork-owned runtime-environment-rename module, so the store’s command channel keeps one operations surface; the rename itself lives in the fork-owned file'
+  },
+  {
+    path: 'src/shared/remote-runtime/host-store/runtime-environment-store-command.ts',
+    budget: 2,
+    why: 'one command case, because every environment-store write is dispatched through this switch and a fork operation cannot be reached without one'
+  },
+  {
+    path: 'src/shared/remote-runtime/host-store/runtime-environment-store-worker-protocol.ts',
+    budget: 2,
+    why: 'one request variant and one success variant, the typed pair the switch above is checked against'
+  },
+  {
+    path: 'src/shared/remote-runtime/host-store/runtime-environment-store.ts',
+    budget: 10,
+    why: 'one async facade wrapper, so main calls the rename through the worker instead of touching the file itself'
+  },
+  {
+    path: 'src/renderer/src/components/status-bar/host-connections/RuntimeHostStatusRow.tsx',
+    budget: 10,
+    why: 'one import, one optional meshStatus prop and the glyph beside the name: the row is upstream’s, and the icon component, the hook and the status mapping are fork-owned files'
+  },
+  {
+    path: 'config/main-blocking-helper-baseline.txt',
+    budget: 1,
+    why: 'one baseline row for the fork-owned rename operation’s single store write; the ratchet charges the module that calls the helper, so the row has to live in upstream’s file'
   }
 ]
 

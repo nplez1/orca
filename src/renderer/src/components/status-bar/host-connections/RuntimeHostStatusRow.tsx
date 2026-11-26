@@ -20,6 +20,8 @@ import type {
   RuntimeHostBlockedCopy,
   RuntimeHostBlockedRecovery
 } from './remote-host-connection-status'
+import { MeshPairStatusIcon } from './MeshPairStatusIcon'
+import type { HostMeshPairStatus } from '../../../../../shared/host-mesh/host-mesh-contract'
 
 function runtimeStatusLabel(state: RuntimeHostConnectionState, t: Translate = translate): string {
   switch (state) {
@@ -150,6 +152,7 @@ export function RuntimeHostStatusRow({
   detail,
   diagnostics,
   blocked,
+  meshStatus,
   onConnect,
   onDisconnect,
   onRecover
@@ -158,6 +161,7 @@ export function RuntimeHostStatusRow({
   state: RuntimeHostConnectionState
   detail?: string
   diagnostics?: RemoteRuntimeSharedConnectionDiagnostics | null
+  meshStatus?: HostMeshPairStatus | null
   /** Set when the host refused this client; its copy replaces the transport state. */
   blocked?: (RuntimeHostBlockedCopy & { recovery: RuntimeHostBlockedRecovery | null }) | null
   onConnect?: () => Promise<void>
@@ -235,7 +239,10 @@ export function RuntimeHostStatusRow({
     <>
       <span aria-hidden="true" className={`size-1.5 shrink-0 rounded-full ${dotColor}`} />
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[12px] font-medium">{label}</div>
+        <div className="flex min-w-0 items-center gap-1 text-[12px] font-medium">
+          <span className="truncate">{label}</span>
+          {meshStatus ? <MeshPairStatusIcon status={meshStatus} /> : null}
+        </div>
         <div className="flex min-w-0 items-center gap-1.5 text-[10px] text-muted-foreground">
           <span>
             {t('auto.components.status.bar.SshStatusSegment.remote_server', 'Remote Server')}

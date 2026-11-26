@@ -38,7 +38,8 @@ function groupState(): HostMeshState {
         'key-b': { kind: 'awaitingOffer', requestedAtEpoch: 5, expiresAt: 900 }
       },
       inbound: { 'key-a': { kind: 'active' }, 'key-b': { kind: 'absent' } }
-    }
+    },
+    names: { 'key-a': { label: 'Studio', version: 2 } }
   }
 }
 
@@ -232,5 +233,49 @@ describe('the group on disk', () => {
     store().write(groupState())
 
     expect(store().readSettings().enabled).toBe(false)
+  })
+})
+
+describe('the names the group agreed on', () => {
+  beforeEach(() => {
+    testState.dir = mkdtempSync(join(tmpdir(), 'orca-mesh-store-names-'))
+  })
+  afterEach(() => {
+    rmSync(testState.dir, { recursive: true, force: true })
+  })
+
+  it('survives a write and read, so a rename is not undone by the next pass', () => {
+    store().write({ ...groupState(), names: { 'key-b': { label: 'Build mini', version: 3 } } })
+
+    expect(store().read()?.names).toEqual({ 'key-b': { label: 'Build mini', version: 3 } })
+  })
+})
+
+describe('a group written before names existed', () => {
+  beforeEach(() => {
+    testState.dir = mkdtempSync(join(tmpdir(), 'orca-mesh-store-legacy-'))
+  })
+  afterEach(() => {
+    rmSync(testState.dir, { recursive: true, force: true })
+  })
+
+  it('reads back with no names rather than as an unreadable file', () => {
+    // Why the file is written by hand: every build before this one wrote exactly this, and the reader has to accept it.
+    writeFileSync(
+      statePath(),
+      JSON.stringify({
+        version: 1,
+        state: {
+          groupId: 'group-1',
+          epoch: 7,
+          selfKey: 'key-self',
+          members: [{ hostKey: 'key-a', label: 'Studio', addedAtEpoch: 3 }],
+          tombstones: [],
+          links: { outbound: {}, inbound: {} }
+        }
+      })
+    )
+
+    expect(store().read()?.names).toEqual({})
   })
 })

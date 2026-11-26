@@ -39,13 +39,5 @@
     "2026-11-20 sync (upstream 0c6207e3d7): one whole-step entry for `check:code-quality:changed`, which cannot pass before `main` is pushed — E2BIG on the 2000-commit diff, see LOCAL-PATCHES.md § `local(lint)`: the 2026-11-20 sync's lint gate. It goes stale on the first run after `git push origin main`; prune it then. The three ratchets that arrived with this sync were closed in the tree and in two new `.fork.txt` overlays, not here."
   ],
   "recordedAt": "2026-11-26",
-  "entries": [
-    {
-      "step": "check-host-mesh-upstream-seams",
-      "match": "rpc-method-registry\\.ts",
-      "class": "foreign: a merge diff charges upstream's own rewrite to the fork",
-      "owner": "local(hosts)",
-      "evidence": "LOCAL-PATCHES.md § local(lint): the 2026-11-26 sync's lint gate. The step diffs merge-base(HEAD, origin/main)..HEAD, which on the 2026-11-26 merge commit is the whole upstream delta, so upstream's own 12+/6- rewrite of that file counts as the fork's seam. The fork's actual seam is the two lines the budget allows: `git diff 3e227259249 HEAD` on the file prints one FORK_RPC_METHODS import and one spread and nothing else. Goes stale at the next push, when the base is upstream rather than the fork's old tip — prune it then."
-    }
-  ]
+  "entries": []
 }

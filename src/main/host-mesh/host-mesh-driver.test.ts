@@ -180,7 +180,8 @@ class Mesh {
         return {
           environmentId,
           hostKey: offer.hostKey,
-          label: peer?.name ?? offer.hostKey
+          label: peer?.name ?? offer.hostKey,
+          namedHere: existing === undefined
         }
       },
       revokeMintedRow: (deviceId: string) => {
@@ -218,6 +219,16 @@ class Mesh {
       settings: () => host.settings,
       saveSettings: (settings) => {
         host.settings = settings
+      },
+      // The pairing store's name for a peer, which is what every surface reads.
+      renameEnvironment: async (environmentId, name) => {
+        const hostKey = host.environments.get(environmentId)
+        if (hostKey === undefined) {
+          return false
+        }
+        const changed = host.labels.get(hostKey) !== name
+        host.labels.set(hostKey, name)
+        return changed
       },
       requestOwnSync: () => {
         this.ownSyncs.push(host)
@@ -869,5 +880,82 @@ describe('refusals that keep a sealed box meaningful', () => {
 
     const reply = await studio.rpc.join(request, {})
     expect(reply).toEqual({ kind: 'refused', reason: 'offer-not-from-joiner' })
+  })
+})
+
+describe('renaming a machine for the group', () => {
+  /** The reported fleet: a studio that dials both work hosts, which is where placeholders come from. */
+  async function convergedFleet(): Promise<{
+    mesh: Mesh
+    studio: FakeHost
+    laptop: FakeHost
+    vm: FakeHost
+  }> {
+    const mesh = new Mesh()
+    const studio = mesh.add('studio')
+    const laptop = mesh.add('laptop')
+    const vm = mesh.add('vm')
+    mesh.seedPairingFromCaller(studio, laptop)
+    mesh.seedPairingFromCaller(studio, vm)
+    // The upgrade step: a group exists only once one host groups the pairings it already holds.
+    studio.driver.migrateFromPairings()
+    await studio.driver.sync()
+    await mesh.drainOwnSyncs()
+    return { mesh, studio, laptop, vm }
+  }
+
+  it('renames the pairing row here at once, and the other hosts’ rows on their next pass', async () => {
+    const { mesh, studio, laptop, vm } = await convergedFleet()
+
+    await studio.driver.renameMember(laptop.hostKey, 'Build mini')
+
+    // The host that renamed it owns a pairing row, so the new name shows without waiting for a pass.
+    const renamed = await studio.driver.snapshot()
+    expect(renamed.members.find((member) => member.hostKey === laptop.hostKey)?.label).toBe(
+      'Build mini'
+    )
+
+    // The third machine learns the name and renames its own pairing row with it — the repair nobody has to ask for.
+    await vm.driver.sync()
+    expect(vm.labels.get(laptop.hostKey)).toBe('Build mini')
+    await laptop.driver.sync()
+    await mesh.drainOwnSyncs()
+    expect(vm.labels.get(laptop.hostKey)).toBe('Build mini')
+  })
+
+  it('keeps the name that outranks a later seed from a machine that has not met the rename', async () => {
+    const { studio, laptop } = await convergedFleet()
+    await studio.driver.renameMember(laptop.hostKey, 'Build mini')
+    // A pass that seeds again from this host's own pairing name must not walk the rename back.
+    await studio.driver.sync()
+
+    const view = await studio.driver.snapshot()
+    expect(view.members.find((member) => member.hostKey === laptop.hostKey)?.label).toBe(
+      'Build mini'
+    )
+  })
+})
+
+describe('a name someone typed against one a pairing invented', () => {
+  it('keeps the typed name when the spoke’s own row holds its hostname', async () => {
+    const mesh = new Mesh()
+    const studio = mesh.add('studio')
+    const laptop = mesh.add('laptop')
+    // The hub is where the owner typed "Studio laptop"; the spoke's row for the hub is what a redemption wrote.
+    mesh.seedPairingFromCaller(studio, laptop)
+    studio.labels.set(laptop.hostKey, 'Studio laptop')
+    laptop.labels.set(studio.hostKey, 'studio.local')
+    studio.driver.migrateFromPairings()
+    await studio.driver.sync()
+    await mesh.drainOwnSyncs()
+
+    // The invented name must never walk the typed one back, on the hub or anywhere it reaches.
+    await laptop.driver.sync()
+    await mesh.drainOwnSyncs()
+    expect(studio.labels.get(laptop.hostKey)).toBe('Studio laptop')
+    const view = await studio.driver.snapshot()
+    expect(view.members.find((member) => member.hostKey === laptop.hostKey)?.label).toBe(
+      'Studio laptop'
+    )
   })
 })

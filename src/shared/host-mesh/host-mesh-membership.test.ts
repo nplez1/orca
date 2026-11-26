@@ -15,6 +15,7 @@ import {
   setHostMeshOutboundLink,
   summarizeHostMesh
 } from './host-mesh-membership'
+import { setHostMeshName } from './host-mesh-names'
 
 function emptyGroup(): HostMeshState {
   return createHostMeshState({ selfKey: 'key-self', groupId: 'group-1', epoch: 1 })
@@ -249,5 +250,120 @@ describe('leaving a group', () => {
     // A tombstone naming this host reads as "ejected", so writing one on the way out would make every
     // later rejoin look like that to itself.
     expect(left.tombstones).toEqual([])
+  })
+})
+
+describe('naming a machine for the group', () => {
+  function syncFrom(overrides: Partial<HostMeshSyncPayload> = {}): HostMeshSyncPayload {
+    return {
+      version: 1,
+      groupId: 'group-1',
+      epoch: 9,
+      selfKey: 'key-a',
+      publicKeyB64: 'pk-a',
+      members: [{ hostKey: 'key-b', label: 'Laptop', addedAtEpoch: 4 }],
+      tombstones: [],
+      links: {},
+      ...overrides
+    }
+  }
+
+  it('renames the member row, so an introduction carries the new name rather than the one it arrived with', () => {
+    const merged = applyHostMeshSync(
+      withMembers(['key-a', 'key-b']),
+      syncFrom({ names: { 'key-b': { label: 'Build mini', version: 2 } } })
+    )
+
+    expect(merged.members.find((member) => member.hostKey === 'key-b')?.label).toBe('Build mini')
+    expect(merged.names['key-b']).toEqual({ label: 'Build mini', version: 2 })
+  })
+
+  it('keeps a newer name when an older rename arrives from a machine that has not caught up', () => {
+    const named = setHostMeshName(withMembers(['key-a', 'key-b']), {
+      hostKey: 'key-b',
+      label: 'Build mini'
+    })
+    const merged = applyHostMeshSync(
+      named,
+      syncFrom({ names: { 'key-b': { label: 'Mesh host bbbb', version: 1 } } })
+    )
+
+    expect(merged.names['key-b']?.label).toBe('Build mini')
+  })
+
+  it('converges when two owners rename the same machine at the same version', () => {
+    const mine = setHostMeshName(withMembers(['key-a', 'key-b']), {
+      hostKey: 'key-b',
+      label: 'Studio B'
+    })
+    const theirs = setHostMeshName(withMembers(['key-a', 'key-b']), {
+      hostKey: 'key-b',
+      label: 'Studio A'
+    })
+
+    // Each host pulls the other's map: whichever word wins locally has to be the same one on both, or the
+    // fleet would keep its own answer forever and every host would look right only to itself.
+    const fromMine = applyHostMeshSync(theirs, syncFrom({ names: mine.names }))
+    const fromTheirs = applyHostMeshSync(mine, syncFrom({ names: theirs.names }))
+
+    expect(fromMine.names['key-b']?.label).toBe(fromTheirs.names['key-b']?.label)
+  })
+
+  it('reads a peer that predates naming as saying nothing, not as erasing a name', () => {
+    const named = setHostMeshName(withMembers(['key-a', 'key-b']), {
+      hostKey: 'key-b',
+      label: 'Build mini'
+    })
+    const merged = applyHostMeshSync(named, syncFrom({ names: undefined }))
+
+    expect(merged.names['key-b']?.label).toBe('Build mini')
+  })
+})
+
+describe('names arriving from a member', () => {
+  function syncFrom(names: HostMeshSyncPayload['names']): HostMeshSyncPayload {
+    return {
+      version: 1,
+      groupId: 'group-1',
+      epoch: 9,
+      selfKey: 'key-a',
+      publicKeyB64: 'pk-a',
+      members: [{ hostKey: 'key-b', label: 'Laptop', addedAtEpoch: 4 }],
+      tombstones: [],
+      links: {},
+      names
+    }
+  }
+
+  it('refuses a name for a machine this group does not have', () => {
+    const merged = applyHostMeshSync(
+      withMembers(['key-a']),
+      syncFrom({ 'key-stranger': { label: 'Not in this group', version: 9 } })
+    )
+
+    expect(merged.names['key-stranger']).toBeUndefined()
+  })
+
+  it('refuses a version no owner rename could ever outrank, and a label past the cap', () => {
+    const merged = applyHostMeshSync(
+      withMembers(['key-a', 'key-b']),
+      syncFrom({
+        'key-b': { label: 'Laptop', version: 1e308 },
+        'key-a': { label: 'x'.repeat(300), version: 3 }
+      })
+    )
+
+    expect(merged.names['key-b']).toBeUndefined()
+    expect(merged.names['key-a']).toBeUndefined()
+  })
+
+  it('refuses a prototype key rather than letting it become one', () => {
+    const polluted: Record<string, { label: string; version: number }> = JSON.parse(
+      '{"__proto__": {"label": "polluted", "version": 5}}'
+    )
+    const merged = applyHostMeshSync(withMembers(['key-a', 'key-b']), syncFrom(polluted))
+
+    expect(Object.getPrototypeOf(merged.names)).toBe(Object.prototype)
+    expect(Object.keys(merged.names)).toEqual([])
   })
 })

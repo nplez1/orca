@@ -8,6 +8,8 @@ export const hostMeshApi = {
     ipcRenderer.invoke('hostMesh:join', environmentId),
   remove: (hostKey: string): Promise<HostMeshSnapshot> =>
     ipcRenderer.invoke('hostMesh:remove', hostKey),
+  rename: (hostKey: string, label: string): Promise<HostMeshSnapshot> =>
+    ipcRenderer.invoke('hostMesh:rename', hostKey, label),
   leave: (): Promise<HostMeshSnapshot> => ipcRenderer.invoke('hostMesh:leave'),
   settings: (patch: Partial<HostMeshSettings>): Promise<HostMeshSnapshot> =>
     ipcRenderer.invoke('hostMesh:settings', patch)

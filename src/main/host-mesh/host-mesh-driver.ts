@@ -3,6 +3,9 @@ import { randomUUID } from 'node:crypto'
 import nacl from 'tweetnacl'
 import {
   HOST_MESH_JOIN_METHOD,
+  HOST_MESH_MAX_LABEL_CHARS,
+  HOST_MESH_NAME_DEFAULT_VERSION,
+  HOST_MESH_NAME_SEED_VERSION,
   HOST_MESH_OFFER_BACK_METHOD,
   HOST_MESH_OFFER_TTL_MS,
   HOST_MESH_PAYLOAD_VERSION,
@@ -12,6 +15,7 @@ import {
   HOST_MESH_REVERSE_OFFER_RETRY_MS,
   HOST_MESH_SYNC_METHOD,
   hostMeshPairStatus,
+  isHostMeshPlaceholderName,
   type HostMeshJoinReply,
   type HostMeshJoinRequest,
   type HostMeshMember,
@@ -42,6 +46,7 @@ import {
   setHostMeshOutboundLink,
   summarizeHostMesh
 } from '../../shared/host-mesh/host-mesh-membership'
+import { mergeHostMeshNames, setHostMeshName } from '../../shared/host-mesh/host-mesh-names'
 import { orcaHostKeyOf } from '../host-graph/host-graph-self-identity'
 import { createHostMeshStore, type HostMeshStore } from './host-mesh-store'
 import { createHostMeshWriteLock } from './host-mesh-write-lock'
@@ -139,6 +144,85 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
     }
   }
 
+  /** What the group calls this host, if it has ever been named. */
+  function selfName(state: HostMeshState): string | undefined {
+    return state.names[state.selfKey]?.label
+  }
+
+  /**
+   * What this host reports when it introduces or offers itself.
+   *
+   * Why the fallback is the hostname and not "this host": a recipient stores this string as the pairing's name, so
+   * "this host" would leave every machine that redeemed an offer from here with a row nobody can identify.
+   */
+  function myName(state: HostMeshState): string {
+    return selfName(state) ?? deps.labelForHostKey(selfKey()) ?? deps.selfLabel?.() ?? 'Orca host'
+  }
+
+  /**
+   * Names the group has for its members, this host's own included — the seed a peer reads on its next pull.
+   *
+   * Why a seed is derived here and not stored at pairing time: the name a machine has on THIS host is exactly the
+   * name its owner typed into this host's own pairing row, which is often the only good name that exists for a
+   * machine nobody has renamed since.
+   */
+  function namesForPass(state: HostMeshState): HostMeshState {
+    let names = state.names
+    const peerIndex = store.readPeerIndex()
+    for (const member of state.members) {
+      if (names[member.hostKey] !== undefined) {
+        continue
+      }
+      const label = deps.labelForHostKey(member.hostKey)
+      if (label === null || label.trim() === '') {
+        continue
+      }
+      // Why a placeholder is never seeded, invented or not: it names no machine, and a group-wide `Mesh host 8f3ac2b1`
+      // would then outrank a hostname another host reported, on a tie it wins by sorting after `Build-` and `MacBook`.
+      if (isHostMeshPlaceholderName(label, member.hostKey)) {
+        continue
+      }
+      const invented = peerIndex.get(member.hostKey)?.redeemedLabel === label
+      names = mergeHostMeshNames(names, {
+        [member.hostKey]: {
+          label,
+          version: invented ? HOST_MESH_NAME_DEFAULT_VERSION : HOST_MESH_NAME_SEED_VERSION
+        }
+      })
+    }
+    return names === state.names ? state : { ...state, names }
+  }
+
+  /**
+   * The group's name for a member, as a name this host's own surfaces show.
+   *
+   * Why the pairing row is renamed rather than a display override written: the environment name is what the sidebar,
+   * the status bar and the CLI all read, and an override would leave each of them with its own answer.
+   */
+  async function applyMemberNames(state: HostMeshState): Promise<void> {
+    const rename = deps.renameEnvironment
+    if (rename === undefined) {
+      return
+    }
+    for (const member of state.members) {
+      const name = state.names[member.hostKey]?.label
+      if (name === undefined || deps.labelForHostKey(member.hostKey) === name) {
+        continue
+      }
+      const environmentId = deps.environmentIdForHostKey(member.hostKey)
+      if (environmentId === null) {
+        continue
+      }
+      try {
+        await rename(environmentId, name)
+      } catch (error) {
+        // Why not `lastError`: that line is the pass's verdict, and a name the store refused says nothing about
+        // whether every member answered.
+        console.debug('[host-mesh] could not rename the pairing for', member.hostKey, error)
+      }
+    }
+  }
+
   function confirmKey(hostKey: string, publicKeyB64: string | undefined): boolean {
     return publicKeyB64 !== undefined && orcaHostKeyOf(publicKeyB64) === hostKey
   }
@@ -221,11 +305,24 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
     return minted
   }
 
-  /** Redeems one box from a peer: the only place this host gains an outbound credential. */
-  async function redeem(payload: HostMeshOfferPayload): Promise<RedeemedPeer | null> {
+  /**
+   * Redeems one box from a peer: the only place this host gains an outbound credential.
+   *
+   * Why the label comes from the caller and not the box: a sealed payload is held to an exact field set so no build
+   * can smuggle anything past the opener, and a display name is not worth widening that. The name a peer reports
+   * about itself travels in the request it just made, which is the same standing an introduction has.
+   */
+  async function redeem(
+    payload: HostMeshOfferPayload,
+    label?: string
+  ): Promise<RedeemedPeer | null> {
     try {
-      const peer = await deps.redeemOffer(payload.offerUrl, payload.minterHostKey)
-      store.recordPeer(peer.hostKey, { environmentId: peer.environmentId })
+      const peer = await deps.redeemOffer(payload.offerUrl, payload.minterHostKey, label)
+      store.recordPeer(peer.hostKey, {
+        environmentId: peer.environmentId,
+        // Only a row this redemption created carries a name this host chose; an existing row kept the owner's.
+        ...(peer.namedHere ? { redeemedLabel: peer.label } : {})
+      })
       return peer
     } catch (error) {
       lastError = error instanceof Error ? error.message : 'redeem-failed'
@@ -279,7 +376,9 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
     const state = loadState()
     const members: HostMeshMemberView[] = state.members.map((member) => ({
       hostKey: member.hostKey,
-      label: member.label,
+      // Why the name wins over the row's own label: a rename reaches the group before it reaches every pairing
+      // row, and a surface reading the row would keep announcing the old word.
+      label: state.names[member.hostKey]?.label ?? member.label,
       ...(member.introducedBy === undefined ? {} : { introducedBy: member.introducedBy }),
       status: hostMeshPairStatus(member.hostKey, state.links),
       environmentId: deps.environmentIdForHostKey(member.hostKey)
@@ -325,7 +424,7 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
     }
     let state = loadState()
     const own = keypair()
-    const label = deps.labelForHostKey(selfKey()) ?? 'this host'
+    const label = myName(state)
 
     let hello: HostMeshSyncPayload
     try {
@@ -542,7 +641,12 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
       if (opened.payload === null) {
         continue
       }
-      if ((await redeem(opened.payload)) !== null) {
+      if (
+        (await redeem(
+          opened.payload,
+          state.names[sealed.senderHostKey]?.label ?? member?.label
+        )) !== null
+      ) {
         state = setHostMeshOutboundLink(state, {
           hostKey: sealed.senderHostKey,
           link: { kind: 'ok' }
@@ -616,7 +720,7 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
       epoch,
       offerer: {
         hostKey: selfKey(),
-        label: deps.labelForHostKey(selfKey()) ?? 'this host',
+        label: myName(args.state),
         publicKeyB64: keypair().publicKeyB64
       },
       sealed
@@ -768,6 +872,9 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
     if (state.groupId === '' || !deps.settings().enabled) {
       return snapshot()
     }
+    // Why before the pull: this is the pass that tells the members what this host calls them, so seeding after it
+    // would postpone every repair by one cycle.
+    state = namesForPass(state)
     const membersBefore = new Set(state.members.map((member) => member.hostKey))
     state = await pullMemberViews(state)
     // Why a tombstone learned from a member tears down: this is the only path a member that was asleep ever
@@ -796,7 +903,7 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
           carrierHostKey: introducer?.hostKey ?? selfKey(),
           groupId: state.groupId,
           epoch: epochAfter(state.epoch),
-          label: deps.labelForHostKey(selfKey()) ?? 'this host',
+          label: myName(state),
           selfPk: deps.ownKeypair().publicKeyB64
         })
       }
@@ -840,7 +947,43 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
       }
       saveState(state)
     }
+    // Why after the second pass: a name can arrive in either pull, and renaming on the first would leave the pairing
+    // row of a host renamed in the second showing its old name until the next minute.
+    await applyMemberNames(state)
     return snapshot()
+  }
+
+  /**
+   * Renames a machine for the whole group.
+   *
+   * Why this host may rename a machine it is not: the name is a property of the group rather than of the machine, so
+   * whoever knows the better name writes it once and every host — the named one included — reads it on its next pass.
+   */
+  function renameMember(hostKey: string, label: string): Promise<HostMeshSnapshot> {
+    const wanted = label.trim()
+    if (wanted === '' || wanted.length > HOST_MESH_MAX_LABEL_CHARS) {
+      return Promise.reject(new Error('host_mesh_invalid_request'))
+    }
+    return withLock(async () => {
+      const state = loadState()
+      // Why the state is checked before the write: naming a machine outside a group would write a group file that the
+      // upgrade step then reads as "already grouped", leaving the fleet this install was paired with ungrouped.
+      if (state.groupId === '') {
+        throw new Error('host_mesh_not_in_group')
+      }
+      if (
+        hostKey !== state.selfKey &&
+        !state.members.some((member) => member.hostKey === hostKey)
+      ) {
+        // Why its own code: the host may have been ejected while the dialog that named it was open, and an
+        // unusable-name message for a machine that is no longer a member misleads the owner.
+        throw new Error('host_mesh_unknown_member')
+      }
+      const next = setHostMeshName(state, { hostKey, label: wanted })
+      saveState(next)
+      await applyMemberNames(next)
+      return snapshot()
+    })
   }
 
   function removeMember(hostKey: string): Promise<HostMeshSnapshot> {
@@ -914,6 +1057,7 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
     join,
     sync,
     noteConnectionChange,
+    renameMember,
     removeMember,
     leave,
     updateSettings,

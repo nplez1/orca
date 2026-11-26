@@ -14,6 +14,7 @@ import {
 import { ServerRowChip } from '../../host-rows/ServerListRow'
 import { hostGroupMemberStatus } from './host-group-copy'
 import { runHostMeshAction, useHostMeshSnapshot } from './host-mesh-shared-state'
+import { MeshMemberRenameDialog } from './mesh-member-rename-dialog'
 
 /**
  * One paired host's place in the mesh, rendered inside that host's own row.
@@ -32,6 +33,7 @@ export function MeshMemberAffordance({
   const snapshot = useHostMeshSnapshot()
   const [busy, setBusy] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  const [renaming, setRenaming] = useState(false)
   const member = memberForEnvironment(snapshot?.members ?? [], environmentId)
 
   // Why the switch is not checked: an owner who turns mesh mode off still has to be able to eject a member — the
@@ -56,11 +58,23 @@ export function MeshMemberAffordance({
         variant="ghost"
         size="xs"
         disabled={busy}
+        onClick={() => setRenaming(true)}
+      >
+        {t('auto.components.settings.hostGroup.rename', 'Rename…')}
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="xs"
+        disabled={busy}
         onClick={() => setConfirming(true)}
       >
         {busy ? <LoadingSpinner className="size-3" /> : null}
         {t('auto.components.settings.hostGroup.eject', 'Eject')}
       </Button>
+      {renaming ? (
+        <MeshMemberRenameDialog member={member} open onOpenChange={() => setRenaming(false)} />
+      ) : null}
       <Dialog open={confirming} onOpenChange={(open) => !open && !busy && setConfirming(false)}>
         <DialogContent className="max-w-sm sm:max-w-sm" showCloseButton={false}>
           <DialogHeader>

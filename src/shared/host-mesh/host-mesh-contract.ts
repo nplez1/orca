@@ -117,6 +117,52 @@ export type HostMeshTombstone = {
 }
 
 /**
+ * One machine's name, as the whole mesh knows it.
+ *
+ * Why versioned: the name belongs to the group rather than to whichever machine typed it, so two owners can
+ * rename the same host and the group has to converge on one of them instead of flapping per pass. The higher
+ * version wins and equal versions break deterministically, so every host ends up on the same word.
+ */
+export type HostMeshName = {
+  label: string
+  version: number
+}
+
+/**
+ * The highest version a name may carry.
+ *
+ * Why a cap: a member reports the version it holds, and a value near the float ceiling would leave `+1` unable to
+ * outrank it — one peer could then decide a name forever.
+ */
+export const HOST_MESH_NAME_MAX_VERSION = 1_000_000
+
+/**
+ * The name the pairing store writes when nobody is present to type one.
+ *
+ * Why it is derived and not random: an offer carries the minter's host key, so both ends can agree that this
+ * exact string is a placeholder — which is what lets a real name beat it without any version arithmetic.
+ */
+export function hostMeshPlaceholderName(hostKey: string): string {
+  return `Mesh host ${hostKey.slice(0, 8)}`
+}
+
+/** True for the name a redemption invented, which any real name may overwrite. */
+export function isHostMeshPlaceholderName(label: string, hostKey: string): boolean {
+  return label === hostMeshPlaceholderName(hostKey)
+}
+
+/**
+ * The name a machine reports for itself when nobody has renamed it — its own hostname.
+ *
+ * Why this is the lowest rank: two hosts can disagree about what a machine is called, and the word an owner typed
+ * when pairing is a better answer than the word the machine chose for itself.
+ */
+export const HOST_MESH_NAME_DEFAULT_VERSION = 1
+
+/** A name typed at pairing, which outranks the machine's own hostname. */
+export const HOST_MESH_NAME_SEED_VERSION = 2
+
+/**
  * The link this host owns to a member. Two records exist per pair, one each way, so a half-join is one
  * of them missing rather than an ambiguous single state.
  */
@@ -152,6 +198,14 @@ export type HostMeshState = {
   members: HostMeshMember[]
   tombstones: HostMeshTombstone[]
   links: HostMeshLinkMatrix
+  /**
+   * Names the group agreed on, keyed by host key — including this host's own key, which is how a rename reaches
+   * the machine it names.
+   *
+   * Why it is not `HostMeshMember.label`: a member row only exists on hosts that know the machine, and a name has
+   * to survive being relayed by a host that has never paired with it.
+   */
+  names: Record<string, HostMeshName>
 }
 
 /** What `hostMesh.sync` carries: the whole group's shape, so one member cannot hide another's removal. */
@@ -166,6 +220,13 @@ export type HostMeshSyncPayload = {
   members: HostMeshMember[]
   tombstones: HostMeshTombstone[]
   links: Record<string, HostMeshLinkMatrix>
+  /**
+   * Every name the sender knows, this host's own included.
+   *
+   * Why optional: a peer on a build that predates naming sends none, and an older peer ignores what it cannot read,
+   * so a fleet mid-update keeps syncing instead of refusing each other.
+   */
+  names?: Record<string, HostMeshName>
 }
 
 /** Whether a pair is joined at both ends, at one, or not at all. */

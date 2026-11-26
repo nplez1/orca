@@ -1,10 +1,12 @@
 import { ipcMain } from 'electron'
 import type { HostMeshSettings } from '../../../shared/host-mesh/host-mesh-admission'
+import { HOST_MESH_MAX_LABEL_CHARS } from '../../../shared/host-mesh/host-mesh-contract'
 import {
   joinHostMesh,
   leaveHostMeshGroup,
   readHostMeshSnapshot,
   removeHostMeshMember,
+  renameHostMeshMember,
   updateHostMeshSettings
 } from '../../host-mesh/host-mesh-runtime'
 
@@ -24,6 +26,11 @@ export function registerHostMeshHandlers(): void {
   ipcMain.handle('hostMesh:remove', (_event, hostKey: unknown) =>
     removeHostMeshMember(readId(hostKey))
   )
+  // Why the length is bounded here as well as in the driver: the store this name lands in is capped, and a
+  // renderer bug should not be the thing that finds out.
+  ipcMain.handle('hostMesh:rename', (_event, hostKey: unknown, label: unknown) =>
+    renameHostMeshMember(readId(hostKey), readLabel(label))
+  )
   ipcMain.handle('hostMesh:leave', () => leaveHostMeshGroup())
   ipcMain.handle('hostMesh:settings', (_event, patch: unknown) =>
     updateHostMeshSettings(readSettingsPatch(patch))
@@ -36,6 +43,18 @@ function readId(value: unknown): string {
     throw new Error('host_mesh_invalid_request')
   }
   return value
+}
+
+/** A name is the only free text the mesh stores, so it is trimmed and bounded before it reaches the driver. */
+function readLabel(value: unknown): string {
+  if (typeof value !== 'string') {
+    throw new Error('host_mesh_invalid_request')
+  }
+  const label = value.trim()
+  if (label === '' || label.length > HOST_MESH_MAX_LABEL_CHARS) {
+    throw new Error('host_mesh_invalid_request')
+  }
+  return label
 }
 
 /** Why a guard and not a cast: the patch crossed the process boundary, where its shape is unproven. */

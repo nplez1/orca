@@ -210,6 +210,13 @@ export function resolveEnvironment(
   )
 }
 
+export {
+  renameEnvironment,
+  uniqueEnvironmentName,
+  type RenameEnvironmentArgs,
+  type RenameEnvironmentOutcome
+} from './runtime-environment-rename'
+
 export function resolveEnvironmentPairingOffer(
   userDataPath: string,
   selector: string
