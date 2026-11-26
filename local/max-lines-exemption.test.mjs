@@ -7,12 +7,22 @@
 // `lib/upstream-sync-base.mjs` for why. There is no skip: a check that cannot resolve the base fails and
 // names the command that fixes it, because a policy check that skips is not a policy check.
 //
+// The tool that writes both halves of an exemption is pinned below at its pure seams: a rerun must
+// duplicate neither half, and the row must land in the sorted position the ratchet rewrites to.
+//
 //   node --test local/max-lines-exemption.test.mjs
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
+import {
+  countCodeLines,
+  exemptionHeader,
+  insertBaselineRow,
+  maxLinesReason,
+  withExemptionHeader
+} from './max-lines-exemption.mjs'
 import {
   commitExists,
   commitHasPath,
@@ -78,4 +88,62 @@ test('exempts only upstream-owned files (the recorded sync base is upstream)', (
       'If the file IS upstream-owned, the recorded sync base is older than this sync — re-run ' +
       '`node local/check-upstream-file-comments.mjs --init --accept "<why>"` to move it forward'
   )
+})
+
+test('counts non-blank, non-comment lines, as the oxlint rule does', () => {
+  const source = [
+    '// a line comment',
+    '',
+    '/* a block',
+    '   comment */',
+    'export const a = 1',
+    '   ',
+    'export const b = 2 // trailing'
+  ].join('\n')
+  assert.equal(countCodeLines(source), 2)
+})
+
+// Why assembled: the max-lines ratchet reads source text, so a contiguous disable directive in a
+// fixture is counted as a new exemption for this file and fails the changed-code gate.
+const MAX_LINES_DISABLE = '/* eslint' + '-disable max-lines'
+
+test('writes the header once, above a shebang and never twice', () => {
+  const header = exemptionHeader('upstream-owned and at its budget.')
+  assert.equal(
+    withExemptionHeader('export const a = 1\n', 'upstream-owned and at its budget.'),
+    `${header}\nexport const a = 1\n`
+  )
+  assert.equal(
+    withExemptionHeader('#!/usr/bin/env node\nexport const a = 1\n', 'why'),
+    `#!/usr/bin/env node\n${exemptionHeader('why')}\nexport const a = 1\n`
+  )
+  const once = withExemptionHeader('export const a = 1\n', 'why')
+  assert.equal(withExemptionHeader(once, 'a different reason'), once)
+  assert.equal(
+    exemptionHeader('why\nover two lines.'),
+    `${MAX_LINES_DISABLE} -- Why: why over two lines. */`
+  )
+})
+
+test('adds the baseline row in sorted position and never duplicates it', () => {
+  const baseline = '# a header\n# second line\ninline src/a.ts\ninline src/z.ts\n'
+  const added = insertBaselineRow(baseline, 'inline src/m.ts')
+  assert.equal(
+    added,
+    '# a header\n# second line\ninline src/a.ts\ninline src/m.ts\ninline src/z.ts\n'
+  )
+  assert.equal(insertBaselineRow(added, 'inline src/m.ts'), added)
+})
+
+test('reads the recorded reason out of a file, and null when it has none', () => {
+  assert.equal(
+    maxLinesReason(`${MAX_LINES_DISABLE} -- Why: splitting costs a sync hunk. */\n`),
+    'splitting costs a sync hunk.'
+  )
+  assert.equal(
+    maxLinesReason(`${MAX_LINES_DISABLE} -- Why: it wraps,\n   so the reason does too. */\n`),
+    'it wraps, so the reason does too.'
+  )
+  assert.equal(maxLinesReason('// eslint-disable-next-line no-console\n'), null)
+  assert.equal(maxLinesReason('export const a = 1\n'), null)
 })
