@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { getAgentStatusEpochNow } from '@/lib/agent-status/evidence/agent-status-epoch-clock'
 import {
@@ -63,16 +64,15 @@ export function useTabGroupWorkspaceModel({
 
   const { closeItem, closeMany } = useTabGroupTabCloseCommands({ worktreeId })
 
-  // Why: closing a workspace's last tab keeps it selected and lands on the empty-tabs surface
-  // instead of the landing page, so the pane has to know it has nothing left to show (#96). The
-  // close record is what separates that from an empty workspace whose first tab is still arriving
-  // — a fresh worktree, a host-owned list still mirroring, a chat launch waiting on its host —
-  // which must not flash the surface. Read as one selector so the pane re-renders only when this
-  // workspace's verdict changes, not on every close anywhere. The row check matters: a workspace
-  // this build never initialized has no terminal row, the same absence the seeder reads.
-  const showsEmptyWorkspaceState = useAppStore(
+  // Why: an emptied workspace stays selected on its empty-tabs surface (#96), which must not flash
+  // while a first tab is still arriving (fresh worktree, host list mirroring, pending chat launch).
+  // Either a terminal close record proves the user emptied it (it survives restart; the row check
+  // matches the seeder), or it was emptied while on screen: a last chat, browser or editor close
+  // writes no record. That mark resets on leaving, so a retained pane cannot carry it into a later
+  // visit (sleep, or re-seeding on return).
+  const hasNoContent = useAppStore((state) => hasNoRenderableWorkspaceContent(state, worktreeId))
+  const emptiedByRecordedClose = useAppStore(
     (state) =>
-      hasNoRenderableWorkspaceContent(state, worktreeId) &&
       Object.hasOwn(state.tabsByWorktree, worktreeId) &&
       hasFreshClosedTabRecord(
         state.closedTerminalTabTombstonesByTabId,
@@ -80,6 +80,15 @@ export function useTabGroupWorkspaceModel({
         getAgentStatusEpochNow(state.agentStatusEpoch ?? 0)
       )
   )
+  const isOnScreen = useAppStore((state) => state.activeWorktreeId === worktreeId)
+  const [hasShownContentOnScreen, setHasShownContentOnScreen] = useState(
+    isOnScreen && !hasNoContent
+  )
+  const shownContentThisVisit = isOnScreen && (hasShownContentOnScreen || !hasNoContent)
+  if (shownContentThisVisit !== hasShownContentOnScreen) {
+    setHasShownContentOnScreen(shownContentThisVisit)
+  }
+  const showsEmptyWorkspaceState = hasNoContent && (emptiedByRecordedClose || shownContentThisVisit)
 
   const { closeGroup, closeAllEditorTabsInGroup, closeOthers, closeToRight, closeToLeft } =
     useTabGroupCloseScopeCommands({

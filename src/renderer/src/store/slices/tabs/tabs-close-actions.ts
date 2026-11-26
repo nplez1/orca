@@ -1,5 +1,4 @@
 import { editorTabRetirement } from '../editor/tabs/editor-tab-retirement'
-export { landOnEmptiedWorktree } from './tabs-empty-workspace'
 import { structuredAgentSessionAddressTabId } from '../../../../../shared/agent-session/view/structured-agent-session-projection'
 import { retireRemovedNativeChatTabs } from '@/components/native-chat/session/native-chat-removed-tab-retirement'
 import { retireStructuredAgentSessionReadOwner } from '@/components/native-chat/session/structured/read/structured-agent-session-read-owner-registry'

@@ -18,7 +18,6 @@ import {
   deleteUntouchedUntitledFile,
   shouldDeleteUntouchedUntitledFile
 } from '../tabs/untitled-file-cleanup'
-import { unifiedTabsKeepWorktreeSelected } from '../tabs/unified-tabs-keep-worktree-selected'
 import { isEditorTabContentType } from '../tabs/editor-tab-content-type'
 import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../../../shared/workspace-layout/layout-owner-switch'
 import {
@@ -159,19 +158,11 @@ export function createRecentlyClosedEditorTabs(
           delete newActiveFileIdByWorktree[activeWorktreeId]
           const newActiveTabTypeByWorktree = { ...s.activeTabTypeByWorktree }
           const browserTabsForWorktree = s.browserTabsByWorktree[activeWorktreeId] ?? []
-          const terminalTabsForWorktree = s.tabsByWorktree[activeWorktreeId] ?? []
           newActiveTabTypeByWorktree[activeWorktreeId] =
             browserTabsForWorktree.length > 0 ? 'browser' : 'terminal'
           // Why: mirrored tabs use host tab ids in tab order while local entries use file ids; remove both shapes.
           const closedFileIds = new Set(closingFiles.map((f) => f.id))
           const closedTabOrderIds = new Set([...closedFileIds, ...closingItemIds])
-          const shouldDeactivateWorktree =
-            browserTabsForWorktree.length === 0 &&
-            terminalTabsForWorktree.length === 0 &&
-            !unifiedTabsKeepWorktreeSelected(
-              s.unifiedTabsByWorktree?.[activeWorktreeId],
-              closedTabOrderIds
-            )
           const capturedFiles = workspaceEditorFiles(
             records.openFiles,
             records.unifiedTabsByWorktree[activeWorktreeId]
@@ -203,11 +194,8 @@ export function createRecentlyClosedEditorTabs(
             editorDrafts: newEditorDrafts,
             editorCursorLine: newEditorCursorLine,
             activeFileId: null,
-            // Why: closing every editor can leave no renderable surface; clear the active worktree so the renderer shows the landing page, not a blank workspace.
-            activeWorktreeId: shouldDeactivateWorktree ? null : s.activeWorktreeId,
-            activeBrowserTabId: shouldDeactivateWorktree
-              ? null
-              : browserTabsForWorktree.length > 0
+            activeBrowserTabId:
+              browserTabsForWorktree.length > 0
                 ? (s.activeBrowserTabIdByWorktree[activeWorktreeId] ??
                   browserTabsForWorktree[0]?.id ??
                   null)

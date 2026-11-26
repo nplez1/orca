@@ -17,7 +17,6 @@ import {
   deleteUntouchedUntitledFile,
   shouldDeleteUntouchedUntitledFile
 } from '../tabs/untitled-file-cleanup'
-import { unifiedTabsKeepWorktreeSelected } from '../tabs/unified-tabs-keep-worktree-selected'
 import { mayShareEditorBackingFile } from '../file-ids/editor-file-ids'
 import { isSameOwnedDocument } from '../file-ids/same-owned-editor-document'
 import { isEditorTabContentType } from '../tabs/editor-tab-content-type'
@@ -186,9 +185,6 @@ export function createCloseFileAction(
           const browserTabsForWorktree = activeWorktreeId
             ? (s.browserTabsByWorktree[activeWorktreeId] ?? [])
             : []
-          const terminalTabsForWorktree = activeWorktreeId
-            ? (s.tabsByWorktree[activeWorktreeId] ?? [])
-            : []
           const fallbackBrowserTabId =
             activeWorktreeId && browserTabsForWorktree.length > 0
               ? (s.activeBrowserTabIdByWorktree[activeWorktreeId] ??
@@ -211,21 +207,6 @@ export function createCloseFileAction(
             newActiveTabTypeByWorktree[activeWorktreeId] =
               browserTabsForWorktree.length > 0 ? 'browser' : 'terminal'
           }
-          // Structured chats have no legacy terminal row to keep their workspace selected.
-          const hasRemainingUnifiedTabs =
-            activeWorktreeId !== null &&
-            unifiedTabsKeepWorktreeSelected(
-              s.unifiedTabsByWorktree?.[activeWorktreeId],
-              fileIdsToClose
-            )
-          const shouldDeactivateWorktree =
-            activeWorktreeId !== null &&
-            !closesBackgroundFile &&
-            remainingForWorktree.length === 0 &&
-            browserTabsForWorktree.length === 0 &&
-            terminalTabsForWorktree.length === 0 &&
-            !hasRemainingUnifiedTabs
-
           // Why: prune the closed id from tabBarOrderByWorktree so stale ids don't shift positions on the next reconcile.
           const worktreeId = placementId ?? closedFile?.worktreeId ?? activeWorktreeId
 
@@ -268,11 +249,8 @@ export function createCloseFileAction(
             editorDrafts: newEditorDrafts,
             editorCursorLine: newEditorCursorLine,
             activeFileId: newActiveId,
-            // Why: if the last editor closes with no browser/terminal surface left, return to the landing state like the terminal/browser close handlers do.
-            activeWorktreeId: shouldDeactivateWorktree ? null : s.activeWorktreeId,
-            activeBrowserTabId: shouldDeactivateWorktree
-              ? null
-              : activeWorktreeId && remainingForWorktree.length === 0
+            activeBrowserTabId:
+              activeWorktreeId && remainingForWorktree.length === 0
                 ? fallbackBrowserTabId
                 : s.activeBrowserTabId,
             activeTabType: newActiveTabType,
