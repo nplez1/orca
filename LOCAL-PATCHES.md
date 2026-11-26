@@ -6383,7 +6383,7 @@ ratchet does not count it (4764/4764 unchanged). The reason comment is not decor
 `test-timeout-needs-reason` ratchet refuses a per-test timeout without one, which is the right rule — it
 is what stops a timeout bump from quietly hiding a slow test.
 
-- the test at line 377 (`stops reading a long send family at its first member older than the newest
+- the test at line 377 of the red run (`stops reading a long send family at its first member older than the newest
   turns`) — the one that failed. **Upstream made this exact call in `7b6c852e2de` (#47789)**, after our
   sync base, and that commit's own comment says the fixture is "about 30s on a Windows runner; it counts
   work, not time". The fork takes the code line only: upstream's comment is not copied, because a fork
@@ -6393,7 +6393,7 @@ is what stops a timeout bump from quietly hiding a slow test.
   where our `fork-comment-ok:` line sits, and its `}, 120_000)` is byte-identical to ours — so keep
   upstream's comment, drop ours, keep the timeout. The collision is one line and its answer is written
   here; that is cheaper than the comment ratchet growth an unmarked copy would have cost today.
-- the test at line 270 (`reads the newest turns with the same work however many turns came before them`)
+- the test at line 270 of the red run (`reads the newest turns with the same work however many turns came before them`)
   — the fork's own call, because it passed on the same runner by 3.5 s: 26,488 ms of the 30 s budget on
   `windows-2022`, and 18,920 ms of it on `ubuntu-24.04` (63%). It is the slowest test in the lane and the
   slowest in this file, so one slower runner reddens `fork-performance-contracts` and the nightly unit
@@ -6408,8 +6408,8 @@ to either test's body is the only thing that moves them.
 The six lines this costs in an upstream file are declared as a seam in
 `local/checks/host-mesh-upstream-seams.mjs` (budget 6, the measured size), which is the register that
 makes a fork hunk in upstream's tree visible and bounded rather than silent. That budget only shrinks:
-after the sync takes upstream's `}, 120_000)` and comment, the second test costs nothing and the seam
-re-measures down to the one test upstream left alone.
+once the sync takes upstream's `}, 120_000)` and comment, the `stops reading a long send family` test
+costs nothing and the seam re-measures down to the one test upstream left alone.
 
 **Verified:** the file passes locally (7/7, 4.5 s, macOS, `config/vitest.performance.config.ts`), and
 both ratchets this change touches are green (`test-timeout-needs-reason`, `check-upstream-file-comments`
@@ -6417,7 +6417,8 @@ both ratchets this change touches are green (`test-timeout-needs-reason`, `check
 rather than trusted from a Mac: run
 [45780910456](https://github.com/nplez1/orca/actions/runs/45780910456) at `803bad1e65f` is **green on all
 three legs** — `ubuntu-24.04` 1m51s, `macos-15` 3m45s, `windows-2022` 2m45s — with the test that reddened
-taking 26,610 ms and passing, against 33,065 ms and a 30 s cap on the red run. The two earlier dispatches
-agree (`45779423920` at `12957a82e44`: green, the same test at 34,636 ms), which is also the measurement
-that says how thin the old 30 s margin was: the same test on the same runner has now taken 26.6 s, 33.1 s
-and 34.6 s.
+taking 26,610 ms and passing, against 33,065 ms and a 30 s cap on the red run. The two other dispatches
+agree: `45780202134` at `41a041bc6f2` green on all three legs with the same test at 26,777 ms, and
+`45779423920` at `12957a82e44` green with it at 34,636 ms. Those three numbers are also the measurement
+that says how thin the old 30 s margin was — 26.6 s, 33.1 s and 34.6 s for the same test on the same
+runner.
