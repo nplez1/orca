@@ -20,6 +20,7 @@ export type EnvironmentStoreCommand =
     }
   | { operation: 'parseRemotePairingCode'; args: Parameters<typeof core0.parseRemotePairingCode> }
   | { operation: 'removeEnvironment'; args: Parameters<typeof core0.removeEnvironment> }
+  | { operation: 'renameEnvironment'; args: Parameters<typeof core0.renameEnvironment> }
   | {
       operation: 'updateEnvironmentFromPairingCode'
       args: Parameters<typeof core0.updateEnvironmentFromPairingCode>
@@ -121,6 +122,7 @@ export type EnvironmentStoreSuccess =
       value: ReturnType<typeof core0.resolveEnvironmentPairingOffer>
     }
   | { operation: 'markEnvironmentUsed'; value: ReturnType<typeof core0.markEnvironmentUsed> }
+  | { operation: 'renameEnvironment'; value: ReturnType<typeof core0.renameEnvironment> }
   | {
       operation: 'addManagedOrcadEnvironment'
       value: ReturnType<typeof core1.addManagedOrcadEnvironment>

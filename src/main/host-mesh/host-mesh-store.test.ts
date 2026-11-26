@@ -38,7 +38,8 @@ function groupState(): HostMeshState {
         'key-b': { kind: 'awaitingOffer', requestedAtEpoch: 5, expiresAt: 900 }
       },
       inbound: { 'key-a': { kind: 'active' }, 'key-b': { kind: 'absent' } }
-    }
+    },
+    names: { 'key-a': { label: 'Studio', version: 2 } }
   }
 }
 
@@ -232,5 +233,20 @@ describe('the group on disk', () => {
     store().write(groupState())
 
     expect(store().readSettings().enabled).toBe(false)
+  })
+})
+
+describe('the names the group agreed on', () => {
+  beforeEach(() => {
+    testState.dir = mkdtempSync(join(tmpdir(), 'orca-mesh-store-names-'))
+  })
+  afterEach(() => {
+    rmSync(testState.dir, { recursive: true, force: true })
+  })
+
+  it('survives a write and read, so a rename is not undone by the next pass', () => {
+    store().write({ ...groupState(), names: { 'key-b': { label: 'Build mini', version: 3 } } })
+
+    expect(store().read()?.names).toEqual({ 'key-b': { label: 'Build mini', version: 3 } })
   })
 })

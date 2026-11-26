@@ -159,7 +159,11 @@ export function createHostMeshRpcService(deps: HostMeshDriverDeps): HostMeshRpcS
       const epoch = Math.max(state.epoch, params.epoch) + 1
       let peer: RedeemedPeer
       try {
-        peer = await deps.redeemOffer(decision.payload.offerUrl, decision.payload.minterHostKey)
+        peer = await deps.redeemOffer(
+          decision.payload.offerUrl,
+          decision.payload.minterHostKey,
+          params.joiner.label
+        )
       } catch {
         return { kind: 'refused', reason: 'redeem-failed' }
       }
@@ -298,7 +302,11 @@ export function createHostMeshRpcService(deps: HostMeshDriverDeps): HostMeshRpcS
       }
       let peer: RedeemedPeer
       try {
-        peer = await deps.redeemOffer(decision.payload.offerUrl, decision.payload.minterHostKey)
+        peer = await deps.redeemOffer(
+          decision.payload.offerUrl,
+          decision.payload.minterHostKey,
+          params.newcomer.label
+        )
       } catch {
         return { kind: 'refused', reason: 'redeem-failed' }
       }
@@ -410,7 +418,11 @@ export function createHostMeshRpcService(deps: HostMeshDriverDeps): HostMeshRpcS
       }
       let peer: RedeemedPeer
       try {
-        peer = await deps.redeemOffer(decision.payload.offerUrl, decision.payload.minterHostKey)
+        peer = await deps.redeemOffer(
+          decision.payload.offerUrl,
+          decision.payload.minterHostKey,
+          params.offerer.label
+        )
       } catch {
         return { kind: 'refused', reason: 'redeem-failed' }
       }
@@ -480,7 +492,10 @@ export function createHostMeshRpcService(deps: HostMeshDriverDeps): HostMeshRpcS
         publicKeyB64: deps.ownKeypair().publicKeyB64,
         members: state.members.filter((member) => member.hostKey !== params.hostKey),
         tombstones: state.tombstones,
-        links: { [selfKey()]: state.links }
+        links: { [selfKey()]: state.links },
+        // Why the whole map and not only this host's entry: a name is the group's, so a host that learned a better one
+        // for a third machine has to be able to hand it on. A caller reads its own entry from here.
+        names: state.names
       }
     },
 

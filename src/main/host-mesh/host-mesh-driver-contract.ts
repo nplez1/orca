@@ -108,13 +108,24 @@ export type HostMeshDriverDeps = {
    *
    * Why the expected key is an argument: an offer URL is what a peer supplied, so it must be checked against
    * the machine the caller believes minted it *before* this host saves an environment record for it.
+   *
+   * Why the label is too: this is the only moment the pairing gets a name, and the machine that made the
+   * pairing knows what it is called — a name invented here is one the owner has to rename by hand.
    */
-  redeemOffer: (offerUrl: string, expectedHostKey: string) => Promise<RedeemedPeer>
+  redeemOffer: (offerUrl: string, expectedHostKey: string, label?: string) => Promise<RedeemedPeer>
   /** Cuts outbound reach to a member: the environment record, not the device row. */
   forgetEnvironment: (selector: string) => void
   /** Cuts inbound reach: the device row the member's credential belongs to. */
   forgetDevice: (hostKey: string) => void
   environmentIdForHostKey: (hostKey: string) => string | null
+  /**
+   * Renames this host's saved pairing for a machine, so the name the group agreed on is the name every surface
+   * shows.
+   *
+   * Why it may disambiguate: two machines can legitimately answer to one name, and a row left on a placeholder
+   * because the store refused the second `Mac mini` is worse than `Mac mini (2)`.
+   */
+  renameEnvironment?: (environmentId: string, name: string) => Promise<void>
   /**
    * Every machine this install is already paired with, which is the only thing an upgrade can group.
    *
@@ -123,6 +134,13 @@ export type HostMeshDriverDeps = {
    */
   listPairedHostKeys: () => { hostKey: string; label: string; publicKeyB64?: string }[]
   labelForHostKey: (hostKey: string) => string | null
+  /**
+   * What this machine calls itself when nobody has renamed it: its own hostname.
+   *
+   * Why a dependency: a recipient stores this string as the pairing's name, so the driver cannot invent `"this
+   * host"` without every peer that redeemed an offer ending up with a row nobody can identify.
+   */
+  selfLabel?: () => string
   /** One call to a peer this host is paired with. Rejects only on transport failure. */
   send: <T>(environmentId: string, method: string, params: unknown) => Promise<T>
   /**
@@ -164,6 +182,8 @@ export type HostMeshDriver = {
   /** A member's connection came up, so an offer refused on technical grounds is worth making again. */
   noteConnectionChange: () => void
   removeMember: (hostKey: string) => Promise<HostMeshSnapshot>
+  /** Renames a machine for the whole group; the name reaches the other hosts on their next pass. */
+  renameMember: (hostKey: string, label: string) => Promise<HostMeshSnapshot>
   leave: () => Promise<HostMeshSnapshot>
   updateSettings: (patch: Partial<HostMeshSettings>) => Promise<HostMeshSnapshot>
   /** The one-shot upgrade step: group the machines this install was already paired with. */

@@ -4,19 +4,27 @@ import {
   addOrUpdateEnvironmentFromPairingCode,
   parseRemotePairingCode,
   removeEnvironment,
+  renameEnvironment,
   resolveEnvironmentPairingOffer
 } from '../../shared/remote-runtime/host-store/runtime-environment-store'
-import { listEnvironments } from '../../shared/remote-runtime/host-store/runtime-environment-store-operations'
+import {
+  listEnvironments,
+  uniqueEnvironmentName
+} from '../../shared/remote-runtime/host-store/runtime-environment-store-operations'
+import { publishRuntimeEnvironmentCatalogChanged } from '../ipc/runtime-environments/catalog/runtime-environment-catalog-broadcast'
 import { pairedRuntimeConnectionFromOffer } from '../../shared/remote-runtime/pairing/paired-runtime-connection'
 import { sendRemoteRuntimeRequestOnSocket } from '../../shared/remote-runtime/requests/remote-runtime-request-socket'
-import { orcaHostKeyOf } from '../host-graph/host-graph-self-identity'
+import { orcaHostKeyOf, selfLabel } from '../host-graph/host-graph-self-identity'
 import { getCanonicalUserDataPath } from '../persistence/loading-store/user-data-path'
 import { loadOrCreateE2EEKeypair } from '../runtime/rpc/server/pairing/e2ee-keypair'
 import {
   createOwnerPairingOffer,
   type PairingOfferServer
 } from '../runtime/rpc/server/pairing/pairing-offer-requests'
-import { HOST_MESH_OFFER_TTL_MS } from '../../shared/host-mesh/host-mesh-contract'
+import {
+  HOST_MESH_OFFER_TTL_MS,
+  hostMeshPlaceholderName
+} from '../../shared/host-mesh/host-mesh-contract'
 import type { HostMeshDriverDeps } from './host-mesh-driver-contract'
 import { createHostMeshWriteLock } from './host-mesh-write-lock'
 import { createHostMeshDriver } from './host-mesh-driver'
@@ -120,7 +128,7 @@ function depsFromApp(server: HostMeshRuntimeServer): HostMeshDriverDeps {
       }
       return { offerUrl: offer.pairingUrl, deviceId: offer.deviceId }
     },
-    redeemOffer: async (offerUrl, expectedHostKey) => {
+    redeemOffer: async (offerUrl, expectedHostKey, label) => {
       const offer = await parseRemotePairingCode(userDataPath, offerUrl)
       // Refused before any environment record exists for it: a box names the machine it should have come
       // from, and an offer minted by any other machine is not the box this host was promised.
@@ -128,8 +136,13 @@ function depsFromApp(server: HostMeshRuntimeServer): HostMeshDriverDeps {
         throw new Error('offer-not-from-expected-minter')
       }
       const outcome = await addOrUpdateEnvironmentFromPairingCode(userDataPath, {
-        // Nobody is present to type a name, and the host key is the one identifier two hosts cannot share.
-        name: `Mesh host ${orcaHostKeyOf(offer.publicKeyB64).slice(0, 8)}`,
+        // Nobody is present to type a name, so the machine that minted the offer names itself; the host key is only
+        // the fallback for a minter too old to send one. Two machines genuinely called the same thing get a suffix
+        // rather than an error, because a refused redemption would leave the pair half-joined.
+        name: uniqueEnvironmentName(
+          listEnvironments(userDataPath),
+          label?.trim() || hostMeshPlaceholderName(expectedHostKey)
+        ),
         pairingCode: offerUrl
       })
       const publicKey = getPreferredPairedRuntimeConnection(outcome.environment).hostPublicKeyB64
@@ -149,6 +162,12 @@ function depsFromApp(server: HostMeshRuntimeServer): HostMeshDriverDeps {
         console.debug('[host-mesh] could not forget the environment', selector, error)
       })
     },
+    // Why the catalog broadcast: every surface reads the pairing store through its own cache, and a rename that
+    // nobody was told about would leave the old name on screen until the next unrelated refresh.
+    renameEnvironment: async (environmentId, name) => {
+      await renameEnvironment(userDataPath, environmentId, { name, disambiguate: true })
+      publishRuntimeEnvironmentCatalogChanged()
+    },
     // Why the peer index and not the pairing rows: another build may rewrite the device registry and drop
     // the fields that would have named this member's row.
     revokeMintedRow: (deviceId) => {
@@ -167,6 +186,8 @@ function depsFromApp(server: HostMeshRuntimeServer): HostMeshDriverDeps {
     },
     environmentIdForHostKey: (hostKey) => environmentForHostKey(userDataPath, hostKey)?.id ?? null,
     labelForHostKey: (hostKey) => environmentForHostKey(userDataPath, hostKey)?.name ?? null,
+    // What a peer stores as the name of the pairing it makes with this host when nobody has typed one.
+    selfLabel: () => selfLabel(),
     listPairedHostKeys: () => {
       try {
         return listEnvironments(userDataPath).flatMap((environment) => {

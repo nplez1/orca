@@ -46,6 +46,8 @@ export type HostMeshApi = {
   /** Pair this host with every member of the group the given paired environment belongs to. */
   join: (environmentId: string) => Promise<HostMeshJoinOutcome>
   remove: (hostKey: string) => Promise<HostMeshSnapshot>
+  /** Rename a machine for the whole group; the other hosts read the name on their next pass. */
+  rename: (hostKey: string, label: string) => Promise<HostMeshSnapshot>
   leave: () => Promise<HostMeshSnapshot>
   settings: (patch: Partial<HostMeshSettings>) => Promise<HostMeshSnapshot>
 }

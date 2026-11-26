@@ -70,6 +70,16 @@ export async function updateEnvironmentFromPairingCode(
   return reply.value
 }
 
+export async function renameEnvironment(
+  ...args: Parameters<typeof core.renameEnvironment>
+): Promise<ReturnType<typeof core.renameEnvironment>> {
+  const reply = await submitEnvironmentStoreCommand({ operation: 'renameEnvironment', args })
+  if (reply.operation !== 'renameEnvironment') {
+    throw new Error('Unexpected environment store response')
+  }
+  return reply.value
+}
+
 export async function replaceEnvironmentPairing(
   ...args: Parameters<typeof core.replaceEnvironmentPairing>
 ): Promise<ReturnType<typeof core.replaceEnvironmentPairing>> {

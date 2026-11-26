@@ -43,6 +43,9 @@ const tombstoneSchema = z.looseObject({
   removedBy: z.string().min(1)
 })
 
+// A version per name: the group's word for a machine changes by rename, and two owners must converge.
+const nameSchema = z.looseObject({ label: z.string().min(1), version: z.number() })
+
 const outboundLinkSchema = z.discriminatedUnion('kind', [
   z.looseObject({ kind: z.literal('ok') }),
   z.looseObject({
@@ -77,7 +80,8 @@ const stateSchema = z.looseObject({
   links: z.looseObject({
     outbound: z.record(z.string().min(1), outboundLinkSchema),
     inbound: z.record(z.string().min(1), inboundLinkSchema)
-  })
+  }),
+  names: z.record(z.string().min(1), nameSchema).default({})
 })
 
 const peerEntrySchema = z.looseObject({

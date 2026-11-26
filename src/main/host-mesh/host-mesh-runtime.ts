@@ -66,6 +66,11 @@ export function removeHostMeshMember(hostKey: string): Promise<HostMeshSnapshot>
   return requireDriver().removeMember(hostKey)
 }
 
+/** Renames a machine for the whole group; every other host picks the name up on its next pass. */
+export function renameHostMeshMember(hostKey: string, label: string): Promise<HostMeshSnapshot> {
+  return requireDriver().renameMember(hostKey, label)
+}
+
 export function leaveHostMeshGroup(): Promise<HostMeshSnapshot> {
   return requireDriver().leave()
 }
