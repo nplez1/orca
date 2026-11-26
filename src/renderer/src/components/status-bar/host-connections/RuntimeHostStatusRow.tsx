@@ -161,7 +161,6 @@ export function RuntimeHostStatusRow({
   state: RuntimeHostConnectionState
   detail?: string
   diagnostics?: RemoteRuntimeSharedConnectionDiagnostics | null
-  /** How joined this host is to the mesh; absent for a host that is not a member. */
   meshStatus?: HostMeshPairStatus | null
   /** Set when the host refused this client; its copy replaces the transport state. */
   blocked?: (RuntimeHostBlockedCopy & { recovery: RuntimeHostBlockedRecovery | null }) | null

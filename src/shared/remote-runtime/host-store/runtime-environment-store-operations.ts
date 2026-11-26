@@ -210,11 +210,11 @@ export function resolveEnvironment(
   )
 }
 
-// Why re-exported here: the store's command channel is typed against this module, so the operations stay one surface.
 export {
   renameEnvironment,
   uniqueEnvironmentName,
-  type RenameEnvironmentArgs
+  type RenameEnvironmentArgs,
+  type RenameEnvironmentOutcome
 } from './runtime-environment-rename'
 
 export function resolveEnvironmentPairingOffer(

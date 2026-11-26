@@ -1548,6 +1548,7 @@
 1 src/shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-workspace-runtime.ts
 2 src/shared/remote-runtime/host-store/runtime-e2ee-keypair-file.ts
 3 src/shared/remote-runtime/host-store/runtime-environment-managed-orcad-operations.ts
+1 src/shared/remote-runtime/host-store/runtime-environment-rename.ts # one small named write per mesh rename, beside the pairing row it renames; the same call the operations module already makes through the store's command channel (reviewed: Opus 5.5 at high, 2026-11-27)
 2 src/shared/remote-runtime/host-store/runtime-environment-resume-pairing-operations.ts
 2 src/shared/remote-runtime/host-store/runtime-environment-sidecar.ts
 4 src/shared/remote-runtime/host-store/runtime-environment-store-command.ts

@@ -172,6 +172,13 @@ export type RedeemedPeer = {
   environmentId: string
   hostKey: string
   label: string
+  /**
+   * True only when the redemption created the pairing row, which is the only case where this host chose its name.
+   *
+   * Why it matters: a row that already existed kept the name its owner typed, so treating that name as invented
+   * would rank it below a hostname and let a later merge overwrite it.
+   */
+  namedHere: boolean
 }
 
 export type HostMeshDriver = {

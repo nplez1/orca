@@ -22,6 +22,15 @@ import { runHostMeshAction } from './host-mesh-shared-state'
  * belongs to the group, so this writes through the mesh and every member — the machine itself included — reads it
  * on its next pass.
  */
+/** Why the code and not the message: each one is a different thing for the owner to do. */
+function failureOf(error: unknown): 'invalid' | 'unknown-member' | 'unreachable' {
+  const message = error instanceof Error ? error.message : ''
+  if (message.includes('host_mesh_unknown_member')) {
+    return 'unknown-member'
+  }
+  return message.includes('host_mesh_invalid_request') ? 'invalid' : 'unreachable'
+}
+
 export function MeshMemberRenameDialog({
   member,
   open,
@@ -34,7 +43,7 @@ export function MeshMemberRenameDialog({
   const t = useTranslate()
   const [value, setValue] = useState(member.label)
   const [busy, setBusy] = useState(false)
-  const [failure, setFailure] = useState<'invalid' | 'unreachable' | null>(null)
+  const [failure, setFailure] = useState<'invalid' | 'unknown-member' | 'unreachable' | null>(null)
 
   // Seed on every open so a cancelled draft cannot reappear under the name the mesh has now.
   const [seededFor, setSeededFor] = useState({ open, label: member.label })
@@ -55,13 +64,7 @@ export function MeshMemberRenameDialog({
     setFailure(null)
     void runHostMeshAction((api) => api.rename(member.hostKey, trimmed))
       .then(() => onOpenChange(false))
-      .catch((error: unknown) =>
-        setFailure(
-          error instanceof Error && error.message.includes('host_mesh_invalid_request')
-            ? 'invalid'
-            : 'unreachable'
-        )
-      )
+      .catch((error: unknown) => setFailure(failureOf(error)))
       .finally(() => setBusy(false))
   }
 
@@ -102,6 +105,13 @@ export function MeshMemberRenameDialog({
               {t(
                 'auto.components.settings.hostGroup.renameInvalid',
                 'That name cannot be used. Pick a shorter name with at least one visible character.'
+              )}
+            </p>
+          ) : failure === 'unknown-member' ? (
+            <p className="text-xs text-destructive">
+              {t(
+                'auto.components.settings.hostGroup.renameUnknownMember',
+                'That host is no longer in the mesh with this computer, so its name cannot be changed here.'
               )}
             </p>
           ) : failure === 'unreachable' ? (

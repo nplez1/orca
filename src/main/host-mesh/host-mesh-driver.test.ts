@@ -180,7 +180,8 @@ class Mesh {
         return {
           environmentId,
           hostKey: offer.hostKey,
-          label: peer?.name ?? offer.hostKey
+          label: peer?.name ?? offer.hostKey,
+          namedHere: existing === undefined
         }
       },
       revokeMintedRow: (deviceId: string) => {

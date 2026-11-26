@@ -177,12 +177,12 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
       if (label === null || label.trim() === '') {
         continue
       }
-      // Why a redemption's own word ranks lowest: it is a hostname or a placeholder this host wrote itself, while a
-      // row the owner typed outranks it — an invented name must never walk back a name someone chose.
-      const invented = peerIndex.get(member.hostKey)?.redeemedLabel === label
-      if (!invented && isHostMeshPlaceholderName(label, member.hostKey)) {
+      // Why a placeholder is never seeded, invented or not: it names no machine, and a group-wide `Mesh host 8f3ac2b1`
+      // would then outrank a hostname another host reported, on a tie it wins by sorting after `Build-` and `MacBook`.
+      if (isHostMeshPlaceholderName(label, member.hostKey)) {
         continue
       }
+      const invented = peerIndex.get(member.hostKey)?.redeemedLabel === label
       names = mergeHostMeshNames(names, {
         [member.hostKey]: {
           label,
@@ -318,11 +318,10 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
   ): Promise<RedeemedPeer | null> {
     try {
       const peer = await deps.redeemOffer(payload.offerUrl, payload.minterHostKey, label)
-      // Why the label is recorded: a row this host named itself is not a name the owner chose, and a later pass has
-      // to be able to tell the two apart or the invented word would outrank the typed one.
       store.recordPeer(peer.hostKey, {
         environmentId: peer.environmentId,
-        redeemedLabel: peer.label
+        // Only a row this redemption created carries a name this host chose; an existing row kept the owner's.
+        ...(peer.namedHere ? { redeemedLabel: peer.label } : {})
       })
       return peer
     } catch (error) {
@@ -976,7 +975,9 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
         hostKey !== state.selfKey &&
         !state.members.some((member) => member.hostKey === hostKey)
       ) {
-        throw new Error('host_mesh_invalid_request')
+        // Why its own code: the host may have been ejected while the dialog that named it was open, and an
+        // unusable-name message for a machine that is no longer a member misleads the owner.
+        throw new Error('host_mesh_unknown_member')
       }
       const next = setHostMeshName(state, { hostKey, label: wanted })
       saveState(next)

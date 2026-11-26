@@ -75,8 +75,6 @@ export function SshStatusSegment(): React.JSX.Element | null {
     unsupportedPeerCount,
     refresh: refreshRelayed
   } = useRelayedFleetHosts()
-  // Why gated on the menu: the mesh read is local but pointless for a closed menu, and the rows only exist
-  // while it is open.
   const meshPairStatuses = useHostMeshPairStatuses(menuOpen)
 
   const projectHostIds = useMemo(

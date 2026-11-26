@@ -70,7 +70,9 @@ export const peerEntrySchema = z.looseObject({
   environmentId: z.string().min(1).nullable(),
   // The name a redemption wrote into this host's pairing row, so a later pass can tell an invented word from one
   // the owner typed.
-  redeemedLabel: z.string().max(256).nullable().optional()
+  // Why no length cap here: this host writes a name it already suffixed (`Mac mini (2)`) or one an owner typed, so a
+  // cap would reject a value of its own making and drop the entry — losing the device rows removal needs.
+  redeemedLabel: z.string().nullable().optional()
 })
 
 /** Partial on purpose: a build that adds a rule leaves this one's booleans at their defaults. */

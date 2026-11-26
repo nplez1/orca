@@ -27,12 +27,18 @@ export type RenameEnvironmentArgs = {
   disambiguate?: boolean
 }
 
+export type RenameEnvironmentOutcome = {
+  environment: KnownRuntimeEnvironment
+  /** False when the row already had this name, which is what a repeated mesh pass looks like. */
+  changed: boolean
+}
+
 /** Renames a saved server in place, keeping its id, pairing and history. */
 export function renameEnvironment(
   userDataPath: string,
   selector: string,
   args: RenameEnvironmentArgs
-): KnownRuntimeEnvironment {
+): RenameEnvironmentOutcome {
   const store = readPersistedEnvironmentStore(userDataPath)
   const existing = resolveEnvironmentFromStore(store, selector)
   const wanted = args.name.trim()
@@ -46,7 +52,7 @@ export function renameEnvironment(
     throw remoteServerPairingStoreError('nameTaken', { name: collision.name })
   }
   if (name === existing.name) {
-    return existing
+    return { environment: existing, changed: false }
   }
   const next = { ...existing, name, updatedAt: args.now ?? Date.now() }
   writeEnvironmentStore(userDataPath, {
@@ -55,7 +61,7 @@ export function renameEnvironment(
       .map((entry) => (entry.id === existing.id ? next : entry))
       .sort((a, b) => a.name.localeCompare(b.name))
   })
-  return next
+  return { environment: next, changed: true }
 }
 
 /** `Mac mini`, then `Mac mini (2)`, since a fleet can legitimately hold two machines with one name. */

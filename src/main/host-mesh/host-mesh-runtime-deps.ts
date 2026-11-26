@@ -153,7 +153,9 @@ function depsFromApp(server: HostMeshRuntimeServer): HostMeshDriverDeps {
       return {
         environmentId: outcome.environment.id,
         hostKey: orcaHostKeyOf(publicKey),
-        label: outcome.environment.name
+        label: outcome.environment.name,
+        // Only a row this store created carries the name this host chose; an upsert kept the one it already had.
+        namedHere: !outcome.updatedExisting
       }
     },
     // Why fired and not awaited: the dep is called from a synchronous position, and an environment with
@@ -166,11 +168,10 @@ function depsFromApp(server: HostMeshRuntimeServer): HostMeshDriverDeps {
     // Why the catalog broadcast is conditional: every window refetches the pairing list on it, and a pass that
     // rebroadcast a name the store had already suffixed would do that every minute for the rest of the install.
     renameEnvironment: async (environmentId, name) => {
-      const renamed = await renameEnvironment(userDataPath, environmentId, {
+      const { changed } = await renameEnvironment(userDataPath, environmentId, {
         name,
         disambiguate: true
       })
-      const changed = renamed.name === name
       if (changed) {
         publishRuntimeEnvironmentCatalogChanged()
       }

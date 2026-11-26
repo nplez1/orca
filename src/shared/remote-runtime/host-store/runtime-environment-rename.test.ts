@@ -37,8 +37,9 @@ describe('renaming a saved server', () => {
 
     const renamed = renameEnvironment(userDataPath, id, { name: '  Build mini  ' })
 
-    expect(renamed.id).toBe(id)
-    expect(renamed.name).toBe('Build mini')
+    expect(renamed.changed).toBe(true)
+    expect(renamed.environment.id).toBe(id)
+    expect(renamed.environment.name).toBe('Build mini')
     const [stored] = listEnvironments(userDataPath)
     expect(stored?.name).toBe('Build mini')
     expect(stored?.id).toBe(id)
@@ -51,7 +52,7 @@ describe('renaming a saved server', () => {
     expect(() => renameEnvironment(userDataPath, id, { name: 'studio' })).toThrow()
 
     const suffixed = renameEnvironment(userDataPath, id, { name: 'Studio', disambiguate: true })
-    expect(suffixed.name).toBe('Studio (2)')
+    expect(suffixed.environment.name).toBe('Studio (2)')
   })
 
   it('refuses a blank name', async () => {
