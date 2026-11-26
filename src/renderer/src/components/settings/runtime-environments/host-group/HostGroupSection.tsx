@@ -147,7 +147,7 @@ export function HostGroupSection(): React.JSX.Element | null {
             <DialogDescription>
               {t(
                 'auto.components.settings.hostGroup.leaveDescription',
-                'This computer stops listing the mesh’s members and leaves it. The pairings with each member stay, and every member keeps its own copy.'
+                'This computer leaves the group and drops its pairings with the members: each one is told, and this computer forgets the reach in both directions. Pairings with machines outside the group are untouched.'
               )}
             </DialogDescription>
           </DialogHeader>
