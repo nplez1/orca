@@ -43,7 +43,9 @@ already present, so a rerun after a forgotten row repairs it and duplicates noth
 It refuses a path that does not exist, a path git does not track (the ratchet scans the index, so that
 row would be stale on arrival — \`git add\` it first), and a file under its budget. It warns, without
 refusing, when the path is absent from the recorded sync base: the fork's rule is to split a
-fork-owned file rather than exempt it, and local/max-lines-exemption.test.mjs fails on that row.`
+fork-owned file rather than exempt it, and local/max-lines-exemption.test.mjs fails on that row.
+A row already recorded in that test's FORK_OWNED_EXCEPTIONS is exempt from the rule and is not
+warned about; adding a path to it is a policy change, not part of this tool's job.`
 
 /** The `-- Why:` text of a file's max-lines disable, or null when it carries none. */
 export function maxLinesReason(sourceText) {

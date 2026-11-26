@@ -86,6 +86,30 @@ rather than a restore).
 **Do not:** resolve a stale entry by restoring the file. A moved `upstreamBlob` means the question is
 open again, not that the deletion was wrong.
 
+### The deleted-fork-tests baseline was re-bound, and its predecessor's debts are named here
+
+**Paths:** `local/sync/upstream-deleted-fork-tests-baseline.json`
+
+**Resolution:** manual — `--baseline-init --accept` for the new range
+
+**Decision:** the file records one range at a time, and a baseline bound to another range is ignored
+by `deleted-fork-tests.mjs`. This sync re-bound it to `3e227259249..f9895f13436` with 0 paths and 0
+cases gone, which is the correct answer and also deleted the previous range's 167 paths and 237 cases
+from the tree — including their `coverage owed` notes. Two LOCAL-PATCHES.md rows cite this file as
+where that evidence lives, so what those rows point at is now this paragraph plus git history. The
+debts that were recorded there and are still owed:
+
+- the `servesLocally` webhook card cases (no test pins a locally-served webhook staying out of the
+  cloud's rule list);
+- the REST-first update-delay resolver (its two titles survive only in
+  `local/nightly-linux-known-red.json`'s `prunedSince` history);
+- the keybindings-under-`~/.orca-np` case;
+- the orcad `ORCA_USER_DATA` precedence case.
+
+**Do not:** read an empty `files`/`cases` map as "nothing was ever lost". It means nothing is known to
+be gone _in the recorded range_; the earlier record is in git, at the commit before this sync's
+`local(sync)` baseline commit.
+
 ---
 
 ## 2026-11-24 sync (upstream `7daf01d99f3`, 1350 commits)

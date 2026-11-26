@@ -32,7 +32,7 @@ export function lintMarkerPath(gitCommonDir, revision) {
  * The revision and tree state a marker names, and the common git dir markers live under.
  *
  * Why the common dir and not the worktree's own git dir: a linked worktree answers the latter with
- * `.git/worktrees/<name>`, which would split the markers per worktree and re-gate one SHA twice —the
+ * `.git/worktrees/<name>`, which would split the markers per worktree and re-gate one SHA twice — the
  * bug `gate-unit.mjs` documents around its cache dir.
  */
 export function lintVerdictTarget(git) {

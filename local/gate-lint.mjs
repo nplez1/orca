@@ -328,15 +328,6 @@ export function unaccountedFailureLines(output, accounted = []) {
 }
 
 /**
- * Whether a failure line is covered by a known-red entry.
- *
- * Why `wholeStep` rather than "no match": a missing `match` used to mean the broadest possible entry,
- * which also masked a new failure in that step. It is now the explicit, rarer form — the only way to
- * allowlist a step whose output the parser could not split into lines. Shape is validated by
- * `entryProblem`, which the line loop must not call: a throw here would abandon every later step.
- */
-
-/**
  * Turn step results into a verdict.
  *
  * `results`: `[{ id, exitCode, output, seconds }]`. `entries`: the allowlist's `entries`.
