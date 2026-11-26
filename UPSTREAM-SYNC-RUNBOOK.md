@@ -404,13 +404,23 @@ at no cost.
   is reported like any other. A bare `gh run list --workflow fork-main-tests.yml -L1` _does_ show a
   candidate run — add `--branch main` when you mean the nightly.
 
-**Triage in parallel.** Start `gh run watch <id> --repo nplez1/orca --compact --exit-status` as one
-background command and let its exit notify you; meanwhile carry on with Step 3's review and the local
-release gates. A red shard is fixed or classified exactly as a release-lane red is (RELEASE-RUNBOOK.md
-Step 1.5): `gh run download <id> --repo nplez1/orca`, then
-`node local/check-nightly-linux-parity.mjs --failures <dir>`, and hand the reds to a fixer with
-[`repair-tests.md`](./local/sync/templates/repair-tests.md). Commit the fixes and re-run the script on
-the new HEAD.
+**Triage without ending the turn.** `gh run watch … &` is not a wait in this harness: pi does not track
+a bash job, so it notifies nothing, and the turn that starts one and stops is never woken. One measured
+release session lost 4 hours that way (14:07 to 18:11) with the lane's result already sitting unread.
+Wait in one of the three shapes that do wake:
+
+1. **Hold the turn** with a sized foreground command —
+   `timeout 1800 bash -c "gh run watch <id> --repo nplez1/orca --compact --exit-status"`. The same shape
+   on `orca-queue node local/gate-unit.mjs` returned in 62–69 s in that session, so this is cheaper than
+   it looks.
+2. **Hand it to an Agent**, whose completion does notify.
+3. **One bounded poll loop** — `while kill -0 $pid` under a single `timeout`. Never `sleep N; tail` turns:
+   each one costs a whole turn to learn nothing.
+
+A red shard is fixed or classified exactly as a release-lane red is (RELEASE-RUNBOOK.md Step 1.5): `gh run
+download <id> --repo nplez1/orca`, then `node local/check-nightly-linux-parity.mjs --failures <dir>`, and
+hand the reds to a fixer with [`repair-tests.md`](./local/sync/templates/repair-tests.md). Commit the
+fixes and re-run the script on the new HEAD.
 
 **Run it again on the final revision**, before `node local/dispatch-release.mjs`, and wait for it to
 pass. The one exemption: a later commit that touches only `local/sync/release-review/*.json` does not

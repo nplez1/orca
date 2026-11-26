@@ -50,13 +50,14 @@ Notes for this release: {{NOTES}}
 - Follow Step 0.5, then Step 1.5. Repair gate reds with `repair-tests.md` / `repair-lint.md`.
 - Follow Step 1.6, the review gate, exactly as written there. Fix its findings with
   `repair-review-findings.md`. Do not use `--waive-review`.
-- Re-run the early Linux lane on the final revision (UPSTREAM-SYNC-RUNBOOK.md Step 3.5). Start
-  `gh run watch <id> --repo nplez1/orca --exit-status` as one background command, wait for its exit
-  notification, and follow Step 2 to dispatch only once it exits 0 — a foreground watch outlives the
-  harness's 600 s command limit (rule 6). Never `gh workflow run fork-release.yml` directly.
-- Watch the release run the same way: one background
-  `gh run watch <id> --repo nplez1/orca --compact --exit-status`, then its exit notification. Pass
-  `--repo nplez1/orca` to every `gh` command: without it `gh` resolves to the `upstream` remote.
+- Re-run the early Linux lane on the final revision (UPSTREAM-SYNC-RUNBOOK.md Step 3.5). Follow Step 2
+  to dispatch only once it exits 0. Never `gh workflow run fork-release.yml` directly. A foreground watch
+  can outlive a harness command cap (600 s under Claude Code; pi runs unbounded unless you size one), so
+  hold the turn with a `timeout` sized to the lane or hand the watch to an Agent — never `&` and carry on: pi does not notify on a bash job, and one
+  release session lost 4 hours that way.
+- Watch the release run the same way: a sized foreground
+  `timeout 1800 bash -c "gh run watch <id> --repo nplez1/orca --compact --exit-status"`, or an Agent.
+  Pass `--repo nplez1/orca` to every `gh` command: without it `gh` resolves to the `upstream` remote.
 - Read the draft release body as the
   runbook's "Release notes" section says, and publish only when it is right.
 - Verify the published release: its tag, that it is marked Latest, and that its asset list matches the

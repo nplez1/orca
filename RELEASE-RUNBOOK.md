@@ -149,6 +149,30 @@ cannot outrun those verdicts. Nothing checks `Fork base gates` was green for the
 change the compiler's verdict at publish time was whatever the dispatcher happened to have run by hand.
 A typecheck red has no allowlist: the fix is a clean `pnpm tc`, the same as this step's.
 
+### The order that keeps the review valid
+
+Every gate repair moves HEAD and a review covers a revision, so the gates go **before** the review,
+never after it:
+
+1. Finish every code edit and every review fix.
+2. `orca-queue node local/gate-lint.mjs`.
+3. `orca-queue node local/gate-unit.mjs`, `pnpm tc`, and the early Linux lane on that same HEAD.
+4. The review, then its delta round on the fix commit.
+5. From here to the dispatch, only review-neutral commits: `*.md` and `local/sync/release-review/**`.
+
+On the 2026-11-24 release lint failed 5 of 11 runs, and each repair moved HEAD _after_ the review was
+written, so every one of them voided it and opened another delta round. `--prepare` now refuses outright
+until the lint and unit gates pass on HEAD — the same rule enforced rather than described.
+
+Packaging is the one gate with no local form today, and that is what the same release paid for: all three
+package jobs failed on a bare `socket.io-client` import, discovered only when the release itself was
+dispatched. Before step 4, produce one artifact and point the packaging guard at it:
+
+```bash
+pnpm build:unpack                             # one platform, --dir: minutes, not a release
+node local/verify-packaged-bundle.mjs         # exit 2 means nothing was checked, never a pass
+```
+
 ## Step 1.6 — the review gate, before the dispatch
 
 **Why this is a step and not a note.** On 2026-11-10 this release shipped after a review that had spawned six
@@ -213,6 +237,11 @@ node local/release-review-gate.mjs                           # still the authori
   finding was not real).
 - **The gate refuses** a release whose sweep has a silent slice, whose sweep finding nobody adjudicated, or
   whose adjudicated BLOCKER/SHOULD-FIX is neither fixed nor dismissed with a reason.
+
+- **A delta that reports nothing above MINOR/NIT closes the loop.** MINOR and NIT are listed in the PR
+  body, not fixed and not re-reviewed — on the 2026-11-24 release rounds 5–14 found 0 blockers and 1
+  SHOULD-FIX, and the 14-round tail cost ~$60. A fourth delta round needs the user's explicit approval:
+  say what is still outstanding and let them decide.
 
 - **`--prepare`** writes `git show --remerge-diff` of HEAD's sync (the newest first-parent merge, or
   `--merge <sha>`) into `<git dir>/orca-review/sync-<merge>/`, never `/tmp`. It leaves out content another gate

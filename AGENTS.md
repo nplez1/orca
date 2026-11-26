@@ -152,6 +152,9 @@ fork-only patch as a reversion — that is where the ~300k-line PRs came from.
   their real cost and causes repeated timeouts and restarts. The unit is per-harness — pi's Bash tool
   takes **seconds** (`timeout: 600`), Claude Code's takes **milliseconds** (`600000`). An ms-scale
   number handed to pi is not rejected, it just means ~7 days: no deadline at all.
+- **A turn may not end with only a detached background process outstanding**: pi does not notify on a
+  bash job, so nothing ever wakes that turn. Hold the turn with a sized foreground command, or hand the
+  work to an Agent, which does notify.
 - Electron and tests: `ORCA_BACKGROUND_LAUNCH=1`, hidden renderers, CDP screenshots. Never steal focus.
 
 ## CI-fix cycle — standing preference
