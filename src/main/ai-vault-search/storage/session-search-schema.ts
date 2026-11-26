@@ -1,4 +1,3 @@
-import { removeTree } from '../../../shared/file-write/windows-transient-lock-removal'
 import { randomUUID } from 'node:crypto'
 import { ensureSessionListSchema, prepareSessionListSchema } from '../session-search-list-schema'
 import type SyncDatabase from '../../sqlite/sync-database'
@@ -136,15 +135,5 @@ export function addSessionSearchPrefixHashColumn(db: SyncDatabase): void {
   } catch (error) {
     db.exec('ROLLBACK')
     throw error
-  }
-}
-
-/** Async lock retries keep scanner/server deadlines responsive after all workers have retired. */
-export async function removeSessionSearchDatabaseAsync(path: string): Promise<void> {
-  if (path === ':memory:') {
-    return
-  }
-  for (const suffix of ['', '-wal', '-shm', '-journal']) {
-    await removeTree(`${path}${suffix}`)
   }
 }

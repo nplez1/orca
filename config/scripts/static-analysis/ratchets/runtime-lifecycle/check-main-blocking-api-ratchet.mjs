@@ -111,6 +111,7 @@ export async function main(root = process.cwd(), arg = undefined, sources = unde
       {
         name: `main-blocking-${category}`,
         baselinePath: `config/main-blocking-${category}-baseline.txt`,
+        overlayPath: `config/main-blocking-${category}-baseline.fork.txt`,
         header: [
           `# Legacy synchronous ${category} uses per file; counts may only go DOWN.`,
           '# Worker/utility entries and modules only they import are exempt; anything event-loop code imports stays guarded.'

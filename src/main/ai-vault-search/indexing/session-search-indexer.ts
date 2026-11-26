@@ -102,9 +102,14 @@ export class SessionSearchIndexer {
       )
     }
     // Claim ownership before async initialization so another indexer cannot race the writer open.
-    this.store = new SessionSearchWorkerStore(options.databasePath, onError, () => {
-      this.sweepNext = true
-    })
+    this.store = new SessionSearchWorkerStore(
+      options.databasePath,
+      onError,
+      () => {
+        this.sweepNext = true
+      },
+      options.contentEnabled
+    )
     liveIndexerPaths.add(this.ownershipPath)
     this.store.setRetentionCutoffMs(this.cutoffMs())
     this.unregister = registerSessionSearchIndexConsumer(this.store)

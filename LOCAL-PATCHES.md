@@ -1794,6 +1794,44 @@ put upstream's worker-only sqlite on **orcad's** event loop, because orcad insta
 in process. That is 12 files and ~150 synchronous uses, so it is a code fix — run orcad's search
 through the session-search worker, or keep the store out of the module orcad loads — and not a
 baseline row. Recording it would silence the ratchet that exists to catch exactly this.
+**Resolved 2026-11-25** in the code, as asked: see the next section.
+
+### `local(lint)`: `main-blocking-api`'s sqlite category fixed in the code, two pre-ratchet rows adopted
+
+`check:main-blocking-api-ratchet` was red on an unchanged `main` (767c078) with 13 sqlite findings.
+Upstream `7daf01d99f3` is green. The fork's tree was red before that sync too (`1db15d9ff09`,
+2026-11-19), so the fork's own code put them there.
+
+- **Session search, 11 files, fixed in the code.** `SessionSearchInstance`, which orcad installs in
+  process, now holds no connection. The writer thread records content consent when it opens the index
+  (`open` carries `contentEnabled`), and Agent Session History's list is a reader-thread `list` op that
+  reads every page in one request. A list the readers fail, such as one a settings change retires,
+  answers null, so the caller falls back to the scanner as before. The worker side is
+  `worker/session-search-worker-instance-ops.ts`. `removeSessionSearchDatabaseAsync` moved from
+  upstream's `storage/session-search-schema.ts` to `storage/session-search-database-removal.ts`, so the
+  instance no longer imports the opener. That takes upstream's `session-search-schema.ts` out of orcad's
+  graph too (a `0` overlay row).
+- **Two pre-ratchet rows adopted**, both fork #238 (2026-10-29), which predates the ratchet's arrival
+  in the fork (upstream #41263, 2026-11-15 sync):
+  - `parse-cache/session-parse-cache-database.ts` at 27 (+7, the parser-version stamp). Its SQL runs
+    only in the scanner child, because the database opens behind `owner`, set only by
+    `initSessionParseCachePersistence`.
+  - `orchestration/db/schema/migrate.ts` at 1, the pre-DDL `user_version` read. It does run on main,
+    once per orchestration DB open. Upstream's own `migrate()` reads the same pragma uncounted.
+  - The deeper fix for the first is to move parse-cache's configure/get into a SQL-free module. That
+    would also clear upstream's 20 and the helper overlay's 12.
+- **Overlay, not base rows:** the ratchet gained the helper ratchet's one `overlayPath:` line, so
+  `config/main-blocking-sqlite-baseline.txt` stays upstream's bytes. Rows that dropped out were pruned:
+  11 from the helper overlay (one is now `0`) and `session-search-list-schema.ts`'s main-sync-fs row.
+
+Anchors: the `overlayPath:` line in
+`config/scripts/static-analysis/ratchets/runtime-lifecycle/check-main-blocking-api-ratchet.mjs`;
+`config/main-blocking-sqlite-baseline.fork.txt`; the moved function, a sync-conflict hunk in upstream's
+`storage/session-search-schema.ts`. Upstream files that diverge further:
+`session-search-instance.ts`, `indexing/session-search-indexer.ts`,
+`worker/session-search-{readers,worker-entry,worker-protocol,worker-store-base}.ts` and
+`scan-service/session-scanner-service-search.ts`. Tests:
+`src/main/ai-vault-search/session-search-instance.test.ts`.
 
 ### `local(lint)`: the 2026-11-08 sync's lint gate — 14 red steps, what moved and why
 

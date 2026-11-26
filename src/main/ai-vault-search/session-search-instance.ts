@@ -9,20 +9,11 @@ import type { AiVaultSearchSettings } from '../../shared/ai-vault/search/ai-vaul
 import { SessionSearchIndexer } from './indexing/session-search-indexer'
 import { SessionSearchReaders } from './worker/session-search-readers'
 import { sessionSearchHistoryCutoffMs } from './session-search-retention-policy'
-import type SyncDatabase from '../sqlite/sync-database'
-import {
-  openSessionSearchDatabase,
-  removeSessionSearchDatabaseAsync
-} from './storage/session-search-schema'
+import { removeSessionSearchDatabaseAsync } from './storage/session-search-database-removal'
 import type { SessionSearchScanRoots } from './discovery/session-search-scan-roots'
 import type { SessionSearchIndexerOptions } from './indexing/session-search-indexer-options'
 import type { SessionSearchHostScope } from './session-search-service'
-import {
-  listIndexedSessions,
-  type IndexedSessionList,
-  type IndexedSessionListArgs
-} from './session-search-list'
-import { writeSessionSearchContentConsent } from './storage/session-search-store'
+import type { IndexedSessionList, IndexedSessionListArgs } from './session-search-list'
 
 export type SessionSearchInstanceOptions = {
   databasePath: string
@@ -31,12 +22,7 @@ export type SessionSearchInstanceOptions = {
   onError?: (error: unknown) => void
   reconcileIntervalMs?: number
 }
-type LiveIndex = {
-  indexer: SessionSearchIndexer
-  readers: SessionSearchReaders
-  /** Reader connection for the index list; the indexer owns a separate writer connection. */
-  db: SyncDatabase
-}
+type LiveIndex = { indexer: SessionSearchIndexer; readers: SessionSearchReaders }
 
 /** Replace the writer and readers together, awaiting their exits before reopening or unlinking. */
 export class SessionSearchInstance {
@@ -76,7 +62,6 @@ export class SessionSearchInstance {
     const old = this.live
     this.live = null
     old?.indexer.close()
-    old?.db.close()
     const retired = old
       ? Promise.all([old.indexer.retired(), old.readers.close()])
       : Promise.resolve()
@@ -86,33 +71,24 @@ export class SessionSearchInstance {
       if (clear) {
         await removeSessionSearchDatabaseAsync(this.options.databasePath)
       }
-      // Open before the writer does: the writer's process reads consent from the
-      // rows, so the record has to land before the indexer's store opens.
-      const db = openSessionSearchDatabase(this.options.databasePath)
-      writeSessionSearchContentConsent(db, settings.contentEnabled)
+      const indexer = new SessionSearchIndexer({
+        ...this.options,
+        historyDays: settings.historyDays,
+        contentEnabled: settings.contentEnabled
+      })
       try {
-        const indexer = new SessionSearchIndexer({
-          ...this.options,
-          historyDays: settings.historyDays,
-          contentEnabled: settings.contentEnabled
-        })
-        try {
-          await indexer.initialize()
-        } catch (error) {
-          indexer.close()
-          await indexer.retired()
-          throw error
-        }
-        const readers = new SessionSearchReaders(
-          this.options.databasePath,
-          sessionSearchHistoryCutoffMs(settings.historyDays, Date.now())
-        )
-        this.live = { indexer, readers, db }
-        void indexer.start().catch(this.onError)
+        await indexer.initialize()
       } catch (error) {
-        db.close()
+        indexer.close()
+        await indexer.retired()
         throw error
       }
+      const readers = new SessionSearchReaders(
+        this.options.databasePath,
+        sessionSearchHistoryCutoffMs(settings.historyDays, Date.now())
+      )
+      this.live = { indexer, readers }
+      void indexer.start().catch(this.onError)
     })
     this.trackTransition(operation)
     return operation
@@ -171,12 +147,15 @@ export class SessionSearchInstance {
    * host with no sessions never indexes a file and would otherwise be stranded on
    * the scanner for good.
    */
-  listSessions(args: IndexedSessionListArgs): IndexedSessionList | null {
+  async listSessions(lists: IndexedSessionListArgs[]): Promise<IndexedSessionList[] | null> {
     const live = this.live
     if (!live || live.indexer.status().lastSweepCompletedAt === null) {
       return null
     }
-    return listIndexedSessions(live.db, args)
+    return live.readers.list(lists).catch((error: unknown) => {
+      this.onError(error)
+      return null
+    })
   }
 
   /**
@@ -199,7 +178,6 @@ export class SessionSearchInstance {
       return
     }
     live.indexer.close()
-    live.db.close()
     await Promise.all([live.indexer.retired(), live.readers.close()])
   }
 }

@@ -39,7 +39,8 @@ export class SessionSearchWorkerStoreBase extends SessionSearchCursorSnapshot {
   constructor(
     protected readonly path: string,
     protected readonly onError: (error: unknown) => void,
-    private readonly onInvalidated: () => void = () => undefined
+    private readonly onInvalidated: () => void = () => undefined,
+    private readonly contentEnabled?: boolean
   ) {
     super()
     this.client = new SessionSearchWorkerClient(
@@ -68,7 +69,13 @@ export class SessionSearchWorkerStoreBase extends SessionSearchCursorSnapshot {
     this.initialization ??= (async () => {
       await this.client.retired()
       const epoch = this.client.epoch
-      await this.client.request({ op: 'open', path: this.path, reader: false, cutoff: this.cutoff })
+      await this.client.request({
+        op: 'open',
+        path: this.path,
+        reader: false,
+        cutoff: this.cutoff,
+        ...(this.contentEnabled === undefined ? {} : { contentEnabled: this.contentEnabled })
+      })
       this.initializedEpoch = epoch
     })()
       .catch((error) => {

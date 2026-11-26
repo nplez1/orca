@@ -182,24 +182,23 @@ export class SessionScannerServiceSearch {
     }
     const limit = aiVaultScanLimit(options)
     const scopePaths = options.scopePaths ?? []
-    const read = (paths: readonly string[]): AiVaultSession[] | null =>
-      instance.listSessions({
-        limit,
-        scopePaths: paths,
-        executionHostId: options.executionHostId ?? LOCAL_EXECUTION_HOST_ID,
-        ...(query ? { query } : {})
-      })?.sessions ?? null
+    const page = (paths: readonly string[]) => ({
+      limit,
+      scopePaths: paths,
+      executionHostId: options.executionHostId ?? LOCAL_EXECUTION_HOST_ID,
+      ...(query ? { query } : {})
+    })
     // The unscoped page comes first: a scope widens it, never replaces it, and an
     // unbounded page already holds every scope's rows.
     const unbounded = !Number.isFinite(limit)
-    const capped = read([])
-    if (capped === null) {
+    const scoped = scopePaths.length > 0 && !unbounded
+    // One request, so both pages pass the same warm-up gate in one reader turn.
+    const pages = await instance.listSessions(scoped ? [page([]), page(scopePaths)] : [page([])])
+    if (pages === null) {
       return null
     }
-    // The union the scanner applies. The second read shares the first's turn, so a null
-    // here cannot differ from it.
-    const scopeSessions = scopePaths.length > 0 && !unbounded ? (read(scopePaths) ?? []) : []
-    const sessions = unionScopedSessions(capped, scopeSessions)
+    // The union the scanner applies.
+    const sessions = unionScopedSessions(pages[0].sessions, pages[1]?.sessions ?? [])
     return {
       sessions: sessions.map(withCachedPreviews),
       issues: [],

@@ -3,7 +3,7 @@
   "base": "7daf01d99f3d3301bf3c867e293ebb9d1f9a324e",
   "perFileThreshold": 5,
   "accepted": "The 2026-11-24 release: the Photon runtime's socket.io-client packaging root records why a fork dependency must be copied beside the main bundle (three platform package jobs failed without it), and the zsh login-shell arm's guard explains why the binary rather than the platform decides.",
-  "total": 4767,
+  "total": 4764,
   "files": {
     ".github/workflows/e2e.yml": 11,
     ".github/workflows/pr.yml": 7,
@@ -38,7 +38,7 @@
     "src/main/ai-vault-search/indexing/session-search-indexer.ts": 21,
     "src/main/ai-vault-search/query/session-search-engine.ts": 9,
     "src/main/ai-vault-search/scope/session-search-scope-paths.ts": 7,
-    "src/main/ai-vault-search/session-search-instance.ts": 21,
+    "src/main/ai-vault-search/session-search-instance.ts": 18,
     "src/main/ai-vault-search/session-search-retention-policy.ts": 12,
     "src/main/ai-vault-search/storage/session-search-index-writer.ts": 16,
     "src/main/ai-vault-search/storage/session-search-store.ts": 34,
