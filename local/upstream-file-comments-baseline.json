@@ -2,8 +2,8 @@
   "note": "Fork comments in upstream-owned files (LOCAL-PATCHES.md). Frozen per-file maxima at or above 5 lines plus the frozen total; both may only shrink. Regenerate with `node local/check-upstream-file-comments.mjs --init`.",
   "base": "3e227259249d2daa02ce89f927036bb931fcd1b1",
   "perFileThreshold": 5,
-  "accepted": "2026-11-26 sync (upstream 3e227259249): the fork's comment lines in upstream-owned files grew by 34 with this merge — the launch-extras helper in bot-tools-file, the settings host-scope guards, the leave-thread source widening, the changed-code casting exemption, and upstream's own rewritten files that the fork's delta now sits inside. Re-taken at the new base rather than per-file: this baseline is a running measure, and each line above is a fork comment a reviewer can see in the merge diff. Evidence: LOCAL-PATCHES.md § local(lint).",
-  "total": 4797,
+  "accepted": "2026-11-26 release: the nine Linux-lane repairs added 12 fork comment lines to upstream-owned files — the two hook matchers now explain why the alternation comes from HOME_DIRECTORY_NAME/LEGACY_HOME_DIRECTORY_NAME, the root-bypass parser explains the relay-name acceptance, and the pi look-around mirror is upstream's own text. Each line is a fork comment a reviewer sees in the diff. Evidence: LOCAL-PATCHES.md § local(lint).",
+  "total": 4809,
   "files": {
     ".github/workflows/e2e.yml": 11,
     ".github/workflows/pr.yml": 7,
