@@ -9,7 +9,7 @@ import { BotAvatarColorSchema } from './bot-avatar-color'
 import { BotStoredOutfitSchema } from './bot-avatar-outfit'
 import { BOT_TOOL_HEADER_NAME_PATTERN, BOT_TOOL_NAME_PATTERN, BotToolUrl } from '../bot-tools'
 import { BOT_AGENTS, BotNameSchema, type BotAgent } from '../bot-types'
-import { validateSkillPackageName } from '../skills/packages/skill-package-manifest'
+import { validateSkillPackageName } from '../skills/packages/skill-package-name'
 import type { BotTextFlagKind } from './bot-text-scan'
 
 export const BOT_PACKAGE_SCHEMA_VERSION = 1
