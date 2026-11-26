@@ -6239,18 +6239,18 @@ tests, including a three-host simulation that drives the real protocol through a
 | `src/cli/{specs/index,hosts/host-handler-groups,dispatch/remote-selection-scope}.ts`                                                            | `orca group` registration                                             |
 | `src/main/startup/runtime-startup/main-process-runtime-launch.ts`                                                                               | the one `configureHostMeshRuntimeFromApp` call                        |
 
-**A host's name, and what it cost upstream (2026-11-27).** A name is a fact about the group rather than
+**A host's name, and what it cost upstream (2026-11-26).** A name is a fact about the group rather than
 about the client showing it: `HostMeshSyncPayload.names` carries a versioned register, a rename on any
 host propagates on the next pass, and each pass renames this host's own pairing row from the winning
 entry — which is what repairs the rows a redemption had named `Mesh host 8f3ac2b1`, without re-pairing
 anything. A redemption now names the row from the label the peer reports in its request (the sealed
 payload is held to an exact field set and deliberately unchanged); the peer index records the label a
 redemption wrote so a later pass can rank an invented name below one an owner typed. The upstream cost is
-five seams, all declared in `local/checks/host-mesh-upstream-seams.mjs`: one command case, the protocol
-request/success pair, one async facade wrapper, the operations re-export, and the glyph slot on the
-status bar's runtime host row. The rename operation, the merge rules and the ranking live in fork-owned
-files (`runtime-environment-rename.ts`, `host-mesh-names.ts`, `MeshPairStatusIcon.tsx`,
-`use-host-mesh-pair-statuses.ts`).
+six seams, all declared in `local/checks/host-mesh-upstream-seams.mjs`: one command case, the protocol
+request/success pair, one async facade wrapper, the operations re-export, the glyph slot on the
+status bar's runtime host row, and one blocking-helper baseline row. The rename operation, the merge rules
+and the ranking live in fork-owned files (`runtime-environment-rename.ts`, `host-mesh-names.ts`,
+`MeshPairStatusIcon.tsx`, `use-host-mesh-pair-statuses.ts`).
 
 **Permissions, and why they are what they are.** The six peer-facing methods are `workspace` — a caller at
 that tier already runs host-user code, so learning membership is not a new capability, and every dangerous
