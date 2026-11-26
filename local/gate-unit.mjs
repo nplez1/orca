@@ -41,6 +41,7 @@ import { FORK_TEST_INCLUDE, forkTestFiles } from './run-fork-tests.mjs'
 import {
   GATE_INPUT_PATHS,
   allowlistFingerprint,
+  cachedVerdictPath,
   cachedVerdictProblem,
   formatVerdict,
   gateInputsFingerprint,
@@ -598,9 +599,12 @@ function main() {
       : 'HEAD moved before the run recorded its revision'
   if (recordProblem) {
     console.log(`gate-unit: not recording this verdict — ${recordProblem}`)
-  } else if (cachePath) {
+  } else {
     mkdirSync(cacheDir, { recursive: true })
-    writeFileSync(cachePath, `${JSON.stringify(verdict, null, 2)}\n`)
+    writeFileSync(
+      cachedVerdictPath(cacheDir, revision, allowlistHash),
+      `${JSON.stringify(verdict, null, 2)}\n`
+    )
   }
   reportResult(verdict)
   process.exit(verdict.exitCode)
