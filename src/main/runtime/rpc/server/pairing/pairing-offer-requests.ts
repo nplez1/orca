@@ -144,8 +144,6 @@ export async function createOwnerPairingOffer(
   params: PairingCreateOfferParams,
   lookup?: DefaultRouteInterfaceLookup,
   createdByDeviceId?: string,
-  // Why a separate argument: the wire schema is upstream's, and a caller that needs one row per recipient
-  // (the mesh hands a different machine its own offer) cannot express that as "rotate", which drops the rest.
   options: { fresh?: boolean; offerTtlMs?: number } = {}
 ): Promise<PairingCreateOfferResult> {
   if (params.scope === 'mobile') {
