@@ -104,7 +104,9 @@ debts that were recorded there and are still owed:
 - the REST-first update-delay resolver (its two titles survive only in
   `local/nightly-linux-known-red.json`'s `prunedSince` history);
 - the keybindings-under-`~/.orca-np` case;
-- the orcad `ORCA_USER_DATA` precedence case.
+- the orcad `ORCA_USER_DATA` precedence case;
+- the six `setTargetHidden` SSH-target cases (the feature still lives in `ssh-connection-store.ts`);
+- the ~20-case pane-screen prompt/dialog reader spec.
 
 **Do not:** read an empty `files`/`cases` map as "nothing was ever lost". It means nothing is known to
 be gone _in the recorded range_; the earlier record is in git, at the commit before this sync's

@@ -3587,7 +3587,7 @@ section stays readable. `tests/tools/fork-process-docs.test.mjs` holds the three
   batches of ≤20**. Decisions are in [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md)
   § 2026-11-24. What a reviewer will want first:
 
-  - **The test-retirement rule at 3× the last sync.** `local/sync/upstream-deleted-fork-tests-baseline.json`
+  - **The test-retirement rule at 3× the last sync** (superseded on 2026-11-26: that record was re-bound to the new range, and its 167 paths / 237 cases now live only in git — see the convergence ledger § 2026-11-26 for the debts that were named there). `local/sync/upstream-deleted-fork-tests-baseline.json`
     now records **167 fork-modified test files and 237 fork-added cases** (was 83), all taken as
     deletions — restoring a file upstream retired costs a permanent modify/delete conflict on every
     future sync. The retired harnesses that surviving tests still import are the 10 `restore`
@@ -3659,7 +3659,9 @@ section stays readable. `tests/tools/fork-process-docs.test.mjs` holds the three
     pins the basename — the part that matters, since a bare `orca` is GNOME's screen reader on Linux.
   - **83 fork-modified test files and 182 fork-added cases went with upstream's retirements**
     (#42831–#43662, #43120, #43339), recorded in
-    [local/sync/upstream-deleted-fork-tests-baseline.json](./local/sync/upstream-deleted-fork-tests-baseline.json).
+    [local/sync/upstream-deleted-fork-tests-baseline.json](./local/sync/upstream-deleted-fork-tests-baseline.json)
+    — re-bound to the 2026-11-26 range, so this count is now recorded in git history and in the
+    convergence ledger § 2026-11-26, not in that file.
     The heaviest loss is the fork's whole `src/main/updater/*.test.ts` set, in one of its most-patched
     areas; re-homing those cases into fork-owned suites is owed.
   - **25 upstream-owned files are exempted from `max-lines`, not split.** Each was verified as

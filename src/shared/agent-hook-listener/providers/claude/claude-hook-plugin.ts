@@ -17,4 +17,7 @@ const HOME_DIRECTORY_PATTERN = [HOME_DIRECTORY_NAME, LEGACY_HOME_DIRECTORY_NAME]
   .join('|')
 
 /** Matches any Orca-managed hook command in a settings file: script paths with either separator (JSON-escaped), the native .exe, encoded PowerShell. */
-export const CLAUDE_MANAGED_HOOK_COMMAND_PATTERN = String.raw`(?:${HOME_DIRECTORY_PATTERN}).{1,2}agent-hooks|orca-agent-hook\.exe|-EncodedCommand ${ORCA_ENCODED_HOOK_LEAD}`
+// Why a plain group and not `(?:…)`: this string is also run through `grep -sE` by the bash/zsh
+// `claude` wrapper (claude-shell-function.ts), which rejects `(?:` outright — silently under -s, so the
+// guard would read "no Orca hooks" and add them a second time.
+export const CLAUDE_MANAGED_HOOK_COMMAND_PATTERN = String.raw`(${HOME_DIRECTORY_PATTERN}).{1,2}agent-hooks|orca-agent-hook\.exe|-EncodedCommand ${ORCA_ENCODED_HOOK_LEAD}`
