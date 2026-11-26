@@ -23,6 +23,7 @@ import { linkBotOwnSkills } from './bot-own-skills'
 import { botSessionInstructions } from './bot-session-instructions'
 import { createBotSessionMentions } from './bot-session-mentions'
 import { botLaunchExtras } from './bot-tools-file'
+import { botGithubAppIdentityOutdated } from './bot-gh-app-identity'
 import { botLaunchRepos, type LaunchRepoStore } from './bot-launch-repos'
 import type { BotController } from './bot-controller'
 import type { BotWorkRecord } from './bot-work-record'
@@ -238,14 +239,24 @@ export function botStructuredSessionWiring(deps: {
     launchTools: {
       changed: async (sessionId) => {
         const launched = launchedTools.get(sessionId)
-        return (
-          launched !== undefined &&
-          (await sessionLaunchToolsChanged(launched, sessionHostMcpDelivered(sessionId)))
-        )
+        if (launched === undefined) {
+          return false
+        }
+        // Why the App check rides here and in `outdated`: the merge moved the launch onto upstream's
+        // tool digests, and `botLaunchToolsChecks` — the only caller of this test — lost its callers,
+        // so a token that expired or an App disconnected since launch reached nothing.
+        if (launched.bot && botGithubAppIdentityOutdated(launched.bot.appIdentity)) {
+          return true
+        }
+        return sessionLaunchToolsChanged(launched, sessionHostMcpDelivered(sessionId))
       },
       outdated: (sessionId) => {
         const launched = launchedTools.get(sessionId)
-        return launched !== undefined && sessionLaunchToolsOutdated(launched)
+        return (
+          launched !== undefined &&
+          ((launched.bot !== null && botGithubAppIdentityOutdated(launched.bot.appIdentity)) ||
+            sessionLaunchToolsOutdated(launched))
+        )
       }
     },
     prepareSessionLinkedSkills: async (record) => {

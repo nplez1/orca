@@ -119,8 +119,16 @@ export function MobileConnectorLogo({
     )
   }
   const side = SOURCE_ICON_VIEW_BOX[source]
+  // Why photon gets the neutral tone: it is this fork's iMessage connector, and borrowing Discord's
+  // blurple for the row's own glyph made two different connectors look alike.
   const fill =
-    source === 'github' ? colors.textPrimary : source === 'linear' ? '#5E6AD2' : '#5865F2'
+    source === 'github'
+      ? colors.textPrimary
+      : source === 'linear'
+        ? '#5E6AD2'
+        : source === 'photon'
+          ? colors.textSecondary
+          : '#5865F2'
   return (
     <Svg width={size} height={size} viewBox={`0 0 ${side} ${side}`} fill={fill}>
       <Path d={SOURCE_PATHS[source]} />

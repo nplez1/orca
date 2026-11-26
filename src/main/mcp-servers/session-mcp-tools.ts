@@ -15,6 +15,7 @@ import {
   type RelayFolders
 } from '../bots/tool-relay/bot-tool-relay'
 import { relayProcessUrl } from '../bots/tool-relay/bot-tool-relay-grants'
+import { withBotGhShimOnPath } from '../bots/fork-gh-shim'
 
 const LOOPBACK_HOSTS = ['127.0.0.1', 'localhost', '::1']
 
@@ -163,8 +164,11 @@ export function withSessionMcpToolsEnv(
   env: Record<string, string>,
   tools: SessionMcpTools
 ): Record<string, string> {
+  // Why the shim step is here and not in the caller: it is what puts the bot's `gh` wrapper on PATH, so
+  // the marker the own-PR guard reads is written at all. A launch that copies `extraEnv` without it
+  // carries ORCA_BOT_GH_SHIM_DIR as a bare variable and nothing on PATH.
   if (!tools.relayed) {
-    return Object.keys(tools.env).length > 0 ? { ...env, ...tools.env } : env
+    return withBotGhShimOnPath(Object.keys(tools.env).length > 0 ? { ...env, ...tools.env } : env)
   }
   // Both CLIs send loopback calls into HTTP(S)_PROXY unless NO_PROXY names loopback.
   const existing = [env.NO_PROXY, env.no_proxy]
@@ -172,5 +176,5 @@ export function withSessionMcpToolsEnv(
     .map((entry) => entry.trim())
     .filter(Boolean)
   const noProxy = [...new Set([...existing, ...LOOPBACK_HOSTS])].join(',')
-  return { ...env, ...tools.env, NO_PROXY: noProxy, no_proxy: noProxy }
+  return withBotGhShimOnPath({ ...env, ...tools.env, NO_PROXY: noProxy, no_proxy: noProxy })
 }

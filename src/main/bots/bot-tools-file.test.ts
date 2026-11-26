@@ -1,6 +1,6 @@
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, delimiter } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { botToolDraftInput, draftFromServer } from '../../shared/bots/bot-tool-draft'
 import { _resetSecretStoreForTests, setSecretStore } from '../../shared/secure-storage/secret-store'
@@ -16,8 +16,9 @@ import {
 import { readBotToolDetails } from './bot-tool-details'
 import { addBotTool, updateBotTool, type BotToolsHome } from './bot-tools-host'
 import { sessionMcpLaunchTools } from '../mcp-servers/session-mcp-launch'
+import { withSessionMcpToolsEnv } from '../mcp-servers/session-mcp-tools'
 import {
-  botSessionToolServers,
+  botLaunchExtras,
   botToolsPath,
   changeBotToolServers,
   currentBotToolsRevision,
@@ -72,18 +73,25 @@ describe("a bot's tools file", () => {
   })
 
   it.skipIf(process.platform === 'win32')(
-    "gives a launch in the bot's home the bot's own gh, first on its PATH",
+    "puts the bot's own gh first on the PATH its CLI is launched with",
     async () => {
       const folder = tempDir('bot-tools-file-')
-      const bots = [{ id: 'scout', name: 'Scout', folderWorkspaceId: 'scout-home' }]
-      const { tools } = await botSessionToolServers(
-        bots,
+      const bot = { id: 'scout', name: 'Scout', hostMcpServers: false as const }
+      const extras = await botLaunchExtras(bot, 'grok', folder)
+      const { tools } = await sessionMcpLaunchTools(
+        bot,
         { provider: 'grok', location: { workspaceId: folderWorkspaceKey('scout-home') } },
         folder,
-        relay
+        { relay, botLaunch: extras }
       )
-
-      expect(tools.env.ORCA_BOT_GH_SHIM_DIR).toContain('.gh-shims')
+      // Why PATH and not the env key: `withSessionMcpToolsEnv` consumes ORCA_BOT_GH_SHIM_DIR and
+      // prefixes PATH with it, and PATH is what decides whether the bot's `gh` — and so the marker the
+      // own-PR guard reads — exists at all. Asserting the variable alone is how that step went missing.
+      const env = withSessionMcpToolsEnv({ PATH: '/usr/bin:/bin' }, tools)
+      const shim = extras.extraEnv.ORCA_BOT_GH_SHIM_DIR ?? ''
+      expect(shim).toContain('.gh-shims')
+      expect(env.ORCA_BOT_GH_SHIM_DIR).toBeUndefined()
+      expect(env.PATH.startsWith(`${shim}${delimiter}`)).toBe(true)
     }
   )
 

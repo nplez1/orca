@@ -30,9 +30,9 @@ export function formatOffered(offered: NonNullable<BotReplyResult['offered']>): 
 export function formatReply(reply: ConnectorReply): string {
   const place = reply.place ?? 'the thread'
   return [
-    reply.status === 'posted'
-      ? `Posted to ${place}.`
-      : `Sent; Orca Cloud will post it to ${place}.`,
+    // Why `Queued for` rather than upstream's "Sent; Orca Cloud will post it to": a photon (iMessage)
+    // reply is queued locally and never goes through the cloud, so the claim would be false.
+    reply.status === 'posted' ? `Posted to ${place}.` : `Queued for ${place}.`,
     ...(reply.notices ?? [])
   ].join('\n')
 }
