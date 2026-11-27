@@ -582,7 +582,7 @@
 5 src/main/ipc/ephemeral-vm/ephemeral-vm-provision-handler.ts # split out of ephemeral-vm.ts; runs only on invoked provisions, never at boot
 7 src/main/ipc/ephemeral-vm/ephemeral-vm-runtime-handlers.ts
 7 src/main/ipc/ephemeral-vm/ephemeral-vm.ts
-3 src/main/ipc/ephemeral-vm/lazy-ephemeral-vm-handlers.ts # one-shot startup reconcile (only when VM state files exist), one-shot interrupted-provision flagging at startup (the session that never opens the VM UI is the one that must still flag them), and first-invoke handler load; all three run once, and nothing blocks an empty boot
+2 src/main/ipc/ephemeral-vm/lazy-ephemeral-vm-handlers.ts # one-shot startup reconcile (only when VM state files exist) and first-invoke handler load; nothing blocks an empty boot
 15 src/main/ipc/filesystem/access/filesystem-auth.ts
 20 src/main/ipc/filesystem/access/local-file-access-resolution.ts
 3 src/main/ipc/filesystem/filesystem.ts

@@ -65,6 +65,7 @@
 4 src/main/droid/droid-hook-config-files.ts # upstream #47853 added hook-install reads; two of the four reach the fork's blocking createManagedCommandMatcher
 1 src/main/dsh/hook-settings.ts
 2 src/main/ephemeral-vm-runtime-context-menu.ts
+3 src/main/ipc/ephemeral-vm/lazy-ephemeral-vm-handlers.ts # the fork's one-shot interrupted-provision flagging at startup (flagInterruptedEphemeralVmProvisioning reads shared/ephemeral-vm-provisioning-attempts.ts, which probes synchronously) joins upstream's one-shot reconcile and lazy group load; the session that never opens the VM UI is the one that must still flag them — LOCAL-PATCHES.md § local(vm)
 8 src/main/ephemeral-vm-runtime-extend.ts
 7 src/main/ephemeral-vm-runtime-provisioning-recovery.ts
 4 src/main/ephemeral-vm-runtime-reclaim.ts
