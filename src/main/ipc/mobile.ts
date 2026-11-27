@@ -3,11 +3,8 @@ import { app, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
 import type { RuntimeAccessGrant } from '../../shared/remote-runtime/host-catalog/runtime-access-grants'
 import type { MobilePairingConnectionMode } from '../../shared/remote-runtime/pairing/mobile-pairing-connection-mode'
 import type { RuntimePairingReach } from '../../shared/remote-runtime/pairing/runtime-pairing-reach'
-import {
-  isExpiredPairingOffer,
-  isPairedMobileDevice,
-  type DeviceEntry
-} from '../runtime/rpc/server/pairing/device-entry'
+import { isPairedMobileDevice, type DeviceEntry } from '../runtime/rpc/server/pairing/device-entry'
+import { isLiveRuntimeGrant } from '../host-mesh/host-mesh-runtime-grants'
 import {
   requestMobilePairingOffer,
   requestRuntimePairingOffer
@@ -183,10 +180,9 @@ export function registerMobileHandlers(
     }
     // Runtime links are bearer credentials immediately, so unconnected grants must remain revocable.
     const all = registry.listDevices({ fresh: true })
-    const now = Date.now()
     return {
       grants: all
-        .filter((d) => d.scope === 'runtime' && !isExpiredPairingOffer(d, now))
+        .filter(isLiveRuntimeGrant)
         .sort((a, b) => b.pairedAt - a.pairedAt)
         .map((d) => toRuntimeAccessGrant(d, all))
     }

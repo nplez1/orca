@@ -6529,6 +6529,43 @@ where a fork-owned `src/shared/host-mesh/` commit plus an undeclared upstream fi
 diff carrying the sync-base record is not. The same change fixes a latent crash: the verbose listing read
 `seam.budget` for every touched file, which no run reached while an undeclared file exited first.
 
+### `local(lint)`: the mesh row's upstream surface, measured back down (#492)
+
+The lint gate reddened on #492 at `b4e2b203` (run
+[45970908792](https://github.com/nplez1/orca/actions/runs/45970908792/job/140410832857)): `check-host-mesh-upstream-seams`
+reported `server-rows/runtime-server-row.tsx` at **21 lines against a budget of 2**, and the same revision measured
+locally under the strictness a hosts diff derives reports three upstream files the register did not declare at all —
+`src/main/ipc/mobile.ts` (9), `runtime-server-row-menu.tsx` (3) and `host-rows/ServerListRow.tsx` (2). 35 lines of
+upstream surface where the register allowed 2, and every one of them a hunk a sync pays for. The feature was right
+and the placement was not: the branch had moved Rename and Eject out of two ghost buttons beside the chip and into the
+host's overflow menu, which put the dialog's state, the dialog itself and a widened import into upstream's row file.
+
+Three changes, each following the register's own rule ("put what grew behind a fork-owned module"):
+
+- **The row is three lines again.** `mesh-member-affordance.tsx` (fork-owned) exports `MeshMemberAffordance`, which
+  renders the chip _and_ the dialogs, and `MeshMemberMenuItems`, which opens them. The menu and the chip slot are two
+  slots of upstream's row, so no component of this feature owns both: the open action lives in a module store beside
+  the snapshot the group already publishes (`useSyncExternalStore`, a primitive snapshot, so one row opening a dialog
+  does not re-render the others). The row renders one element plus one `meshItems` slot, and `budget: 2 → 3` is that
+  slot — the only raise here. Both dialogs portal, so the chip slot is a correct place to render them.
+- **`mobile.ts` is three lines, not nine.** The expired-offer predicate moved to the fork-owned
+  `host-mesh-runtime-grants.ts`, so upstream's file keeps its own import line and swaps one filter argument; five of
+  those nine lines were upstream's multi-line import block widening to carry a second name.
+- **Two seams declared, not moved.** `runtime-server-row-menu.tsx` (3: the optional `meshItems` slot) and
+  `host-rows/ServerListRow.tsx` (2: `py-px`/`leading-4` off the shared chip, so a Mesh, Default or SSH-tunnel chip
+  sits at label height — the third complaint recorded in `BRANCHES.md`) have no fork-owned alternative: one is a prop
+  on the component that owns the menu, the other is a class string. Both are in the register with a `why`, at their
+  measured line counts.
+
+Evidence: `node local/checks/host-mesh-upstream-seams.mjs --base origin/main` on `d423d627dd4` reports 4 upstream
+files / 35 lines and exit 1 (one over-budget seam, three undeclared), and exit 0 after, every declared seam at or
+under budget and nothing left as a note. The register now declares 22 upstream files / 107 budgeted lines; this
+branch spends 11 across four files. `local/design/host-mesh.md` § Upstream sync surface carries the same table.
+
+Anchors: `local/checks/host-mesh-upstream-seams.mjs` (three entries added, one raised),
+`src/renderer/src/components/settings/runtime-environments/host-group/mesh-member-affordance.tsx` (the store and the
+single element the row renders), `src/main/host-mesh/host-mesh-runtime-grants.ts`, `local/design/host-mesh.md`.
+
 ### `local(test)`: the perf contract whose Windows wall clock, not its operation count, reddened the lane
 
 `fork-performance-contracts` reddened on `main` at `767c078fde1` (run

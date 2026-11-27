@@ -2,7 +2,7 @@ import { defineFixture } from '../../../../component-fixtures/component-fixture'
 import type { HostMeshSnapshot } from '../../../../../../preload/api/host-mesh-api'
 import { ServerListRow, ServerRowChip } from '../../host-rows/ServerListRow'
 import { HostGroupSection } from './HostGroupSection'
-import { MeshMemberChip, MeshMemberMenuItems } from './mesh-member-affordance'
+import { MeshMemberAffordance, MeshMemberChip, MeshMemberMenuItems } from './mesh-member-affordance'
 import { publishHostMeshSnapshot } from './host-mesh-shared-state'
 
 /**
@@ -134,13 +134,13 @@ export const rowAffordance = defineFixture({
     <div className="divide-y divide-border rounded-lg border border-border bg-card">
       <ServerListRow
         name="studio"
-        chips={<MeshMemberChip environmentId="env-studio" />}
-        menuItems={<MeshMemberMenuItems environmentId="env-studio" onAction={() => {}} />}
+        chips={<MeshMemberAffordance environmentId="env-studio" />}
+        menuItems={<MeshMemberMenuItems environmentId="env-studio" />}
         status={{ label: 'Connected', tone: 'success' }}
       />
       <ServerListRow
         name="macbook-pro-16"
-        chips={<MeshMemberChip environmentId="env-laptop" />}
+        chips={<MeshMemberAffordance environmentId="env-laptop" />}
         status={{ label: 'Connected', tone: 'success' }}
       />
       <ServerListRow
@@ -148,7 +148,7 @@ export const rowAffordance = defineFixture({
         chips={
           <>
             <ServerRowChip>SSH tunnel</ServerRowChip>
-            <MeshMemberChip environmentId="env-unpaired" />
+            <MeshMemberAffordance environmentId="env-unpaired" />
           </>
         }
         status={{ label: 'Connected', tone: 'success' }}

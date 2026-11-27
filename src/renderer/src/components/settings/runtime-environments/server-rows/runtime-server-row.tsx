@@ -32,12 +32,7 @@ import {
   ServerRowDetailsToggle,
   type ServerRowStatus
 } from '../../host-rows/ServerListRow'
-import {
-  MeshMemberChip,
-  MeshMemberDialogs,
-  MeshMemberMenuItems,
-  type MeshMemberAction
-} from '../host-group/mesh-member-affordance'
+import { MeshMemberAffordance, MeshMemberMenuItems } from '../host-group/mesh-member-affordance'
 import { RuntimeSshAccessControl } from '../ssh-access/RuntimeSshAccessControl'
 import { RuntimeSshAccessDialog } from '../ssh-access/runtime-ssh-access-dialog'
 import {
@@ -117,7 +112,6 @@ export function RuntimeServerRow({
   const [repairOpen, setRepairOpen] = useState(false)
   const [sshDialogOpen, setSshDialogOpen] = useState(false)
   const [expanded, setExpanded] = useState(false)
-  const [meshAction, setMeshAction] = useState<MeshMemberAction | null>(null)
   const row = useRuntimeServerRowState(environment, details)
   const managedForgettable = managed ? managedServerForgettable(managed, row.serverReplaced) : false
   const actionBusy = connecting || switching || disconnecting || removing
@@ -291,16 +285,8 @@ export function RuntimeServerRow({
   const footer =
     pendingSshAccess ||
     expanded ||
-    meshAction !== null ||
     (managed && managedServerHasConfirmation(managed, managedForgettable)) ? (
       <>
-        {meshAction !== null ? (
-          <MeshMemberDialogs
-            environmentId={environment.id}
-            action={meshAction}
-            onClose={() => setMeshAction(null)}
-          />
-        ) : null}
         {pendingSshAccess && sshAccessApi ? (
           <RuntimeSshAccessControl
             api={sshAccessApi}
@@ -350,7 +336,7 @@ export function RuntimeServerRow({
                 {t('auto.components.settings.serverList.sshTunnelChip', 'SSH tunnel')}
               </ServerRowChip>
             ) : null}
-            <MeshMemberChip environmentId={environment.id} />
+            <MeshMemberAffordance environmentId={environment.id} />
           </>
         }
         meta={meta}
@@ -374,9 +360,7 @@ export function RuntimeServerRow({
                 <ManagedServerMenuItems lifecycle={managed} forgettable={managedForgettable} />
               ) : null
             }
-            meshItems={
-              <MeshMemberMenuItems environmentId={environment.id} onAction={setMeshAction} />
-            }
+            meshItems={<MeshMemberMenuItems environmentId={environment.id} />}
             onUpdate={onOpenUpdate}
             onConnect={() => onConnect(environment)}
             onDisconnect={() => onDisconnect(environment)}

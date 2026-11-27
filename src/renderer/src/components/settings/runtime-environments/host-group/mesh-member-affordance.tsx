@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { Pencil, UserMinus } from 'lucide-react'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { useTranslate } from '@/i18n/use-translate'
@@ -57,13 +57,34 @@ export function MeshMemberChip({
   )
 }
 
-/** The member's actions, for the row's `...` menu. Nothing renders for a host that is not a member. */
-export function MeshMemberMenuItems({
-  environmentId,
-  onAction
+/**
+ * The whole row affordance: the chip, plus the dialog its menu action opens.
+ *
+ * Why one element for both: the chip slot and the menu are two slots of upstream's row, so this is the one
+ * piece of the feature that file renders, and the dialog keeps its state here rather than in that file.
+ */
+export function MeshMemberAffordance({
+  environmentId
 }: {
   environmentId: string
-  onAction: (action: MeshMemberAction) => void
+}): React.JSX.Element {
+  // Why the close on unmount: the store outlives the row, so a dialog left open by a row that went away would
+  // reopen on the row that replaced it.
+  useEffect(() => () => closeMeshAction(environmentId), [environmentId])
+
+  return (
+    <>
+      <MeshMemberChip environmentId={environmentId} />
+      <MeshMemberDialogs environmentId={environmentId} />
+    </>
+  )
+}
+
+/** The member's actions, for the row's `...` menu. Nothing renders for a host that is not a member. */
+export function MeshMemberMenuItems({
+  environmentId
+}: {
+  environmentId: string
 }): React.JSX.Element | null {
   const t = useTranslate()
   const member = useMeshMember(environmentId)
@@ -73,11 +94,14 @@ export function MeshMemberMenuItems({
 
   return (
     <>
-      <DropdownMenuItem onSelect={() => onAction('rename')}>
+      <DropdownMenuItem onSelect={() => setOpenMeshAction(environmentId, 'rename')}>
         <Pencil />
         {t('auto.components.settings.hostGroup.rename', 'Rename…')}
       </DropdownMenuItem>
-      <DropdownMenuItem variant="destructive" onSelect={() => onAction('eject')}>
+      <DropdownMenuItem
+        variant="destructive"
+        onSelect={() => setOpenMeshAction(environmentId, 'eject')}
+      >
         <UserMinus />
         {t('auto.components.settings.hostGroup.eject', 'Eject')}
       </DropdownMenuItem>
@@ -89,31 +113,29 @@ export function MeshMemberMenuItems({
  * The two dialogs the menu opens.
  *
  * Why outside the menu and not inside a menu item: a dropdown unmounts its content on select, so a dialog
- * rendered there would disappear with it. The row owns the open action and renders this beside the row.
+ * rendered there would disappear with it. The chip slot renders this, which stays mounted.
  */
 export function MeshMemberDialogs({
-  environmentId,
-  action,
-  onClose
+  environmentId
 }: {
   environmentId: string
-  action: MeshMemberAction | null
-  onClose: () => void
 }): React.JSX.Element | null {
   const t = useTranslate()
   const member = useMeshMember(environmentId)
+  const action = useOpenMeshAction(environmentId)
   const [busy, setBusy] = useState(false)
   const mountedRef = useMountedRef()
 
   if (member === null || action === null) {
     return null
   }
+  const close = (): void => closeMeshAction(environmentId)
   if (action === 'rename') {
-    return <MeshMemberRenameDialog member={member} open onOpenChange={onClose} />
+    return <MeshMemberRenameDialog member={member} open onOpenChange={close} />
   }
 
   return (
-    <Dialog open onOpenChange={(open) => !open && !busy && onClose()}>
+    <Dialog open onOpenChange={(open) => !open && !busy && close()}>
       <DialogContent className="max-w-sm sm:max-w-sm" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>
@@ -131,7 +153,7 @@ export function MeshMemberDialogs({
           <div className="mt-0.5 truncate font-mono text-muted-foreground">{member.hostKey}</div>
         </div>
         <DialogFooter>
-          <Button variant="outline" disabled={busy} onClick={onClose}>
+          <Button variant="outline" disabled={busy} onClick={close}>
             {t('auto.components.settings.hostGroup.cancel', 'Cancel')}
           </Button>
           <Button
@@ -144,7 +166,7 @@ export function MeshMemberDialogs({
               void runHostMeshAction((api) => api.remove(member.hostKey))
                 .then(() => {
                   if (mountedRef.current) {
-                    onClose()
+                    close()
                   }
                 })
                 .catch(() => undefined)
@@ -160,6 +182,50 @@ export function MeshMemberDialogs({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/**
+ * Which row's action dialog is open.
+ *
+ * Why a module store rather than a prop: the menu that opens a dialog and the chip slot that renders it are two
+ * slots of upstream's row, so no component of this feature owns both, and one store keeps that row two lines.
+ */
+type OpenMeshAction = { environmentId: string; action: MeshMemberAction } | null
+
+let openMeshActionState: OpenMeshAction = null
+const openMeshActionListeners = new Set<() => void>()
+
+function subscribeOpenMeshAction(listener: () => void): () => void {
+  openMeshActionListeners.add(listener)
+  return () => {
+    openMeshActionListeners.delete(listener)
+  }
+}
+
+function notifyOpenMeshAction(): void {
+  for (const listener of openMeshActionListeners) {
+    listener()
+  }
+}
+
+function setOpenMeshAction(environmentId: string, action: MeshMemberAction): void {
+  openMeshActionState = { environmentId, action }
+  notifyOpenMeshAction()
+}
+
+function closeMeshAction(environmentId: string): void {
+  if (openMeshActionState?.environmentId !== environmentId) {
+    return
+  }
+  openMeshActionState = null
+  notifyOpenMeshAction()
+}
+
+/** A primitive snapshot, so a store change for one row does not re-render the others. */
+function useOpenMeshAction(environmentId: string): MeshMemberAction | null {
+  return useSyncExternalStore(subscribeOpenMeshAction, () =>
+    openMeshActionState?.environmentId === environmentId ? openMeshActionState.action : null
   )
 }
 

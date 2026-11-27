@@ -88,14 +88,29 @@ export const SEAMS = [
     why: 'one import and one call telling the fleet a connection changed'
   },
   {
+    path: 'src/main/ipc/mobile.ts',
+    budget: 3,
+    why: 'one import and one predicate in the runtime-grant list: an offer past its TTL can pair nothing, and this feature mints one per reverse offer, so an expired row is not a link; the predicate itself is fork-owned (`host-mesh-runtime-grants.ts`)'
+  },
+  {
     path: 'src/renderer/src/components/settings/runtime-environments/catalog/RuntimeEnvironmentsPane.tsx',
     budget: 3,
     why: 'one import and one <HostGroupSection /> element'
   },
   {
+    path: 'src/renderer/src/components/settings/runtime-environments/server-rows/runtime-server-row-menu.tsx',
+    budget: 3,
+    why: 'one optional `meshItems` slot beside the other row actions, so a member’s Rename and Eject sit in the host’s own overflow menu instead of two ghost buttons beside its status'
+  },
+  {
     path: 'src/renderer/src/components/settings/runtime-environments/server-rows/runtime-server-row.tsx',
+    budget: 3,
+    why: 'one import, one <MeshMemberAffordance /> in the chips slot and one `meshItems` slot on the row menu — the chip, both actions and both dialogs are fork-owned, so a host row carries its mesh state and its Eject instead of the pane repeating every host in a second list'
+  },
+  {
+    path: 'src/renderer/src/components/settings/host-rows/ServerListRow.tsx',
     budget: 2,
-    why: 'one import and one <MeshMemberAffordance /> in the chips slot, so a host row carries its mesh state and its Eject instead of the pane repeating every host in a second list'
+    why: '`py-px` and `leading-4` off upstream’s chip, so a Mesh, Default or SSH-tunnel chip sits at label height beside the row’s name instead of taller than it'
   },
   {
     path: 'src/renderer/src/components/status-bar/host-connections/SshStatusSegment.tsx',

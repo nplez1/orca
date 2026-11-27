@@ -392,6 +392,16 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
   rewritten and its sidecar then dropped. R3 fixes that plus three MINORs, all test-pinned. **R3 was not re-reviewed**
   — a third round needs the owner's approval — so the reviewed revision is R2 and the guard fix is covered by tests
   rather than by review.
+- **Lint gate red (2026-11-27), and the surface it found:** `check-host-mesh-upstream-seams` failed on the chip/actions
+  commit `d423d627dd4` — `runtime-server-row.tsx` at 21 lines against a budget of 2, plus three upstream files it did
+  not declare (`mobile.ts` 9, `runtime-server-row-menu.tsx` 3, `ServerListRow.tsx` 2). Fixed in
+  `7666b4e7584` by moving the dialog state and dialogs into the fork-owned affordance (a module store, since the menu
+  and the chip slot are two slots of upstream's row) and the expired-offer predicate into
+  `host-mesh-runtime-grants.ts`: 4 upstream files / 11 lines, every declared seam within budget, lint gate 55/55 and
+  `pnpm check:changed` 42/42 locally, and the `rowAffordance` fixture re-shot through the row's real element. That
+  commit changes renderer code inside the reviewed range, so the PR body's review claim is accurate only through R2;
+  a delta round is the owner's call. `LOCAL-PATCHES.md` § `local(lint)`: the mesh row's upstream surface carries the
+  reasoning.
 
 ### nplez1/New-Loop-Job-Support — a pi pane reads its own scheduled work (pi revamp follow-up, PR #449)
 
