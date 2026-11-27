@@ -207,6 +207,14 @@
       "reason": "The popout window is never opened, and popout.tsx mounts DashboardPopoutRoot, which requires the onAckAgent/onRevealAgent props upstream added to AgentKanbanBoard. The fork's live page view is built on that same board, so restoring this means either two live dashboard implementations or changing the shipped view. Re-bound at the 2026-11-24 sync, where upstream moved it under snapshot/, and again at the 2026-11-27 sync, where upstream's only change was one line."
     },
     {
+      "path": "src/renderer/src/components/dashboard-popout/use-dashboard-popout-close-shortcut.ts",
+      "commit": "2026-11-27",
+      "upstreamBlob": "dce517bf0cb0fe9a2d6d305fa7145864b163e60a",
+      "class": "dashboard-delivery",
+      "status": "expected-deletion",
+      "reason": "Upstream's own file, deleted with the rest of the popout: its only job is the close shortcut for a window this fork never opens. It arrived in the 2026-11-27 sync and went with the trio it serves, so it is recorded here rather than left to be restored by a future sync that finds an unexplained delete."
+    },
+    {
       "path": "src/renderer/src/components/dashboard/AgentDashboardDrawer.tsx",
       "commit": "ab57bb7bbb",
       "upstreamBlob": "cf59f9e65457ea0c5d2114d91dbf36df5cc85b50",

@@ -3596,8 +3596,8 @@ section stays readable. `tests/tools/fork-process-docs.test.mjs` holds the three
     `src/main/antigravity/native-account-store.ts` now classifies in `NON_USAGE_CREDENTIAL_STORES`
     because it is an account store, not a usage store.
   - **The dashboard pop-out trio stays deleted.** Upstream's whole delta on the three files was 8
-    insertions, nothing outside the deleted set imports them, and the fork-owned close-shortcut hook
-    went with them.
+    insertions, nothing outside the deleted set imports them, and the close-shortcut hook — upstream's
+    own file at the pinned base — went with them and carries its own `expected-deletion` row.
   - **A re-export was the bug, not the retry.** `jira-api-error.ts` re-exported the class that
     `authenticated-request.ts` declares, so a test mocking the request layer erased `JiraApiError`
     itself and upstream's new unbounded-JQL cases threw on every `instanceof` and every construction.
@@ -3615,7 +3615,7 @@ section stays readable. `tests/tools/fork-process-docs.test.mjs` holds the three
     identity sweep's report-only baseline was re-frozen at 551 after `--fix` rewrote five `.orca`
     literals; the deleted-fork-tests baseline was re-bound to `27a700fd8d`..`e8321ad760` and records two
     fork cases whose only subject was the retired Antigravity enable gate; `expected-deletions.json`
-    gained the nine `USAGE_PROVIDER_MANIFEST.antigravity.*` symbols; and the fork-comment ratchet was
+    gained the seven `USAGE_PROVIDER_MANIFEST.antigravity.*` symbols and two dead renderer constants; and the fork-comment ratchet was
     pruned to **4817/4817** after its rationale was moved out of upstream-owned files into the ledger
     and § Fork comment rationale below.
   - **Opened clean:** `pnpm tc` was green on the merged tip, `post-sync.mjs` passed 16 of 18 rows with

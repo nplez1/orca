@@ -54,8 +54,9 @@ section) is untouched, which is why `src/main/antigravity/native-account-store.t
 
 **Decision:** the fork delivers the dashboard as a content-area view and never opens a popout window.
 Upstream's whole delta on the three files was 2, 1 and 5 insertions, no path outside the deleted set
-imports them, and the fourth file — a hook whose only job was the popout's close shortcut — is
-fork-owned and went with them. `.../snapshot/dashboard-agent-status-patch.ts` is upstream's and has no
+imports them, and the fourth file — a hook whose only job was the popout's close shortcut — went with
+them. That fourth one is **upstream's** (present at `27a700fd8d6` as `dce517bf0cb0`), so it has its own
+`expected-deletion` row; deleting a fork-owned file needs none. `.../snapshot/dashboard-agent-status-patch.ts` is upstream's and has no
 importer either; it is kept as upstream's bytes rather than deleted, which is the same trade the
 manifest records for the held dashboard delivery pair.
 
@@ -149,7 +150,8 @@ sweep's report-only baseline was re-frozen at 551 after `--fix` rewrote five `.o
 `claude-hook-plugin.test.ts`. The deleted-fork-tests baseline was re-bound to
 `27a700fd8d`..`e8321ad760` and records two fork cases whose only subject was the retired Antigravity
 enable gate (`status-bar-provider-visibility.test.ts`, `usage-provider-manifest.conformance.test.ts`).
-`expected-deletions.json` gained the nine `USAGE_PROVIDER_MANIFEST.antigravity.*` symbols.
+`expected-deletions.json` gained the seven `USAGE_PROVIDER_MANIFEST.antigravity.*` symbols plus two
+renderer constants that died with the retirement.
 
 **Do not:** spend a max-lines exemption on a fork-owned file, and do not re-take a baseline without the
 reason recorded here.
