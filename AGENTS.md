@@ -116,8 +116,9 @@ on the last 40 commits, 15 touched `src/shared` or `src/packages`, so roughly a 
 carry the full gate — the third with the blast radius.
 
 Gate 3 is **lint**: the script requires the PASS marker a full, clean `orca-queue node local/gate-lint.mjs`
-writes for the head, or for an ancestor that only docs and review records follow (the same walk the
-release boundary uses). An upstream PR is exempt, because upstream's CI lints it. Measured 2026-11-13 →
+writes for the head itself — not an ancestor, because lint reads Markdown (`check:readme-local-links`,
+`verify:bundled-skill-guides`), so a docs-only commit can still turn it red. An upstream PR is
+exempt, because upstream's CI lints it. Measured 2026-11-13 →
 11-27, 37 of 118 `Fork PR gates` runs went red, every one of them at the lint verdict, while the PR
 opener never asked. Iterate with `node local/gate-lint.mjs --fast` — 16 steps in about 45 s, no queue,
 no marker — which every one of those 37 runs would have failed locally; then run the full gate once on

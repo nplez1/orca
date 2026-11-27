@@ -9,6 +9,7 @@ import {
   FAST_LINT_STEPS,
   finalize,
   FORK_LINT_STEPS,
+  parseArgs,
   matchesEntry,
   resolveGateSteps,
   resolveLintSteps,
@@ -72,6 +73,9 @@ describe('fork-only steps run from the gate, not from package.json', () => {
     expect(FAST_LINT_STEPS.filter((id) => !ids.has(id))).toEqual([])
     expect(new Set(FAST_LINT_STEPS).size).toBe(FAST_LINT_STEPS.length)
     expect(FAST_LINT_STEPS).toContain('check-upstream-file-comments')
+    // `--fast` must go through `only`: that is what keeps a subset PASS from writing the marker
+    // `open-pr.mjs` gate 3 accepts.
+    expect(parseArgs(['--fast']).only).toEqual(FAST_LINT_STEPS)
   })
 
   it('runs the fork comment ratchet on this repository', () => {

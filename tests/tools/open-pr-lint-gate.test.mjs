@@ -74,16 +74,32 @@ it('does not ask for a lint verdict on an upstream PR', () => {
   expect(result.passes.at(-1)).toContain('gate 3 not required')
 })
 
-it('reads gate 3 from the lint marker a full gate-lint PASS writes', () => {
+it('reads gate 3 from the lint marker of the head itself, never an ancestor', () => {
   const commonDir = tempDir()
-  const noGit = () => {
-    throw new Error('no repository')
-  }
-  expect(lintGateProblem(REVISION, { commonDir, git: noGit })).toContain('no green lint verdict')
+  expect(lintGateProblem(REVISION, { commonDir })).toContain('no full lint verdict')
+
+  // A PASS on the parent does not count: lint reads Markdown, so a README-only commit after it can
+  // still turn lint red, which the release boundary's docs-only walk would let through.
+  const parent = 'b'.repeat(40)
+  writeLintVerdict({
+    gitCommonDir: commonDir,
+    revision: parent,
+    steps: [{ id: 'oxlint', exitCode: 0 }]
+  })
+  expect(lintGateProblem(REVISION, { commonDir })).toContain('an ancestor does not count')
+
   writeLintVerdict({
     gitCommonDir: commonDir,
     revision: REVISION,
     steps: [{ id: 'oxlint', exitCode: 0 }]
   })
-  expect(lintGateProblem(REVISION, { commonDir, git: noGit })).toBeNull()
+  expect(lintGateProblem(REVISION, { commonDir })).toBeNull()
+})
+
+it('writes no marker a subset or dirty run could leave for gate 3 to accept', () => {
+  const gitCommonDir = tempDir()
+  const steps = [{ id: 'oxlint', exitCode: 0 }]
+  expect(writeLintVerdict({ gitCommonDir, revision: REVISION, steps, only: ['oxlint'] })).toBeNull()
+  expect(writeLintVerdict({ gitCommonDir, revision: REVISION, steps, dirty: true })).toBeNull()
+  expect(lintGateProblem(REVISION, { commonDir: gitCommonDir })).toContain('no full lint verdict')
 })

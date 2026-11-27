@@ -35,10 +35,11 @@
 import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
+import { FAST_LINT_STEPS } from './gate-lint-fast-steps.mjs'
 import { lintVerdictTarget, writeLintVerdict } from './gate-lint-verdict.mjs'
 import { entryProblem, matchesEntry } from './lib/known-red.mjs'
 
-export { entryProblem, matchesEntry }
+export { entryProblem, matchesEntry, FAST_LINT_STEPS }
 
 const ROOT = resolve(import.meta.dirname, '..')
 const DEFAULT_ALLOWLIST = join(ROOT, 'local', 'lint-known-red.json')
@@ -80,7 +81,7 @@ function usage() {
   return 'usage: node local/gate-lint.mjs [--allowlist PATH] [--only id,id | --fast] [--timeout-ms N] [--prune] [--verbose]'
 }
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
   const options = {
     allowlist: DEFAULT_ALLOWLIST,
     only: null,
@@ -238,38 +239,6 @@ export const FORK_LINT_STEPS = [
     command: 'pnpm run check:compat-boundary-imports',
     argv: ['pnpm', 'run', 'check:compat-boundary-imports']
   }
-]
-
-/**
- * The inner-loop subset `--fast` runs: every step that reddened a PR, measured 2026-11-13 → 11-27, that
- * finishes in seconds. 37 of 118 `Fork PR gates` runs failed the lint verdict, and every one of those 37
- * failed at least one step listed here; 31 failed only steps listed here. Run together they took 45 s on
- * this machine, against ~10 minutes and the queue for the full gate.
- *
- * Why not inside `check:code-quality:changed`: that script is upstream's and at its line budget, and most
- * of these are fork steps or whole-repo ratchets that a changed-lines scan cannot express.
- *
- * It is a subset, so a `--fast` PASS records no marker and satisfies no gate: `open-pr.mjs` still needs a
- * full run. Ids are checked against the resolved steps like `--only`, so a sync that renames one fails
- * loudly instead of running less.
- */
-export const FAST_LINT_STEPS = [
-  'check-upstream-file-comments',
-  'check-upstream-identity-literals',
-  'check-host-mesh-upstream-seams',
-  'check:workspace-path-sync-fs-ratchet',
-  'check:main-blocking-helper-ratchet',
-  'check:main-sync-fs-ratchet',
-  'check:runtime-electron-ratchet',
-  'check:recurring-timer-ratchet',
-  'check:max-lines-ratchet',
-  'check:focus-read-ratchet',
-  'verify:bundled-skill-guides',
-  'verify:skill-bundle-manifest',
-  'verify:localization-extraction',
-  'verify:localization-catalogs',
-  'verify:localization-coverage',
-  'check:readme-local-links'
 ]
 
 /**
@@ -820,7 +789,21 @@ async function main(argv = process.argv.slice(2)) {
       prune: options.prune,
       allowlist: options.allowlist,
       manifest,
-      recordVerdict: (verdict) => gitCommonDir && writeLintVerdict({ ...verdict, gitCommonDir }),
+      recordVerdict: (verdict) => {
+        // Why these refusals: the marker is what `open-pr.mjs` gate 3 accepts, so it must name the
+        // default allowlist and the revision that actually ran. A run against another allowlist, or
+        // one whose HEAD moved or tree changed while the steps ran, says nothing about this commit.
+        const after = lintVerdictTarget(git)
+        if (
+          !gitCommonDir ||
+          options.allowlist !== DEFAULT_ALLOWLIST ||
+          after.fullRevision !== fullRevision ||
+          after.dirty
+        ) {
+          return null
+        }
+        return writeLintVerdict({ ...verdict, gitCommonDir })
+      },
       out: writeOut,
       err: writeErr
     }
