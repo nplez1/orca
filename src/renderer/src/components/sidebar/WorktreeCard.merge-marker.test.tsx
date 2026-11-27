@@ -7,23 +7,21 @@ import type { GlobalSettings } from '../../../../shared/settings/global-settings
 import type { Repo } from '../../../../shared/repository/repo-types'
 import type { WorktreeCardProperty } from '../../../../shared/ui-chrome/ui-chrome-types'
 import type { Worktree } from '../../../../shared/worktree/types'
+import WorktreeCard from './workspace-card/surface/WorktreeCard'
 
 let worktreeCardProperties: WorktreeCardProperty[] = ['status', 'pr']
 let hostedReviewCache: Record<string, unknown> = {}
 let settings: Partial<GlobalSettings> | null = null
 
-// Why a static import rather than the lazy `await import()` each test used to do: the card's module
-// graph is what this file costs — 17.5s to transform and load cold on the nightly runner against 1.5s
-// warm here — and inside a test body that cost is charged to that test's own timeout. At module scope
-// it has no per-test budget to cross, and the test bodies stay synchronous, so a test that does
-// outlive its budget can no longer resume halfway through the next one (run 45942815750: a 20s
-// timeout in the first test, then a false failure in the second).
-import WorktreeCard from './workspace-card/surface/WorktreeCard'
+// Why the card is imported statically: its module graph is this file's whole cost (17.5s cold on the
+// nightly runner, milliseconds of render), and inside a test body that cost is charged to that test's
+// timeout — which is how run 45942815750 reddened, then resumed mid-way through the next test.
 
 vi.mock('@/store', async () => {
   const { useAppStore: realStore } = await vi.importActual<typeof StoreModule>('@/store')
   // Why the real initial state: the card reads whatever the store carries, and a hand-kept
   // subset goes stale silently. Only the fields each test mutates are overridden here.
+  // Why buildState stays lazy: the card's static import loads before the `let`s above initialise.
   const buildState = () => ({
     ...realStore.getInitialState(),
     fetchHostedReviewForBranch: vi.fn(),

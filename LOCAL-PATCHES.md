@@ -6608,28 +6608,42 @@ metadata row.
 **The cost was the card's module graph, not the assertions.** Each test opened with its own
 `await import('./workspace-card/surface/WorktreeCard')`, so the cold transform and load of that graph
 was charged to the test's own timeout — and the file's line in the run the night before
-([45758341047](https://github.com/nplez1/orca/actions/runs/45758341047), green) is **17,462 ms**. On a
-warm Mac the same file is 1.5 s, and the two tests inside it are 20 ms and 3 ms: a 20 s budget against a
-17.5 s cost, decided by how loaded the runner is.
+([45758341047](https://github.com/nplez1/orca/actions/runs/45758341047), green) is **17,462 ms**. Before
+this change on a warm Mac the same file was 1.5 s and its first test alone was 1,506 ms of it: a 20 s
+budget against a 17.5 s cost, decided by how loaded the runner is. The renders are milliseconds — the
+second test, whose import was already cached, took 3 ms.
 
 **The second failure was the first one's shadow.** A timed-out test body is abandoned, not cancelled, so
 the first test's continuation ran during the second, left the module-level `settings` on the experimental
-card style, and the default-style metadata row the last assertion reads was never rendered. Both tests
-assert the same product behaviour in either style, so one red was reported as two.
+card style, and the default-style metadata row the last assertion reads was never rendered. Test 1 is the
+one that covers both card styles; test 2 pins the default style, so its last assertion was the one the
+leftover state could break, and one red was reported as two.
 
 **What the fork changed**, in the same commit as this entry: one static
 `import WorktreeCard from './workspace-card/surface/WorktreeCard'` replaces both dynamic imports, and the
-two `}, 20_000)` timeouts go with them. Module scope has no per-test budget to cross, both bodies are now
-synchronous (so an abandoned body has no point to resume from), and nothing left in either body can
-await — which is why removing the timeouts is the fix rather than a wider one. The file is fork-added, so
-this costs nothing in `check-upstream-file-comments` (4,764/4,764) and needs no
+two `}, 20_000)` timeouts go with them. Module scope has no per-test budget to cross, and both bodies are
+now synchronous, so an abandoned body has no `await` to resume from. The tests stay bounded: the project
+default is `testTimeout: 30_000` (`config/vitest.config.ts`), which now covers only the renders, and
+Vitest compares elapsed time against it after a body returns even where it cannot interrupt one. The file
+is fork-added, so this costs nothing in `check-upstream-file-comments` (4,828/4,828) and needs no
 `host-mesh-upstream-seams` row; no allowlist moved, and both tests still run and assert the same markup.
 
 **Verified on the runner that reddened.** Dispatch
 [45953273363](https://github.com/nplez1/orca/actions/runs/45953273363) at `9a0bd1b944c` — the commit this
 entry ships with — is green on all 24 shards, and the file's own line reads **137 ms** for its two tests
-where the same line read 17,462 ms the night before. The 17.3 s did not disappear: it is the collection
-phase now, where the shard job's 60-minute budget covers it.
+where the same line read 17,462 ms the night before. The 17 s did not disappear: shard 17's wall clock is
+102 s against 103 s on the green run before it, so the cost moved to the file's collection, where the
+shard job's `timeout-minutes: 60` covers it.
+
+**The shard-timing overlay cannot see that move, and the next regeneration will drop this file.**
+`local/ci-shard-timings-overlay.json` weighs this test file at 3,894 ms from run 43332008251, and its
+metric is the report's per-file `endTime - startTime`, which excludes collection. At 137 ms the file
+falls under the 2,000 ms threshold on the next `import`, while the shard still pays the ~17 s. That is a
+shard-balance question, not a correctness one, so it is recorded rather than fixed here: whoever next
+regenerates the overlay should keep this entry with `--override
+src/renderer/src/components/sidebar/WorktreeCard.merge-marker.test.tsx=17000`, or record that
+`unit-report-file-duration` does not count a heavy graph's collection.
 
 The anchors are the file and its two `it(...)` titles. A future edit that puts an `await` back inside
-either body re-creates the exposure this entry removes, because the timeout that would cover it is gone.
+either body re-creates the exposure this entry removes, charged to the 30 s project default rather than to
+a budget sized for the graph.
