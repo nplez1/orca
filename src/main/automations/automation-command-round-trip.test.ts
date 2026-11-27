@@ -53,7 +53,7 @@ describe('a command automation through the runtime and the store', () => {
       extraAgentArgs: '--model opus',
       repo: 'r1',
       rrule: 'FREQ=DAILY;BYHOUR=9;BYMINUTE=0',
-      dtstart: Date.now()
+      dtstart: Date.UTC(2026, 0, 1)
     })
     const stored = () => controller.show(automation.id)
     return { controller, automation, stored }

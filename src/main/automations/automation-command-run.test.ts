@@ -5,6 +5,14 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import type { AutomationScript } from '../../shared/automations/automation-definition'
 import { AutomationService } from './automation-service'
+import { runHostCommand } from './dispatch/command-runner'
+import type * as CommandRunnerModule from './dispatch/command-runner'
+
+// Passes through; it exposes when a command the service started has finished.
+vi.mock('./dispatch/command-runner', async (importOriginal) => {
+  const actual = await importOriginal<typeof CommandRunnerModule>()
+  return { ...actual, runHostCommand: vi.fn(actual.runHostCommand) }
+})
 
 vi.mock('electron', () => ({
   app: {
@@ -46,7 +54,7 @@ describe('a command automation run', () => {
       workspaceMode: 'new_per_run',
       timezone: 'UTC',
       rrule: 'FREQ=DAILY;BYHOUR=9;BYMINUTE=0',
-      dtstart: Date.now()
+      dtstart: Date.UTC(2026, 0, 1)
     })
     const service = new AutomationService(store)
     const read = (runId: string) =>
@@ -96,7 +104,10 @@ describe('a command automation run', () => {
 
     service.stop()
     // The killed command closes after the stop; its outcome belongs to no live dispatch.
-    await new Promise((resolve) => setTimeout(resolve, 500))
+    await expect(vi.mocked(runHostCommand).mock.results.at(-1)?.value).resolves.toMatchObject({
+      error: 'Command was stopped before it finished.'
+    })
+    await new Promise((resolve) => setImmediate(resolve))
     expect(read(first.id)?.status).toBe('dispatching')
   })
 })

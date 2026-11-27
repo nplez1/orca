@@ -1,6 +1,7 @@
 // One shell command on a host: a local spawn or an SSH channel, with a timeout, a tree kill, and a
 // tail-truncated capture. Prechecks and command automations both run through it.
-import { spawn, type ChildProcess } from 'node:child_process'
+import type { ChildProcess } from 'node:child_process'
+import { spawnProcess } from '@orca/process-host'
 import type { ClientChannel } from 'ssh2'
 import type { AutomationPrecheckResult } from '../../../shared/automations/history/automation-run'
 import { MAX_AUTOMATION_PRECHECK_OUTPUT_CHARS } from '../../../shared/automations/launch/automation-precheck'
@@ -115,21 +116,23 @@ function spawnLocalCommand(
   run: HostCommandRun,
   target: Extract<HostCommandTarget, { type: 'local' }>
 ): ChildProcess {
-  const detached = process.platform !== 'win32'
-  if (run.shell === 'login' && process.platform !== 'win32') {
-    return spawn(process.env.SHELL || '/bin/sh', ['-lc', run.command.command], {
-      cwd: target.cwd,
-      detached,
-      env: process.env,
-      windowsHide: true
+  const { command } = run.command
+  const options = { cwd: target.cwd, env: process.env }
+  if (process.platform === 'win32') {
+    // cmd needs the line verbatim; it does not understand Node's argument escaping.
+    return spawnProcess({
+      ...options,
+      program: process.env.ComSpec || 'cmd.exe',
+      args: ['/d', '/s', '/c', `"${command}"`],
+      windowsVerbatimArguments: true
     })
   }
-  return spawn(run.command.command, {
-    cwd: target.cwd,
-    detached,
-    env: process.env,
-    shell: true,
-    windowsHide: true
+  const login = run.shell === 'login'
+  return spawnProcess({
+    ...options,
+    program: login ? process.env.SHELL || '/bin/sh' : '/bin/sh',
+    args: [login ? '-lc' : '-c', command],
+    detached: true
   })
 }
 
