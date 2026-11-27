@@ -1784,6 +1784,11 @@
       "partialListing": "Only part of this folder is listed."
     }
   },
+  "plugins": {
+    "actionConfirmation": {
+      "changeCommandAutomationDetail": "It runs a shell command you chose, with no agent. It would change: {{fields}}."
+    }
+  },
   "automations": {
     "command": {
       "command": "Command",
@@ -1812,6 +1817,9 @@
       "timeout": "Timeout",
       "timeoutInvalid": "Enter a timeout from 1 to {{max}} seconds.",
       "timeoutSeconds": "Timeout (seconds)"
+    },
+    "runFailures": {
+      "overlap": "The previous run of this command was still in progress, so Orca skipped this one."
     }
   }
 }

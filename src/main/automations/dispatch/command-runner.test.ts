@@ -30,9 +30,12 @@ describe('runHostCommand', () => {
   })
 
   it('reports a timeout in the label that ran it', async () => {
-    const result = await runHostCommand(commandRun('sleep 5', {
-      command: { command: 'sleep 5', timeoutSeconds: 1 }
-    }), { type: 'local', cwd: process.cwd() })
+    const result = await runHostCommand(
+      commandRun('sleep 5', {
+        command: { command: 'sleep 5', timeoutSeconds: 1 }
+      }),
+      { type: 'local', cwd: process.cwd() }
+    )
     expect(result.timedOut).toBe(true)
     expect(result.exitCode).toBeNull()
     expect(result.error).toBe('Command timed out after 1s.')

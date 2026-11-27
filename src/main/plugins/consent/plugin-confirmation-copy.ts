@@ -69,17 +69,23 @@ export function pluginConfirmationCopy(
     ),
     detail: [
       identity,
-      subject.elevated
+      subject.command
         ? translateMain(
-            'plugins.actionConfirmation.changeElevatedAutomationDetail',
-            'It runs its agent with extra settings you chose (arguments, a permission mode or a precheck command). It would change: {{fields}}.',
+            'plugins.actionConfirmation.changeCommandAutomationDetail',
+            'It runs a shell command you chose, with no agent. It would change: {{fields}}.',
             { fields: subject.fields.join(', ') }
           )
-        : translateMain(
-            'plugins.actionConfirmation.changeAutomationDetail',
-            'The plugin did not create it. It would change: {{fields}}.',
-            { fields: subject.fields.join(', ') }
-          ),
+        : subject.elevated
+          ? translateMain(
+              'plugins.actionConfirmation.changeElevatedAutomationDetail',
+              'It runs its agent with extra settings you chose (arguments, a permission mode or a precheck command). It would change: {{fields}}.',
+              { fields: subject.fields.join(', ') }
+            )
+          : translateMain(
+              'plugins.actionConfirmation.changeAutomationDetail',
+              'The plugin did not create it. It would change: {{fields}}.',
+              { fields: subject.fields.join(', ') }
+            ),
       subject.prompt === undefined
         ? null
         : translateMain('plugins.actionConfirmation.newPrompt', 'New prompt: “{{prompt}}”', {

@@ -33,6 +33,8 @@ import {
 import { RuntimeClientError } from '../runtime/connection/types'
 import { cloudRules, findBot, type HostBot } from '../bots/bot'
 import { getEnabledFlag, getPrecheckFlag } from './automation-handler-flags'
+import { getScriptActionFlag } from './automation-script-flag'
+import { assertAutomationFieldsSupported } from './automation-host-support'
 import { getTimezoneFlags } from './automation-timezone-flag'
 import { legacyPlaceOf } from '../../shared/connector-place-names'
 import { callerChat } from './automation-caller-chat'
@@ -305,12 +307,18 @@ export async function createBotAutomation(
   if (refusal) {
     throw new RuntimeClientError('invalid_argument', refusal)
   }
+  const action = getScriptActionFlag(flags)
+  await assertAutomationFieldsSupported(client, { action })
   const item = await automationItemFlag(client, flags, bot.id)
   const saved = await client.call<{ automation: Automation }>('automation.create', {
     name: getRequiredStringFlag(flags, 'name'),
-    prompt: getRequiredStringFlag(flags, 'prompt'),
-    precheck: getPrecheckFlag(flags),
-    agentId: botAutomationSetup(target, bot).agent,
+    ...(action
+      ? { action, prompt: getOptionalStringFlag(flags, 'prompt') ?? '', agentId: null }
+      : {
+          prompt: getRequiredStringFlag(flags, 'prompt'),
+          precheck: getPrecheckFlag(flags),
+          agentId: botAutomationSetup(target, bot).agent
+        }),
     bot: target,
     workspaceMode: 'existing',
     ...getTimezoneFlags(flags),

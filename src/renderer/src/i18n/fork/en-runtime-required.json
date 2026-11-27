@@ -47,6 +47,11 @@
       }
     }
   },
+  "automations": {
+    "runFailures": {
+      "overlap": "The previous run of this command was still in progress, so Orca skipped this one."
+    }
+  },
   "jira": {
     "issue": {
       "assignableUsersError": "Failed to load the people assignable to this issue.",

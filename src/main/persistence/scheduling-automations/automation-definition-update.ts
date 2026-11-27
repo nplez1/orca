@@ -7,6 +7,7 @@ import {
   automationWithLaunchSetup
 } from '../../../shared/automations/launch/automation-launch-setup'
 import { automationCanonicalLaunchSetup } from '../../../shared/automations/launch/automation-canonical-launch-setup'
+import type { AutomationLaunchSetup } from '../../../shared/automations/launch/automation-launch-types'
 import type {
   Automation,
   AutomationUpdateInput
@@ -130,7 +131,20 @@ export function mergeAutomationUpdate(
     options?.destination,
     projectionContext
   )
-  const launchSetupUpdate = applyAutomationLaunchSetupPatch(updates, current)
+  // Absent keeps the stored action; null clears it, giving the automation its agent back.
+  const action = normalizeAutomationAction(
+    updates.action === undefined ? current.action : updates.action
+  )
+  if (action && updates.agentId) {
+    throw new Error(
+      'A command automation runs no agent: pass --script to keep it a command, or clear --script to give it an agent.'
+    )
+  }
+  // A command launches no agent, so its agent launch settings are neither applied nor kept.
+  const { launchSetupPatch: _patch, extraAgentArgs: _extras, ...commandUpdates } = updates
+  const launchSetupUpdate: typeof commandUpdates & AutomationLaunchSetup = action
+    ? commandUpdates
+    : applyAutomationLaunchSetupPatch(updates, current)
   // Ignore undefined values preserved by structuredClone; explicit clears use null.
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: filtering removes only undefined entries from the validated patch and retains every remaining field's type.
   const definedUpdates = Object.fromEntries(
@@ -151,10 +165,6 @@ export function mergeAutomationUpdate(
     selectorMoveRequested && repo ? getAutomationSchedulerOwner(repo) : current.schedulerOwner
   const contexts = getAutomationContextsForRepo(repo, operations.state.projectHostSetups ?? [])
   const workspaceMode = updates.workspaceMode ?? current.workspaceMode
-  // A command automation launches no agent; clearing the action gives the automation its agent back.
-  const action = Object.hasOwn(definedUpdates, 'action')
-    ? normalizeAutomationAction(definedUpdates.action)
-    : normalizeAutomationAction(current.action)
   const agentId = action
     ? null
     : definedUpdates.agentId !== undefined
@@ -167,9 +177,11 @@ export function mergeAutomationUpdate(
     ...current,
     ...definedUpdates,
     name: updates.name !== undefined ? updates.name.trim() || 'Untitled automation' : current.name,
-    precheck: Object.hasOwn(definedUpdates, 'precheck')
-      ? normalizeAutomationPrecheck(definedUpdates.precheck)
-      : normalizeAutomationPrecheck(current.precheck),
+    precheck: action
+      ? null
+      : normalizeAutomationPrecheck(
+          Object.hasOwn(definedUpdates, 'precheck') ? definedUpdates.precheck : current.precheck
+        ),
     action,
     agentId,
     projectId: repoId,
@@ -227,7 +239,9 @@ export function mergeAutomationUpdate(
   for (const key of ['surface', 'launchPreferences', 'agentArgs', 'extraAgentArgs'] as const) {
     delete merged[key]
   }
-  Object.assign(merged, automationCanonicalLaunchSetup(launchSetupUpdate))
+  if (!action) {
+    Object.assign(merged, automationCanonicalLaunchSetup(launchSetupUpdate))
+  }
   assertAutomationExtraAgentArgs(merged)
   // The key would otherwise stay on a record that went back to an agent.
   if (!action) {

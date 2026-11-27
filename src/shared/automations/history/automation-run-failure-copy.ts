@@ -41,7 +41,8 @@ export const AUTOMATION_RUN_FAILURE_COPY = {
   botsOffByTeam: 'Bots are turned off by your team, so Orca skipped this run.',
   botMissing: 'The bot this automation runs as no longer exists.',
   botFolderMissing: "The bot's folder is no longer available.",
-  botPaused: '{{bot}} is paused, so Orca skipped this run.'
+  botPaused: '{{bot}} is paused, so Orca skipped this run.',
+  overlap: 'The previous run of this command was still in progress, so Orca skipped this one.'
 } as const
 
 export type AutomationRunFailureCode = keyof typeof AUTOMATION_RUN_FAILURE_COPY

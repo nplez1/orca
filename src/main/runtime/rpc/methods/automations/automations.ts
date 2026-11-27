@@ -142,16 +142,11 @@ export const AUTOMATION_METHODS = [
     params: AutomationUpdate,
     handler: async (params, context) => {
       refuseFromLookAround(params.callerSessionId, context)
-      const automation = await context.runtime.updateAutomation(
-        params.id,
-        // Null clears the action back to an agent automation; absent leaves it as it is.
-        { ...params.updates, action: params.updates.action ?? undefined },
-        {
-          expectedOwner: mutationOwner(params.id, params.expectedOwner, context),
-          destination: params.destination,
-          expectedWorkspaceMode: params.expectedWorkspaceMode
-        }
-      )
+      const automation = await context.runtime.updateAutomation(params.id, params.updates, {
+        expectedOwner: mutationOwner(params.id, params.expectedOwner, context),
+        destination: params.destination,
+        expectedWorkspaceMode: params.expectedWorkspaceMode
+      })
       const caller = chatOfCaller(params.callerSessionId, context)
       recordAutomationSavedCard(caller, 'updated', automation)
       return { automation: automationForClient(automation, context) }

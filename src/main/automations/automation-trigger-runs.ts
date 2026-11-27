@@ -24,7 +24,10 @@ export type AutomationTriggerRunContext = {
   wakeGateDelayMs: number
   /** The automation's dispatch lane; the operation must not dispatch itself. */
   inLane<T>(automationId: string, operation: () => Promise<T>): Promise<T>
-  describeRefusal(target: AutomationRunTargetResult): Promise<AutomationRunFailure | null>
+  describeRefusal(
+    automation: Automation,
+    target: AutomationRunTargetResult
+  ): Promise<AutomationRunFailure | null>
   resolveTarget(automation: Automation): AutomationRunTargetResult
   dispatch(
     automation: Automation,
@@ -59,7 +62,7 @@ export async function runScheduledOccurrence(
 
   // Fold recurring refusals before creating rows so they do not evict real run history.
   const target = ctx.resolveTarget(automation)
-  const refusal = await ctx.describeRefusal(target)
+  const refusal = await ctx.describeRefusal(automation, target)
   // Once WSL owns the schedule, avoid churning skips on the retained local copy.
   if (refusal?.errorCode === 'wslMoveOwnedByHost') {
     await ctx.runs.advanceNextRun(automation.id, now)
@@ -137,7 +140,7 @@ async function admitEvent(
     return { run: await recordMissedRun({ runs: ctx.runs, automation, scheduledFor, event }) }
   }
   const target = ctx.resolveTarget(automation)
-  const refusal = await ctx.describeRefusal(target)
+  const refusal = await ctx.describeRefusal(automation, target)
   const repeated = refusal
     ? await ctx.runs.repeatSkip(automationId, refusal.error, scheduledFor, event)
     : null

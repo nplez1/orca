@@ -4,11 +4,11 @@ import type { AutomationPrecheck } from '../../../shared/automations/automation-
 import type { AutomationPrecheckResult } from '../../../shared/automations/history/automation-run'
 import {
   failedCommandResult,
-  killLocalCommandProcessTree,
   runHostCommand,
   type HostCommandRun,
   type HostCommandTarget
 } from './command-runner'
+import { killLocalCommandProcessTree } from './command-process-tree-kill'
 
 /** Every precheck runs plainly, and names itself in a timeout message. */
 const PRECHECK_RUN = {

@@ -10,14 +10,13 @@ import {
   PLUGIN_AUTOMATION_SCHEDULE_MAX
 } from '../../../../shared/plugins/workers/plugin-host-api-automation-methods'
 
-/** The parts of a stored automation plugins may read; the rest (precheck, action, agent arguments,
+/** The parts of a stored automation plugins may read; the rest (precheck, agent arguments,
  *  launch setup, setup trust, owner) never reaches them. */
 export const automationAnswer = lazyZodSchema(() =>
   z.object({
     id: z.string(),
     name: z.string(),
     prompt: z.string(),
-    // Null on a command automation, which has no agent and is never projected.
     agentId: z.string().nullable(),
     projectId: z.string(),
     runContext: z
@@ -40,7 +39,6 @@ export const automationAnswer = lazyZodSchema(() =>
         endedAt: z.number().optional()
       })
       .optional(),
-    // Read only to tell whether runs use extra settings; never projected.
     action: z.object({ kind: z.string() }).optional(),
     precheck: z.object({ command: z.string() }).nullable().optional(),
     agentArgs: z.string().nullable().optional(),
@@ -87,13 +85,11 @@ export function projectPluginAutomations(
   return {
     automations: automations
       .flatMap((automation) => {
-        // A command automation runs a shell line as the person; a plugin neither sees nor owns one.
         const agent = automation.agentId
         if (!agent) {
           return []
         }
         const raw = automation.workspaceMode === 'existing' ? automation.workspaceId : null
-        // A workspace `workspace.list` no longer lists keeps its raw id, when that fits the field.
         const workspaceId = raw ? (workspaceIds.get(raw) ?? fittingId(raw)) : null
         return {
           id: automation.id,

@@ -23,6 +23,8 @@ export type PluginConfirmationSubject =
       fields: readonly ('name' | 'prompt' | 'schedule' | 'timezone' | 'enabled')[]
       /** Its runs use extra agent settings the person chose (arguments, permission mode, precheck). */
       elevated?: true
+      /** Elevated because its runs are a shell command, with no agent. */
+      command?: true
       /** The new prompt, when the change sets one. */
       prompt?: string
     }

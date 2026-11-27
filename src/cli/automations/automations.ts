@@ -9,7 +9,6 @@ import type { AutomationDestination } from '../../shared/automations/ownership/a
 import type { CommandHandler } from '../dispatch/dispatch'
 import {
   formatAutomationList,
-  formatAutomationEnabled,
   formatAutomationRemoved,
   formatAutomationRun,
   formatAutomationRuns,
@@ -39,12 +38,12 @@ import {
   getEnabledFlag,
   getOptionalProviderFlag,
   getPrecheckFlag,
-  getScriptActionFlag,
   getProviderFlag,
   getReuseSessionFlag,
   getSourceContextFlag,
   getWorkspaceModeFlag
 } from './automation-handler-flags'
+import { getScriptActionFlag } from './automation-script-flag'
 import { getExtraAgentArgsFlag } from './automation-extra-agent-args-flag'
 import { assertAutomationFieldsSupported } from './automation-host-support'
 import { assertAutomationSetupMode, getAutomationSetupFlag } from './automation-setup-flag'
@@ -70,6 +69,10 @@ import {
 import { callerChat } from './automation-caller-chat'
 import { getOnceFlags } from './automation-once-flag'
 import { watchPrCreateFlags } from './automation-watch-pr'
+import {
+  AUTOMATION_ENABLED_HANDLERS,
+  resolveAutomationMutationState
+} from './automation-enabled-handlers'
 
 type AutomationCreateParams = Omit<AutomationCreateInput, 'projectId' | 'timezone'> & {
   destination?: AutomationDestination
@@ -100,36 +103,6 @@ async function resolveDefaultTarget(
     }
     return {}
   }
-}
-
-// Read the authoritative owner for fencing; older hosts omit it and impose no precondition.
-async function resolveAutomationMutationState(
-  client: Parameters<CommandHandler>[0]['client'],
-  id: string
-): Promise<AutomationShowPayload> {
-  const result = await client.call<AutomationShowPayload>('automation.show', { id })
-  return result.result
-}
-
-/** `enable` and `disable` are one write with the flag flipped; both fence the owner first. */
-async function setAutomationEnabled(args: {
-  client: Parameters<CommandHandler>[0]['client']
-  flags: Parameters<CommandHandler>[0]['flags']
-  json: boolean
-  enabled: boolean
-}): Promise<void> {
-  const id = getRequiredStringFlag(args.flags, 'id')
-  const { owner: expectedOwner, automation } = await resolveAutomationMutationState(args.client, id)
-  if (automation.enabled === args.enabled) {
-    writeStdoutLine(`${automation.name} is already ${args.enabled ? 'on' : 'off'}.`)
-    return
-  }
-  const result = await args.client.call<{ automation: Automation }>('automation.update', {
-    id,
-    ...(expectedOwner ? { expectedOwner } : {}),
-    updates: { enabled: args.enabled }
-  })
-  printResult(result, args.json, (value) => formatAutomationEnabled(value, args.enabled))
 }
 
 export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
@@ -276,12 +249,7 @@ export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
       )
     }
   },
-  'automations enable': async ({ flags, client, json }) => {
-    await setAutomationEnabled({ client, flags, json, enabled: true })
-  },
-  'automations disable': async ({ flags, client, json }) => {
-    await setAutomationEnabled({ client, flags, json, enabled: false })
-  },
+  ...AUTOMATION_ENABLED_HANDLERS,
   'automations remove': async ({ flags, client, json }) => {
     const id = getRequiredStringFlag(flags, 'id')
     const { owner: expectedOwner } = await resolveAutomationMutationState(client, id)

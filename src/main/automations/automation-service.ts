@@ -29,7 +29,6 @@ import {
 import { createAutomationRunWriter, type AutomationRunWriter } from './run-history/run-writer'
 import { reportAutomationScheduleDrift } from './dispatch/schedule-drift-report'
 import {
-  canDispatchTo,
   describeScheduledTickRefusal,
   recordRefusedAutomationRun
 } from './dispatch/dispatch-refusal'
@@ -58,6 +57,8 @@ export class AutomationService {
   private readonly duePasses = createCoalescingKeyedRunner<void>()
   private stopped = false
   private dispatchGeneration = 0
+  /** Replaced on each stop, which kills the commands the earlier one covers. */
+  private commandAbort = new AbortController()
   private readonly claudeUsage: AutomationUsageClient | null
   private readonly codexUsage: AutomationUsageClient | null
   private readonly allowRemoteHostScheduling: boolean
@@ -144,6 +145,8 @@ export class AutomationService {
   stop(): void {
     this.stopped = true
     this.dispatchGeneration += 1
+    this.commandAbort.abort()
+    this.commandAbort = new AbortController()
     this.completionWatcher?.dispose()
     clearInterval(this.timer ?? undefined)
     this.timer = null
@@ -270,12 +273,10 @@ export class AutomationService {
       runs: this.runs,
       wakeGateDelayMs,
       inLane: (automationId, operation) => this.runInAutomationLane(automationId, operation),
-      describeRefusal: (target) => {
-        const canDispatch = canDispatchTo(
-          { repo: Boolean(this.availableLauncher()), bot: Boolean(this.botDispatcher) },
-          target
-        )
-        return describeScheduledTickRefusal(this.store, { target, canDispatch })
+      describeRefusal: (automation, target) => {
+        const repo = Boolean(this.availableLauncher())
+        const launchers = { repo, bot: Boolean(this.botDispatcher) }
+        return describeScheduledTickRefusal(this.store, automation, launchers, target)
       },
       resolveTarget: (automation) => this.resolveTarget(automation),
       dispatch: (automation, run, target) =>
@@ -318,6 +319,7 @@ export class AutomationService {
           botDispatcher: this.botDispatcher,
           chatDispatcher:
             this.allowRemoteHostScheduling || this.availableLauncher() ? this.chatDispatcher : null,
+          commandSignal: this.commandAbort.signal,
           resolveTarget: (current) => this.resolveTarget(current),
           ...(this.onRunRefused ? { onRunRefused: this.onRunRefused } : {}),
           runPrecheck: () => this.runPrecheck(automation.id, run.id),

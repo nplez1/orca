@@ -28,6 +28,9 @@ export function describeStrandedAutomationRun(run: AutomationRun): string {
     return 'Orca stopped before this run could launch.'
   }
   if (run.status === 'dispatching') {
+    if (run.sessionKind === 'script') {
+      return 'Orca stopped before this command finished.'
+    }
     return 'Orca stopped before this run reported that its agent started.'
   }
   return 'Orca lost the terminal for this run before it reported completion.'
@@ -147,14 +150,19 @@ export class AutomationRunCompletionWatcher {
 
   /** Fail unclaimed rows now (no lane survives startup); reattach launched ones within the ready-surface grace. */
   reconcileRetainedRuns(runs: readonly AutomationRun[]): void {
+    const retained: AutomationRun[] = []
     for (const run of runs) {
-      if (run.status === 'pending') {
+      // A command run has nothing to reattach, and left open it would refuse every later one.
+      if (
+        run.status === 'pending' ||
+        (run.status === 'dispatching' && run.sessionKind === 'script')
+      ) {
         this.strand(run)
+      } else if (run.status === 'dispatched' || run.status === 'dispatching') {
+        retained.push(run)
       }
     }
-    this.reconciler.reconcile(
-      runs.filter((run) => run.status === 'dispatched' || run.status === 'dispatching')
-    )
+    this.reconciler.reconcile(retained)
   }
 
   /** Call after renderer attachment or headless PTY adoption. */

@@ -36,10 +36,8 @@ const ExtraAgentArgs = lazyZodSchema(() =>
   z.string({ message: 'Extra agent arguments must be text.' }).optional()
 )
 
-/** A stored command: one shell line, its deadline, and the shell and delivery it asks for. */
 const AutomationScriptParam = lazyZodSchema(() =>
   z.strictObject({
-    // 4000 chars mirrors MAX_AUTOMATION_COMMAND_LENGTH: a command is a line, not a script file.
     command: z
       .string()
       .trim()
@@ -52,7 +50,6 @@ const AutomationScriptParam = lazyZodSchema(() =>
   })
 )
 
-/** What the automation does: launch an agent, or run a command with no agent at all. */
 const AutomationActionParam = lazyZodSchema(() =>
   z.discriminatedUnion('kind', [
     z.strictObject({ kind: z.literal('agent') }),
@@ -60,9 +57,12 @@ const AutomationActionParam = lazyZodSchema(() =>
   ])
 )
 
-/** A command needs no prompt; an agent automation needs a non-empty one. */
-function assertAutomationActionedPrompt(
-  value: { prompt?: string; action?: { kind: 'agent' | 'command' } | null },
+function assertAutomationActionedFields(
+  value: {
+    prompt?: string
+    agentId?: string | null
+    action?: { kind: 'agent' | 'command' } | null
+  },
   ctx: z.RefinementCtx
 ): void {
   if (value.action?.kind === 'command') {
@@ -70,6 +70,9 @@ function assertAutomationActionedPrompt(
   }
   if (!value.prompt?.trim()) {
     ctx.addIssue({ code: 'custom', message: 'Missing automation prompt', path: ['prompt'] })
+  }
+  if (!value.agentId) {
+    ctx.addIssue({ code: 'custom', message: 'Missing automation agent', path: ['agentId'] })
   }
 }
 
@@ -177,7 +180,7 @@ export const AutomationCreate = lazyZodSchema(() =>
       waitInCallerChat: z.literal(true).optional()
     })
     .superRefine(refuseUnknownNamedZone)
-    .superRefine(assertAutomationActionedPrompt)
+    .superRefine(assertAutomationActionedFields)
 )
 
 export const AutomationUpdateFields = lazyZodSchema(() =>
@@ -186,7 +189,6 @@ export const AutomationUpdateFields = lazyZodSchema(() =>
       name: OptionalString,
       prompt: OptionalString,
       precheck: AutomationPrecheck,
-      // Null clears back to an agent automation.
       action: AutomationActionParam.nullable().optional(),
       agentId: TuiAgent.nullable().optional(),
       extraAgentArgs: ExtraAgentArgs,

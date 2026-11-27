@@ -7,6 +7,7 @@ import type {
 } from '../../../../shared/automations/automation-definition'
 import type { RuntimeStore } from '../../construction/runtime-store-contract'
 import { botAutomationSetup } from '../../../../shared/bots/bot-agent-setup'
+import { normalizeAutomationAction } from '../../../../shared/automations/launch/automation-command'
 import { withPatchPlaceRefs } from '../../../automations/bot-automation-place-refs'
 import {
   assertCloudTakesTriggers,
@@ -79,7 +80,12 @@ export async function patchBotAutomationUpdate(
       lookups.webhooks.hearing(bot),
       lookups.webhooks.cloudRules(updates.on)
     )
-    patch.agentId = agent
+    // A command keeps no agent; naming one stays in the patch for the store to refuse.
+    if (
+      !normalizeAutomationAction(updates.action === undefined ? current.action : updates.action)
+    ) {
+      patch.agentId = agent
+    }
     patch.workspaceId = botAutomationTarget(bot).workspaceId
     if (patch.on) {
       assertCloudTakesTriggers(lookups.cloudTriggers(), patch.on, current.on)

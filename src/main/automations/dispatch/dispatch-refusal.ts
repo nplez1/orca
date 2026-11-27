@@ -17,6 +17,7 @@ import {
   automationRunFailure,
   type AutomationRunFailure
 } from '../../../shared/automations/history/automation-run-failure-copy'
+import { isCommandAutomation } from '../../../shared/automations/launch/automation-command'
 
 export const NO_DISPATCH_HOST = AUTOMATION_RUN_FAILURE_COPY.noDispatchHost
 export const WSL_MOVE_IN_PROGRESS = AUTOMATION_RUN_FAILURE_COPY.wslMoveInProgress
@@ -30,11 +31,35 @@ function targetFailure({
   return failure
 }
 
-/** Bot runs launch in main; other runs need a window or the headless dispatcher. */
+/** Commands run outside the lane; a claim ignores pending rows newer than its own run. */
+export function describeCommandOverlap(
+  store: Pick<Store, 'listAutomationRuns'>,
+  automation: Automation,
+  claiming?: Pick<AutomationRun, 'id' | 'createdAt'>
+): AutomationRunFailure | null {
+  if (!isCommandAutomation(automation)) {
+    return null
+  }
+  const busy = store
+    .listAutomationRuns(automation.id)
+    .some(
+      (run) =>
+        run.id !== claiming?.id &&
+        (run.status === 'dispatching' ||
+          (run.status === 'pending' && (!claiming || run.createdAt < claiming.createdAt)))
+    )
+  return busy ? automationRunFailure('overlap') : null
+}
+
+/** A command needs no launcher. Bot runs launch in main; others need a window or headless host. */
 export function canDispatchTo(
+  automation: Automation,
   launchers: { repo: boolean; bot: boolean },
   target: AutomationRunTargetResult
 ): boolean {
+  if (isCommandAutomation(automation)) {
+    return true
+  }
   return target.ok && 'bot' in target ? launchers.bot : launchers.repo
 }
 
@@ -73,14 +98,18 @@ export async function describeStoppedWslDistroRefusal(
   return blocked ? automationRunFailure('wslDistroStopped', { distro: blocked.distro }) : null
 }
 
-/** A tick's refusal: the synchronous reasons, then a stopped WSL distro (an async read). */
+/** A tick's refusal: the synchronous reasons, a stopped WSL distro (an async read), then overlap. */
 export async function describeScheduledTickRefusal(
   store: Store,
-  input: Parameters<typeof describeScheduledRefusal>[0]
+  automation: Automation,
+  launchers: { repo: boolean; bot: boolean },
+  target: AutomationRunTargetResult
 ): Promise<AutomationRunFailure | null> {
+  const canDispatch = canDispatchTo(automation, launchers, target)
   return (
-    describeScheduledRefusal(input) ??
-    (input.target.ok ? await describeStoppedWslDistroRefusal(store, input.target) : null)
+    describeScheduledRefusal({ target, canDispatch }) ??
+    (target.ok ? await describeStoppedWslDistroRefusal(store, target) : null) ??
+    describeCommandOverlap(store, automation)
   )
 }
 

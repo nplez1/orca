@@ -11,6 +11,7 @@ import type {
   Automation,
   AutomationCreateInput
 } from '../../../shared/automations/automation-definition'
+import type { AutomationLaunchSetup } from '../../../shared/automations/launch/automation-launch-types'
 import type { AutomationRun } from '../../../shared/automations/history/automation-run'
 import type { PersistedState } from '../../../shared/orca-profiles/persisted-state-types'
 import { normalizeAutomationPrecheck } from '../../../shared/automations/launch/automation-precheck'
@@ -103,9 +104,10 @@ export function createAutomation(
   }
   const schedulerOwner = getAutomationSchedulerOwner(repo)
   const contexts = getAutomationContextsForRepo(repo, operations.state.projectHostSetups ?? [])
-  const setup = applyAutomationLaunchSetupPatch(input)
-  const extraAgentArgs = storedExtraAgentArgs(setup.extraAgentArgs)
   const action = normalizeAutomationAction(input.action)
+  // A command launches no agent, so it stores no agent launch settings.
+  const setup: AutomationLaunchSetup = action ? {} : applyAutomationLaunchSetupPatch(input)
+  const extraAgentArgs = storedExtraAgentArgs(setup.extraAgentArgs)
   const agentId = action ? null : input.agentId
   if (!action && !agentId) {
     throw new Error('An automation needs an agent, or a command to run.')
@@ -115,7 +117,8 @@ export function createAutomation(
     ...automationCreateIdentity(input),
     name: input.name.trim() || 'Untitled automation',
     prompt: input.prompt,
-    precheck: normalizeAutomationPrecheck(input.precheck),
+    // A precheck gates an agent launch; on a command it would never run.
+    precheck: action ? null : normalizeAutomationPrecheck(input.precheck),
     ...(action ? { action } : {}),
     agentId,
     ...(setup.surface ? { surface: setup.surface } : {}),

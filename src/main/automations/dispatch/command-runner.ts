@@ -1,15 +1,13 @@
 // One shell command on a host: a local spawn or an SSH channel, with a timeout, a tree kill, and a
 // tail-truncated capture. Prechecks and command automations both run through it.
 import { spawn, type ChildProcess } from 'node:child_process'
-import { windowsSystem32Binary } from '@orca/process-host/windows-system-binary'
-import { childProcessHasExited } from '@orca/process-host/process-tree-termination'
 import type { ClientChannel } from 'ssh2'
 import type { AutomationPrecheckResult } from '../../../shared/automations/history/automation-run'
 import { MAX_AUTOMATION_PRECHECK_OUTPUT_CHARS } from '../../../shared/automations/launch/automation-precheck'
 import { getSshConnectionManager } from '../../ssh/targets/ssh-target-registry'
 import { quotePosixShell } from '../../../shared/shell/launch/shell-argument-quoting'
-import { admitSelfInitiatedTreeKill } from '../../pty/process-retirement/own-chromium-tree-kill-guard'
 import { errorMessage } from '../../../shared/errors/error-message'
+import { killLocalCommandProcessTree, type HostCommandKillSite } from './command-process-tree-kill'
 
 /** A command as it is stored: one shell string and its own deadline. */
 export type HostCommand = {
@@ -34,9 +32,6 @@ export type HostCommandTarget =
 /** The capture a run stores; a precheck's own record is the same shape. */
 export type HostCommandResult = AutomationPrecheckResult
 
-/** Named so a tree kill admits only the site that asked for it. */
-export type HostCommandKillSite = 'automation-precheck-timeout' | 'automation-command-timeout'
-
 export type HostCommandRun = {
   command: HostCommand
   /** Absent is `plain`: the shell a precheck has always used. */
@@ -44,6 +39,8 @@ export type HostCommandRun = {
   /** Names the command in a timeout message, as in "Precheck timed out after 60s." */
   label: string
   killSite: HostCommandKillSite
+  /** Aborting kills the command as a timeout would. */
+  signal?: AbortSignal
 }
 
 type TailBuffer = {
@@ -64,6 +61,10 @@ function appendTail(buffer: TailBuffer, chunk: string): TailBuffer {
 
 function timeoutMessage(run: HostCommandRun): string {
   return `${run.label} timed out after ${run.command.timeoutSeconds}s.`
+}
+
+function stoppedMessage(run: HostCommandRun): string {
+  return `${run.label} was stopped before it finished.`
 }
 
 function createCommandResult(
@@ -109,64 +110,6 @@ export function failedCommandResult(
   })
 }
 
-export function killLocalCommandProcessTree(
-  child: ChildProcess,
-  killSite: HostCommandKillSite
-): ReturnType<typeof setTimeout> | null {
-  const pid = child.pid
-  if (!pid) {
-    child.kill()
-    return null
-  }
-
-  if (process.platform === 'win32') {
-    // An exited root's pid may be reused before close; only the handle kill is safe then.
-    if (
-      childProcessHasExited(child) ||
-      !admitSelfInitiatedTreeKill({
-        pid,
-        site: killSite,
-        scope: 'win-taskkill-tree'
-      })
-    ) {
-      child.kill()
-      return null
-    }
-    try {
-      // Shell commands can leave descendants running after the root exits.
-      const killer = spawn(
-        windowsSystem32Binary('taskkill.exe'),
-        ['/pid', String(pid), '/t', '/f'],
-        {
-          stdio: 'ignore',
-          windowsHide: true
-        }
-      )
-      killer.on('error', () => child.kill())
-      killer.unref()
-    } catch {
-      child.kill()
-    }
-    return null
-  }
-
-  try {
-    process.kill(-pid, 'SIGTERM')
-  } catch {
-    child.kill()
-  }
-
-  const forceKillTimer = setTimeout(() => {
-    try {
-      process.kill(-pid, 'SIGKILL')
-    } catch {
-      /* Ignore errors from the final best-effort group kill. */
-    }
-  }, 2000)
-  forceKillTimer.unref?.()
-  return forceKillTimer
-}
-
 /** The local spawn for a shell mode; Windows has no login shell, so it always spawns plainly. */
 function spawnLocalCommand(
   run: HostCommandRun,
@@ -196,21 +139,36 @@ function runLocalCommand(
 ): Promise<HostCommandResult> {
   const startedAt = Date.now()
   const timeoutMs = run.command.timeoutSeconds * 1000
+  if (run.signal?.aborted) {
+    return Promise.resolve(failedCommandResult(run, startedAt, stoppedMessage(run)))
+  }
   return new Promise((resolve) => {
     let stdout: TailBuffer = { content: '', truncated: false }
     let stderr: TailBuffer = { content: '', truncated: false }
     let timedOut = false
+    let stopped = false
     let settled = false
     let timeout: ReturnType<typeof setTimeout> | null = null
     let forceKillTimer: ReturnType<typeof setTimeout> | null = null
 
     const child = spawnLocalCommand(run, target)
 
+    const abort = (): void => {
+      stopped = true
+      if (timeout) {
+        clearTimeout(timeout)
+        timeout = null
+      }
+      forceKillTimer ??= killLocalCommandProcessTree(child, run.killSite)
+    }
+    run.signal?.addEventListener('abort', abort, { once: true })
+
     const settle = (exitCode: number | null, error: string | null): void => {
       if (settled) {
         return
       }
       settled = true
+      run.signal?.removeEventListener('abort', abort)
       if (timeout) {
         clearTimeout(timeout)
         timeout = null
@@ -239,7 +197,8 @@ function runLocalCommand(
       settle(null, error.message)
     })
     child.on('close', (code) => {
-      settle(timedOut || typeof code !== 'number' ? null : code, timedOut ? timeoutMessage(run) : null)
+      const error = timedOut ? timeoutMessage(run) : stopped ? stoppedMessage(run) : null
+      settle(timedOut || stopped || typeof code !== 'number' ? null : code, error)
     })
   })
 }
@@ -255,14 +214,21 @@ function runSshChannelCommand(
     let stderr: TailBuffer = { content: '', truncated: false }
     let exitCode: number | null = null
     let timedOut = false
+    let stopped = false
     let settled = false
     let timeout: ReturnType<typeof setTimeout> | null = null
+
+    const abort = (): void => {
+      stopped = true
+      channel.close()
+    }
 
     const settle = (exitCode: number | null, error: string | null): void => {
       if (settled) {
         return
       }
       settled = true
+      run.signal?.removeEventListener('abort', abort)
       if (timeout) {
         clearTimeout(timeout)
         timeout = null
@@ -274,6 +240,7 @@ function runSshChannelCommand(
       timedOut = true
       channel.close()
     }, timeoutMs)
+    run.signal?.addEventListener('abort', abort, { once: true })
 
     const fail = (error: Error): void => {
       settle(null, error.message)
@@ -293,8 +260,13 @@ function runSshChannelCommand(
       if (typeof code === 'number') {
         exitCode = code
       }
-      settle(exitCode, timedOut ? timeoutMessage(run) : null)
+      const error = timedOut ? timeoutMessage(run) : stopped ? stoppedMessage(run) : null
+      settle(exitCode, error)
     })
+    // Stopped while the channel was opening; its listeners are attached by now.
+    if (run.signal?.aborted) {
+      abort()
+    }
   })
 }
 
@@ -303,11 +275,13 @@ function remoteCommandLine(
   run: HostCommandRun,
   target: Extract<HostCommandTarget, { type: 'ssh' }>
 ): string {
+  // /bin/sh expands $SHELL, since the account's own shell may not read `${SHELL:-…}`.
   const line =
     run.shell === 'login'
-      ? `\${SHELL:-/bin/sh} -lc ${quotePosixShell(run.command.command)}`
+      ? `/bin/sh -c ${quotePosixShell(`exec "\${SHELL:-/bin/sh}" -lc ${quotePosixShell(run.command.command)}`)}`
       : run.command.command
-  return `cd ${quotePosixShell(target.cwd)} && ${line}`
+  // Its own statement: after `cd … &&`, a command's `||` branch would run in the wrong directory.
+  return `cd ${quotePosixShell(target.cwd)} || exit 1\n${line}`
 }
 
 async function runSshCommand(
