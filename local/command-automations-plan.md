@@ -10,9 +10,11 @@ Replacing the Hermes agent with an Orca bot needs one thing Orca cannot do: a sc
 jobs (`auto-issues` every 5m, `orca-discovery-launch`, `agent-watchdog`) are all deterministic scripts;
 porting them as prompts would cost ~288 model turns a day and put a tuned reconcile policy into prose.
 
-Second gap: enable/disable exists in the record and the CLI (`getEnabledFlag`,
-`src/cli/automations/automations.ts:159,211`) but not in the Automations page, so the switch the owner
-asked for ("stop ingesting agent-tagged work while I do repo work") is not reachable where they look.
+Second gap, corrected after reading the page: there is none. Enable/disable already exists —
+`toggleAutomation` (`authoring/automation-management-actions.ts:42`) is wired to a row action and to the
+detail header (`details/AutomationsDetailPane.tsx:171`); what was missing was a named CLI verb
+(`update --enabled=false` was the way) and its documentation. Both now exist. "Pause all" would still be
+new, and is optional.
 
 ## What already exists (reuse, do not rebuild)
 
@@ -63,6 +65,24 @@ export type AutomationAction = { kind: 'agent' } | { kind: 'command'; script: Au
 Rejected for v1: env overrides (the command can `export`), a per-automation concurrency knob (the tick
 guard is enough until a slow script proves otherwise), a bare "run this file" mode (one shell string is
 enough and matches precheck).
+
+## Slicing, corrected once the code was read
+
+`agentId` becoming nullable is not a record-only change: the renderer's draft models, agent pickers and
+save paths all take a `TuiAgent`, so every file that shows or edits an automation must move with the
+type. The record change therefore cannot land alone, and the CLI's `--script` flag is useless before it.
+The five content sections below stay as the specification; the delivery boundaries are these:
+
+| Order | What lands | State |
+| --- | --- | --- |
+| 1 | Executor extraction: `command-runner.ts`, precheck delegates to it | landed, `be362fcbbec` |
+| 2 | Enable/disable from the CLI, with spec, help and skill guide | landed, `d643551074c` |
+| 3 | ~~The page's enable/disable switch~~ — already present; only "Pause all" would be new | not needed |
+| 4 | Script automations: record + RPC contract + renderer + CLI in one PR | needs the unit gate |
+| 5 | Dispatch a command run, and settle report/delivery | after 4 |
+
+Step 3 is separate from 4 on purpose: a switch is a page change, and a switch that waits on a nullable
+`agentId` is a switch nobody gets for a week.
 
 ## The changes, in order
 
