@@ -9,6 +9,7 @@ import type { AutomationDestination } from '../../shared/automations/ownership/a
 import type { CommandHandler } from '../dispatch/dispatch'
 import {
   formatAutomationList,
+  formatAutomationEnabled,
   formatAutomationRemoved,
   formatAutomationRun,
   formatAutomationRuns,
@@ -107,6 +108,27 @@ async function resolveAutomationMutationState(
 ): Promise<AutomationShowPayload> {
   const result = await client.call<AutomationShowPayload>('automation.show', { id })
   return result.result
+}
+
+/** `enable` and `disable` are one write with the flag flipped; both fence the owner first. */
+async function setAutomationEnabled(args: {
+  client: Parameters<CommandHandler>[0]['client']
+  flags: Parameters<CommandHandler>[0]['flags']
+  json: boolean
+  enabled: boolean
+}): Promise<void> {
+  const id = getRequiredStringFlag(args.flags, 'id')
+  const { owner: expectedOwner, automation } = await resolveAutomationMutationState(args.client, id)
+  if (automation.enabled === args.enabled) {
+    writeStdoutLine(`${automation.name} is already ${args.enabled ? 'on' : 'off'}.`)
+    return
+  }
+  const result = await args.client.call<{ automation: Automation }>('automation.update', {
+    id,
+    ...(expectedOwner ? { expectedOwner } : {}),
+    updates: { enabled: args.enabled }
+  })
+  printResult(result, args.json, (value) => formatAutomationEnabled(value, args.enabled))
 }
 
 export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
@@ -248,6 +270,12 @@ export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
         `Pinned to ${liveBot.name}'s current agent (${pinned.agent}): this automation keeps it when ${liveBot.name} switches agents; --agent bot follows ${liveBot.name} again.`
       )
     }
+  },
+  'automations enable': async ({ flags, client, json }) => {
+    await setAutomationEnabled({ client, flags, json, enabled: true })
+  },
+  'automations disable': async ({ flags, client, json }) => {
+    await setAutomationEnabled({ client, flags, json, enabled: false })
   },
   'automations remove': async ({ flags, client, json }) => {
     const id = getRequiredStringFlag(flags, 'id')

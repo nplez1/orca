@@ -182,6 +182,25 @@ export const AUTOMATION_COMMAND_SPECS: CommandSpec[] = [
     ]
   },
   {
+    path: ['automations', 'enable'],
+    summary: 'Switch an Orca automation back on',
+    usage: 'orca automations enable <id> [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'id'],
+    positionalArgs: ['id'],
+    examples: ['orca automations enable 2f9e...', 'orca automations enable --id 2f9e... --json']
+  },
+  {
+    path: ['automations', 'disable'],
+    summary: 'Switch an Orca automation off, keeping it and its history',
+    usage: 'orca automations disable <id> [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'id'],
+    positionalArgs: ['id'],
+    notes: [
+      'A disabled automation keeps its schedule and does not run; orca automations runs --id <automation-id> keeps its history.'
+    ],
+    examples: ['orca automations disable 2f9e...', 'orca automations disable --id 2f9e... --json']
+  },
+  {
     path: ['automations', 'remove'],
     aliases: [['automations', 'delete']],
     destructive: true,

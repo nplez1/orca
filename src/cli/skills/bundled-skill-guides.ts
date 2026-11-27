@@ -720,6 +720,8 @@ const ORCA_CLI_AUTOMATIONS_REFERENCE_MARKDOWN = [
   "ORCA automations edit <automationId> --trigger weekdays --time 09:30 --fresh-session --json",
   "ORCA automations run <automationId> --json",
   "ORCA automations runs --id <automationId> --json",
+  "ORCA automations disable <automationId> --json   # switch it off; keeps the schedule and history",
+  "ORCA automations enable <automationId> --json    # switch it back on",
   "ORCA automations remove <automationId> --json   # or: automations delete",
   "```",
   "",
