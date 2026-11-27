@@ -1,4 +1,5 @@
 import { ipcMain, type WebContents } from 'electron'
+import type { IpcHandleRegistrar } from '../lazy-ipc-handle-group'
 import type {
   TerminalPreviewConnectResult,
   TerminalPreviewSnapshot
@@ -22,12 +23,17 @@ function isTerminalPreviewRenderer(sender: WebContents): boolean {
   return isTrustedUIRenderer(sender)
 }
 /** Pop-out terminal transport with an atomic snapshot/live boundary. */
-export function registerTerminalPreviewHandlers(runtime: OrcaRuntimeService): void {
-  ipcMain.removeHandler('terminalPreview:connect')
-  ipcMain.removeHandler('terminalPreview:unsubscribe')
-  ipcMain.removeHandler('terminalPreview:input')
-  ipcMain.removeHandler('terminalPreview:ack')
-  ipcMain.removeHandler('terminalPreview:fit')
+export function registerTerminalPreviewHandlers(
+  runtime: OrcaRuntimeService,
+  ipc: IpcHandleRegistrar = ipcMain
+): void {
+  if (ipc === ipcMain) {
+    ipcMain.removeHandler('terminalPreview:connect')
+    ipcMain.removeHandler('terminalPreview:unsubscribe')
+    ipcMain.removeHandler('terminalPreview:input')
+    ipcMain.removeHandler('terminalPreview:ack')
+    ipcMain.removeHandler('terminalPreview:fit')
+  }
 
   const subscriptionsByContents = new Map<number, Map<string, TerminalPreviewOutputStream>>()
   // Unsubscribe or renderer document retirement releases the host pane's grid claim.
@@ -84,7 +90,7 @@ export function registerTerminalPreviewHandlers(runtime: OrcaRuntimeService): vo
     return perPty
   }
 
-  ipcMain.handle(
+  ipc.handle(
     'terminalPreview:connect',
     async (
       event,
@@ -160,7 +166,7 @@ export function registerTerminalPreviewHandlers(runtime: OrcaRuntimeService): vo
     }
   )
 
-  ipcMain.handle(
+  ipc.handle(
     'terminalPreview:input',
     (event, args: { ptyId?: unknown; data?: unknown }): Promise<boolean> => {
       if (
@@ -174,25 +180,22 @@ export function registerTerminalPreviewHandlers(runtime: OrcaRuntimeService): vo
     }
   )
 
-  ipcMain.handle(
-    'terminalPreview:ack',
-    (event, args: { ptyId?: unknown; bytes?: unknown }): void => {
-      if (
-        !isTerminalPreviewRenderer(event.sender) ||
-        !isValidPtyId(args?.ptyId) ||
-        typeof args.bytes !== 'number' ||
-        !Number.isFinite(args.bytes) ||
-        args.bytes <= 0 ||
-        args.bytes > TERMINAL_PREVIEW_OUTPUT_BATCH_MAX_BYTES
-      ) {
-        return
-      }
-      subscriptionsByContents.get(event.sender.id)?.get(args.ptyId)?.acknowledge(args.bytes)
+  ipc.handle('terminalPreview:ack', (event, args: { ptyId?: unknown; bytes?: unknown }): void => {
+    if (
+      !isTerminalPreviewRenderer(event.sender) ||
+      !isValidPtyId(args?.ptyId) ||
+      typeof args.bytes !== 'number' ||
+      !Number.isFinite(args.bytes) ||
+      args.bytes <= 0 ||
+      args.bytes > TERMINAL_PREVIEW_OUTPUT_BATCH_MAX_BYTES
+    ) {
+      return
     }
-  )
+    subscriptionsByContents.get(event.sender.id)?.get(args.ptyId)?.acknowledge(args.bytes)
+  })
 
   // Return effective viewer-claimed size so the renderer can scale when phone priority prevents fitting.
-  ipcMain.handle(
+  ipc.handle(
     'terminalPreview:fit',
     async (
       event,
@@ -244,7 +247,7 @@ export function registerTerminalPreviewHandlers(runtime: OrcaRuntimeService): vo
     }
   )
 
-  ipcMain.handle('terminalPreview:unsubscribe', (event, args: { ptyId?: unknown }): void => {
+  ipc.handle('terminalPreview:unsubscribe', (event, args: { ptyId?: unknown }): void => {
     if (!isTerminalPreviewRenderer(event.sender) || !isValidPtyId(args?.ptyId)) {
       return
     }

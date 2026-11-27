@@ -381,7 +381,7 @@ export default function AiVaultPanel({
         )}
         {!searching && (
           <AiVaultShowMoreSessionsRow
-            loaded={sessions.length}
+            loaded={sessions.length + (scanResult?.hiddenRowCount ?? 0)}
             loadedSessionLimit={loadedSessionLimit}
             loading={loading}
             sessionLimit={sessionLimit}

@@ -5,7 +5,28 @@
 name; where an older entry reads oddly for the topology it was written in (a `main` that mirrored
 upstream), the date on it is the explanation. `upstream/main` has always meant upstream's.
 
-Last updated **2026-11-24** — `main` merged upstream main @ `7daf01d99f3` (1,350 commits) from
+Last updated **2026-11-27** — `main` merged upstream main @ `27a700fd8d6` (441 commits) from
+`e8321ad760` (merge base `3e227259249`, rollback tag `archive/pre-sync-e8321ad760`). **98 conflicted
+paths** — `both-rewrote 60, union 28, duplicate-tail 3, modify/delete 3, rename-replay 3,
+duplicate-members 1` — with no `package.json` or lockfile conflict and no upstream rename in the range.
+Resolved in eight area batches of ≤20 paths; the three `modify/delete` paths were settled from
+`expected-deletions.json` (they stay deleted, blobs re-bound). Upstream retired **Antigravity usage
+reading** (`289e3c029e2`, a user-safety fix: headless `agy` runs outside ACP get Google accounts
+flagged) and the fork accepted the retirement. `pnpm tc`, `post-sync.mjs` (16/18, 2 info) and
+`check:code-quality:changed` (0 of 2,982) are green on the merged tip; the early Linux lane found
+three reds the Mac gate cannot see and all three were fixed before the release gates. Decisions are in
+[local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) § "2026-11-27 sync", the
+narrative in [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) § Sync log. Every local PR branch sits on a
+pre-sync base and needs its own catch-up before it can be opened.
+
+Previous — **2026-11-26** — `main` merged upstream main @ `3e227259249` (530 commits) from
+`f9895f1343` (merge base `7daf01d99f3`, merge `b6bc8137f5e`). This entry is a backfill: that sync was
+recorded in the convergence ledger but never here. Its decisions are
+[local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) § "2026-11-26 sync"; its
+conflict counts were not recorded at the time and are not reconstructed here. Three releases shipped
+from this line that day (`np.60`, `np.61`, `np.62`).
+
+Previous — **2026-11-24** — `main` merged upstream main @ `7daf01d99f3` (1,350 commits) from
 `cc4fefcbaad` (merge base `0c6207e3d7`, merge `a8c508f5fb7`). **323 conflicted paths** —
 `modify/delete 192, both-rewrote 75, union 42, duplicate-tail 7, rename-replay 5,
 duplicate-members 2` — against an upstream delta that retired **6,116 files, 5,217 of them test

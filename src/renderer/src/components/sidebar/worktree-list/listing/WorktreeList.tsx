@@ -190,9 +190,12 @@ const WorktreeList = React.memo(function WorktreeList({
       )
     )
   }, [allProjectsCollapsed, projectCollapseKeys, setCollapsedGroups])
+  // Every view keeps its workspace card selected, full-page views included.
+  const activeCardWorktreeId = currentSidebarWorktreeId
   const selection = useSidebarWorktreeSelection({
     sectionRows: rowModel.sectionRows,
-    pinnedDisplayPolicy
+    pinnedDisplayPolicy,
+    active: { worktreeId: activeCardWorktreeId, hostId: activeWorkspaceExecutionHostId }
   })
   const statusMutations = useWorktreeStatusMutations({
     workspaceStatuses: boardStatuses,
@@ -320,8 +323,7 @@ const WorktreeList = React.memo(function WorktreeList({
         hostOptions={rowModel.hostOptions}
         occurrencePlan={rowModel.occurrencePlan}
         visibleProjectRepoIdsBySection={visibleProjectRepoIdsBySection}
-        // Every view keeps its workspace card selected, full-page views included.
-        activeWorktreeId={currentSidebarWorktreeId}
+        activeWorktreeId={activeCardWorktreeId}
         activeWorkspaceExecutionHostId={activeWorkspaceExecutionHostId}
         currentWorktreeId={currentSidebarWorktreeId}
         groupBy={groupBy}

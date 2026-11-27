@@ -933,23 +933,27 @@ Known gaps, recorded rather than chased:
 - After an Orca restart a child is unattributed until the parent's next post republishes
   `provider_session`, because rosters are not restored from disk.
 
-### `local(agents)`: monitoring is reserved for Claude session-cron callbacks
+### `local(agents)`: monitoring is reserved for Claude session-cron callbacks and running monitors
 
 Upstream's lead-status fold reads _any_ live non-agent child work as `workingMode: 'monitoring'`,
-which includes an ordinary background shell. This fork's `#26` reserves the monitoring badge for
-Claude session-cron callbacks, because a shell the agent started as part of its turn is still agent
-work. The fork owner chose (2026-09-25) to keep this policy and express it on upstream's fold rather
-than revert to upstream's semantics.
+which includes an ordinary background shell. This fork's `#26` keeps the monitoring badge off a
+background shell, because a shell the agent started as part of its turn is still agent work: it is
+reserved for Claude session-cron callbacks and for a running **monitor**, which is upstream's own
+verdict and the one `claude-background-task-inventory.test.ts` pins. The fork owner chose (2026-09-25)
+to keep this policy and express it on upstream's fold rather than revert to upstream's semantics; the
+2026-11-28 sync narrowed it to the shell kind alone, because the fork's justification names a shell
+and a monitor is `kind: 'monitor'`, not a shell (`classifyClaudeBackgroundTaskKind`).
 
 Anchors, both on upstream-owned files and marked `LOCAL(nplez1)`:
 
 - `src/shared/agent-hook-listener/providers/claude-pane-hold-evidence.ts` — `resolveClaudePaneStatus`
   is where the policy actually lives, and the file a conflict resolver has to keep the fork's side of.
   Through `claudePaneHoldEvidence` it splits the fold's two inputs: `hasLiveAgentWork` is the pane's
-  running or owed agent work **or** a running non-agent child task
-  (`state.claudeRunningNonAgentTaskPaneKeys`), so a background shell the agent started is agent work;
-  `hasLiveNonAgentWork` is the session-cron set **plus `owedShell`**, because an owed shell is a pending
-  wake-up rather than the running shell the policy is about. The same function reports
+  running or owed agent work **or** a running non-agent task whose kind is a shell
+  (`state.claudeRunningNonAgentTasksByPaneKey`, `hasShellTask`), so a background shell the agent
+  started is agent work; `hasLiveNonAgentWork` is the session-cron set, a running monitor, **plus
+  `owedShell`**, because an owed shell is a pending wake-up rather than the running shell the policy is
+  about. The same function reports
   `claudeMonitoringEquivalentHold` for a shell-only hold, and `claude-events.ts` reads it where upstream
   asks `heldTurnCountsAsFinished`: upstream stamps `turnCompletedAt` for a monitoring-held turn, so the
   fork must restate that verdict or a shell-held turn never announces its completion. Renaming the badge
@@ -3574,6 +3578,72 @@ pnpm run sync:localization-runtime-catalog
 [local/sync/sync-log-archive.md](./local/sync/sync-log-archive.md), newest first, so this
 section stays readable. `tests/tools/fork-process-docs.test.mjs` holds the three-entry rule.
 
+- **2026-11-27 — merge of upstream `27a700fd8d6` (441 commits) into the release line, from
+  `e8321ad760`** (merge base `3e227259249`, rollback tag `archive/pre-sync-e8321ad760`). **98
+  conflicted paths** — `both-rewrote 60, union 28, duplicate-tail 3, modify/delete 3, rename-replay 3,
+  duplicate-members 1` — with **no** `package.json` or lockfile conflict and no upstream rename in the
+  range (checked at `-M50%`; the two hits at `-M20%` are unrelated files). Resolved in eight area
+  batches of ≤20 paths. The three `modify/delete` paths were settled from `expected-deletions.json`
+  rather than by a human: they stay deleted and the manifest was re-bound to the new upstream blobs.
+  Decisions are in [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) § 2026-11-27.
+  What a reviewer will want first:
+
+  - **The one feature upstream removed was a safety fix.** `289e3c029e2` stopped reading Antigravity
+    usage because the fetcher ran the user's `agy` outside ACP, and headless `agy` runs have been
+    reported to get Google accounts flagged. The fork accepts the retirement instead of restoring the
+    fetcher it shipped in `np.62`: `antigravityAccounts: []` still publishes for older clients, the
+    chat/ACP provider and its accounts section are untouched, and
+    `src/main/antigravity/native-account-store.ts` now classifies in `NON_USAGE_CREDENTIAL_STORES`
+    because it is an account store, not a usage store.
+  - **The dashboard pop-out trio stays deleted.** Upstream's whole delta on the three files was 8
+    insertions, nothing outside the deleted set imports them, and the fork-owned close-shortcut hook
+    went with them.
+  - **A re-export was the bug, not the retry.** `jira-api-error.ts` re-exported the class that
+    `authenticated-request.ts` declares, so a test mocking the request layer erased `JiraApiError`
+    itself and upstream's new unbounded-JQL cases threw on every `instanceof` and every construction.
+    The class is declared in `jira-api-error.ts` now. The machinery itself was re-homed onto the fork's
+    read path (`jira-issue-page-reads.ts`), and the **paged** path is still unguarded against unbounded
+    JQL — a named follow-up, not a sync repair.
+  - **The Claude monitor policy narrowed to background shells.** The fork's `local(agents)` demotion
+    applied to every running non-agent task; a monitor is its own kind, and the fork's own #284 already
+    grants monitoring to pi watch loops, so a monitor now keeps upstream's `workingMode: 'monitoring'`
+    and its agent time. `LOCAL-PATCHES.md` § `local(agents)` was corrected to match.
+  - **The order that saved a release dispatch:** the early Linux lane ran before the release gates and
+    found three shards red on tests the Mac gate cannot see. All three were fixed, not classified.
+  - **Baselines moved, each with its reason.** Five upstream-owned files the union pushed past the
+    300/400-line budget were exempted with `local/max-lines-exemption.mjs` rather than split; the
+    identity sweep's report-only baseline was re-frozen at 551 after `--fix` rewrote five `.orca`
+    literals; the deleted-fork-tests baseline was re-bound to `27a700fd8d`..`e8321ad760` and records two
+    fork cases whose only subject was the retired Antigravity enable gate; `expected-deletions.json`
+    gained the nine `USAGE_PROVIDER_MANIFEST.antigravity.*` symbols; and the fork-comment ratchet was
+    pruned to **4817/4817** after its rationale was moved out of upstream-owned files into the ledger
+    and § Fork comment rationale below.
+  - **Opened clean:** `pnpm tc` was green on the merged tip, `post-sync.mjs` passed 16 of 18 rows with
+    2 info, and `check:code-quality:changed` reported 0 findings across 2,982 changed files.
+
+### Fork comment rationale moved out of upstream-owned files (2026-11-27 sync)
+
+The ratchet (`local/check-upstream-file-comments.mjs`) forbids rationale paragraphs above upstream's
+code, so this sync's were moved here and into the ledger. Kept verbatim because the code they explain
+is upstream's and the next sync will bring it again:
+
+- **`src/main/jira/jira-api-error.ts`** — the class must be declared here rather than re-exported from
+  `authenticated-request.ts`: a re-export makes it part of that module's surface, so anything mocking the
+  request layer erases every `instanceof` against it. `fieldErrors` is present when Jira answered with an
+  `errors` object, which is how a transition or edit names the field it refused; `scopeMismatch` means
+  the credential is valid but under-scoped, so it must not be cleared.
+- **`src/main/jira/jira-issue-search.ts`** — the fork extracted `runPerSite` out of `searchIssues`, so
+  three of upstream's own comments (discovery-before-search slot order, cancellation through queue
+  admission, the partial-success rule) now sit inside the helper and read as fork additions. They are
+  marked `fork-comment-ok` in place rather than reworded, because they must stay byte-identical to what
+  the next sync brings. The fork's own two cursor comments explain the guard in the line below them.
+- **`src/shared/agent-hook-listener/listener-state.ts`** — `piScheduledWorkByPaneKey` is kept on the
+  listener state rather than read off the current event because a republish can be triggered by something
+  that carries no inventory at all (a descendant draining, a resumed session's placeholder), and reading
+  absence there would drop a hold nothing has cleared; its fire times are relative to the post that armed
+  it. `descendantLeadStateByPaneKey` is deliberately not a state claim: it only refines a republish an
+  incoming descendant event already triggered, and never creates a row on its own.
+
 - **2026-11-24 — merge of upstream `7daf01d99f3` (1,350 commits) into the release line, from
   `cc4fefcbaad`** (merge base `0c6207e3d7`, rollback tag `archive/pre-sync-cc4fefcbaa`, merge commit
   `a8c508f5fb7`). **323 conflicted paths** —
@@ -3668,54 +3738,6 @@ section stays readable. `tests/tools/fork-process-docs.test.mjs` holds the three
     upstream-owned _and_ under budget upstream, so the overage is the fork's delta; splitting one costs
     a permanent hunk on every sync (this file's `local(lint)` rule). The ratchet grew by 31 entries and
     the review gate should see it.
-
-- **2026-11-15 — merge of upstream `1ce376b27e` (1,180 commits) into the release line, from
-  `a992b134ff`** (merge base `86ee16da9ea`). **694 conflicted paths, 824 hunks** —
-  `both-rewrote 325, modify/delete 182, union 166, rename-replay 10, duplicate-tail 5, add/add 4,
-  duplicate-members 2`. This is the largest delta since 2026-11-08. Resolved in four tiers: **10
-  fork deletions** asserted by the ledger (the dashboard pop-out cluster and
-  `AiCommitPrSettingsFields`, which the fork had re-homed into `settings/ai-generation-fields.tsx`),
-  **163 upstream test retirements** taken as deletions, **189 paths proved outright** by
-  `conflicts.mjs --apply-proven` (import-only three-way unions), and the remaining ~330 resolved in
-  seven disjoint area batches. What a reviewer will want first:
-
-  - **The cost was module moves, not markers.** Upstream moved ~6,900 paths — owner-scoped
-    directories again, plus `ai-vault/parsing/`, `ai-vault-search/{indexing,storage,worker,discovery}/`,
-    `cli/{projects,workspaces,runtime,hosts}/`, `git/command-runner/{host-routing,admission,process-capture}/`
-    and `shared/{agent-usage/rate-limits,remote-runtime}/`. Each one re-points imports, and `pnpm tc`
-    is the only thing that sees it: the first `tc:node` after the markers were gone still held 60+
-    errors, and a `resolveDir: process.cwd()` site would fail only at runtime.
-  - **Five fork deltas were re-homed rather than merged**: `repo relocate` into
-    `cli/projects/repo.ts` (plus its hint in `projects/repo-format.ts`), the AI Vault
-    list-fingerprint snapshot API into `ai-vault/listing/session-list-fingerprint.ts`, the scan
-    time/BOM hardening into `ai-vault/parsing/{session-record-time,session-json-object}.ts`, the
-    ephemeral-VM test fixture into `task-page/linear/issue-refresh/`, and the `orca.yaml` recipe
-    `passEnv` key into the fork's `orca-yaml-vm-recipes.ts`.
-  - **`git/runner.ts` is gone.** Upstream deleted the re-export barrel; the fork's four surviving
-    importers now name `command-runner/git-exec-file`, `-sync`, `git-spawn` and the `host-routing/*`
-    modules directly. `command-runner/local-login-shell-git-environment.ts` is fork-only and stays.
-  - **The dashboard open-mode module is fork-owned again.** Upstream added
-    `agent-dashboard-open-mode.ts` and four of its files import it; this fork ships one mode, so the
-    module resolves `'in-window'` unconditionally and `canOpenAgentDashboardPopout()` is `false`.
-  - **The four usage stores moved behind the backend daemon.** `createUsageService(host)` in
-    `backend/usage-service.ts` owns claude/codex/opencode/muse now; `mainProcessState` has no
-    `openCodeUsage`/`museUsage`, and `claudeUsage`/`codexUsage` come from
-    `BackendSupervisor.automationClient(...)`.
-  - **`AiVaultSearchSettings` keeps the fork's `contentEnabled` tier.** Upstream's `enabled` never
-    parsed here; every upstream handler and test that set it was adapted to the fork's two-tier
-    consent model.
-  - **`host-sync-settings-disposition` gained seven rows** for settings upstream added:
-    `claudeOAuthUsageEnabled` (`hostLocal` — a machine-level billing call) and
-    `browserExtensionsEnabled` / `browserMemorySaverHours` / `prAutoRefresh` /
-    `workspaceCleanupPolicy` / `worktreeCardDetailsRow` / `orchestrationCoordinatorApprovalsEnabled`
-    (`replicated`).
-  - **Two conflicts were settled by deleting concatenated code, not by a human choice.**
-    `worktree-background-removal.ts` and `detected-worktree-scan-cache.ts` each held both sides'
-    implementations after the three-way merge; both now carry upstream's model only, with the
-    fork's `deleteRemoteBranch` threading intact.
-  - **Coverage:** three fork tests were restored from the pre-sync tip because the merge deleted a
-    fixture they use (`lucide-icon-stub-fixture.ts`, `use-task-page-source-display.test-fixture.tsx`,
-    `__mocks__/task-page-jira-favourite-fixture.ts`).
 
 ### `local(ci)`: release workflow
 

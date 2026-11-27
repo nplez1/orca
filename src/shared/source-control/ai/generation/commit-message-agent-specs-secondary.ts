@@ -8,7 +8,6 @@ import type {
 type SecondaryAgentSpecDeps = {
   BASIC_THINKING_LEVELS: ThinkingLevel[]
   parseCursorModels: (stdout: string) => CommitMessageModel[]
-  parseAntigravityModels: (stdout: string) => CommitMessageModel[]
   parseLineModels: (stdout: string) => CommitMessageModel[]
   /** Copilot's probe and the catalog a machine without the binary falls back to. */
   copilotCatalog: {
@@ -20,7 +19,6 @@ type SecondaryAgentSpecDeps = {
 export function buildSecondaryCommitMessageAgentSpecs({
   BASIC_THINKING_LEVELS,
   parseCursorModels,
-  parseAntigravityModels,
   parseLineModels,
   copilotCatalog
 }: SecondaryAgentSpecDeps): Partial<Record<TuiAgent, CommitMessageAgentSpec>> {
@@ -68,8 +66,9 @@ export function buildSecondaryCommitMessageAgentSpecs({
       effortFlag: [],
       label: 'Cursor',
       binary: 'cursor-agent',
-      promptDelivery: 'argv',
-      buildArgs: ({ prompt, model }) => [
+      // --print reads piped stdin when argv has no prompt; Windows agent.cmd cannot carry multi-line argv (#8793).
+      promptDelivery: 'stdin',
+      buildArgs: ({ model }) => [
         '--print',
         '--mode',
         'ask',
@@ -77,8 +76,7 @@ export function buildSecondaryCommitMessageAgentSpecs({
         '--output-format',
         'text',
         '--model',
-        model,
-        prompt
+        model
       ],
       modelSource: 'dynamic',
       modelDiscovery: { binary: 'cursor-agent', args: ['--list-models'], parse: parseCursorModels },
@@ -195,28 +193,6 @@ export function buildSecondaryCommitMessageAgentSpecs({
       models: copilotCatalog.fallbackModels,
       // Plans hide models they do not offer; Auto runs on any plan.
       defaultModelId: 'auto'
-    },
-    antigravity: {
-      id: 'antigravity',
-      modelFlag: [{ aliases: ['--model'] }],
-      effortFlag: [{ aliases: ['--effort'] }],
-      label: 'Antigravity',
-      binary: 'agy',
-      // Empty --print selects stream input without consuming the next flag (agy >= 1.1.15).
-      promptDelivery: 'stdin',
-      buildArgs: ({ model, thinkingLevel }) => [
-        '--print=',
-        '--input-format=stream-json',
-        '--output-format=stream-json',
-        '--sandbox',
-        ...(model && model !== 'default' ? ['--model', model] : []),
-        ...(thinkingLevel ? ['--effort', thinkingLevel] : [])
-      ],
-      singletonOptions: [['--model'], ['--effort']],
-      modelSource: 'dynamic',
-      modelDiscovery: { binary: 'agy', args: ['models'], parse: parseAntigravityModels },
-      models: [{ id: 'default', label: 'Config default' }],
-      defaultModelId: 'default'
     },
     jcode: {
       id: 'jcode',

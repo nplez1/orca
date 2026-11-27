@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the monitor/shell kind is carried through upstream's roster state for the fork's narrowed demotion policy. */
 import {
   AGENT_MODEL_MAX_LENGTH,
   normalizeOptionalField
@@ -102,10 +103,17 @@ export function getOrCreateClaudeSubagentRoster(
 export function updateClaudeRunningNonAgentTask(
   state: HookListenerState,
   paneKey: string,
-  inventory: { hasRunningNonAgentTask: boolean; runningNonAgentTaskCommands: readonly string[] }
+  inventory: {
+    hasRunningNonAgentTask: boolean
+    hasRunningShellTask: boolean
+    runningNonAgentTaskCommands: readonly string[]
+  }
 ): void {
   if (inventory.hasRunningNonAgentTask) {
-    state.claudeRunningNonAgentTasksByPaneKey.set(paneKey, inventory.runningNonAgentTaskCommands)
+    state.claudeRunningNonAgentTasksByPaneKey.set(paneKey, {
+      commands: inventory.runningNonAgentTaskCommands,
+      hasShellTask: inventory.hasRunningShellTask
+    })
   } else {
     state.claudeRunningNonAgentTasksByPaneKey.delete(paneKey)
   }

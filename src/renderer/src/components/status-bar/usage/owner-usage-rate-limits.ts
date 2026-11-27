@@ -135,7 +135,6 @@ const NOT_SET_UP_NEEDS_REASON: ReadonlySet<UsageProviderKey> = new Set([
   'minimax',
   'zcode',
   'cursor',
-  'antigravity',
   'muse'
 ])
 

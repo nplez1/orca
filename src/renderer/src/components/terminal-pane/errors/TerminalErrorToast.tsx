@@ -21,6 +21,7 @@ import {
 import { isWslDistroHoldText } from '@/runtime/hosts/wsl/wsl-distro-hold-copy'
 import { isSshSignInRequiredTerminalError } from './terminal-ssh-sign-in-error'
 import { ORCA_REPOSITORY_URL } from '../../../../../shared/orca-repository'
+import { runWithFinally } from '@/lib/run-with-finally'
 
 export function TerminalErrorToast({
   error,
@@ -102,14 +103,17 @@ export function TerminalErrorToast({
     onRestoreTerminalFocus?.()
     setRetrying(true)
     setRetryFailed(false)
-    try {
-      setRetryFailed(!(await onRetry()))
-    } catch {
-      // Keep the safety warning available when a best-effort remount cannot start.
-      setRetryFailed(true)
-    } finally {
-      setRetrying(false)
-    }
+    await runWithFinally(
+      async () => {
+        try {
+          setRetryFailed(!(await onRetry()))
+        } catch {
+          // Keep the safety warning available when a best-effort remount cannot start.
+          setRetryFailed(true)
+        }
+      },
+      () => setRetrying(false)
+    )
   }
 
   return (
@@ -169,10 +173,7 @@ export function TerminalErrorToast({
               'auto.components.terminal.pane.TerminalErrorToast.5c8ce20be6',
               'If this persists, please'
             )}{' '}
-            <a
-              href={`${ORCA_REPOSITORY_URL}/issues`}
-              className="underline underline-offset-2"
-            >
+            <a href={`${ORCA_REPOSITORY_URL}/issues`} className="underline underline-offset-2">
               {t('auto.components.terminal.pane.TerminalErrorToast.a7e2fd2699', 'file an issue')}
             </a>
             .

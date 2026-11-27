@@ -51,13 +51,11 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
       zcodeConfigChanged,
       zcodeGeneration,
       forkProviderCycle,
-      antigravityGeneration,
       claudeFetchGated,
       results: [claudeResult, codexResult, opencodeGoResult, kimiResult, miniMaxResult],
       grokResultPromise,
       cursorResultPromise,
-      zcodeResultPromise,
-      antigravityResultPromise
+      zcodeResultPromise
     } = prepared
     if (signal.aborted) {
       return
@@ -152,11 +150,10 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
         : this.state.minimax
     })
 
-    const [grokSettled, cursorSettled, zcodeSettled, antigravitySettled] = await Promise.all([
+    const [grokSettled, cursorSettled, zcodeSettled] = await Promise.all([
       grokResultPromise,
       cursorResultPromise,
-      zcodeResultPromise,
-      antigravityResultPromise
+      zcodeResultPromise
     ])
     const { deepseek, fireworks, deepinfra, copilot } =
       await applyForkProviderCycle(forkProviderCycle)
@@ -177,8 +174,6 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
           error: 'ZCode Coding Plan account changed during refresh'
         }
     const shouldApplyZcode = zcodeGeneration === this.zcodeFetchGeneration
-    const antigravity = settleSiblingProviderResult('antigravity', antigravitySettled)
-    const shouldApplyAntigravity = antigravityGeneration === this.antigravityFetchGeneration
     // Discard Cursor stale usage only for a known account change; unidentified transient failures retain their last reading.
     const cursorAccountChanged = hasKnownProvenanceChange(previousState.cursor, cursor)
     const previousZcodeAccount = previousState.zcode?.usageMetadata?.authProvenance
@@ -199,9 +194,6 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
     this.trackActiveFailureStreak('cursor', cursor)
     if (shouldApplyZcode) {
       this.trackActiveFailureStreak('zcode', zcode)
-    }
-    if (shouldApplyAntigravity) {
-      this.trackActiveFailureStreak('antigravity', antigravity)
     }
     // Why not gated: no request was made, so the failure streak must not grow on the old snapshot.
     if (shouldApplyDeepSeek && !forkProviderCycle.deepSeek.fetchGated) {
@@ -227,12 +219,6 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
           : zcode.status === 'error' && !sameZcodeAccount
             ? zcode
             : this.applyStalePolicy(zcode, previousState.zcode),
-      // Another runtime's last reading must not stand in for this runtime's failure.
-      antigravity: !shouldApplyAntigravity
-        ? this.state.antigravity
-        : hasKnownProvenanceChange(previousState.antigravity, antigravity)
-          ? antigravity
-          : this.applyStalePolicy(antigravity, previousState.antigravity),
       deepseek: this.applyForkProviderResult({
         gated: forkProviderCycle.deepSeek.fetchGated,
         applies: shouldApplyDeepSeek,

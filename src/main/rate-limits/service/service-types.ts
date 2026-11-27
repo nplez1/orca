@@ -126,8 +126,6 @@ export type CopilotResolvedConfig = {
   config: CopilotRateLimitConfig
   error: string | null
 }
-export type AntigravityUsageEnabledResolver = () => boolean
-
 export { USAGE_PROVIDER_STATE_KEYS } from '../../../shared/usage-providers/usage-provider-readouts'
 
 export type ClaudeOAuthUsageEnabledResolver = () => boolean
@@ -173,7 +171,6 @@ export type InternalRateLimitState = {
   codex: ProviderRateLimits | null
   opencodeGo: ProviderRateLimits | null
   kimi: ProviderRateLimits | null
-  antigravity: ProviderRateLimits | null
   minimax: ProviderRateLimits | null
   grok: ProviderRateLimits | null
   cursor: ProviderRateLimits | null

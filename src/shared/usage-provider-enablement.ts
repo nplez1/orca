@@ -16,7 +16,6 @@ import type { ProviderRateLimits } from './agent-usage/rate-limits/rate-limit-ty
 export const USAGE_PROVIDER_IDS = [
   'claude',
   'codex',
-  'antigravity',
   'opencode-go',
   'kimi',
   'minimax',

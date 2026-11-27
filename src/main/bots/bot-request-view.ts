@@ -91,12 +91,15 @@ export function botRequestAnswerRef(record: BotRequestRecord): string | null {
     : null
 }
 
+// A source a paired newer Orca named reads as it sent it.
+const SOURCE_NAMES: Partial<Record<string, string>> = BOT_REQUEST_SOURCE_NAMES
+
 export function botRequestAskerLabel(asker: BotRequestAsker): string {
   if (asker.kind === 'owner') {
     return 'your owner'
   }
   return asker.kind === 'person'
-    ? `${asker.name ?? 'someone'} on ${BOT_REQUEST_SOURCE_NAMES[asker.source]}`
+    ? `${asker.name ?? 'someone'} on ${SOURCE_NAMES[asker.source] ?? asker.source}`
     : 'someone Orca cannot name'
 }
 

@@ -4,10 +4,14 @@ import { withSpan } from '../observability/tracer'
 import type { JiraAuthType, JiraSite } from '../../shared/jira/jira-types'
 import { isJiraGatewayBaseUrl } from './gateway-base-url'
 import { withJiraRequestDeadline } from './jira-request-deadline'
+import { JiraApiError } from './jira-api-error'
 import {
   readFetchResponseBytesWithinLimit,
   readFetchResponseJsonWithinLimit
 } from '../../shared/network/fetch-response-body'
+
+// Importers of the request layer still reach the class here; `jira-api-error.ts` declares it.
+export { JiraApiError } from './jira-api-error'
 
 // Electron's Chrome UA triggers Atlassian XSRF rejection on token-authenticated writes; no-check does not bypass it.
 const JIRA_API_USER_AGENT = 'Orca'
@@ -20,39 +24,6 @@ export type JiraClientForSite = {
 // Server/DC needs REST v2; Cloud uses v3.
 export function apiBasePath(site: JiraSite): string {
   return site.authType === 'server' ? '/rest/api/2' : '/rest/api/3'
-}
-
-export class JiraApiError extends Error {
-  status: number | null
-  /** Jira's per-field rejections, keyed by field key. Present when Jira answered
-   *  with an `errors` object, which is how a transition or edit names the field
-   *  it refused. */
-  fieldErrors?: Record<string, string>
-  /** Jira's non-field error strings, e.g. a workflow rule that failed outright. */
-  errorMessages?: string[]
-  /** True when the token's scopes do not cover this request, so the credential
-   *  is valid but under-scoped and must not be cleared. */
-  scopeMismatch = false
-
-  constructor(
-    message: string,
-    status: number | null = null,
-    detail?:
-      | {
-          fieldErrors?: Record<string, string>
-          errorMessages?: string[]
-          scopeMismatch?: boolean
-        }
-      // Upstream's call sites pass the scope flag positionally rather than as detail.
-      | boolean
-  ) {
-    super(message)
-    this.status = status
-    const fields = typeof detail === 'boolean' ? undefined : detail
-    this.fieldErrors = fields?.fieldErrors
-    this.errorMessages = fields?.errorMessages
-    this.scopeMismatch = typeof detail === 'boolean' ? detail : fields?.scopeMismatch === true
-  }
 }
 
 /** REST base URL: the scoped-token gateway for Cloud sites that declare one. */

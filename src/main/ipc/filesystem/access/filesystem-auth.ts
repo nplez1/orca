@@ -1,7 +1,7 @@
 import { resolve, dirname, basename } from 'node:path'
 import { realpathSync } from 'node:fs'
 import type { RuntimeStore } from '../../../runtime/construction/runtime-store-contract'
-import { lstat } from 'node:fs/promises'
+import { lstatWithoutArchiveLock } from '../../../filesystem/asar-transparent-fs'
 import {
   realpathAcrossWslDriveMount,
   windowsFsPath
@@ -201,7 +201,7 @@ async function resolveAuthorizedMissingPath(
 async function isSymlink(path: string): Promise<boolean> {
   try {
     // A UNC drive-mount path opens only through its drive path; lstat there still sees links.
-    return (await lstat(windowsFsPath(path))).isSymbolicLink()
+    return (await lstatWithoutArchiveLock(windowsFsPath(path))).isSymbolicLink()
   } catch (error) {
     if (isENOENT(error)) {
       return false

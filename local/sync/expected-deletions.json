@@ -193,18 +193,18 @@
     {
       "path": "src/renderer/src/components/dashboard-popout/DashboardPopoutRoot.tsx",
       "commit": "ab57bb7bbb",
-      "upstreamBlob": "9a51da4b151219008cf54372aed6e9fe19e62e2b",
+      "upstreamBlob": "e277b4d15bc95324fa4f9b1795c9aec1e44eafa1",
       "class": "dashboard-delivery",
       "status": "expected-deletion",
-      "reason": "The popout window is never opened, and popout.tsx mounts DashboardPopoutRoot, which requires the onAckAgent/onRevealAgent props upstream added to AgentKanbanBoard. The fork's live page view is built on that same board, so restoring this means either two live dashboard implementations or changing the shipped view."
+      "reason": "The popout window is never opened, and popout.tsx mounts DashboardPopoutRoot, which requires the onAckAgent/onRevealAgent props upstream added to AgentKanbanBoard. The fork's live page view is built on that same board, so restoring this means either two live dashboard implementations or changing the shipped view. Re-bound at the 2026-11-27 sync: upstream's only change was 2 insertions, and nothing outside the deleted set imports it."
     },
     {
       "path": "src/renderer/src/components/dashboard-popout/snapshot/useDashboardSnapshot.ts",
       "commit": "a8c508f5fb7",
-      "upstreamBlob": "a0904c6286e6c6410aa7c1de86bb2bb51b1e85fd",
+      "upstreamBlob": "195b62c361edcbf6a5893d91f8f2fa1bf3f55b03",
       "class": "dashboard-delivery",
       "status": "expected-deletion",
-      "reason": "The popout window is never opened, and popout.tsx mounts DashboardPopoutRoot, which requires the onAckAgent/onRevealAgent props upstream added to AgentKanbanBoard. The fork's live page view is built on that same board, so restoring this means either two live dashboard implementations or changing the shipped view. Re-bound at the 2026-11-24 sync, where upstream moved it under snapshot/."
+      "reason": "The popout window is never opened, and popout.tsx mounts DashboardPopoutRoot, which requires the onAckAgent/onRevealAgent props upstream added to AgentKanbanBoard. The fork's live page view is built on that same board, so restoring this means either two live dashboard implementations or changing the shipped view. Re-bound at the 2026-11-24 sync, where upstream moved it under snapshot/, and again at the 2026-11-27 sync, where upstream's only change was one line."
     },
     {
       "path": "src/renderer/src/components/dashboard/AgentDashboardDrawer.tsx",
@@ -270,10 +270,10 @@
     {
       "path": "src/renderer/src/popout.tsx",
       "commit": "ab57bb7bbb",
-      "upstreamBlob": "8bb7d1924271312c8fe47f5d356d0d90284139bb",
+      "upstreamBlob": "7cb14de5dfc79a3a283e18d1b242cb0f8a7a176c",
       "class": "dashboard-delivery",
       "status": "expected-deletion",
-      "reason": "The popout window is never opened, and popout.tsx mounts DashboardPopoutRoot, which requires the onAckAgent/onRevealAgent props upstream added to AgentKanbanBoard. The fork's live page view is built on that same board, so restoring this means either two live dashboard implementations or changing the shipped view."
+      "reason": "The popout window is never opened, and popout.tsx mounts DashboardPopoutRoot, which requires the onAckAgent/onRevealAgent props upstream added to AgentKanbanBoard. The fork's live page view is built on that same board, so restoring this means either two live dashboard implementations or changing the shipped view. Re-bound at the 2026-11-27 sync: upstream's only change was 5 insertions, and nothing outside the deleted set imports it."
     },
     {
       "path": "src/renderer/src/store/slices/worktrees/worktrees-slice-test-harness.ts",
@@ -2500,6 +2500,69 @@
       "status": "expected-deletion",
       "supersededBy": "nothing — upstream removed Gemini CLI support (#48447) in the 2026-11-26 sync",
       "reason": "The setting itself is gone from GlobalSettings, so its host-sync disposition row cannot exist; the disposition map is typed over the settings record."
+    },
+    {
+      "path": "src/renderer/src/components/settings/provider-accounts-sections.tsx",
+      "symbol": "AntigravityIcon",
+      "status": "expected-deletion",
+      "supersededBy": "src/renderer/src/components/settings/accounts/providers/AntigravityAccountsSection.tsx renders its own agent icon",
+      "reason": "The Antigravity accounts section survives the usage retirement, but upstream moved it out of the shared provider list into its own file in the accounts reorganisation, so the fork's icon constant in the shared list has nothing left to render."
+    },
+    {
+      "path": "src/renderer/src/components/skills/catalog/skills-page-column.ts",
+      "symbol": "SKILLS_PAGE_TOP_ROW_INSET",
+      "status": "expected-deletion",
+      "supersededBy": "the merged skills-page-column.ts and the `rail-page-row-gutter` utility in src/renderer/src/assets/main.css",
+      "reason": "Upstream's Workbench rail rewrite (#50484) moved every rail page onto the shared gutter utility, which reserves the Windows/Linux window-control width itself, so the fork's bespoke top-row inset has no caller left."
+    },
+    {
+      "path": "src/shared/usage-providers/usage-provider-manifest.ts",
+      "symbol": "USAGE_PROVIDER_MANIFEST.antigravity",
+      "status": "expected-deletion",
+      "supersededBy": "nothing — upstream retired Antigravity usage reading (289e3c029e2)",
+      "reason": "Upstream retired Antigravity usage reading (289e3c029e2) and the fork accepted it; the manifest row went with the RateLimitState slot."
+    },
+    {
+      "path": "src/shared/usage-providers/usage-provider-manifest.ts",
+      "symbol": "USAGE_PROVIDER_MANIFEST.antigravity.owner",
+      "status": "expected-deletion",
+      "supersededBy": "nothing — upstream retired Antigravity usage reading (289e3c029e2)",
+      "reason": "Member of the deleted `antigravity` row; upstream retired Antigravity usage reading (289e3c029e2) and the fork accepted it; the manifest row went with the RateLimitState slot."
+    },
+    {
+      "path": "src/shared/usage-providers/usage-provider-manifest.ts",
+      "symbol": "USAGE_PROVIDER_MANIFEST.antigravity.stateKey",
+      "status": "expected-deletion",
+      "supersededBy": "nothing — upstream retired Antigravity usage reading (289e3c029e2)",
+      "reason": "Member of the deleted `antigravity` row; upstream retired Antigravity usage reading (289e3c029e2) and the fork accepted it; the manifest row went with the RateLimitState slot."
+    },
+    {
+      "path": "src/shared/usage-providers/usage-provider-manifest.ts",
+      "symbol": "USAGE_PROVIDER_MANIFEST.antigravity.configuredFlags",
+      "status": "expected-deletion",
+      "supersededBy": "nothing — upstream retired Antigravity usage reading (289e3c029e2)",
+      "reason": "Member of the deleted `antigravity` row; upstream retired Antigravity usage reading (289e3c029e2) and the fork accepted it; the manifest row went with the RateLimitState slot."
+    },
+    {
+      "path": "src/shared/usage-providers/usage-provider-manifest.ts",
+      "symbol": "USAGE_PROVIDER_MANIFEST.antigravity.pendingReadout",
+      "status": "expected-deletion",
+      "supersededBy": "nothing — upstream retired Antigravity usage reading (289e3c029e2)",
+      "reason": "Member of the deleted `antigravity` row; upstream retired Antigravity usage reading (289e3c029e2) and the fork accepted it; the manifest row went with the RateLimitState slot."
+    },
+    {
+      "path": "src/shared/usage-providers/usage-provider-manifest.ts",
+      "symbol": "USAGE_PROVIDER_MANIFEST.antigravity.pendingNeedsSetup",
+      "status": "expected-deletion",
+      "supersededBy": "nothing — upstream retired Antigravity usage reading (289e3c029e2)",
+      "reason": "Member of the deleted `antigravity` row; it carried the enable-gate mark, and upstream retired Antigravity usage reading (289e3c029e2) and the fork accepted it; the manifest row went with the RateLimitState slot."
+    },
+    {
+      "path": "src/shared/usage-providers/usage-provider-manifest.ts",
+      "symbol": "USAGE_PROVIDER_MANIFEST.antigravity.credentials",
+      "status": "expected-deletion",
+      "supersededBy": "nothing — upstream retired Antigravity usage reading (289e3c029e2)",
+      "reason": "Member of the deleted `antigravity` row; upstream retired Antigravity usage reading (289e3c029e2) and the fork accepted it; the manifest row went with the RateLimitState slot."
     }
   ]
 }

@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { getDetachedWorkspaceReviewRequest } from '../review/workspace-detached-review-request'
-import { getLinearReadScope, scopedLinearCacheKey } from '@/store/slices/linear/linear-slice-scope'
 import { getWorkspaceAttachmentSourceContext } from '../review/workspace-attachment-source-result'
 import { getWorkspaceReferenceLinearWorkspaceId } from '../review/workspace-reference-details'
 import { getWorktreeGitIdentityDisplay } from '../../../../../../shared/worktree/row-display/git-identity-display'
@@ -12,8 +11,11 @@ import { getGitHubPRCacheKey } from '../../../../../../shared/github/cache/githu
 import { issueCacheKey as getIssueCacheKey } from '@/store/github/cache/cache-identity'
 import { getHostedReviewCacheKey } from '@/store/slices/hosted-review/hosted-review-cache-identity'
 import { isFolderRepo } from '../../../../../../shared/repository/repo-kind'
+import {
+  areTaskSourceContextsEqual,
+  getTaskSourceCacheScope
+} from '../../../../../../shared/work-items/task-source-context'
 import { getWorktreeGitHubIssueRepository } from '../../../../../../shared/worktree/github-issue-repository'
-import { areTaskSourceContextsEqual } from '../../../../../../shared/work-items/task-source-context'
 import { parseWorkspaceKey } from '../../../../../../shared/workspace/identity/workspace-scope'
 import {
   getWorktreeCardPrDisplay,
@@ -119,11 +121,13 @@ export function useWorktreeCardReviewDetails({
     worktree.linkedLinearIssueWorkspaceId,
     linearSourceContext
   )
+  const linearCachePrefix = linearSourceContext
+    ? getTaskSourceCacheScope(linearSourceContext)
+    : null
   const linearIssueCacheKey = worktree.linkedLinearIssue
-    ? scopedLinearCacheKey(
-        getLinearReadScope(settings, linearSourceContext),
-        `${linearWorkspaceId}::${worktree.linkedLinearIssue}`
-      )
+    ? linearCachePrefix
+      ? `${linearCachePrefix}::${linearWorkspaceId}::${worktree.linkedLinearIssue}`
+      : `${linearWorkspaceId}::${worktree.linkedLinearIssue}`
     : ''
 
   // Subscribe to ONLY the specific cache entry, not entire review/issue caches.

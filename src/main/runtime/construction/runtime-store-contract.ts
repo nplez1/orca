@@ -7,6 +7,7 @@ export type RuntimeStore = {
   getSshTargets?: Store['getSshTargets']
   getRepo: Store['getRepo']
   getRepoForHost?: Store['getRepoForHost']
+  getRepoRegistrations?: Store['getRepoRegistrations']
   addRepo: Store['addRepo']
   updateRepo: Store['updateRepo']
   /** See `RepoUpdatePersistenceOperations.relocateRepoPath`: moving a checkout re-keys its ids,

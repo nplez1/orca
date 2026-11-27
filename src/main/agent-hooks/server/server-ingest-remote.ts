@@ -297,8 +297,13 @@ export abstract class AgentHookServerIngestRemote extends AgentHookServerIngestS
       applyClaudeBackgroundWork
         ? () => {
             if (envelope.claudeRunningNonAgentTask) {
-              // The relay's own row names the commands; this host only gates on the fact.
-              this.state.claudeRunningNonAgentTasksByPaneKey.set(paneKey, [])
+              // The relay's own row names the commands; this host only gates on the fact, so it keeps
+              // the shell verdict: a relayed row carries no task kind, and the fork's behaviour for an
+              // unknown kind is the one it already shipped, not upstream's monitoring badge.
+              this.state.claudeRunningNonAgentTasksByPaneKey.set(paneKey, {
+                commands: [],
+                hasShellTask: true
+              })
             } else {
               this.state.claudeRunningNonAgentTasksByPaneKey.delete(paneKey)
             }

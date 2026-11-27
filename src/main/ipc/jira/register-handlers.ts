@@ -2,6 +2,7 @@ import { taskProviderFailure } from '../../../shared/work-items/task-provider-fa
 import { JiraIssueListFiltersParam } from '../../../shared/rpc-contract/jira/jira-quick-filter-params'
 import { JiraFavouriteFilterParams } from '../../../shared/rpc-contract/jira/jira-favourite-filter-params'
 import { ipcMain } from 'electron'
+import type { IpcHandleRegistrar } from '../lazy-ipc-handle-group'
 import type { JiraMediaFormat } from '../../../shared/jira/jira-attachment-image'
 import { connect, disconnect, getStatus, selectSite, testConnection } from '../../jira/client'
 import { listFavouriteFilters } from '../../jira/favourite-filters'
@@ -38,9 +39,9 @@ import type {
 const issueSummaryRequests = new JiraCancellableRequests()
 const searchRequests = new JiraCancellableRequests()
 
-export function registerJiraHandlers(): void {
+export function registerJiraHandlers(ipc: IpcHandleRegistrar = ipcMain): void {
   registerJiraPageHandlers({ searchRequests })
-  ipcMain.handle('jira:connect', async (_event, args: JiraConnectArgs) => {
+  ipc.handle('jira:connect', async (_event, args: JiraConnectArgs) => {
     if (
       typeof args?.siteUrl !== 'string' ||
       typeof args?.email !== 'string' ||
@@ -63,12 +64,12 @@ export function registerJiraHandlers(): void {
     return result
   })
 
-  ipcMain.handle('jira:disconnect', async (_event, args?: { siteId?: string }) => {
+  ipc.handle('jira:disconnect', async (_event, args?: { siteId?: string }) => {
     await disconnect(normalizeJiraSiteId(args?.siteId))
     _resetPreflightCache()
   })
 
-  ipcMain.handle('jira:selectSite', async (_event, args: { siteId: JiraSiteSelection }) => {
+  ipc.handle('jira:selectSite', async (_event, args: { siteId: JiraSiteSelection }) => {
     const siteId = normalizeJiraSiteSelection(args?.siteId)
     if (!siteId) {
       return getStatus()
@@ -76,15 +77,15 @@ export function registerJiraHandlers(): void {
     return selectSite(siteId)
   })
 
-  ipcMain.handle('jira:status', () => getStatus())
+  ipc.handle('jira:status', () => getStatus())
 
-  ipcMain.handle('jira:readStatus', () => getStatus())
+  ipc.handle('jira:readStatus', () => getStatus())
 
-  ipcMain.handle('jira:testConnection', async (_event, args?: { siteId?: string }) => {
+  ipc.handle('jira:testConnection', async (_event, args?: { siteId?: string }) => {
     return testConnection(normalizeJiraSiteId(args?.siteId))
   })
 
-  ipcMain.handle(
+  ipc.handle(
     'jira:searchIssues',
     async (
       _event,
@@ -104,11 +105,11 @@ export function registerJiraHandlers(): void {
     }
   )
 
-  ipcMain.handle('jira:cancelSearchIssues', (_event, args: { requestId?: string }) => {
+  ipc.handle('jira:cancelSearchIssues', (_event, args: { requestId?: string }) => {
     searchRequests.cancel(args?.requestId)
   })
 
-  ipcMain.handle(
+  ipc.handle(
     'jira:listIssues',
     async (
       _event,
@@ -132,7 +133,7 @@ export function registerJiraHandlers(): void {
     }
   )
 
-  ipcMain.handle(
+  ipc.handle(
     'jira:getIssue',
     async (_event, args: { key: string; siteId?: string; mediaFormat?: JiraMediaFormat }) => {
       if (typeof args?.key !== 'string' || !args.key.trim()) {
@@ -147,7 +148,7 @@ export function registerJiraHandlers(): void {
     }
   )
 
-  ipcMain.handle(
+  ipc.handle(
     'jira:lookupIssueSummary',
     async (_event, args: { key: string; siteId: string; requestId?: string }) => {
       if (
@@ -164,11 +165,11 @@ export function registerJiraHandlers(): void {
     }
   )
 
-  ipcMain.handle('jira:cancelIssueSummary', (_event, args: { requestId?: string }) => {
+  ipc.handle('jira:cancelIssueSummary', (_event, args: { requestId?: string }) => {
     issueSummaryRequests.cancel(args?.requestId)
   })
 
-  ipcMain.handle('jira:createIssue', async (_event, args: JiraCreateIssueArgs) => {
+  ipc.handle('jira:createIssue', async (_event, args: JiraCreateIssueArgs) => {
     if (typeof args?.projectId !== 'string' || !args.projectId.trim()) {
       return taskProviderFailure('jira.projectRequired', 'Project is required.')
     }
@@ -195,7 +196,7 @@ export function registerJiraHandlers(): void {
     })
   })
 
-  ipcMain.handle(
+  ipc.handle(
     'jira:updateIssue',
     async (_event, args: { key: string; updates: JiraIssueUpdate; siteId?: string }) => {
       if (typeof args?.key !== 'string' || !args.key.trim()) {
@@ -216,7 +217,7 @@ export function registerJiraHandlers(): void {
     }
   )
 
-  ipcMain.handle(
+  ipc.handle(
     'jira:addIssueComment',
     async (
       _event,
@@ -237,7 +238,7 @@ export function registerJiraHandlers(): void {
     }
   )
 
-  ipcMain.handle(
+  ipc.handle(
     'jira:issueComments',
     async (_event, args: { key: string; siteId?: string; mediaFormat?: JiraMediaFormat }) => {
       if (typeof args?.key !== 'string' || !args.key.trim()) {
@@ -252,7 +253,7 @@ export function registerJiraHandlers(): void {
     }
   )
 
-  ipcMain.handle(
+  ipc.handle(
     'jira:listEditFields',
     async (_event, args: { key: string; siteId?: string; strict?: boolean }) => {
       if (typeof args?.key !== 'string' || !args.key.trim()) {
@@ -262,15 +263,15 @@ export function registerJiraHandlers(): void {
     }
   )
 
-  registerJiraProjectMetadataHandlers(normalizeJiraSiteId)
+  registerJiraProjectMetadataHandlers(normalizeJiraSiteId, ipc)
 
-  ipcMain.handle('jira:listFavouriteFilters', async (_event, args: unknown) => {
+  ipc.handle('jira:listFavouriteFilters', async (_event, args: unknown) => {
     return listFavouriteFilters(JiraFavouriteFilterParams.parse(args).siteId)
   })
 
-  registerJiraUserSearchHandlers()
+  registerJiraUserSearchHandlers(ipc)
 
-  ipcMain.handle(
+  ipc.handle(
     'jira:listTransitions',
     async (_event, args: { key: string; siteId?: string; strict?: boolean }) => {
       if (typeof args?.key !== 'string' || !args.key.trim()) {
@@ -284,7 +285,7 @@ export function registerJiraHandlers(): void {
     }
   )
 
-  ipcMain.handle(
+  ipc.handle(
     'jira:getProjectStatusOrder',
     async (_event, args: { projectKey: string; siteId?: string }) => {
       if (typeof args?.projectKey !== 'string' || !args.projectKey.trim()) {

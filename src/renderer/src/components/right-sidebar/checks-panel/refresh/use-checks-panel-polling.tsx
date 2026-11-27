@@ -124,8 +124,7 @@ export function useChecksPanelPolling(model: ChecksPanelPollingInput) {
       if (!repo || !targetPRNumber) {
         return
       }
-      // Why: a scheduled poll refreshes rows that are already on screen; flipping the panel's
-      // loading state for it blanks counts and disables buttons on every tick.
+      // Why: a scheduled poll refreshes rows already on screen; flipping loading state blanks counts and disables buttons on every tick.
       if (!background) {
         setChecksLoading(true)
       }
@@ -256,8 +255,7 @@ export function useChecksPanelPolling(model: ChecksPanelPollingInput) {
       if (commitAsCurrent) {
         asyncResultKeyRef.current = requestKey
       }
-      // Why: a background poll must not invalidate the generation a foreground request is about to
-      // clear, or the flags it set stay true with nobody left to unset them.
+      // Why: a background poll must not invalidate the generation a foreground request is about to clear, or its flags stay true with nobody left to unset them.
       const loadingGeneration = suppressLoading
         ? gitLabDetailsLoadingGenerationRef.current
         : gitLabDetailsLoadingGenerationRef.current + 1

@@ -40,7 +40,6 @@ function provider(overrides: Partial<ProviderRateLimits> = {}): ProviderRateLimi
 const PROVIDER_IDS: ProviderRateLimits['provider'][] = [
   'claude',
   'codex',
-  'antigravity',
   'opencode-go',
   'kimi',
   'minimax',

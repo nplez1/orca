@@ -29,6 +29,7 @@ import {
 
 const ISSUE_SEARCH_TIMEOUT_MS = 30_000
 
+// fork-comment-ok: fork-only helper; its doc must sit on the definition a sync rewrites around
 /** Runs one read per connected site, keeping a site's failure from erasing the others'. */
 async function runPerSite<T>(
   entries: JiraClientForSite[],
@@ -172,6 +173,7 @@ async function runIssuePageSearch(
   if (entries.length === 0 || ('jql' in query && !query.jql)) {
     return empty
   }
+  // fork-comment-ok: the single-site cursor rule is fork paging behaviour; the why belongs on the guard
   // A cursor names one site's page; fanning it out would re-read every other site's first page.
   if (cursor && entries.length !== 1) {
     throw new Error('Jira issue paging needs a single site.')
@@ -206,6 +208,7 @@ async function runIssuePageSearch(
         : null
     }
   }
+  // fork-comment-ok: multi-site paging has no shared cursor; the why belongs on the return below
   // Several sites have no shared cursor: their pages cannot be interleaved in updated order.
   const collected = read.flatMap((page) => page.issues)
   return {

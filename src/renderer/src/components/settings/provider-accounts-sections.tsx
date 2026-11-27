@@ -22,7 +22,6 @@ import type { AccountsPaneSectionModel } from './accounts/accounts-pane-types'
 import type { ProviderAccountsIcon } from './ProviderAccountsSection'
 import { ProviderHeaderLink } from './ProviderAccountsSection'
 import {
-  getAccountsAntigravitySearchEntries,
   getAccountsCodexSearchEntries,
   getAccountsCopilotSearchEntries,
   getAccountsCursorSearchEntries,
@@ -42,7 +41,6 @@ import type { UsageHostSettingsModel } from './accounts/usage/use-usage-host-set
 import { renderClaudeAccountsSection } from './accounts/claude/accounts-pane-claude-section'
 import { renderCodexAccountsSection } from './accounts/codex/accounts-pane-codex-section'
 import { renderOpenCodeAccountsSection } from './accounts/providers/accounts-pane-opencode-section'
-import { AntigravityAccountsSection } from './accounts/providers/AntigravityAccountsSection'
 import {
   MiniMaxAccountsSection,
   getMiniMaxConsoleUrl
@@ -100,9 +98,6 @@ const CURSOR_USAGE_DASHBOARD_URL = 'https://cursor.com/dashboard/spending'
 const KimiIcon: ProviderAccountsIcon = ({ size }) => <AgentIcon agent="kimi" size={size} />
 const GrokIcon: ProviderAccountsIcon = ({ size }) => <AgentIcon agent="grok" size={size} />
 const CursorIcon: ProviderAccountsIcon = ({ size }) => <AgentIcon agent="cursor" size={size} />
-const AntigravityIcon: ProviderAccountsIcon = ({ size }) => (
-  <AgentIcon agent="antigravity" size={size} />
-)
 const ZcodeIcon: ProviderAccountsIcon = ({ size }) => <AgentIcon agent="zcode" size={size} />
 const MuseIcon: ProviderAccountsIcon = ({ size }) => <AgentIcon agent="muse" size={size} />
 
@@ -129,28 +124,6 @@ export const getProviderAccountsSections = createLocalizedCatalog(
       Icon: OpenAIIcon,
       searchEntries: getAccountsCodexSearchEntries,
       renderBody: ({ model }) => renderCodexAccountsSection(model)
-    },
-    {
-      id: 'antigravity',
-      title: translate('accounts.antigravity.title', 'Antigravity'),
-      description: ({ model }) =>
-        translate('accounts.antigravity.scope', 'Manage the native agy account on {{host}}.', {
-          host: model.accountRuntimeSentenceLabel
-        }),
-      Icon: AntigravityIcon,
-      searchEntries: getAccountsAntigravitySearchEntries,
-      renderBody: ({ model, accountOwner, accountOwnerKey, accountOwnerPlatform }) => (
-        <AntigravityAccountsSection
-          key={`antigravity:${accountOwnerKey}:${model.accountRuntime.runtime}:${model.accountRuntime.wslDistro ?? ''}`}
-          owner={accountOwner}
-          target={{
-            runtime: model.accountRuntime.runtime,
-            wslDistro: model.accountRuntime.wslDistro
-          }}
-          label={model.accountRuntimeSentenceLabel}
-          ownerPlatform={accountOwnerPlatform}
-        />
-      )
     },
     {
       id: 'opencode-go',

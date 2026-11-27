@@ -22,6 +22,138 @@ Rules for using it:
 
 ---
 
+## 2026-11-27 sync (upstream `27a700fd8d6`, 441 commits)
+
+### Antigravity usage reading is retired on this line too
+
+**Paths:** `src/main/rate-limits/providers/antigravity/**` (deleted), `src/shared/usage-providers/**`, `src/shared/agent-usage/**`, the status-bar usage surface
+
+**Resolution:** take-theirs (delete), then repair the dangling references
+
+**Decision:** upstream `289e3c029e2` retired it because the fetcher ran the user's `agy` as
+`agy -p /usage --output-format json` every 15 minutes, `agy` supports outside clients only through
+ACP, and headless runs have been reported to get Google accounts flagged. That is a user-safety reason,
+not a taste one, so the fork accepts the retirement instead of restoring the fetcher it shipped in
+`v1.4.214-np.62`: the fetcher, the per-account reading cache, the status-bar meter and toggle, the
+enable-gate manifest row and the Settings > Accounts usage readout are all gone. `RateLimitState` keeps
+`antigravityAccounts?: []` — upstream still publishes an empty list so older clients' Antigravity menu
+loads — and the **chat/ACP** provider (the native `agy` account, its API-key field and its accounts
+section) is untouched, which is why `src/main/antigravity/native-account-store.ts` is now classified in
+`NON_USAGE_CREDENTIAL_STORES` rather than in the usage manifest.
+
+**Do not:** restore `providers/antigravity/antigravity-usage-fetcher.ts`, and do not drop
+`antigravityAccounts` from `RateLimitState`; a missing field there breaks older clients.
+
+### The dashboard popout stays deleted, and its manifest entries are re-bound rather than restored
+
+**Paths:** `src/renderer/src/components/dashboard-popout/DashboardPopoutRoot.tsx`,
+`.../dashboard-popout/snapshot/useDashboardSnapshot.ts`, `src/renderer/src/popout.tsx`,
+`.../dashboard-popout/use-dashboard-popout-close-shortcut.ts`
+
+**Resolution:** delete (re-apply), and re-bind the three blobs in `local/sync/expected-deletions.json`
+
+**Decision:** the fork delivers the dashboard as a content-area view and never opens a popout window.
+Upstream's whole delta on the three files was 2, 1 and 5 insertions, no path outside the deleted set
+imports them, and the fourth file — a hook whose only job was the popout's close shortcut — is
+fork-owned and went with them. `.../snapshot/dashboard-agent-status-patch.ts` is upstream's and has no
+importer either; it is kept as upstream's bytes rather than deleted, which is the same trade the
+manifest records for the held dashboard delivery pair.
+
+**Do not:** restore any of the four to make a future modify/delete go away. Re-bind `upstreamBlob` and
+say what upstream changed.
+
+### Upstream's Jira error class is declared here, not re-exported through a mockable module
+
+**Paths:** `src/main/jira/jira-api-error.ts`, `src/main/jira/authenticated-request.ts`
+
+**Resolution:** manual
+
+**Decision:** the fork carried `jira-api-error.ts` as a re-export of the class `authenticated-request.ts`
+declares. `jira-issue-search.test.ts` mocks the request layer, so the re-export came back `undefined`:
+`error instanceof JiraApiError` threw "Right hand side of instanceof is not an object" and upstream's
+own new cases threw from `new JiraApiError(...)`. The class is now declared in `jira-api-error.ts` with
+the fork's detail-rich constructor, and `authenticated-request.ts` imports and re-exports it — one class,
+so every `instanceof` in either module agrees.
+
+**Do not:** turn `jira-api-error.ts` back into a `export { … } from './authenticated-request'`.
+
+### The Claude monitor policy narrows to background shells
+
+**Paths:** `src/shared/agent-hook-listener/listener-state.ts`,
+`.../providers/claude/lifecycle/claude-pane-hold-evidence.ts`, `claude-background-task-inventory.ts`,
+`claude-roster-state.ts`, `claude-status-build.ts`, `server-ingest-normalization.ts`,
+`server-ingest-remote.ts`, `server-state-contract.ts`
+
+**Resolution:** manual
+
+**Decision:** the fork's `local(agents)` rule demoted a Claude pane to plain working whenever _any_
+non-agent task was running, monitors included. A monitor is its own task kind, upstream's
+`isClaudeAmbientArtifactMonitor` (`6ff6df14b6d`) is intact, and the fork's own #284 already grants
+monitoring to pi watch loops — so the demotion now applies to `command` (shell) tasks only, and a
+monitor keeps upstream's `workingMode: 'monitoring'` and its agent-time accounting.
+
+**Do not:** re-widen the demotion to every non-agent task; that is what failed upstream's inventory
+test. A relayed pane cannot tell a shell from a monitor, so it keeps the fork's shipped verdict, and
+that ambiguity stays documented in the code.
+
+### The Jira unbounded-JQL retry lives in the fork's page-reads module, and its paged path is unguarded
+
+**Paths:** `src/main/jira/jira-issue-page-reads.ts`, `src/main/jira/jira-issue-search.ts`
+
+**Resolution:** manual (re-home)
+
+**Decision:** upstream added `isUnboundedJqlError`, `searchBoundedToVisibleProjects`,
+`sitesSkippingBoundedRetry` and `uniqueProjectIds` to `jira-issue-search.ts`, which this fork had already
+split into orchestration (`jira-issue-search.ts`) and reads (`jira-issue-page-reads.ts`). The machinery was
+re-homed onto the read path the fork actually takes, so the array reads (`readIssuesForClient`) get the
+bounded retry.
+
+**Do not:** assume the paged path is covered. `readIssuePageForClient` re-sends the original query on a
+cursor continuation instead of `page.jql`, so `listIssuesPage`/`searchIssuesPage` still fail a 400 on
+unbounded JQL past the first page. Named follow-up, not a sync repair.
+
+### Bot mail callers may arrive with or without a transport scope
+
+**Paths:** `src/main/runtime/rpc/methods/orchestration/messaging/bot-recipient.ts`
+
+**Resolution:** manual (widened union)
+
+**Decision:** `readActingSender` accepts `BotMailContext | string | undefined`: the fork's callers pass a
+context, `peer-mail-sending-askers.ts` passes a bare session id, and a string means "no transport scope,
+so no local-owner stamp".
+
+**Do not:** narrow the parameter back to one shape to make the call sites agree; move the peer-mail caller
+to a context instead.
+
+### `runtimePairingInterface` is host-local in the replication contract
+
+**Paths:** `src/main/orca-profiles/host-sync-settings-disposition.ts`
+
+**Resolution:** manual
+
+**Decision:** upstream's new setting joins the disposition record as `hostLocal`, beside `machineName`
+and `mobilePairingCustomAddresses`: it names this host's pairing surface, not a replicated preference.
+See `docs/reference/host-settings-replication.md` for the field-disposition contract.
+
+### This sync's baselines moved, and each move is the reason it moved
+
+**Paths:** `config/max-lines-baseline.txt`, `local/upstream-file-comments-baseline.json`,
+`local/sync/upstream-deleted-fork-tests-baseline.json`, `local/sync/expected-deletions.json`
+
+**Resolution:** manual, with the repos' own tools
+
+**Decision:** five upstream-owned files the union pushed past the 300/400-line budget
+(`pr-conversation-response.ts`, `AccountsPane.tsx`, `client-ui-params.ts`, `worktree-status.ts`,
+`clipboard-ipc-handlers.ts`) were exempted with `local/max-lines-exemption.mjs`, not split. The identity
+sweep's report-only baseline was re-frozen at 551 after `--fix` rewrote five `.orca` literals in
+`claude-hook-plugin.test.ts`. The deleted-fork-tests baseline was re-bound to
+`27a700fd8d`..`e8321ad760` and records two fork cases whose only subject was the retired Antigravity
+enable gate (`status-bar-provider-visibility.test.ts`, `usage-provider-manifest.conformance.test.ts`).
+`expected-deletions.json` gained the nine `USAGE_PROVIDER_MANIFEST.antigravity.*` symbols.
+
+**Do not:** spend a max-lines exemption on a fork-owned file, and do not re-take a baseline without the
+reason recorded here.
+
 ## 2026-11-26 sync (upstream `3e227259249`, 530 commits)
 
 ### The shared CLI-resolution stub carries the fork's identity _and_ upstream's new cases

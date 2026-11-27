@@ -42,6 +42,13 @@ import {
 import type { HermesPaneTurn } from './providers/hermes/hermes-pane-turn'
 import type { ClaudePromptTurns } from './providers/claude/lifecycle/claude-prompt-turn-order'
 
+/** What a Claude pane's running non-agent background tasks are, plus the one kind that decides its
+ *  status: a background shell reads as agent work here, a monitor keeps upstream's monitoring verdict. */
+export type ClaudeRunningNonAgentTasks = {
+  commands: readonly string[]
+  hasShellTask: boolean
+}
+
 /** Per-listener-instance caches needing per-PTY teardown; Orca's main process and the relay each get their own, never shared. */
 export type HookListenerState = {
   warnedVersions: Set<string>
@@ -70,9 +77,9 @@ export type HookListenerState = {
   claudeOpenToolUsesByPaneKey: Map<string, ClaudeToolRequest[]>
   /** One-normalization provenance marker for a status backed only by restored child state. */
   claudeUnconfirmedRestoredStatusPaneKeys: Set<string>
-  /** Panes whose latest authoritative Claude task inventory still has running non-agent work. */
-  /** Panes whose main agent has running non-agent background tasks, with what each runs. */
-  claudeRunningNonAgentTasksByPaneKey: Map<string, readonly string[]>
+  /** Panes whose main agent has running non-agent background tasks, what each runs, and whether a
+   *  shell is among them — the only kind this fork reads as agent work rather than as monitoring. */
+  claudeRunningNonAgentTasksByPaneKey: Map<string, ClaudeRunningNonAgentTasks>
   /** Panes whose latest authoritative Claude cron inventory still has a scheduled job. */
   claudeActiveSessionCronPaneKeys: Set<string>
   /** Background tasks each pane's main agent launched, and which of them still owe it a notification. */
@@ -120,16 +127,12 @@ export type HookListenerState = {
    *  A child's own process can outlive its row (a spooled hook, a retirement that beat it), and a
    *  post from it would otherwise be read as the pane's own agent. */
   retiredPiClaudeChildrenByPaneKey: Map<string, Map<string, number>>
-  /** What the LEAD session last said, before descendants gated it — so draining the
-   *  last child republishes the lead's verdict instead of the gated one. Deliberately
-   *  NOT a state claim (see `paneHasStateClaims`): it only refines a republish that an
-   *  incoming descendant event already triggered, and never creates a row on its own. */
+  /** What the LEAD session last said, before descendants gated it — so draining the last child
+   *  republishes the lead's verdict instead of the gated one. NOT a state claim (see
+   *  `paneHasStateClaims`): it refines a republish that already happened. */
   descendantLeadStateByPaneKey: Map<string, AgentStatusState>
-  /** Scheduled work a pi pane's own extension last reported armed — a loop, a pending wakeup or a cold
-   *  job — with when that post arrived, because its fire times are relative to it and the hold must
-   *  age. Kept here rather than read off the current event because a republish can be triggered by
-   *  something that carries no inventory at all (a descendant draining, a resumed session's
-   *  placeholder), and reading absence there would drop a hold nothing has cleared. */
+  /** Armed scheduled work a pi pane's own extension last reported — loop, pending wakeup or cold job —
+   *  with when that post arrived: its fire times are relative to it, and the hold must age. */
   piScheduledWorkByPaneKey: Map<string, PiScheduledWorkInventory>
   /** Hermes turn per pane, so tool hooks from its post-turn background review can be ignored. */
   hermesTurnByPaneKey: Map<string, HermesPaneTurn>

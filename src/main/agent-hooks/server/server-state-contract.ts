@@ -3,7 +3,10 @@ import type {
   AgentProcessVerdict
 } from '../../../shared/agent-status/process/agent-process-presence'
 
-import type { HookListenerState } from '../../../shared/agent-hook-listener/listener-state'
+import type {
+  ClaudeRunningNonAgentTasks,
+  HookListenerState
+} from '../../../shared/agent-hook-listener/listener-state'
 
 import type {
   AgentStatusObservation,
@@ -163,7 +166,7 @@ export abstract class AgentHookServerStateContract {
 
   protected abstract setClaudeBackgroundEvidence(
     paneKey: string,
-    runningTasks: readonly string[] | undefined,
+    runningTasks: ClaudeRunningNonAgentTasks | undefined,
     hasActiveCron: boolean
   ): void
 

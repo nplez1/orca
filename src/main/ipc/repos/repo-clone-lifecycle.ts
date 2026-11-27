@@ -23,6 +23,7 @@ import {
   cleanupClaimedCloneTarget,
   claimCloneTarget,
   deriveValidatedClonePath,
+  ensureCloneDestination,
   getClonePathComparisonKey,
   getSavedProjectPathKeys,
   resolveCloneDestination
@@ -177,8 +178,7 @@ export function registerRepoCloneHandlers(
           emitRepoAdded('clone_url', true, true)
           return reused
         }
-        // Fresh installs may lack the destination used as the clone process cwd.
-        await mkdir(args.destination, { recursive: true })
+        await ensureCloneDestination(args.destination)
         // Why: the claim below is non-recursive, so the project folder has to exist first;
         // today's flat layout is unaffected because dirname(clonePath) is then the destination.
         await mkdir(dirname(clonePath), { recursive: true })

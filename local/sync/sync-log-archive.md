@@ -6,6 +6,54 @@ three most recent inline so that section stays readable. Same text and same orde
 Entries dated before the 2026-11-09 rename have been rewritten to say `main`; where one reads oddly
 for the topology it was written in (a `main` that mirrored upstream), its date is the explanation.
 
+- **2026-11-15 — merge of upstream `1ce376b27e` (1,180 commits) into the release line, from
+  `a992b134ff`** (merge base `86ee16da9ea`). **694 conflicted paths, 824 hunks** —
+  `both-rewrote 325, modify/delete 182, union 166, rename-replay 10, duplicate-tail 5, add/add 4,
+  duplicate-members 2`. This is the largest delta since 2026-11-08. Resolved in four tiers: **10
+  fork deletions** asserted by the ledger (the dashboard pop-out cluster and
+  `AiCommitPrSettingsFields`, which the fork had re-homed into `settings/ai-generation-fields.tsx`),
+  **163 upstream test retirements** taken as deletions, **189 paths proved outright** by
+  `conflicts.mjs --apply-proven` (import-only three-way unions), and the remaining ~330 resolved in
+  seven disjoint area batches. What a reviewer will want first:
+
+  - **The cost was module moves, not markers.** Upstream moved ~6,900 paths — owner-scoped
+    directories again, plus `ai-vault/parsing/`, `ai-vault-search/{indexing,storage,worker,discovery}/`,
+    `cli/{projects,workspaces,runtime,hosts}/`, `git/command-runner/{host-routing,admission,process-capture}/`
+    and `shared/{agent-usage/rate-limits,remote-runtime}/`. Each one re-points imports, and `pnpm tc`
+    is the only thing that sees it: the first `tc:node` after the markers were gone still held 60+
+    errors, and a `resolveDir: process.cwd()` site would fail only at runtime.
+  - **Five fork deltas were re-homed rather than merged**: `repo relocate` into
+    `cli/projects/repo.ts` (plus its hint in `projects/repo-format.ts`), the AI Vault
+    list-fingerprint snapshot API into `ai-vault/listing/session-list-fingerprint.ts`, the scan
+    time/BOM hardening into `ai-vault/parsing/{session-record-time,session-json-object}.ts`, the
+    ephemeral-VM test fixture into `task-page/linear/issue-refresh/`, and the `orca.yaml` recipe
+    `passEnv` key into the fork's `orca-yaml-vm-recipes.ts`.
+  - **`git/runner.ts` is gone.** Upstream deleted the re-export barrel; the fork's four surviving
+    importers now name `command-runner/git-exec-file`, `-sync`, `git-spawn` and the `host-routing/*`
+    modules directly. `command-runner/local-login-shell-git-environment.ts` is fork-only and stays.
+  - **The dashboard open-mode module is fork-owned again.** Upstream added
+    `agent-dashboard-open-mode.ts` and four of its files import it; this fork ships one mode, so the
+    module resolves `'in-window'` unconditionally and `canOpenAgentDashboardPopout()` is `false`.
+  - **The four usage stores moved behind the backend daemon.** `createUsageService(host)` in
+    `backend/usage-service.ts` owns claude/codex/opencode/muse now; `mainProcessState` has no
+    `openCodeUsage`/`museUsage`, and `claudeUsage`/`codexUsage` come from
+    `BackendSupervisor.automationClient(...)`.
+  - **`AiVaultSearchSettings` keeps the fork's `contentEnabled` tier.** Upstream's `enabled` never
+    parsed here; every upstream handler and test that set it was adapted to the fork's two-tier
+    consent model.
+  - **`host-sync-settings-disposition` gained seven rows** for settings upstream added:
+    `claudeOAuthUsageEnabled` (`hostLocal` — a machine-level billing call) and
+    `browserExtensionsEnabled` / `browserMemorySaverHours` / `prAutoRefresh` /
+    `workspaceCleanupPolicy` / `worktreeCardDetailsRow` / `orchestrationCoordinatorApprovalsEnabled`
+    (`replicated`).
+  - **Two conflicts were settled by deleting concatenated code, not by a human choice.**
+    `worktree-background-removal.ts` and `detected-worktree-scan-cache.ts` each held both sides'
+    implementations after the three-way merge; both now carry upstream's model only, with the
+    fork's `deleteRemoteBranch` threading intact.
+  - **Coverage:** three fork tests were restored from the pre-sync tip because the merge deleted a
+    fixture they use (`lucide-icon-stub-fixture.ts`, `use-task-page-source-display.test-fixture.tsx`,
+    `__mocks__/task-page-jira-favourite-fixture.ts`).
+
 - **2026-11-10 — merge of upstream `86ee16da9ea` (426 commits) into the release line, from
   `24dceda182f`** (merge base `51c77320bc`, merge commit `266cd398f34`). **281 conflicted paths** —
   `both-rewrote 155, union 64, modify/delete 27, rename-replay 23, duplicate-tail 9, no-markers 2,

@@ -90,9 +90,6 @@ vi.mock('./providers/cursor/cursor-fetcher', () => ({
 }))
 
 vi.mock('./providers/zcode/zcode-usage-fetcher', () => ({ fetchZcodeRateLimits: vi.fn() }))
-vi.mock('./providers/antigravity/antigravity-usage-fetcher', () => ({
-  fetchAntigravityRateLimits: vi.fn()
-}))
 vi.mock('./providers/muse/muse-usage-fetcher', () => ({ fetchMuseRateLimits: vi.fn() }))
 
 vi.mock('./providers/cursor/cursor-auth', () => ({

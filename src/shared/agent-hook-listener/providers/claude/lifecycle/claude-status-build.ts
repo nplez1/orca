@@ -60,7 +60,7 @@ export function buildClaudeStatusPayload(
     // Only a row its background shells hold open names them; a turn in progress does not.
     backgroundCommands:
       options.workingMode === 'monitoring'
-        ? state.claudeRunningNonAgentTasksByPaneKey.get(paneKey)
+        ? state.claudeRunningNonAgentTasksByPaneKey.get(paneKey)?.commands
         : undefined,
     mainAgent: mainAgentRecord ? claudeMainAgentStatusForPayload(mainAgentRecord) : undefined
   })

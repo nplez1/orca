@@ -32,8 +32,9 @@ export function mobileWebAppBundleMaxAssets(routeCount, imageCount, catalogChunk
 
 // UI-language catalogs have their own allowance, like the font: one chunk per non-English locale,
 // fetched only for the active language, never before the first route. Code keeps its own fence.
+// 4 MiB covers the 10 translated locale chunks (~3.19 MiB as of 2026-11-26).
 export const MOBILE_WEB_APP_BUNDLE_MAX_CATALOG_CHUNKS = 10
-export const MOBILE_WEB_APP_BUNDLE_MAX_CATALOG_BYTES = 3 * 1024 * 1024
+export const MOBILE_WEB_APP_BUNDLE_MAX_CATALOG_BYTES = 4 * 1024 * 1024
 // A budget, not a frame limit: the host sends a catalog as plain JSON in one reply (gzipped when the phone
 // reads compressed frames) under the 4 MiB REMOTE_RUNTIME_MAX_OUTBOUND_JSON_BYTES. This keeps the first-paint
 // read short and the page's gzipped stored copy under DEVICE_STORE_MAX_VALUE_LENGTH.
@@ -47,8 +48,8 @@ export const MOBILE_WEB_APP_HOST_CATALOG_MAX_BYTES = 1024 * 1024
 // names count as eager. The phone shell still downloads each on-demand file to disk once per bundle
 // update (shellDownloadedAssets), so this budget also bounds that download.
 // fork-comment-ok: the measured budget each sync re-takes, which upstream's copy cannot know.
-// Eager: main's own fence. 11.25 MiB since the 2026-11-26 sync took it to 11,540,299 bytes (11 MiB
-// on 2026-11-24 was 11,479,156); a quarter-MiB keeps it tight enough to trip on a real regression.
+// Eager: main's own fence. 11.25 MiB: 11 MiB was 11,479,156 (2026-11-24); upstream measured 11,534,272
+// plus ~1.8 KB and the fork 11,540,299 on 2026-11-26. A quarter-MiB still trips on a real regression.
 export const MOBILE_WEB_APP_BUNDLE_MAX_EAGER_BYTES = 11.25 * 1024 * 1024
 export const MOBILE_WEB_APP_BUNDLE_MAX_ON_DEMAND_BYTES = 1024 * 1024
 export const MOBILE_WEB_APP_BUNDLE_MAX_ON_DEMAND_FILE_BYTES = 128 * 1024

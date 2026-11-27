@@ -35,12 +35,28 @@ export type ClaudeBackgroundAgentTask = {
   teammate: boolean
 }
 
+// Claude keeps its artifact live-updates and presence sockets open all session and leaves them out of its own in-flight work, but hook rows drop the ambient flag.
+const CLAUDE_AMBIENT_ARTIFACT_MONITOR_PREFIXES = [
+  'live updates for artifact ',
+  'presence on artifact '
+]
+
+function isClaudeAmbientArtifactMonitor(taskType: string, description: unknown): boolean {
+  return (
+    taskType === 'monitor' &&
+    typeof description === 'string' &&
+    CLAUDE_AMBIENT_ARTIFACT_MONITOR_PREFIXES.some((prefix) => description.startsWith(prefix))
+  )
+}
+
 /** Absent/malformed inventory on older Claude builds means retain the tracked roster; never clear it. */
 export function readClaudeBackgroundAgentTasks(hookPayload: Record<string, unknown>): {
   present: boolean
   tasks: ClaudeBackgroundAgentTask[]
   truncated: boolean
   hasRunningNonAgentTask: boolean
+  /** A running background shell, which this fork reads as agent work rather than as monitoring. */
+  hasRunningShellTask: boolean
   /** Ids of the running shell-like entries; one without an id is counted but not listed. */
   runningNonAgentTaskIds: string[]
   /** Running shells blocked on `orca orchestration check --wait`, which recovers them after a listener restart. */
@@ -55,6 +71,7 @@ export function readClaudeBackgroundAgentTasks(hookPayload: Record<string, unkno
       tasks: [],
       truncated: false,
       hasRunningNonAgentTask: false,
+      hasRunningShellTask: false,
       runningNonAgentTaskIds: [],
       runningAgentWaitIds: [],
       runningNonAgentTaskCommands: []
@@ -63,6 +80,7 @@ export function readClaudeBackgroundAgentTasks(hookPayload: Record<string, unkno
   const tasks: ClaudeBackgroundAgentTask[] = []
   let truncated = false
   let hasRunningNonAgentTask = false
+  let hasRunningShellTask = false
   const runningNonAgentTaskIds: string[] = []
   const runningAgentWaitIds: string[] = []
   const runningNonAgentTaskCommands: string[] = []
@@ -82,10 +100,14 @@ export function readClaudeBackgroundAgentTasks(hookPayload: Record<string, unkno
       hasRunningNonAgentTask ||= !isTerminal
       continue
     }
+    if (isClaudeAmbientArtifactMonitor(taskType, obj.description)) {
+      continue
+    }
     const isAgentTask = isAgentChildWorkKind(classifyClaudeBackgroundTaskKind(taskType))
     // Why: future non-agent types and nonterminal labels must fail active; only typed agent rows or explicit terminal states can safely retire work.
     if (!isAgentTask && !isTerminal) {
       hasRunningNonAgentTask = true
+      hasRunningShellTask ||= classifyClaudeBackgroundTaskKind(taskType) === 'command'
       const id = typeof obj.id === 'string' ? obj.id.trim() : ''
       if (id.length > 0) {
         runningNonAgentTaskIds.push(id)
@@ -121,6 +143,7 @@ export function readClaudeBackgroundAgentTasks(hookPayload: Record<string, unkno
     tasks,
     truncated,
     hasRunningNonAgentTask,
+    hasRunningShellTask,
     runningNonAgentTaskIds,
     runningAgentWaitIds,
     runningNonAgentTaskCommands

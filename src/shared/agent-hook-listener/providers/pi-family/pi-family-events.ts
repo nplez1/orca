@@ -82,8 +82,7 @@ export function normalizePiCompatibleEvent(
   let stateName =
     isPiCompatibleAsk || isOmpApprovalRequest || isOmpPlanReview
       ? 'blocked'
-      : isOmpApprovalResolution ||
-          isPiCompactionStart ||
+      : isPiCompactionStart ||
           eventName === 'before_agent_start' ||
           eventName === 'agent_start' ||
           eventName === 'tool_call' ||
@@ -97,7 +96,7 @@ export function normalizePiCompatibleEvent(
 
   if (isPiUiPrompt) {
     stateName = 'waiting'
-  } else if (isPiUiPromptEnd || isOmpPlanReviewEnd) {
+  } else if (isPiUiPromptEnd || isOmpPlanReviewEnd || isOmpApprovalResolution) {
     stateName = hookPayload.is_idle === true ? 'done' : 'working'
   }
 

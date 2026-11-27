@@ -54,6 +54,11 @@ const NON_USAGE_CREDENTIAL_STORES: readonly { storeModule: string; reason: strin
       "The Antigravity chat's own Gemini API key (model access), not the usage metering reader."
   },
   {
+    storeModule: 'antigravity/native-account-store',
+    reason:
+      "The ACP chat lane's native `agy` account vault (the signed-in account itself, not a usage reading); usage reading for Antigravity was retired."
+  },
+  {
     storeModule: 'bitbucket/credential-store',
     reason: 'Bitbucket integration credentials; carries host-local site metadata, so no port yet.'
   },

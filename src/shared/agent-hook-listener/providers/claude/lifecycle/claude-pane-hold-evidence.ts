@@ -74,10 +74,12 @@ export function resolveClaudePaneStatus(
   // Tasks still owe main-agent notifications after ending; those wakeup turns keep the pane live.
   const held = claudePaneHoldEvidence(state, paneKey, lead)
   const own = lead.waitingAgentId !== undefined ? lead.stateBeforeWait : lead
+  const runningNonAgent = state.claudeRunningNonAgentTasksByPaneKey.get(paneKey)
   // LOCAL(nplez1): only a plain running shell is reclassified as agent work, and upstream would have
-  // called that hold monitoring (see LOCAL-PATCHES.md § local(agents)).
+  // called that hold monitoring (see LOCAL-PATCHES.md § local(agents)). A monitor is not a shell: it
+  // keeps upstream's accounting, so a turn held only by one still reads monitoring.
   const shellHeldAsAgentWork =
-    state.claudeRunningNonAgentTasksByPaneKey.has(paneKey) && !held.runningAgent && !held.owedAgent
+    runningNonAgent?.hasShellTask === true && !held.runningAgent && !held.owedAgent
   return {
     ...foldAgentLeadStatus({
       leadState: lead.state,
@@ -85,15 +87,14 @@ export function resolveClaudePaneStatus(
         // Child waits displace the lead record; the roster carries none.
         hasWaitingChildWork: false,
         // LOCAL(nplez1): a background shell the agent started is agent work, so it reads plain
-        // `working`; only a Claude session-cron callback earns the monitoring badge (see
-        // LOCAL-PATCHES.md § local(agents)). Upstream's *owed* notification evidence stays where
-        // upstream put it — `owedShell` on the non-agent side — because an owed shell is a pending
-        // wake-up rather than the running shell the policy is about.
-        hasLiveAgentWork:
-          held.runningAgent ||
-          held.owedAgent ||
-          state.claudeRunningNonAgentTasksByPaneKey.has(paneKey),
-        hasLiveNonAgentWork: state.claudeActiveSessionCronPaneKeys.has(paneKey) || held.owedShell
+        // `working`; a session-cron callback or a running monitor earns the monitoring badge (see
+        // LOCAL-PATCHES.md § local(agents)). Upstream's owed-notification evidence stays on its own
+        // `owedShell`: a pending wake-up, not the running shell this policy is about.
+        hasLiveAgentWork: held.runningAgent || held.owedAgent || shellHeldAsAgentWork,
+        hasLiveNonAgentWork:
+          state.claudeActiveSessionCronPaneKeys.has(paneKey) ||
+          held.owedShell ||
+          (runningNonAgent !== undefined && !runningNonAgent.hasShellTask)
       })
     }),
     ...(shellHeldAsAgentWork ? { claudeMonitoringEquivalentHold: true as const } : {}),

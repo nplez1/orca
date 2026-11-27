@@ -296,6 +296,8 @@ export type AiVaultListResult = {
   /** Requires the caller to reuse the exact previously received body. */
   unchanged?: true
   sessions: AiVaultSession[]
+  /** Scanned rows the host's listing hid (deleted chats, a chat's other conversations): depth checks still count them. */
+  hiddenRowCount?: number
   issues: AiVaultScanIssue[]
   scannedAt: string
   /** A paged reply holding more rows than this one reply could carry; request `nextOffset`. */

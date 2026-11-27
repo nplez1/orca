@@ -1,10 +1,17 @@
 import type { Session } from 'electron'
+import type { NetworkProxySettings } from '../../shared/network/network-proxy'
 
 /** Desktop uses Chromium session/proxy state and user agent; headless hosts use Node/environment defaults.
  * Callers must consume or cancel response bodies: unread undici bodies can crash the process. */
 
 export type MainHttpClient = {
   fetch(url: string, init?: RequestInit): Promise<Response>
+  /** Desktop only: route one request through `proxy` instead of the app-wide proxy policy. */
+  fetchThroughProxy?(
+    proxy: NetworkProxySettings,
+    url: string,
+    init?: RequestInit
+  ): Promise<Response>
   /** fork-comment-ok: fork-added seam; a 3xx comes back instead of being followed.
    * Absent only where the transport cannot do it — a caller that must vet hops then refuses.
    */

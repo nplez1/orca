@@ -81,6 +81,9 @@ export const GLOBAL_SETTINGS_HOST_SYNC_DISPOSITION = {
   // Why hostLocal: upstream calls it host-owned — each host updates the server it installed, so the
   // main's answer would overwrite a host's own.
   antigravityServerAutoUpdateEnabled: 'hostLocal',
+  // Why hostLocal: a pairing interface is this machine's own network interface, like
+  // `mobilePairingCustomAddresses` and `machineName` next to it — meaningless or wrong on another host.
+  runtimePairingInterface: 'hostLocal',
   // Why hostLocal: a caption cache keyed by `host|bot|avatar`, so every entry describes a picture this
   // machine made.
   generatedAvatarDescriptions: 'hostLocal'

@@ -15,7 +15,10 @@ import {
   restateHookRoot
 } from '../../../shared/agent-hook-listener/presence/agent-hook-owner-presence'
 import { normalizeHookPayload } from '../../../shared/agent-hook-listener/normalization/normalize-hook-payload'
-import { takeHoldRetraction } from '../../../shared/agent-hook-listener/listener-state'
+import {
+  takeHoldRetraction,
+  type ClaudeRunningNonAgentTasks
+} from '../../../shared/agent-hook-listener/listener-state'
 import { withStopTranscriptReadsSkipped } from '../../../shared/agent-hook-listener/transcript-lines'
 import { droidStopTranscriptPath } from '../../../shared/agent-hook-listener/providers/droid/droid-turn-outcome'
 import {
@@ -142,7 +145,7 @@ export abstract class AgentHookServerIngestNormalization extends AgentHookServer
 
   protected setClaudeBackgroundEvidence(
     paneKey: string,
-    runningTasks: readonly string[] | undefined,
+    runningTasks: ClaudeRunningNonAgentTasks | undefined,
     hasActiveCron: boolean
   ): void {
     if (runningTasks) {

@@ -129,7 +129,7 @@ export function consumeCodebuddySessionLine(state: CodebuddySessionParseState, l
       isMeta: asRecord(record.providerData)?.skipRun === true
     })
     if (text && !isMetaUserTurn) {
-      state.firstUserTitle ??= text
+      state.firstUserTitle ??= normalizeTitleText(text)
     }
     return
   }

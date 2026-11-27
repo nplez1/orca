@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { lazyZodSchema } from '../../schema/lazy-zod-schema'
 import {
   EphemeralVmRecipeConnectionResultSchema,
   EphemeralVmRecipeLegacyResultSchema,
@@ -11,53 +12,57 @@ import type {
 import type { EphemeralVmFailure } from '../ephemeral-vm-recipes/ephemeral-vm-failure-copy'
 import { toEphemeralVmRuntimeRecipeSnapshot as stripEphemeralVmRecipeTimeouts } from '../ephemeral-vm-recipes/ephemeral-vm-recipe-timeouts'
 
-export const EphemeralVmRuntimeStatusSchema = z.enum([
-  'provisioning',
-  'running',
-  'suspended',
-  'suspend_failed',
-  'resume_failed',
-  'failed',
-  'cleanup_pending',
-  'cleanup_failed',
-  'cleaned'
-])
+export const EphemeralVmRuntimeStatusSchema = lazyZodSchema(() =>
+  z.enum([
+    'provisioning',
+    'running',
+    'suspended',
+    'suspend_failed',
+    'resume_failed',
+    'failed',
+    'cleanup_pending',
+    'cleanup_failed',
+    'cleaned'
+  ])
+)
 
 export type EphemeralVmRuntimeStatus = z.infer<typeof EphemeralVmRuntimeStatusSchema>
 
-export const EphemeralVmCleanupStatusSchema = z.enum([
-  'not_started',
-  'disabled',
-  'running',
-  'succeeded',
-  'failed'
-])
+export const EphemeralVmCleanupStatusSchema = lazyZodSchema(() =>
+  z.enum(['not_started', 'disabled', 'running', 'succeeded', 'failed'])
+)
 
 export type EphemeralVmCleanupStatus = z.infer<typeof EphemeralVmCleanupStatusSchema>
 
-export const EphemeralVmRuntimeConnectionModeSchema = z.enum(['orca-server', 'ssh'])
+export const EphemeralVmRuntimeConnectionModeSchema = lazyZodSchema(() =>
+  z.enum(['orca-server', 'ssh'])
+)
 
-const EphemeralVmRuntimeRecipeSchema = z
-  .object({
-    id: z.string().min(1),
-    name: z.string().min(1),
-    create: z.string().min(1),
-    checkoutMode: z.enum(['orca-worktree', 'provisioned-root']).optional(),
-    description: z.string().min(1).optional(),
-    suspend: z.string().min(1).optional(),
-    resume: z.string().min(1).optional(),
-    destroy: z.string().min(1).optional(),
-    destroyDisabled: z.boolean().optional()
-  })
-  .strict()
+const EphemeralVmRuntimeRecipeSchema = lazyZodSchema(() =>
+  z
+    .object({
+      id: z.string().min(1),
+      name: z.string().min(1),
+      create: z.string().min(1),
+      checkoutMode: z.enum(['orca-worktree', 'provisioned-root']).optional(),
+      description: z.string().min(1).optional(),
+      suspend: z.string().min(1).optional(),
+      resume: z.string().min(1).optional(),
+      destroy: z.string().min(1).optional(),
+      destroyDisabled: z.boolean().optional()
+    })
+    .strict()
+)
 
-const EphemeralVmContextMenuItemSchema = z
-  .object({
-    id: z.string().min(1),
-    label: z.string().min(1),
-    command: z.string().min(1)
-  })
-  .strict()
+const EphemeralVmContextMenuItemSchema = lazyZodSchema(() =>
+  z
+    .object({
+      id: z.string().min(1),
+      label: z.string().min(1),
+      command: z.string().min(1)
+    })
+    .strict()
+)
 
 /**
  * The context-menu actions a recipe contributed, snapshotted with the lifecycle commands.
@@ -66,73 +71,77 @@ const EphemeralVmContextMenuItemSchema = z
  * strict, so a field an older build cannot parse would make the whole runtime store unreadable to
  * it. The record's own object is not strict, so an older build drops this field and keeps the host.
  */
-const EphemeralVmContextMenuItemListSchema = z.array(EphemeralVmContextMenuItemSchema)
+const EphemeralVmContextMenuItemListSchema = lazyZodSchema(() =>
+  z.array(EphemeralVmContextMenuItemSchema)
+)
 
 export type EphemeralVmContextMenuItem = z.infer<typeof EphemeralVmContextMenuItemSchema>
 
-export const EphemeralVmRuntimeRecordSchema = z.object({
-  id: z.string().min(1),
-  recipeId: z.string().min(1),
-  /** Snapshot lifecycle commands so later pack updates/disabling/removal cannot change an existing runtime’s cleanup. */
-  recipe: EphemeralVmRuntimeRecipeSchema.optional(),
-  /**
-   * The provider's lease-extension verb, snapshotted with the lifecycle commands so that a later
-   * `orca.yaml` edit cannot redirect it at a lease that is already running. Declared here rather
-   * than inside `recipe` because that snapshot is strict and the store file is written in a shape
-   * an older build has to keep reading; this object is not strict, so an older build strips and
-   * ignores these fields rather than losing the whole runtime.
-   */
-  extend: z.string().min(1).optional(),
-  /** The lifetimes the provider will sell for this host, already canonicalized when `orca.yaml`
-   *  was parsed. Orca offers only these, so it can never ask for a lease that would be refused. */
-  extendDurations: z.array(z.string().min(1)).optional(),
-  /** The context-menu actions this host's recipe declared, snapshotted so a later `orca.yaml` edit
-   *  cannot redirect a click at a different script. A host with none offers no extra items. */
-  contextMenuItems: EphemeralVmContextMenuItemListSchema.optional(),
-  repoId: z.string().min(1).optional(),
-  /** Repo checkout the lifecycle commands ran from, so destroy still works if `repoId` stops resolving. */
-  repoPath: z.string().min(1).optional(),
-  projectId: z.string().min(1).optional(),
-  workspaceId: z.string().min(1).optional(),
-  workspaceName: z.string().min(1).optional(),
-  connectionMode: EphemeralVmRuntimeConnectionModeSchema.optional(),
-  runtimeEnvironmentId: z.string().min(1).optional(),
-  sshTargetId: z.string().min(1).optional(),
-  status: EphemeralVmRuntimeStatusSchema,
-  cleanupStatus: EphemeralVmCleanupStatusSchema,
-  cleanupDisabled: z.boolean().optional(),
-  cleanupLastAttemptAt: z.number().finite().optional(),
-  cleanupLastError: z.string().min(1).optional(),
-  /** Optional open code + params so the renderer can localize `cleanupLastError`; English stays authoritative. */
-  cleanupLastErrorCode: z.string().min(1).optional(),
-  cleanupLastErrorParams: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
-  /**
-   * When Orca released this host's registrations and forgot its workspace rows, because the
-   * provider's lease had lapsed and the machine was not coming back.
-   *
-   * Why recorded rather than left to `status`: reclamation deliberately does NOT destroy the
-   * provider resource — the provider's own TTL owns it, and destroying a machine that was extended
-   * out of band would take unpushed work with it. So `status` cannot say "released", and this
-   * instant is what makes the reclaim idempotent and the Settings row honest.
-   */
-  reclaimedAt: z.number().finite().optional(),
-  /**
-   * The execution-host identities this runtime was reachable as when it was reclaimed.
-   *
-   * Why persisted: the reclaim clears `sshTargetId` and `runtimeEnvironmentId` on this record, so
-   * afterwards an SSH-only host could no longer be matched to its workspace row — and the renderer
-   * needs that match to forget the row when the reclaim event reached nobody.
-   */
-  reclaimedHostIds: z.array(z.string().min(1)).optional(),
-  /** Last suspend/resume failure (English + optional code/params); cleared when one succeeds. */
-  lifecycleLastError: z.string().min(1).optional(),
-  lifecycleLastErrorCode: z.string().min(1).optional(),
-  lifecycleLastErrorParams: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
-  createdAt: z.number().finite(),
-  updatedAt: z.number().finite(),
-  /** Absent only on write-ahead records persisted before `create` returned a result. */
-  recipeResult: EphemeralVmRecipeResultSchema.optional()
-})
+export const EphemeralVmRuntimeRecordSchema = lazyZodSchema(() =>
+  z.object({
+    id: z.string().min(1),
+    recipeId: z.string().min(1),
+    /** Snapshot lifecycle commands so later pack updates/disabling/removal cannot change an existing runtime’s cleanup. */
+    recipe: EphemeralVmRuntimeRecipeSchema.optional(),
+    /**
+     * The provider's lease-extension verb, snapshotted with the lifecycle commands so that a later
+     * `orca.yaml` edit cannot redirect it at a lease that is already running. Declared here rather
+     * than inside `recipe` because that snapshot is strict and the store file is written in a shape
+     * an older build has to keep reading; this object is not strict, so an older build strips and
+     * ignores these fields rather than losing the whole runtime.
+     */
+    extend: z.string().min(1).optional(),
+    /** The lifetimes the provider will sell for this host, already canonicalized when `orca.yaml`
+     *  was parsed. Orca offers only these, so it can never ask for a lease that would be refused. */
+    extendDurations: z.array(z.string().min(1)).optional(),
+    /** The context-menu actions this host's recipe declared, snapshotted so a later `orca.yaml` edit
+     *  cannot redirect a click at a different script. A host with none offers no extra items. */
+    contextMenuItems: EphemeralVmContextMenuItemListSchema.optional(),
+    repoId: z.string().min(1).optional(),
+    /** Repo checkout the lifecycle commands ran from, so destroy still works if `repoId` stops resolving. */
+    repoPath: z.string().min(1).optional(),
+    projectId: z.string().min(1).optional(),
+    workspaceId: z.string().min(1).optional(),
+    workspaceName: z.string().min(1).optional(),
+    connectionMode: EphemeralVmRuntimeConnectionModeSchema.optional(),
+    runtimeEnvironmentId: z.string().min(1).optional(),
+    sshTargetId: z.string().min(1).optional(),
+    status: EphemeralVmRuntimeStatusSchema,
+    cleanupStatus: EphemeralVmCleanupStatusSchema,
+    cleanupDisabled: z.boolean().optional(),
+    cleanupLastAttemptAt: z.number().finite().optional(),
+    cleanupLastError: z.string().min(1).optional(),
+    /** Optional open code + params so the renderer can localize `cleanupLastError`; English stays authoritative. */
+    cleanupLastErrorCode: z.string().min(1).optional(),
+    cleanupLastErrorParams: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
+    /**
+     * When Orca released this host's registrations and forgot its workspace rows, because the
+     * provider's lease had lapsed and the machine was not coming back.
+     *
+     * Why recorded rather than left to `status`: reclamation deliberately does NOT destroy the
+     * provider resource — the provider's own TTL owns it, and destroying a machine that was extended
+     * out of band would take unpushed work with it. So `status` cannot say "released", and this
+     * instant is what makes the reclaim idempotent and the Settings row honest.
+     */
+    reclaimedAt: z.number().finite().optional(),
+    /**
+     * The execution-host identities this runtime was reachable as when it was reclaimed.
+     *
+     * Why persisted: the reclaim clears `sshTargetId` and `runtimeEnvironmentId` on this record, so
+     * afterwards an SSH-only host could no longer be matched to its workspace row — and the renderer
+     * needs that match to forget the row when the reclaim event reached nobody.
+     */
+    reclaimedHostIds: z.array(z.string().min(1)).optional(),
+    /** Last suspend/resume failure (English + optional code/params); cleared when one succeeds. */
+    lifecycleLastError: z.string().min(1).optional(),
+    lifecycleLastErrorCode: z.string().min(1).optional(),
+    lifecycleLastErrorParams: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
+    createdAt: z.number().finite(),
+    updatedAt: z.number().finite(),
+    /** Absent only on write-ahead records persisted before `create` returned a result. */
+    recipeResult: EphemeralVmRecipeResultSchema.optional()
+  })
+)
 
 export type EphemeralVmRuntimeRecord = z.infer<typeof EphemeralVmRuntimeRecordSchema>
 
@@ -260,35 +269,43 @@ export type EphemeralVmWorkspaceLifecycleResult =
   | { ok: true; runtime: EphemeralVmRuntimeRecord | null }
   | ({ ok: false } & EphemeralVmFailure)
 
-export const EphemeralVmRuntimeStoreSchema = z.object({
-  version: z.literal(1),
-  runtimes: z.array(EphemeralVmRuntimeRecordSchema)
-})
+export const EphemeralVmRuntimeStoreSchema = lazyZodSchema(() =>
+  z.object({
+    version: z.literal(1),
+    runtimes: z.array(EphemeralVmRuntimeRecordSchema)
+  })
+)
 
 export type EphemeralVmRuntimeStore = z.infer<typeof EphemeralVmRuntimeStoreSchema>
 
-const RollbackEphemeralVmRuntimeRecipeSchema = z
-  .object({
-    id: z.string().min(1),
-    name: z.string().min(1),
-    create: z.string().min(1),
-    description: z.string().min(1).optional(),
-    suspend: z.string().min(1).optional(),
-    resume: z.string().min(1).optional(),
-    destroy: z.string().min(1).optional(),
-    destroyDisabled: z.boolean().optional()
+const RollbackEphemeralVmRuntimeRecipeSchema = lazyZodSchema(() =>
+  z
+    .object({
+      id: z.string().min(1),
+      name: z.string().min(1),
+      create: z.string().min(1),
+      description: z.string().min(1).optional(),
+      suspend: z.string().min(1).optional(),
+      resume: z.string().min(1).optional(),
+      destroy: z.string().min(1).optional(),
+      destroyDisabled: z.boolean().optional()
+    })
+    .strict()
+)
+
+export const RollbackEphemeralVmRuntimeRecordSchema = lazyZodSchema(() =>
+  EphemeralVmRuntimeRecordSchema.extend({
+    recipe: RollbackEphemeralVmRuntimeRecipeSchema.optional(),
+    recipeResult: z.union([
+      EphemeralVmRecipeLegacyResultSchema,
+      EphemeralVmRecipeConnectionResultSchema
+    ])
   })
-  .strict()
+)
 
-export const RollbackEphemeralVmRuntimeRecordSchema = EphemeralVmRuntimeRecordSchema.extend({
-  recipe: RollbackEphemeralVmRuntimeRecipeSchema.optional(),
-  recipeResult: z.union([
-    EphemeralVmRecipeLegacyResultSchema,
-    EphemeralVmRecipeConnectionResultSchema
-  ])
-})
-
-export const RollbackEphemeralVmRuntimeStoreSchema = z.object({
-  version: z.literal(1),
-  runtimes: z.array(RollbackEphemeralVmRuntimeRecordSchema)
-})
+export const RollbackEphemeralVmRuntimeStoreSchema = lazyZodSchema(() =>
+  z.object({
+    version: z.literal(1),
+    runtimes: z.array(RollbackEphemeralVmRuntimeRecordSchema)
+  })
+)

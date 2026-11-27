@@ -6,8 +6,6 @@ import { readGrokAuthSession } from '../providers/grok/grok-auth'
 import { fetchCursorRateLimits } from '../providers/cursor/cursor-fetcher'
 import { readCursorAuthSession } from '../providers/cursor/cursor-auth'
 import { fetchZcodeRateLimits } from '../providers/zcode/zcode-usage-fetcher'
-import { fetchAntigravityRateLimits } from '../providers/antigravity/antigravity-usage-fetcher'
-import { antigravityUsageDisabledSnapshot } from '../providers/antigravity/antigravity-usage-snapshot'
 import { ZCODE_PLAN_SITE_BASE_URLS } from '../../../shared/agent-accounts/usage-credentials/zcode-plan-sites'
 import { fetchMiniMaxRateLimits } from '../providers/minimax/minimax-fetcher'
 import { createHash } from 'node:crypto'
@@ -59,18 +57,6 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     // Gate only Codex, never siblings, when its runtime is skipped (#STA-4422).
     // Why: resolveCodexHome probes credential homes, so a disabled Codex skips it entirely.
     const codexHome = disabled.has('codex') ? null : await this.resolveCodexHome(codexTarget)
-    const antigravityFetchAllowed =
-      !disabled.has('antigravity') &&
-      (this.antigravityUsageEnabledResolver?.() ?? true) &&
-      (options?.force || !this.shouldSkipAutomatedFetch('antigravity', this.state.antigravity))
-    // A login change seen here invalidates before the baseline below, so this read still counts.
-    const recorder = antigravityFetchAllowed ? this.antigravityAccountUsageRecorder : null
-    const antigravityRead = recorder ? await this.beginAntigravityAccountRead(recorder) : null
-    if (signal.aborted) {
-      return null
-    }
-    const antigravityGeneration = this.antigravityFetchGeneration
-    const antigravityTarget = this.antigravityFetchTarget
     const codexFetchGated = disabled.has('codex') || codexHome?.skip === true
     const codexHomePath = codexHome?.homePath ?? null
     const codexProvenance = codexFetchGated
@@ -100,7 +86,6 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     if (
       claudeGeneration !== this.claudeFetchGeneration ||
       codexGeneration !== this.codexFetchGeneration ||
-      antigravityGeneration !== this.antigravityFetchGeneration ||
       credentialGenerations.some(
         (generation, index) =>
           generation !==
@@ -168,7 +153,6 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
       previousState,
       codexFetchGated,
       codexStateBeforeFetch,
-      antigravityUsageEnabled: antigravityFetchAllowed,
       changed: {
         opencodeGo: opencodeConfigChanged,
         minimax: miniMaxConfigChanged,
@@ -195,18 +179,6 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
         : zcodePlanConfigResult.error
           ? Promise.resolve(this.getZcodePlanCredentialError(zcodePlanConfigResult.error))
           : fetchZcodeRateLimits({ signal, planCredential: zcodePlanCredential })
-    )
-    // Hidden meters avoid the CLI spawn; the separate promise keeps other providers responsive.
-    const antigravityResultPromise = trackSettledProviderResult(
-      antigravityFetchAllowed
-        ? fetchAntigravityRateLimits({
-            signal,
-            target: antigravityTarget,
-            networkProxySettings: this.networkProxySettingsResolver?.()
-          }).then((limits) =>
-            this.attributeAntigravityReading(antigravityRead, antigravityGeneration, limits)
-          )
-        : Promise.resolve(previousState.antigravity ?? antigravityUsageDisabledSnapshot())
     )
     const missingWslCodexHome =
       codexFetchGated || codexHomePath ? null : this.getMissingWslCodexHomeResult(codexTarget)
@@ -317,13 +289,11 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
       zcodeConfigChanged,
       zcodeGeneration,
       forkProviderCycle,
-      antigravityGeneration,
       claudeFetchGated,
       results: [claudeResult, codexResult, opencodeGoResult, kimiResult, miniMaxResult],
       grokResultPromise,
       cursorResultPromise,
-      zcodeResultPromise,
-      antigravityResultPromise
+      zcodeResultPromise
     }
   }
 }

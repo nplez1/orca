@@ -8,7 +8,7 @@ import {
 import type { editor as monacoEditor } from 'monaco-editor'
 import { createRoot, type Root } from 'react-dom/client'
 import { getCommentBodyLayoutLineCount } from '@/lib/source-control/review/comments/comment-body-line-count'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { useAppStore } from '@/store'
 import {
   useDiffCommentAddButtonOverlay,
@@ -92,10 +92,7 @@ export function useDiffCommentDecorator({
   comments,
   commentableLineNumbers,
   gutterOccupiedLineNumbers,
-  addButtonLabel = translate(
-    'auto.components.diff.comments.DiffCommentPopover.f6c449191e',
-    'Add note for the AI'
-  ),
+  addButtonLabel,
   pendingCommentTarget = null,
   addNoteShortcutEnabled = false,
   onCreateComment,
@@ -114,6 +111,10 @@ export function useDiffCommentDecorator({
   pendingScrollCommentId,
   onPendingScrollConsumed
 }: DecoratorArgs): void {
+  const t = useTranslate()
+  const resolvedAddButtonLabel =
+    addButtonLabel ??
+    t('auto.components.diff.comments.DiffCommentPopover.f6c449191e', 'Add note for the AI')
   const ownerKey = commentOwner ? diffCommentOwnerKey(commentOwner) : null
   const clearDeliveredDiffComments = useAppStore((s) => s.clearDeliveredDiffComments)
   const activeGroupId = useAppStore((s) =>
@@ -184,7 +185,7 @@ export function useDiffCommentDecorator({
   useDiffCommentAddButtonOverlay({
     editor,
     monacoModelIdentity,
-    addButtonLabel,
+    addButtonLabel: resolvedAddButtonLabel,
     commentableLineSet,
     gutterOccupiedLines: gutterOccupiedLineSet,
     hoverLineRef,

@@ -5,10 +5,9 @@ import { isUsageEmptyState } from './composition/status-bar-provider-visibility'
 /**
  * Why this file exists: `isUsageEmptyState` decides whether the status bar offers
  * "set up a provider" at all, and its input is fifteen independent slots. The
- * manifest made it one loop, so what needs pinning is the three rules the loop
- * encodes — a disabled provider never holds the CTA back, a slot the host never
- * published is not a fetch in flight, and an enable-gated provider that is off is
- * not one either.
+ * manifest made it one loop, so what needs pinning is the rules the loop
+ * encodes — a disabled provider never holds the CTA back, and a slot the host
+ * never published is not a fetch in flight.
  */
 
 type Snapshots = Parameters<typeof isUsageEmptyState>[0]
@@ -27,7 +26,6 @@ function allUnavailable(overrides: Partial<Snapshots> = {}): Snapshots {
     codex: snapshot('codex', 'unavailable'),
     opencodeGo: snapshot('opencode-go', 'unavailable'),
     kimi: snapshot('kimi', 'unavailable'),
-    antigravity: snapshot('antigravity', 'unavailable'),
     minimax: snapshot('minimax', 'unavailable'),
     grok: snapshot('grok', 'unavailable'),
     cursor: snapshot('cursor', 'unavailable'),
@@ -69,21 +67,11 @@ describe('isUsageEmptyState', () => {
     expect(isUsageEmptyState(allUnavailable(), { grokAuthConfigured: true })).toBe(false)
   })
 
-  it('does not count an enable-gated provider that is switched off as pending', () => {
-    // Why antigravity: agy is read only while `antigravityUsageConfigured` is set, so a
-    // slot there means "not asked" whether it is null or mid-fetch, and counting either
-    // as pending would hide the CTA on every install that never enabled it.
-    expect(isUsageEmptyState(allUnavailable({ antigravity: null }), {})).toBe(true)
-    expect(
-      isUsageEmptyState(allUnavailable({ antigravity: snapshot('antigravity', 'fetching') }), {})
-    ).toBe(true)
-  })
-
   it('does not count a switched-off provider as pending', () => {
     // Why: a disabled provider's slot stays null forever, so it must not hold the CTA.
     expect(
-      isUsageEmptyState(allUnavailable({ antigravity: null, minimax: null }), {
-        disabledUsageProviders: ['antigravity', 'minimax']
+      isUsageEmptyState(allUnavailable({ minimax: null }), {
+        disabledUsageProviders: ['minimax']
       })
     ).toBe(true)
   })

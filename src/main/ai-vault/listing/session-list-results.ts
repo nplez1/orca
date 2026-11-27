@@ -55,6 +55,7 @@ export function restampAiVaultListResult(
             id: `${executionHostId}:${session.agent}:${session.sessionId}:${session.filePath}`
           }
     ),
+    ...(result.hiddenRowCount ? { hiddenRowCount: result.hiddenRowCount } : {}),
     issues: result.issues.map((issue) => ({ ...issue, executionHostId })),
     scannedAt: result.scannedAt
   }
@@ -69,11 +70,13 @@ export function mergeAiVaultListResults(
   const depth = requestedAiVaultSessionDepth({ limit: rawLimit, unlimited })
   const byId = new Map<string, AiVaultSession>()
   const issues: AiVaultScanIssue[] = []
+  let hiddenRowCount = 0
   for (const result of results) {
     for (const session of result.sessions) {
       byId.set(session.id, session)
     }
     issues.push(...result.issues)
+    hiddenRowCount += result.hiddenRowCount ?? 0
   }
   // A scope path is a guarantee every leg already honoured, so the cap must not be
   // the one place that drops its own sessions: the shared truncation keeps the
@@ -82,6 +85,7 @@ export function mergeAiVaultListResults(
     {
       // Recency order with the shared id tiebreak, so a merged list sorts like one host's.
       sessions: sortAiVaultSessionsByRecency([...byId.values()]),
+      ...(hiddenRowCount > 0 ? { hiddenRowCount } : {}),
       issues,
       // Reuse accepted scan times so unchanged host results cannot fabricate freshness.
       scannedAt: latestAiVaultScannedAt(results)

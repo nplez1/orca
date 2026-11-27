@@ -25,7 +25,6 @@ export type FetchAllCyclePrepared = {
   zcodeConfigChanged: boolean
   zcodeGeneration: number
   forkProviderCycle: ForkProviderCyclePrepared
-  antigravityGeneration: number
   claudeFetchGated: boolean
   results: [
     PromiseSettledResult<ProviderRateLimits>,
@@ -37,5 +36,4 @@ export type FetchAllCyclePrepared = {
   grokResultPromise: Promise<SettledProviderResult>
   cursorResultPromise: Promise<SettledProviderResult>
   zcodeResultPromise: Promise<SettledProviderResult>
-  antigravityResultPromise: Promise<SettledProviderResult>
 }

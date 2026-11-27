@@ -1,4 +1,5 @@
 /* eslint-disable max-lines -- Why: upstream-owned and at its budget (299/300); the fork's +2-line delta rides inside it, and splitting costs a permanent sync hunk. */
+import { runWithFinally } from '@/lib/run-with-finally'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useShortcutLabel } from '@/lib/keyboard/useShortcutLabel'
 import { useAppStore } from '../../../store/index'
@@ -86,35 +87,32 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
       return
     }
     setIsRefreshing(true)
-    try {
-      // Why: re-run PATH detection so a freshly-installed/removed CLI's bar appears/hides without restarting Orca.
-      await Promise.all([
-        (refreshRemote ?? refreshRateLimits)(),
-        refreshDetectedAgents(undefined, { wakeWslDistro: true, userInitiated: true })
-      ])
-    } finally {
-      if (mountedRef.current) {
-        setIsRefreshing(false)
+    await runWithFinally(
+      async () => {
+        // Why: re-run PATH detection so a freshly-installed/removed CLI's bar appears/hides without restarting Orca.
+        await Promise.all([
+          (refreshRemote ?? refreshRateLimits)(),
+          refreshDetectedAgents(undefined, { wakeWslDistro: true, userInitiated: true })
+        ])
+      },
+      () => {
+        if (mountedRef.current) {
+          setIsRefreshing(false)
+        }
       }
-    }
+    )
   }, [isRefreshing, remoteOwner, refreshRemote, refreshRateLimits, refreshDetectedAgents])
 
   if (!statusBarVisible) {
     return null
   }
 
-  const { claude, codex, opencodeGo, kimi, antigravity, minimax, grok, cursor, zcode } = rateLimits
+  const { claude, codex, opencodeGo, kimi, minimax, grok, cursor, zcode } = rateLimits
   const muse = rateLimits.muse
 
-  // Antigravity has no saved credential; the checked item and detected CLI establish setup.
-  const antigravityUsageConfigured =
-    !remoteOwned &&
-    statusBarItems.includes('antigravity') &&
-    isStatusBarItemAvailable('antigravity', detectedAgentIds)
   // Use owner-specific durable setup flags; viewer credentials cannot establish remote configuration.
   const usageSettings = {
     ...(remoteOwned ? {} : settings),
-    antigravityUsageConfigured,
     minimaxCookieConfigured: rateLimits.minimaxCookieConfigured,
     minimaxApiKeyConfigured: rateLimits.minimaxApiKeyConfigured,
     opencodeGoApiKeyConfigured: rateLimits.opencodeGoApiKeyConfigured,
@@ -125,7 +123,6 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
   const visibleClaude = getVisibleUsageProvider('claude', claude, usageSettings)
   const visibleCodex = getVisibleUsageProvider('codex', codex, usageSettings)
   const visibleKimi = getVisibleUsageProvider('kimi', kimi, usageSettings)
-  const visibleAntigravity = getVisibleUsageProvider('antigravity', antigravity, usageSettings)
   const visibleMiniMax = getVisibleUsageProvider('minimax', minimax, usageSettings)
   const visibleGrok = getVisibleUsageProvider('grok', grok, usageSettings)
   const visibleCursor = getVisibleUsageProvider('cursor', cursor, usageSettings)
@@ -143,10 +140,6 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
     visibleKimi !== null &&
     statusBarItems.includes('kimi') &&
     isStatusBarItemAvailable('kimi', detectedAgentIds)
-  const showAntigravity =
-    visibleAntigravity !== null &&
-    statusBarItems.includes('antigravity') &&
-    isStatusBarItemAvailable('antigravity', detectedAgentIds)
   // MiniMax supports cookie/API-key usage without an installed CLI.
   const showMiniMax = visibleMiniMax !== null && statusBarItems.includes('minimax')
   const showGrok =
@@ -179,7 +172,6 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
     showCodex ||
     showOpencodeGo ||
     showKimi ||
-    showAntigravity ||
     showMiniMax ||
     showGrok ||
     showCursor ||
@@ -195,7 +187,6 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
     codex?.status === 'fetching' ||
     opencodeGo?.status === 'fetching' ||
     kimi?.status === 'fetching' ||
-    antigravity?.status === 'fetching' ||
     minimax?.status === 'fetching' ||
     grok?.status === 'fetching' ||
     cursor?.status === 'fetching' ||
@@ -211,7 +202,6 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
   const rosterProviders = [
     showClaude ? visibleClaude : null,
     showCodex ? visibleCodex : null,
-    showAntigravity ? visibleAntigravity : null,
     showOpencodeGo ? visibleOpencodeGo : null,
     showKimi ? visibleKimi : null,
     showMiniMax ? visibleMiniMax : null,
