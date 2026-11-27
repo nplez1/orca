@@ -152,6 +152,12 @@ export async function adoptFirstReachable(
   deps: RouteFailoverDeps,
   candidates: readonly string[]
 ): Promise<string | null> {
+  // Why the guard comes before any probe: a row whose address is not its own to move (a tunnel's local port, an
+  // access link's loopback, a managed deployment's) must not be rewritten even when a candidate answers — and for
+  // those rows the rewrite is worse than no repair, because the schema that owns that address then rejects the row.
+  if (await deps.isFixedEndpoint()) {
+    return null
+  }
   const current = await deps.current()
   for (const candidate of candidates) {
     if (candidate === current || !isDialableEndpoint(candidate)) {

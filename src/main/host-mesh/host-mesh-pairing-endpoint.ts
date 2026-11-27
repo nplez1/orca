@@ -13,8 +13,12 @@ import { resolveEnvironmentFromStore } from '../../shared/remote-runtime/host-st
  *
  * Why not `updateEnvironmentFromPairingCode`: that rebuilds the row as a fresh pairing and raises
  * `pairingRevision`, which is the number worker stop/observe and the automation owner keys pin — an address-only
- * move would read as a different machine. Why the rewrite goes through the store file and not the RPC surface: a
- * pairing row is a synchronous write, and this runs inside a pass that must not stall the main process.
+ * move would read as a different machine.
+ *
+ * Why it writes straight to the store file: no asynchronous path exists for a pairing row in this build — every write
+ * of `orca-environments.json` is synchronous, the owner's own pairings included — so this is the same write with a
+ * narrower change, and it is charged to `config/main-blocking-helper-baseline.fork.txt` rather than hidden. It runs
+ * at most once per member per repair, after a dial has already failed.
  *
  * Returns false when the row cannot be moved, which is the caller's cue that its address is not what changed.
  */

@@ -150,6 +150,26 @@ describe('adopting a route that answers', () => {
     const adopted = await adoptFirstReachable(deps({}), ['ws://10.0.0.4:6768'])
     expect(adopted).toBeNull()
   })
+
+  it('never moves a row whose address is not its own to move', async () => {
+    // Why before the probe: a tunnel's local port, an access link's loopback and a managed deployment's address are
+    // all pinned by the schema that owns them, so a rewrite there loses the row rather than repairing it.
+    const probed: string[] = []
+    const adopted = await adoptFirstReachable(
+      {
+        ...deps({ answers: ['ws://10.0.0.4:6768'] }),
+        isFixedEndpoint: async () => true,
+        probe: async (endpoint) => {
+          probed.push(endpoint)
+          return true
+        }
+      },
+      ['ws://10.0.0.4:6768']
+    )
+
+    expect(adopted).toBeNull()
+    expect(probed).toEqual([])
+  })
 })
 
 describe('probing a route with the pairing’s own credential', () => {

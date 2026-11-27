@@ -65,8 +65,15 @@ export const stateSchema = z.looseObject({
   }),
   names: z.record(z.string().min(1), nameSchema).default({}),
   // A file written before routes existed has none, and an empty map is the right "nothing learned yet".
+  // Why trimmed rather than bounded: a value past the cap is a build that raised it, and refusing the whole state
+  // would make one long array cost this host its group — the extra entries are only ever guesses.
   routes: z
-    .record(z.string().min(1), z.array(z.string()).max(HOST_MESH_MAX_ENDPOINT_CANDIDATES))
+    .record(
+      z.string().min(1),
+      z
+        .array(z.string())
+        .transform((endpoints) => endpoints.slice(0, HOST_MESH_MAX_ENDPOINT_CANDIDATES))
+    )
     .default({})
 })
 

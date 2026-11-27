@@ -44,10 +44,10 @@ export function rememberRoutes(args: {
 }): string[] {
   const previous = args.previous ?? []
   const reported = args.reported ?? []
-  // Why a slot is reserved for the best address held before: a machine with four live addresses fills the cap on
-  // its own, and a report that used every slot would drop the one address a failed dial has to fall back on.
-  const best = previous[0]
-  const reserved = best !== undefined && !reported.includes(best) ? 1 : 0
+  // Why a slot is reserved for an address only the fallback set still holds: a machine reporting a full set would
+  // otherwise drop every address left behind, and that leftover is the one a failed dial has to try.
+  const carried = previous.filter((endpoint) => !reported.includes(endpoint))
+  const reserved = carried.length > 0 ? 1 : 0
   const seen = new Set<string>()
   const kept: string[] = []
   const collect = (endpoints: readonly string[], limit: number): void => {

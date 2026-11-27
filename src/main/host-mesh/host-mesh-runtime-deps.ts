@@ -59,11 +59,11 @@ const SEND_TIMEOUT_MS = 20_000
 /**
  * The reach the pairing this host already holds for a member uses, so an offer back cannot widen exposure.
  *
- * Why this matters: minting a runtime offer for network reach calls `ensureNetworkExposure`, which the design note
- * records as irreversible. That was harmless when only an owner's join minted one; the scheduled pass mints on its
- * own, so a host paired over loopback (an SSH tunnel, another account on the same machine) would be opened to the
- * network by a background loop with no owner action. Handing back an offer at the reach the pairing already uses
- * keeps the pair possible and the exposure unchanged.
+ * Why this matters: minting a runtime offer on a network address calls `ensureNetworkExposure`, which the design
+ * note records as irreversible, and the pass mints with no owner present. A member the pairing already reaches over
+ * loopback therefore keeps a loopback address, so a pair that needs no network exposes nothing. A member reachable
+ * only on the network does widen exposure — there is no reach switch to keep it closed — but only to the network the
+ * pairing itself already crosses.
  *
  * Why an address on the member's own network and not merely "whatever this host advertises": with no address the
  * offer is minted on the auto-selected interface, which ranks a Tailscale address first. A member reachable only
@@ -235,7 +235,11 @@ function depsFromApp(server: HostMeshRuntimeServer): HostMeshDriverDeps {
     ownEndpoints: () => ownEndpoints(server),
     // Why the pooled transport is dropped after a move: everything that resolves the pairing row per call already
     // dials the new address, while a connection opened before the move keeps the one the row no longer names.
-    invalidateTransport: (environmentId) => invalidateRuntimeEnvironmentTransport(environmentId),
+    invalidateTransport: (environmentId) => {
+      // Why swallowed: the endpoint was moved either way, and an environment whose status cannot be re-read must not
+      // become an unhandled rejection in the middle of a pass.
+      void invalidateRuntimeEnvironmentTransport(environmentId).catch(() => undefined)
+    },
     adoptReachableEndpoint: (args) => adoptReachableEndpoint(userDataPath, args),
     pruneExpiredOffers: () => {
       try {

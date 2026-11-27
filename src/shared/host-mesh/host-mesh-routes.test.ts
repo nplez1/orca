@@ -34,6 +34,17 @@ describe('keeping a member’s routes', () => {
     expect(kept[0]).toBe(LAN)
   })
 
+  it('keeps carrying that fallback on the report after it, not just the one that dropped it', () => {
+    // Why the second round matters: the address a report leaves behind becomes "previous" on the next one, so a
+    // reservation that only looked at the best previous entry would drop it exactly one pass later.
+    const reported = [LAN, LAN2, 'ws://192.168.1.22:6768', 'ws://192.168.1.23:6768']
+    const first = rememberRoutes({ previous: [TAILNET], reported })
+    const second = rememberRoutes({ previous: first, reported })
+
+    expect(first).toContain(TAILNET)
+    expect(second).toContain(TAILNET)
+  })
+
   it('refuses anything that is not an endpoint this host would dial', () => {
     // A peer's words are not this host's input: a value that cannot be dialed would be recorded as a failed path.
     expect(isDialableEndpoint(LAN)).toBe(true)
