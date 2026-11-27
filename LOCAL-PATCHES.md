@@ -6596,3 +6596,54 @@ and `45779423920` at `12957a82e44` (34,636 ms), each green on all three legs.
 Those numbers are the measurement behind the fix. The test that reddened at 33,065 ms against a 30 s cap
 has since taken 26.2 s, 26.6 s, 26.8 s and 34.6 s on the same runner — one of four still over the old
 cap, and the margin that let the other three through is the coin flip this entry is about.
+
+### `local(test)`: the card test that charged its module graph to a 20s test budget
+
+`fork-main-tests` reddened on `main` at `830852634b4` (run
+[45942815750](https://github.com/nplez1/orca/actions/runs/45942815750), 2026-11-27): shard 17/24 failed
+`src/renderer/src/components/sidebar/WorktreeCard.merge-marker.test.tsx` with `Test timed out in
+20000ms` on the first test, and then failed the second test too, 281 ms later, on an assertion about a
+metadata row.
+
+**The cost was the card's module graph, not the assertions.** Each test opened with its own
+`await import('./workspace-card/surface/WorktreeCard')`, so the cold transform and load of that graph
+was charged to the test's own timeout — and the file's line in the run the night before
+([45758341047](https://github.com/nplez1/orca/actions/runs/45758341047), green) is **17,462 ms**. Before
+this change on a warm Mac the same file was 1.5 s and its first test alone was 1,506 ms of it: a 20 s
+budget against a 17.5 s cost, decided by how loaded the runner is. The renders are milliseconds — the
+second test, whose import was already cached, took 3 ms.
+
+**The second failure was the first one's shadow.** A timed-out test body is abandoned, not cancelled, so
+the first test's continuation ran during the second, left the module-level `settings` on the experimental
+card style, and the default-style metadata row the last assertion reads was never rendered. Test 1 is the
+one that covers both card styles; test 2 pins the default style, so its last assertion was the one the
+leftover state could break, and one red was reported as two.
+
+**What the fork changed**, in the same commit as this entry: one static
+`import WorktreeCard from './workspace-card/surface/WorktreeCard'` replaces both dynamic imports, and the
+two `}, 20_000)` timeouts go with them. Module scope has no per-test budget to cross, and both bodies are
+now synchronous, so an abandoned body has no `await` to resume from. The tests stay bounded: the project
+default is `testTimeout: 30_000` (`config/vitest.config.ts`), which now covers only the renders, and
+Vitest compares elapsed time against it after a body returns even where it cannot interrupt one. The file
+is fork-added, so this costs nothing in `check-upstream-file-comments` (4,828/4,828) and needs no
+`host-mesh-upstream-seams` row; no allowlist moved, and both tests still run and assert the same markup.
+
+**Verified on the runner that reddened.** Dispatch
+[45953273363](https://github.com/nplez1/orca/actions/runs/45953273363) at `9a0bd1b944c` — the commit this
+entry ships with — is green on all 24 shards, and the file's own line reads **137 ms** for its two tests
+where the same line read 17,462 ms the night before. The 17 s did not disappear: shard 17's wall clock is
+102 s against 103 s on the green run before it, so the cost moved to the file's collection, where the
+shard job's `timeout-minutes: 60` covers it.
+
+**The shard-timing overlay cannot see that move, and the next regeneration will drop this file.**
+`local/ci-shard-timings-overlay.json` weighs this test file at 3,894 ms from run 43332008251, and its
+metric is the report's per-file `endTime - startTime`, which excludes collection. At 137 ms the file
+falls under the 2,000 ms threshold on the next `import`, and `--override` cannot put it back — it refuses
+a file `selectEntries` already dropped (`local/ci-shard-timings-overlay.mjs:302`). So the weight has to be
+re-added to the JSON by hand with the collection cost, or the metric taught to count collection, before
+the shard plan stops reading this file as free. Shard balance rather than correctness, recorded here
+because a silent 17 s hole in the weights outlives the reason it was made.
+
+The anchors are the file and its two `it(...)` titles. A future edit that puts an `await` back inside
+either body re-creates the exposure this entry removes, charged to the 30 s project default rather than to
+a budget sized for the graph.

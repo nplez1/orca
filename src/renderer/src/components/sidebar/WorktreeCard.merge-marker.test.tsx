@@ -7,15 +7,21 @@ import type { GlobalSettings } from '../../../../shared/settings/global-settings
 import type { Repo } from '../../../../shared/repository/repo-types'
 import type { WorktreeCardProperty } from '../../../../shared/ui-chrome/ui-chrome-types'
 import type { Worktree } from '../../../../shared/worktree/types'
+import WorktreeCard from './workspace-card/surface/WorktreeCard'
 
 let worktreeCardProperties: WorktreeCardProperty[] = ['status', 'pr']
 let hostedReviewCache: Record<string, unknown> = {}
 let settings: Partial<GlobalSettings> | null = null
 
+// Why the card is imported statically: its module graph is this file's whole cost (17.5s cold on the
+// nightly runner, milliseconds of render), and inside a test body that cost is charged to that test's
+// timeout — which is how run 45942815750 reddened, then resumed mid-way through the next test.
+
 vi.mock('@/store', async () => {
   const { useAppStore: realStore } = await vi.importActual<typeof StoreModule>('@/store')
   // Why the real initial state: the card reads whatever the store carries, and a hand-kept
   // subset goes stale silently. Only the fields each test mutates are overridden here.
+  // Why buildState stays lazy: the card's static import loads before the `let`s above initialise.
   const buildState = () => ({
     ...realStore.getInitialState(),
     fetchHostedReviewForBranch: vi.fn(),
@@ -135,8 +141,7 @@ describe('WorktreeCard merge readiness marker', () => {
 
   // Why both styles: the review glyph moves between the experimental status lane and the
   // metadata row the default card uses, and the marker is only honest if it follows the glyph.
-  it('marks the card review glyph blocked in either card style', async () => {
-    const { default: WorktreeCard } = await import('./workspace-card/surface/WorktreeCard')
+  it('marks the card review glyph blocked in either card style', () => {
     const renderCard = (nextSettings: Partial<GlobalSettings>): string => {
       settings = nextSettings
       return renderToStaticMarkup(
@@ -149,10 +154,10 @@ describe('WorktreeCard merge readiness marker', () => {
 
     expect(defaultStyleMarkup).toContain('data-review-merge-marker="blocked"')
     expect(newStyleMarkup).toContain('data-review-merge-marker="blocked"')
-  }, 20_000)
+  })
 
   // Why: green checks are not a mergeable PR, which is the whole reason the marker exists.
-  it('keeps green checks but drops the marker once the merge box is open', async () => {
+  it('keeps green checks but drops the marker once the merge box is open', () => {
     settings = { experimentalNewWorktreeCardStyle: false }
     hostedReviewCache = {
       'local::repo-1::feature/local-branch': {
@@ -160,7 +165,6 @@ describe('WorktreeCard merge readiness marker', () => {
         fetchedAt: Date.now()
       }
     }
-    const { default: WorktreeCard } = await import('./workspace-card/surface/WorktreeCard')
 
     const markup = renderToStaticMarkup(
       <WorktreeCard worktree={makeWorktree()} repo={makeRepo()} isActive={false} />
@@ -169,5 +173,5 @@ describe('WorktreeCard merge readiness marker', () => {
     expect(markup).toContain('text-emerald-500/80')
     expect(markup).not.toContain('data-review-merge-marker')
     expect(markup).toContain('Linked PR #456 · Ready to merge')
-  }, 20_000)
+  })
 })
