@@ -4803,6 +4803,18 @@ If a commit is wrongly refused, the fix is to branch from `main`, not to bypass 
 machine from the team provisioning system when a worktree is created, and release it when that
 worktree is deleted.
 
+**The fork's two startup duties sit in the registrar, and they have to.** The 2026-11-27 sync brought
+upstream's lazy IPC groups: `src/main/ipc/ephemeral-vm/ephemeral-vm.ts` now loads only on the first
+`ephemeralVm:*` call. The fork's reclaim sweep (`startEphemeralVmRuntimeReclaim`) and
+interrupted-provision flagging (`flagInterruptedEphemeralVmProvisioning`) are about state the previous
+session left behind, so the session that never opens the VM UI is exactly the one that must still run
+them: both are called from `runForkEphemeralVmStartupDuties` in
+`src/main/ipc/ephemeral-vm/lazy-ephemeral-vm-handlers.ts`, outside the lazy group, and
+`lazy-ephemeral-vm-handlers.test.ts` fails if they move back inside it. Each call is idempotent across
+registrations (the reclaimer adopts the new context rather than arming a second interval). The two
+`fork-comment-ok` markers that carry this reason in upstream's file point here; a third comment in
+`ephemeral-vm.ts` was deleted rather than marked, because the registrar already says it.
+
 Inert until wired — each script names the provider verbs it needs at the top; until then it fails
 loudly rather than silently allocating nothing. **Nothing in this flow is provider-specific in
 Orca:** the recipe scripts run on the laptop, from the repo root, and Orca only consumes the one JSON

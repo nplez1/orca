@@ -91,7 +91,6 @@
 12 src/main/index.ts
 8 src/main/ipc/app.ts
 8 src/main/ipc/ephemeral-vm/ephemeral-vm-runtime-handlers.ts
-8 src/main/ipc/ephemeral-vm/ephemeral-vm.ts
 1 src/main/ipc/filesystem/access/filesystem-allowed-roots.ts
 16 src/main/ipc/filesystem/access/filesystem-auth.ts
 1 src/main/ipc/filesystem/filesystem-path-search-handler.ts

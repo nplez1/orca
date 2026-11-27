@@ -64,6 +64,7 @@ export function registerLazyEphemeralVmHandlers(store: Store, pluginService?: Pl
     startupReconciled = true
   })
 
+  // fork-comment-ok: the fork's VM startup duties must run outside upstream's lazy group — see LOCAL-PATCHES.md § local(vm)
   // The fork's own duties run at startup, outside the group above: the group loads on the first
   // `ephemeralVm:*` call, and both duties are about state the previous session left behind, so the
   // session that never opens the VM UI is exactly the one that must still run them.
@@ -75,6 +76,7 @@ export function registerLazyEphemeralVmHandlers(store: Store, pluginService?: Pl
     .catch(() => {})
 }
 
+// fork-comment-ok: why the fork's two duties are called once, here — see LOCAL-PATCHES.md § local(vm)
 /**
  * The sweep that reclaims lapsed leases and the flag for creates that never reported.
  *

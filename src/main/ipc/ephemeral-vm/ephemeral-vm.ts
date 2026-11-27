@@ -41,8 +41,6 @@ export function registerEphemeralVmHandlers(
     }
   }
   registerEphemeralVmRuntimeHandlers(store, ipc)
-  // The fork's reclaim sweep and interrupted-create flagging run at startup in the registry, not here:
-  // this module only loads on the first `ephemeralVm:*` call. See `lazy-ephemeral-vm-handlers.ts`.
   if (!options?.skipStartupReconcile) {
     reconcileInterruptedEphemeralVmProvisionsOnStartup(app.getPath('userData'))
   }
