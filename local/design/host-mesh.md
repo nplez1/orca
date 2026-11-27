@@ -175,6 +175,39 @@ schedules one reconcile in the main process:
 `migrateFromPairings` deliberately still runs once and unrecorded when mesh mode is off, so an owner who turns the
 mesh on later still upgrades the fleet that was already paired.
 
+## Finding a member after it moves
+
+A pairing row holds exactly one endpoint — the address the pair was made on — and nothing in it can be updated by
+a machine that changed networks. A tailnet switched off is the everyday version: the studio keeps dialing an
+address that no longer answers, the pair reads half-joined, and every other feature that resolves that row
+(host-sync, the host graph, any paired client) fails with it.
+
+Two stale-credential facts go with it, because both made the panel lie about the fleet:
+
+- **An offer nobody redeemed before its own TTL is not an active link.** It cannot pair anything, and the mesh mints
+  one per failed reverse offer, so counting them turned a one-way pair into "77 active links" in Settings. A live
+  unredeemed offer still counts, because it is revocable and still scannable — the filter is in
+  `isExpiredPairingOffer`, and `mobile.ts`'s grant list only calls it.
+- **A pass revokes the expired offers it minted**, rather than leaving them for the count to filter forever.
+
+So a member publishes where it is, and the pass acts on it:
+
+- **Both directions of every sync carry the sender's own endpoints**, best first — LAN before tailnet, because the
+  directly-attached path is the one that works without an overlay being up. The field is optional, so a peer on an
+  older build keeps syncing and the receiver keeps the routes it had.
+- **Routes are remembered per member, merged rather than replaced**, capped at four. A host that lost its tailnet
+  address reports only the LAN one; the address it held before stays as a fallback for the day the net comes back.
+- **A failed dial is retried on those routes before the member is called unreachable.** The candidate that answers
+  is adopted: the pairing row's endpoint is rewritten, so the path that was found becomes the path everything else
+  dials. That is why this stays a mesh-only change — the repair is inherited by every reader of that row instead of
+  each feature learning about routes.
+- **An offer carries the same set.** The sealed payload already had `endpointCandidates`; it is now filled, so a
+  freshly paired host knows the other machine's addresses before it has ever synced.
+
+What this does not do: a host in no mesh group has no pass to repair it, so it keeps the single stale endpoint. And
+an SSH-tunnel pairing is never repaired — its endpoint is a local port the tunnel owns, so rewriting it would point
+the row at an address nothing serves.
+
 ## Leaving, and why this half matters more
 
 A mesh that cannot shrink is a liability, so removal is the failure-intolerant half:
@@ -205,9 +238,11 @@ refused introduction shows as a gap instead of a false pairing; a stalled pair r
 removal cuts both directions and a tombstone refuses re-introduction. 81 unit tests.
 
 **Not verified, and not verifiable on one machine:** endpoint reachability across LAN and Tailscale — the
-likeliest cause of a half-join — and removal while a member is asleep. `verifyPairingCode` refuses loopback
-outside tests, so a real offer exchange needs two real Electron main processes. Until a Studio-plus-laptop-plus-VM
-run happens, a group is proven on one network and unproven across two.
+likeliest cause of a half-join — and removal while a member is asleep. The route failover above is the answer to
+the first, and it is proved only against a fake transport: a real Studio-plus-laptop run with Tailscale toggled
+mid-day is what would show it working on two networks. `verifyPairingCode` refuses loopback outside tests, so a
+real offer exchange needs two real Electron main processes. Until that run happens, a group is proven on one
+network and unproven across two.
 
 ## Upstream sync surface
 

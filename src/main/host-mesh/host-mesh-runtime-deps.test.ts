@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_HOST_MESH_SETTINGS } from '../../shared/host-mesh/host-mesh-admission'
 import { readHostMeshSnapshot, updateHostMeshSettings } from './host-mesh-runtime'
 import {
+  chooseOfferAddress,
   configureHostMeshRuntimeFromApp,
   type HostMeshRuntimeServer
 } from './host-mesh-runtime-deps'
@@ -80,5 +81,35 @@ describe('the group in a running app', () => {
     configureHostMeshRuntimeFromApp(fakeServer())
 
     expect(existsSync(hostMeshStorePath(state.userDataPath))).toBe(false)
+  })
+})
+
+describe('the address a mesh offer advertises', () => {
+  // Ordered as the real ranking hands them over: tailnet first, then the LAN.
+  const interfaces = [
+    { name: 'utun4', address: '100.98.144.27' },
+    { name: 'en0', address: '192.168.1.75' },
+    { name: 'en0', address: '192.168.1.211' }
+  ]
+
+  it('picks the address on the network the member is already reached through', () => {
+    // Why this exists: the offer used to advertise the tailnet address to a member that only had the LAN, so its
+    // redeem stalled, the pair read one-way forever, and every retry left another unredeemed credential behind.
+    expect(chooseOfferAddress(interfaces, '192.168.1.126')).toBe('192.168.1.75')
+  })
+
+  it('keeps the tailnet address for a member that is on the tailnet', () => {
+    expect(chooseOfferAddress(interfaces, '100.109.40.38')).toBe('100.98.144.27')
+  })
+
+  it('prefers a non-tailnet address for a peer on a subnet this host cannot match', () => {
+    expect(chooseOfferAddress(interfaces, '10.4.0.9')).toBe('192.168.1.75')
+  })
+
+  it('defers to the auto-selected interface for a hostname or an address it already answered for', () => {
+    expect(chooseOfferAddress(interfaces, 'win.local')).toBeNull()
+    expect(
+      chooseOfferAddress([{ name: 'en0', address: '192.168.1.75' }], '192.168.1.75')
+    ).toBeNull()
   })
 })

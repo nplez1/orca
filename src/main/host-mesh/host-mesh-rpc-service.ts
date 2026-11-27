@@ -30,7 +30,8 @@ import {
   createHostMeshState,
   removeHostMeshMember,
   setHostMeshInboundLink,
-  setHostMeshOutboundLink
+  setHostMeshOutboundLink,
+  setHostMeshRoutes
 } from '../../shared/host-mesh/host-mesh-membership'
 import { orcaHostKeyOf } from '../host-graph/host-graph-self-identity'
 import { createHostMeshStore } from './host-mesh-store'
@@ -137,6 +138,18 @@ export function createHostMeshRpcService(deps: HostMeshDriverDeps): HostMeshRpcS
     }
   }
 
+  /** Keeps the addresses a minter published with its offer, so this host can dial it there if this path dies. */
+  function rememberOfferedRoutes(
+    state: HostMeshState,
+    hostKey: string,
+    endpoints: readonly string[] | undefined
+  ): HostMeshState {
+    if (endpoints === undefined || endpoints.length === 0) {
+      return state
+    }
+    return setHostMeshRoutes(state, { hostKey, endpoints })
+  }
+
   const service: HostMeshRpcService = {
     join: async (params: HostMeshJoinRequest): Promise<HostMeshJoinReply> => {
       let state = loadState()
@@ -170,6 +183,13 @@ export function createHostMeshRpcService(deps: HostMeshDriverDeps): HostMeshRpcS
       if (peer.hostKey !== params.joiner.hostKey) {
         return { kind: 'refused', reason: 'offer-not-from-joiner' }
       }
+      // Why the offer's own candidates are kept: they are the addresses the joiner published with it, and this host
+      // needs them the day that machine's path changes — before any sync can carry the new set.
+      state = rememberOfferedRoutes(
+        state,
+        params.joiner.hostKey,
+        decision.payload.endpointCandidates
+      )
       state = {
         ...state,
         groupId,
@@ -313,6 +333,11 @@ export function createHostMeshRpcService(deps: HostMeshDriverDeps): HostMeshRpcS
       if (peer.hostKey !== params.newcomer.hostKey) {
         return { kind: 'refused', reason: 'offer-not-from-newcomer' }
       }
+      state = rememberOfferedRoutes(
+        state,
+        params.newcomer.hostKey,
+        decision.payload.endpointCandidates
+      )
       const epoch = Math.max(state.epoch, params.epoch) + 1
       state = addHostMeshMember(state, {
         hostKey: params.newcomer.hostKey,
@@ -432,6 +457,13 @@ export function createHostMeshRpcService(deps: HostMeshDriverDeps): HostMeshRpcS
       if (adoption.kind === 'adopt') {
         state = adoption.state
       }
+      // Why after adoption: that state was computed before this call, so writing the routes into the earlier one would
+      // be discarded by the assignment above — and the candidates are exactly what a joined host needs first.
+      state = rememberOfferedRoutes(
+        state,
+        params.offerer.hostKey,
+        decision.payload.endpointCandidates
+      )
       state = addHostMeshMember(state, {
         hostKey: params.offerer.hostKey,
         label: params.offerer.label,
@@ -463,6 +495,10 @@ export function createHostMeshRpcService(deps: HostMeshDriverDeps): HostMeshRpcS
 
     sync: async (params: HostMeshPendingRequest): Promise<HostMeshSyncPayload> => {
       const state = loadState()
+      // Why every reply publishes this host's own addresses: the caller is the one that needs them, and the pass it is
+      // running is the only chance to say where this machine is before the path it dialed stops working.
+      const endpoints = await deps.ownEndpoints()
+      const ownEndpoints = endpoints.length === 0 ? {} : { endpoints: [...endpoints] }
       if (state.groupId !== '' && params.groupId !== '' && state.groupId !== params.groupId) {
         // Why a member still gets the list: two hosts upgraded from the same fleet derive different group
         // ids, and the id is precisely what has to converge — so refusing the list to a member on an id
@@ -480,7 +516,8 @@ export function createHostMeshRpcService(deps: HostMeshDriverDeps): HostMeshRpcS
           // list, so the group's membership is not disclosed to anyone outside it.
           members: isMember ? state.members : [],
           tombstones: [],
-          links: {}
+          links: {},
+          ...ownEndpoints
         }
       }
       // Why our own key is skipped in `members`: a member's list never contains itself.
@@ -495,7 +532,8 @@ export function createHostMeshRpcService(deps: HostMeshDriverDeps): HostMeshRpcS
         links: { [selfKey()]: state.links },
         // Why the whole map and not only this host's entry: a name is the group's, so a host that learned a better one
         // for a third machine has to be able to hand it on. A caller reads its own entry from here.
-        names: state.names
+        names: state.names,
+        ...ownEndpoints
       }
     },
 

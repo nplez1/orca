@@ -37,9 +37,9 @@ export const HOST_MESH_OFFER_BACK_METHOD = 'hostMesh.offerBack'
 /**
  * How often this host re-offers to a member that has not taken it up.
  *
- * Why not every sync: minting is a device row on this host, and one nobody redeems is a live credential for a
- * pairing that may never happen. A refusal is remembered for the rest of the launch, so this bounds the waste
- * to one offer per member per ten minutes while a member is reachable but not yet paired back.
+ * Why this bounds the minting: an offer is a device row on this host, and one nobody redeems is a live credential
+ * for a pairing that may never happen. So a mint happens at most once per member per interval, and a retry inside
+ * the interval resends the box already minted rather than minting a second one.
  */
 export const HOST_MESH_REVERSE_OFFER_RETRY_MS = 10 * 60_000
 /** Members, tombstones and per-link state, so every host renders the same group. */
@@ -206,6 +206,14 @@ export type HostMeshState = {
    * to survive being relayed by a host that has never paired with it.
    */
   names: Record<string, HostMeshName>
+  /**
+   * Where each member was last reachable, keyed by host key, best first.
+   *
+   * Why this host has to remember it: the pairing row holds the one endpoint the pair was made on, and a machine
+   * that moved networks cannot announce the new one over the path that stopped working. What a member publishes
+   * in its own sync is the only evidence of where it is now, so this is what makes a pass able to find it again.
+   */
+  routes: Record<string, string[]>
 }
 
 /** What `hostMesh.sync` carries: the whole group's shape, so one member cannot hide another's removal. */
@@ -227,6 +235,13 @@ export type HostMeshSyncPayload = {
    * so a fleet mid-update keeps syncing instead of refusing each other.
    */
   names?: Record<string, HostMeshName>
+  /**
+   * Where the sender can be reached right now, best first, as full `ws://` endpoints.
+   *
+   * Why optional: a peer on a build before this one sends none, and a receiver keeps the routes it already had —
+   * so a fleet mid-update keeps syncing instead of treating every member as a machine that moved.
+   */
+  endpoints?: string[]
 }
 
 /** Whether a pair is joined at both ends, at one, or not at all. */
@@ -312,6 +327,13 @@ export type HostMeshPendingRequest = {
   version: typeof HOST_MESH_PAYLOAD_VERSION
   groupId: string
   hostKey: string
+  /**
+   * Where the sender can be dialed, on the sync as well as the reply.
+   *
+   * Why the request carries it: a pass only learns a member's addresses if the member answers, and the one pass a
+   * member is most likely to fail is the one after it moved — so both directions have to publish.
+   */
+  endpoints?: string[]
 }
 
 export type HostMeshPendingReply = { sealed: HostMeshSealedOffer[] }

@@ -13,6 +13,7 @@ import {
   leaveHostMeshGroup,
   removeHostMeshMember,
   setHostMeshOutboundLink,
+  setHostMeshRoutes,
   summarizeHostMesh
 } from './host-mesh-membership'
 import { setHostMeshName } from './host-mesh-names'
@@ -365,5 +366,75 @@ describe('names arriving from a member', () => {
 
     expect(Object.getPrototypeOf(merged.names)).toBe(Object.prototype)
     expect(Object.keys(merged.names)).toEqual([])
+  })
+})
+
+describe('where a member says it can be reached', () => {
+  function syncFrom(overrides: Partial<HostMeshSyncPayload> = {}): HostMeshSyncPayload {
+    return {
+      version: 1,
+      groupId: 'group-1',
+      epoch: 9,
+      selfKey: 'key-a',
+      publicKeyB64: 'pk-a',
+      members: [{ hostKey: 'key-b', label: 'Laptop', addedAtEpoch: 4 }],
+      tombstones: [],
+      links: {},
+      ...overrides
+    }
+  }
+
+  it('records the addresses a member published, so a pass can find it after it moves', () => {
+    const merged = applyHostMeshSync(
+      withMembers(['key-a']),
+      syncFrom({ endpoints: ['ws://192.168.1.20:6768', 'ws://100.98.144.27:6768'] })
+    )
+
+    expect(merged.routes['key-a']).toEqual(['ws://192.168.1.20:6768', 'ws://100.98.144.27:6768'])
+  })
+
+  it('keeps the address a member has left behind as a fallback', () => {
+    const before = setHostMeshRoutes(withMembers(['key-a']), {
+      hostKey: 'key-a',
+      endpoints: ['ws://100.98.144.27:6768']
+    })
+    const merged = applyHostMeshSync(before, syncFrom({ endpoints: ['ws://192.168.1.20:6768'] }))
+
+    expect(merged.routes['key-a']).toEqual(['ws://192.168.1.20:6768', 'ws://100.98.144.27:6768'])
+  })
+
+  it('keeps the routes it had from a peer too old to publish any', () => {
+    const before = setHostMeshRoutes(withMembers(['key-a']), {
+      hostKey: 'key-a',
+      endpoints: ['ws://192.168.1.20:6768']
+    })
+    const merged = applyHostMeshSync(before, syncFrom())
+
+    expect(merged.routes['key-a']).toEqual(['ws://192.168.1.20:6768'])
+  })
+
+  it('forgets a removed member’s routes, so nothing tries to dial it again', () => {
+    const routed = setHostMeshRoutes(withMembers(['key-a']), {
+      hostKey: 'key-a',
+      endpoints: ['ws://192.168.1.20:6768']
+    })
+    const removed = removeHostMeshMember(routed, {
+      hostKey: 'key-a',
+      removedBy: 'key-self',
+      epoch: 5
+    })
+
+    expect(removed.routes['key-a']).toBeUndefined()
+  })
+
+  it('leaves the object alone when a member republishes what is already recorded', () => {
+    const routed = setHostMeshRoutes(withMembers(['key-a']), {
+      hostKey: 'key-a',
+      endpoints: ['ws://192.168.1.20:6768']
+    })
+
+    expect(
+      setHostMeshRoutes(routed, { hostKey: 'key-a', endpoints: ['ws://192.168.1.20:6768'] })
+    ).toBe(routed)
   })
 })

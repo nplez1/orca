@@ -8,6 +8,10 @@ import {
   type HostMeshSyncPayload
 } from './host-mesh-contract'
 import { mergeHostMeshNames } from './host-mesh-names'
+import { rememberRoutes } from './host-mesh-routes'
+
+// The routes reducer lives with the route helpers; re-exported so the membership API reads as one surface.
+export { setHostMeshRoutes } from './host-mesh-routes'
 /**
  * The group's rules, as a pure reducer.
  *
@@ -33,7 +37,8 @@ export function createHostMeshState(args: {
     members: [],
     tombstones: [],
     links: { outbound: {}, inbound: {} },
-    names: {}
+    names: {},
+    routes: {}
   }
 }
 
@@ -135,6 +140,7 @@ export function removeHostMeshMember(
   const { [hostKey]: _outbound, ...outbound } = state.links.outbound
   const { [hostKey]: _inbound, ...inbound } = state.links.inbound
   const { [hostKey]: _name, ...names } = state.names
+  const { [hostKey]: _routes, ...routes } = state.routes
   return {
     groupId: state.groupId,
     epoch: Math.max(state.epoch, args.epoch),
@@ -142,7 +148,8 @@ export function removeHostMeshMember(
     members,
     tombstones,
     links: { outbound, inbound },
-    names
+    names,
+    routes
   }
 }
 
@@ -162,7 +169,9 @@ export function leaveHostMeshGroup(state: HostMeshState, args: { epoch: number }
     names:
       state.names[state.selfKey] === undefined
         ? {}
-        : { [state.selfKey]: state.names[state.selfKey] }
+        : { [state.selfKey]: state.names[state.selfKey] },
+    // Why the routes go: this host is in no group, so it has no member whose address it could dial.
+    routes: {}
   }
 }
 
@@ -240,13 +249,28 @@ export function applyHostMeshSync(
       member.label = name.label
     }
   }
+  // Why only the sender's own routes: a member can say where it is, and a claim about a third machine's address
+  // is one it would be dialing second-hand — the same reason its link matrix is read only for itself.
+  const routes = Object.fromEntries(
+    Object.entries(state.routes).filter(([hostKey]) => !removed.has(hostKey))
+  )
+  if (payload.selfKey !== state.selfKey && payload.endpoints !== undefined) {
+    const remembered = rememberRoutes({
+      previous: routes[payload.selfKey],
+      reported: payload.endpoints
+    })
+    if (remembered.length > 0) {
+      routes[payload.selfKey] = remembered
+    }
+  }
   return {
     ...state,
     epoch: Math.max(state.epoch, payload.epoch),
     members: members.filter((member) => !removed.has(member.hostKey)),
     tombstones,
     links,
-    names
+    names,
+    routes
   }
 }
 
