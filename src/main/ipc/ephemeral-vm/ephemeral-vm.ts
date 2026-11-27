@@ -14,9 +14,6 @@ import { registerEphemeralVmRuntimeHandlers } from './ephemeral-vm-runtime-handl
 import type { PluginService } from '../../plugins/plugin-service'
 import { getApprovedPluginVmRecipes } from '../../plugins/contributions/plugin-approved-vm-recipes'
 import type { IpcHandleRegistrar } from '../lazy-ipc-handle-group'
-import { startEphemeralVmRuntimeReclaim } from '../../ephemeral-vm-runtime-reclaim'
-import { flagInterruptedEphemeralVmProvisioning } from '../../ephemeral-vm-runtime-provisioning-recovery'
-import { getCurrentMainWindow } from '../ssh/ssh-ipc-context'
 import {
   cancelEphemeralVmProvision,
   handleEphemeralVmProvision,
@@ -44,14 +41,8 @@ export function registerEphemeralVmHandlers(
     }
   }
   registerEphemeralVmRuntimeHandlers(store, ipc)
-  startEphemeralVmRuntimeReclaim({
-    userDataPath: app.getPath('userData'),
-    getMainWindow: getCurrentMainWindow
-  })
-  // Why here: a create runs detached, so this is the only point at which an attempt that never
-  // reported can be told apart from one whose app was killed mid-flight. It warns and records the
-  // flag; nothing can destroy the machine, because no recipe result ever arrived to build destroy from.
-  flagInterruptedEphemeralVmProvisioning({ userDataPath: app.getPath('userData') })
+  // The fork's reclaim sweep and interrupted-create flagging run at startup in the registry, not here:
+  // this module only loads on the first `ephemeralVm:*` call. See `lazy-ephemeral-vm-handlers.ts`.
   if (!options?.skipStartupReconcile) {
     reconcileInterruptedEphemeralVmProvisionsOnStartup(app.getPath('userData'))
   }

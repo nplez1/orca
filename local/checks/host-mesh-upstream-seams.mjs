@@ -16,6 +16,10 @@
  * measured, so the next person adding one to a fork-owned file instead is the easy path and adding it here is
  * the deliberate one.
  *
+ * Why every row is not this feature's code: some rows exist because a sync repair had to touch an upstream file that
+ * has nothing to do with hosts work, and an undeclared file is what would red instead. Those rows say so in their
+ * `why`, and their budgets are held for the repair alone — they are not allowance for this feature to grow.
+ *
  * Why an undeclared upstream file is a note for another feature and a red for this one: this register governs
  * ONE feature's surface, and `local/gate-lint.mjs` runs it on every pull request. Failing on any upstream-owned
  * file a diff touches made the lint gate red for every branch that fixes an upstream bug — #471's workspace fix
@@ -165,32 +169,32 @@ export const SEAMS = [
   {
     path: 'config/zod-prefer-lazy-baseline.txt',
     budget: 1,
-    why: 'one baseline row removed, not added: the 2026-11-27 sync wrapped this feature’s params files in lazyZodSchema, so the ratchet’s prune had to rewrite upstream’s file'
+    why: 'NOT mesh surface: upstream’s eager-zod ratchet baseline, which no host code touches. The 2026-11-27 sync’s lazyZodSchema repair removed one baseline row, because the ratchet refuses to leave an improved file recorded. The budget covers that sync repair only, so the register does not red it; hosts work must not spend it'
   },
   {
     path: 'src/shared/rpc-contract/jira/jira-params.ts',
     budget: 32,
-    why: 'the 2026-11-27 sync’s lazyZodSchema pass over this feature’s Jira params: the schemas were re-wrapped as upstream writes them after the merge rebuilt them eagerly, and `ListIssuesFields` became a schema. Measured lines added by that pass; the params themselves were not new'
+    why: 'NOT mesh surface, and not this feature’s params: Jira’s RPC schemas, which no mesh code imports. The 2026-11-27 sync’s lazyZodSchema pass re-wrapped them the way upstream writes them after the merge rebuilt them eagerly, and `ListIssuesFields` became a schema; those wrapper lines are a sync repair, not mesh work. The budget covers that sync repair only, so the register does not red it — it is not an allowance for hosts work, and anything a mesh hook needed here belongs in a fork-owned module'
   },
   {
     path: 'src/shared/rpc-contract/github/github-account-binding-params.ts',
     budget: 21,
-    why: 'the same lazyZodSchema pass: both `RepoSelector.extend(...)` calls are wrapped, which also drops the file’s last eager schema'
+    why: 'NOT mesh surface: GitHub account-binding params, which no mesh code imports. The same 2026-11-27 sync repair wrapped both `RepoSelector.extend(...)` calls in lazyZodSchema, which also drops the file’s last eager schema. The budget covers that sync repair only; a hosts diff must not spend it, and 21 lines is not an allowance for this feature'
   },
   {
     path: 'src/shared/rpc-contract/projects/repo-params.ts',
     budget: 12,
-    why: 'the same lazyZodSchema pass over this feature’s repo params, where the host-graph selectors are declared'
+    why: 'Host-graph surface, not mesh: the fork’s host-graph repo selectors are declared here and discovery reads them, while nothing of the group does. The same 2026-11-27 sync repair wrapped them in lazyZodSchema. The budget covers that sync repair only, so the register does not red it; a hosts diff that grows this file must move its code into a fork-owned module rather than spend these 12 lines'
   },
   {
     path: 'src/main/rate-limits/providers/claude/claude-oauth-credentials.ts',
     budget: 18,
-    why: 'the same lazyZodSchema pass: the fork’s settings-env credential source is a wrapped schema now, so the wrapper and its import are fork lines on upstream’s file'
+    why: 'NOT mesh surface: the Claude OAuth credential reader behind the rate-limit providers, which no mesh code imports. The same 2026-11-27 sync repair wrapped the fork’s settings-env credential schema in lazyZodSchema, so the wrapper is a fork line on an upstream file. The budget covers that sync repair only; 18 lines is not a mesh allowance and a hosts diff must not spend it'
   },
   {
     path: 'src/main/ai-vault/listing/session-list-result-validation.ts',
     budget: 2,
-    why: 'the same lazyZodSchema pass: one import and one wrapper around the AI Vault paging schema the fork extended'
+    why: 'NOT mesh surface: AI Vault’s session-listing validation. The same 2026-11-27 sync repair wrapped the fork’s execution-host id schema in `lazyZodSchema(() => …)`, and the two lines are that wrapper line and the one it replaced — not an import, which is upstream’s, and not the schema, which was already here. The budget covers that sync repair only; a hosts diff must not spend it'
   }
 ]
 

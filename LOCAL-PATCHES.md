@@ -6486,11 +6486,20 @@ patch adds **zero** fork comment lines to upstream files — the register lives 
 **The 2026-11-27 sync added six register rows, and none of them is new mesh surface.** That sync brought
 upstream's `check:zod-prefer-lazy-ratchet`, whose baseline is 0, and the merge's resolutions had rebuilt this
 feature's params files eagerly; the repair re-wrapped them in `lazyZodSchema` as upstream writes them. The
-wrappers and their imports are fork lines on upstream-owned files, so each is declared with the lines it
-added — `jira/jira-params.ts` 32, `github-account-binding-params.ts` 21, `claude-oauth-credentials.ts` 18,
-`projects/repo-params.ts` 12, `session-list-result-validation.ts` 2, and one row removed from
-`config/zod-prefer-lazy-baseline.txt`. Measured: `node local/checks/host-mesh-upstream-seams.mjs --base
-<the merge commit>` reports **6 upstream files, 86 lines, every declared seam within budget**.
+wrapper lines are fork lines on upstream-owned files — the `lazyZodSchema` imports are the sync's own, not
+this repair's — so each is declared with the lines it added — `jira/jira-params.ts` 32,
+`github-account-binding-params.ts` 21, `claude-oauth-credentials.ts` 18, `projects/repo-params.ts` 12,
+`session-list-result-validation.ts` 2, and one row removed from `config/zod-prefer-lazy-baseline.txt`.
+Measured: `node local/checks/host-mesh-upstream-seams.mjs --base <the merge commit>` reports **6 upstream
+files, 86 lines, every declared seam within budget**.
+
+**Those six budgets are held for a sync repair, and only for that.** Five of the six files are not mesh surface
+at all — `projects/repo-params.ts` is host-graph work, where discovery's selectors are declared — and the
+register needs a row for each because an undeclared upstream file is what a sync repair would otherwise red
+on; there is no "not my feature" escape in the check. So the 86 lines are not allowance for this feature: a
+hosts diff that grows one of those files must move its code into a fork-owned module and call it from the
+upstream file, exactly as every other seam above does, rather than spend a repair's budget. Each row's `why`
+says which file it is and that its budget covers the repair alone.
 
 Where a hook was unavoidable, the upstream line calls a fork-owned module (`installHostMeshRuntime`,
 `FORK_RPC_METHODS`, `HOST_MESH_HANDLER_GROUP`, `notifyHostGraphOfConnectionChange`,
