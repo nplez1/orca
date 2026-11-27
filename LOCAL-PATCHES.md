@@ -6638,11 +6638,11 @@ shard job's `timeout-minutes: 60` covers it.
 **The shard-timing overlay cannot see that move, and the next regeneration will drop this file.**
 `local/ci-shard-timings-overlay.json` weighs this test file at 3,894 ms from run 43332008251, and its
 metric is the report's per-file `endTime - startTime`, which excludes collection. At 137 ms the file
-falls under the 2,000 ms threshold on the next `import`, while the shard still pays the ~17 s. That is a
-shard-balance question, not a correctness one, so it is recorded rather than fixed here: whoever next
-regenerates the overlay should keep this entry with `--override
-src/renderer/src/components/sidebar/WorktreeCard.merge-marker.test.tsx=17000`, or record that
-`unit-report-file-duration` does not count a heavy graph's collection.
+falls under the 2,000 ms threshold on the next `import`, and `--override` cannot put it back — it refuses
+a file `selectEntries` already dropped (`local/ci-shard-timings-overlay.mjs:302`). So the weight has to be
+re-added to the JSON by hand with the collection cost, or the metric taught to count collection, before
+the shard plan stops reading this file as free. Shard balance rather than correctness, recorded here
+because a silent 17 s hole in the weights outlives the reason it was made.
 
 The anchors are the file and its two `it(...)` titles. A future edit that puts an `await` back inside
 either body re-creates the exposure this entry removes, charged to the 30 s project default rather than to
