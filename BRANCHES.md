@@ -364,6 +364,35 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
 
 ## Branches
 
+### nplez1/HostMeshRoutes — a mesh member publishes where it is, and a dead path fails over
+
+- **Why:** three complaints from a real fleet. One machine reported **77 active links**, because an unredeemed
+  pairing offer counted as a link and the mesh mints one per failed reverse offer. `Win ↔ M3` was joined one way with
+  nothing that could repair it: a pairing row holds the single endpoint the pair was made on, so a machine that
+  changed networks (a tailnet switched off is the everyday case) cannot announce a new address over the path that
+  died. And the `Default`/`Mesh` chips sat taller than the labels beside them.
+- **Shape:** `endpoints` is published in both directions of every sync and in offers (`endpointCandidates` was
+  declared, always empty, and read by nobody); a receiver records what a _member's_ request carried, which is what
+  makes the one-way case repairable; routes are kept per member, merged, capped at four with one slot reserved for an
+  address the report leaves behind and one for a tailnet address; a failed dial is retried on those routes, each
+  probed with the pairing's own credential, and the winner is adopted by rewriting only the row's endpoint — keeping
+  the device token and `pairingRevision` — and dropping the pooled transport. Tunnel, access-link and
+  managed-deployment rows are never moved. Expired offers are dropped from the count and swept, limited to the rows
+  the peer index records. See [`local/design/host-mesh.md`](./local/design/host-mesh.md) § "Finding a member after it
+  moves".
+- **Base:** `main` at `830852634b4`.
+- **Verified:** full unit gate at `bdae757f88` — PASS, 13240 passed, 0 failed (required: `src/shared/**` is a global
+  input); `pnpm check:changed` 42/42; mesh suite 158 tests across 12 files, including `host-mesh-route-paths.test.ts`
+  (the real credential probe against a socket that rejects the wrong token) and a sync-request route test that fails
+  when the recording is removed — checked by removing it. The pairing-row rewrite is charged to
+  `config/main-blocking-helper-baseline.fork.txt` with its reason.
+- **Review:** gate 2 by `claude/opus`, high. R1: 1 BLOCKER (the receiver stored none of a caller's endpoints, so the
+  one-way case — the bug being fixed — was not repairable), 5 SHOULD-FIX, 4 MINOR, 3 NIT. R2 fixed all of them but
+  introduced one BLOCKER of its own: the fixed-endpoint guard was wired but never called, so a tunnel row could be
+  rewritten and its sidecar then dropped. R3 fixes that plus three MINORs, all test-pinned. **R3 was not re-reviewed**
+  — a third round needs the owner's approval — so the reviewed revision is R2 and the guard fix is covered by tests
+  rather than by review.
+
 ### nplez1/New-Loop-Job-Support — a pi pane reads its own scheduled work (pi revamp follow-up, PR #449)
 
 - **Why:** pi-config's `/loop` and pi-subagents were revamped into one `manage_schedules` roster over two
