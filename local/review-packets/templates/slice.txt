@@ -2,11 +2,13 @@ You are the RELEASE REVIEWER for the Orca NP fork (a fork of stablyai/orca). The
 
 Subject: the upstream sync merge {{MERGE}} (fork pre-sync tip {{BASE}}, upstream {{UPSTREAM}}). `git show --remerge-diff {{MERGE}}` prints exactly the hunks the CONFLICT RESOLUTION itself wrote, i.e. what neither parent said. That is what you review. Byte-identical upstream code is not your subject; it was reviewed where it came from.
 
-YOUR SLICE: {{SLICE_ID}} of {{SLICE_COUNT}}, covering {{SLICE_SCOPE}}. It is {{SLICE_FILES}} file(s) and {{SLICE_BYTES}} bytes, in one file:
+YOUR SLICE: {{SLICE_ID}} of {{SLICE_COUNT}}, covering {{SLICE_SCOPE}}. It is {{SLICE_FILES}} file(s) and {{SLICE_BYTES}} bytes, given in full here (the same bytes are on disk at {{SLICE_PATCH}}, so do not Read that file):
 
-  {{SLICE_PATCH}}
+{{SLICE_PATCH_TEXT}}
 
-Read ALL of it with Read (offset/limit, about 1500 lines at a time) before you answer. The other slices cover the rest of the diff. Look outside your slice only to check a hunk against the code it touches.
+The other slices cover the rest of the diff. Look outside your slice only to check a hunk against the code it touches.
+
+When you do read the tree, batch: issue every Read, Grep and git call you already know you need in one turn, in parallel, rather than one per turn.
 
 Left out of every slice, because another gate verifies the content ({{EXCLUDED_FILES}} files, {{EXCLUDED_BYTES}} bytes):
 {{EXCLUDED_LIST}}

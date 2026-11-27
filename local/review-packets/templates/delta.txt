@@ -8,11 +8,11 @@ An earlier round reviewed {{R1}} and returned the findings listed below. The imp
 Findings from the earlier round ({{FINDING_COUNT}}):
 {{FINDINGS}}
 
-The delta is `git diff {{R1}}..{{R2}}`, {{DELTA_FILES}} file(s) and {{DELTA_BYTES}} bytes, in one file:
+The delta is `git diff {{R1}}..{{R2}}`, {{DELTA_FILES}} file(s) and {{DELTA_BYTES}} bytes, given in full here (the same bytes are on disk at {{DELTA_PATCH}}, so do not Read that file):
 
-  {{DELTA_PATCH}}
+{{DELTA_PATCH_TEXT}}
 
-Read ALL of it. The current text of every touched file is in the tree; read the ones you need.
+The current text of every touched file is in the tree; read the ones you need, all in one turn, in parallel.
 {{EXCLUDED_NOTE}}
 Tools: Read, Grep and Glob on the tree and on the packet files above. Bash allows only read-only git (`git show`, `git log`, `git blame`, `git ls-tree`, `git ls-files`, `git cat-file`, `git rev-parse`, `git merge-base`, `git rev-list`) plus `wc`, `head` and `tail`. Run git from the working directory, without `-C` and without pipes into anything else. Everything else is denied.
 

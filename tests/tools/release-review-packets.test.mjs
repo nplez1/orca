@@ -523,6 +523,8 @@ describe('prepare', () => {
     expect(prompt).not.toMatch(/\{\{[A-Z_]+\}\}/)
     expect(prompt).toContain(join(out, 'slice-A.patch'))
     expect(prompt).toContain('src/renderer/src/i18n/locales/zh.json: modified')
+    // The patch is in the prompt, so the reviewer does not spend a turn per chunk reading it back.
+    expect(prompt).toMatch(/```diff\n[\s\S]*\+resolved\n[\s\S]*```/)
     expect(readFileSync(join(out, 'slice-A.patch'), 'utf8')).toContain('+resolved')
   })
 
