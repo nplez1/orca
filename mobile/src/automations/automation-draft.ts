@@ -175,7 +175,7 @@ export function validateAutomationDraft(
 }
 
 type UpdateFields = RpcSendParams<'automation.update'>['updates']
-function editableFields(draft: AutomationDraft): UpdateFields {
+function editableFields(draft: AutomationDraft): Omit<UpdateFields, 'action'> {
   return {
     name: draft.name.trim(),
     prompt: draft.prompt.trim(),
