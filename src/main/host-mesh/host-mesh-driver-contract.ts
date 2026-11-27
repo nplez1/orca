@@ -94,7 +94,7 @@ export type HostMeshDriverDeps = {
   mintRuntimeOffer: (args: {
     environmentId: string
     recipientHostKey: string
-  }) => Promise<{ offerUrl: string; deviceId: string }>
+  }) => Promise<{ offerUrl: string; deviceId: string; endpointCandidates: string[] }>
   /**
    * Revokes one device row this host minted, when the machine it was minted for did not take the offer.
    *
@@ -144,6 +144,44 @@ export type HostMeshDriverDeps = {
   selfLabel?: () => string
   /** One call to a peer this host is paired with. Rejects only on transport failure. */
   send: <T>(environmentId: string, method: string, params: unknown) => Promise<T>
+  /**
+   * Where this host can be reached right now, best first, as endpoints a peer could dial.
+   *
+   * Why it is published to the group at all: the endpoint a pairing was made on is the only one a member has, and a
+   * machine whose tailnet went away has no way to announce the LAN address that still works. Every pass hands the
+   * set over, so the members that can still reach it learn where to look next time.
+   */
+  ownEndpoints: () => Promise<readonly string[]>
+  /**
+   * Tries a member's other known endpoints and adopts the one that answers.
+   *
+   * Why this lives behind a dependency: it rewrites the pairing row for that member, which is the one write that
+   * makes every other feature able to reach it again — host-sync, the host graph and any paired client resolve the
+   * endpoint from that row on each dial, so a repaired row heals them without each of them learning about routes.
+   *
+   * Resolves the endpoint now recorded for the member, or null when none of the candidates answered.
+   */
+  adoptReachableEndpoint?: (args: {
+    environmentId: string
+    candidates: readonly string[]
+  }) => Promise<string | null>
+  /**
+   * Drops the connections this process pools for an environment, after its pairing row moved to a new address.
+   *
+   * Why it is a dependency: the pool lives in the catalog the renderer reads, and this module is a leaf. Without it a
+   * repaired row is picked up by everything that resolves the row per call, while a long-lived socket keeps dialing
+   * the address the row no longer names.
+   */
+  invalidateTransport?: (environmentId: string) => void
+  /**
+   * Revokes this host's own expired, never-redeemed runtime offers and returns the device ids it dropped.
+   *
+   * Why the pass does this: every reverse offer mints one runtime device row, so a member that never takes the
+   * offer leaves one behind per retry. They expire on their own TTL and cannot pair anything, but Settings lists
+   * them as active links until something removes them — an owner reading hundreds of them cannot tell a broken
+   * mesh from a fleet that size.
+   */
+  pruneExpiredOffers?: () => readonly string[]
   /**
    * Asks this host to run a pass of its own, after a peer has just joined it.
    *

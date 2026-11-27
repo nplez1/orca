@@ -78,11 +78,12 @@
 12 src/main/home-directory-migration.ts
 1 src/main/host-graph/host-graph-local-adjacency.ts
 2 src/main/host-graph/host-graph-self-identity.ts
+1 src/main/host-mesh/host-mesh-pairing-endpoint.ts # why: repairing a moved member rewrites one pairing endpoint, and no async store path exists for pairing rows in this build — every write of that file is synchronous, including the owner's own pairings; it runs at most once per member per repair, after a dial already failed. Reviewer: claude/opus, high (R2 delta, MINOR not BLOCKER: the write is the build's only pairing-row mechanism).
 1 src/main/host-mesh/host-mesh-driver.ts
 1 src/main/host-mesh/host-mesh-rpc-service.ts
 3 src/main/host-mesh/host-mesh-runtime-deps.ts
 1 src/main/host-mesh/host-mesh-startup.ts
-18 src/main/host-mesh/host-mesh-store.ts
+17 src/main/host-mesh/host-mesh-store.ts
 5 src/main/host-sync/host-settings-api-key-ports.ts
 1 src/main/host-sync/host-settings-credential-ports.ts
 7 src/main/host-sync/host-settings-jenkins-port.ts

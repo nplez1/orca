@@ -32,7 +32,7 @@ import {
   ServerRowDetailsToggle,
   type ServerRowStatus
 } from '../../host-rows/ServerListRow'
-import { MeshMemberAffordance } from '../host-group/mesh-member-affordance'
+import { MeshMemberAffordance, MeshMemberMenuItems } from '../host-group/mesh-member-affordance'
 import { RuntimeSshAccessControl } from '../ssh-access/RuntimeSshAccessControl'
 import { RuntimeSshAccessDialog } from '../ssh-access/runtime-ssh-access-dialog'
 import {
@@ -360,6 +360,7 @@ export function RuntimeServerRow({
                 <ManagedServerMenuItems lifecycle={managed} forgettable={managedForgettable} />
               ) : null
             }
+            meshItems={<MeshMemberMenuItems environmentId={environment.id} />}
             onUpdate={onOpenUpdate}
             onConnect={() => onConnect(environment)}
             onDisconnect={() => onDisconnect(environment)}

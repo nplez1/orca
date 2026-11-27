@@ -1,5 +1,8 @@
-import type { KnownRuntimeEnvironment } from '../../shared/remote-runtime/host-catalog/runtime-environments'
-import { getPreferredPairedRuntimeConnection } from '../../shared/remote-runtime/host-catalog/runtime-environments'
+import { isIP } from 'node:net'
+import {
+  getPreferredPairedRuntimeConnection,
+  type KnownRuntimeEnvironment
+} from '../../shared/remote-runtime/host-catalog/runtime-environments'
 import {
   addOrUpdateEnvironmentFromPairingCode,
   parseRemotePairingCode,
@@ -12,11 +15,16 @@ import {
   uniqueEnvironmentName
 } from '../../shared/remote-runtime/host-store/runtime-environment-store-operations'
 import { publishRuntimeEnvironmentCatalogChanged } from '../ipc/runtime-environments/catalog/runtime-environment-catalog-broadcast'
+import { invalidateRuntimeEnvironmentTransport } from '../ipc/runtime-environments/runtime-environments'
 import { pairedRuntimeConnectionFromOffer } from '../../shared/remote-runtime/pairing/paired-runtime-connection'
 import { sendRemoteRuntimeRequestOnSocket } from '../../shared/remote-runtime/requests/remote-runtime-request-socket'
 import { orcaHostKeyOf, selfLabel } from '../host-graph/host-graph-self-identity'
 import { getCanonicalUserDataPath } from '../persistence/loading-store/user-data-path'
+import { isTailnetIPv4Address } from '../../shared/network/tailnet-address'
+import { adoptReachableEndpoint, ownEndpoints } from './host-mesh-route-paths'
 import { loadOrCreateE2EEKeypair } from '../runtime/rpc/server/pairing/e2ee-keypair'
+import { getPairingNetworkInterfaces } from '../runtime/rpc/server/pairing/network/pairing-network-interfaces'
+import type { NetworkInterface } from '../runtime/rpc/server/pairing/network/pairing-network-interfaces'
 import {
   createOwnerPairingOffer,
   type PairingOfferServer
@@ -27,6 +35,7 @@ import {
   hostMeshPlaceholderName
 } from '../../shared/host-mesh/host-mesh-contract'
 import type { HostMeshDriverDeps } from './host-mesh-driver-contract'
+import { pruneExpiredMeshOffers } from './host-mesh-offer-pruning'
 import { createHostMeshWriteLock } from './host-mesh-write-lock'
 import { createHostMeshDriver } from './host-mesh-driver'
 import { createHostMeshRpcService } from './host-mesh-rpc-service'
@@ -50,24 +59,33 @@ const SEND_TIMEOUT_MS = 20_000
 /**
  * The reach the pairing this host already holds for a member uses, so an offer back cannot widen exposure.
  *
- * Why this matters: minting a runtime offer for network reach calls `ensureNetworkExposure`, which the design note
- * records as irreversible. That was harmless when only an owner's join minted one; the scheduled pass mints on its
- * own, so a host paired over loopback (an SSH tunnel, another account on the same machine) would be opened to the
- * network by a background loop with no owner action. Handing back an offer at the reach the pairing already uses
- * keeps the pair possible and the exposure unchanged.
+ * Why this matters: minting a runtime offer on a network address calls `ensureNetworkExposure`, which the design
+ * note records as irreversible, and the pass mints with no owner present. A member the pairing already reaches over
+ * loopback therefore keeps a loopback address, so a pair that needs no network exposes nothing. A member reachable
+ * only on the network does widen exposure — there is no reach switch to keep it closed — but only to the network the
+ * pairing itself already crosses.
+ *
+ * Why an address on the member's own network and not merely "whatever this host advertises": with no address the
+ * offer is minted on the auto-selected interface, which ranks a Tailscale address first. A member reachable only
+ * over the LAN then holds an offer it can never dial: its redeem stalls, the pair reads one-way forever, and every
+ * retry leaves another credential behind. The network that already reaches this member is the one fact available
+ * here, so the offer goes out on it.
  */
 async function reachOfExistingPairing(
+  server: PairingOfferServer,
   environmentId: string
-): Promise<{ address: string; reach: 'this-computer' } | Record<string, never>> {
+): Promise<{ address: string } | Record<string, never>> {
   if (environmentId === '') {
     return {}
   }
   try {
     const offer = await resolveEnvironmentPairingOffer(getCanonicalUserDataPath(), environmentId)
     const host = new URL(offer.endpoint).hostname
-    return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]'
-      ? { address: host, reach: 'this-computer' }
-      : {}
+    if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]') {
+      return { address: host }
+    }
+    const address = await addressOnPeersNetwork(server, host)
+    return address === null ? {} : { address }
   } catch {
     // Why the permissive branch: an endpoint this build cannot read is not a reason to refuse the pair, and the
     // existing pairing already reaches that machine, so its exposure is already what it is.
@@ -75,10 +93,90 @@ async function reachOfExistingPairing(
   }
 }
 
+/**
+ * This host's address on the network the member already reaches it through, or null when nothing better than
+ * the auto-selected interface is on offer.
+ *
+ * Why the same /24 first: that interface is the one the member can certainly route to, whatever else its local
+ * network looks like. Falling back to the first interface of the member's family keeps a peer on a wider subnet
+ * (say a routed 10/8) working, which matching only on /24 would refuse.
+ */
+async function addressOnPeersNetwork(
+  server: PairingOfferServer,
+  peerHost: string
+): Promise<string | null> {
+  return chooseOfferAddress(
+    await getPairingNetworkInterfaces(server.getNetworkExposureBindHost()),
+    peerHost
+  )
+}
+
+/**
+ * Which address this host should advertise to a member it already reaches at `peerHost`.
+ *
+ * Exported for its own test: the choice is the whole of the one-way-link bug, and what needs proving is the
+ * order it picks in, not the OS call that supplies the interfaces.
+ */
+export function chooseOfferAddress(
+  interfaces: readonly NetworkInterface[],
+  peerHost: string
+): string | null {
+  const family = isIP(peerHost)
+  if (family === 0) {
+    // A hostname is not an address to match against; the auto-selected interface is all this can offer.
+    return null
+  }
+  const sameFamily = interfaces.filter(
+    (iface) => isIP(iface.address) === family && iface.address !== peerHost
+  )
+  const sameSubnet = sameFamily.find((iface) => sharesIpv4Subnet24(iface.address, peerHost))
+  if (sameSubnet) {
+    return sameSubnet.address
+  }
+  // A member on the tailnet is reached through it, so that is the address to hand back.
+  if (isTailnetIPv4Address(peerHost)) {
+    const tailnet = sameFamily.find((iface) => isTailnetIPv4Address(iface.address))
+    return (tailnet ?? sameFamily[0])?.address ?? null
+  }
+  // Why not the ranked-first interface below: it is the tailnet address whenever this host has one, and a member
+  // that is not on the tailnet cannot dial it — the very offer this exists to stop handing out. Any other address
+  // this host holds is the better guess.
+  const offTailnet = sameFamily.find((iface) => !isTailnetIPv4Address(iface.address))
+  return (offTailnet ?? sameFamily[0])?.address ?? null
+}
+
+function sharesIpv4Subnet24(a: string, b: string): boolean {
+  const left = a.split('.')
+  const right = b.split('.')
+  return (
+    left.length === 4 &&
+    right.length === 4 &&
+    left.slice(0, 3).join('.') === right.slice(0, 3).join('.')
+  )
+}
+
 export type HostMeshRuntimeServer = PairingOfferServer & {
   /** The full revoke: settles queued asks and drops live sockets, not only the row. */
   revokeRuntimeAccess: (deviceId: string) => boolean
-  getDeviceRegistry: () => { removeDevice: (deviceId: string) => boolean } | null
+  getDeviceRegistry: () => HostMeshDeviceRegistry | null
+  /** The listener this host serves on, so the addresses below can be turned into endpoints peers can dial. */
+  getWebSocketEndpoint: () => string | null
+}
+
+/**
+ * Just the part of the device registry the mesh reads: which runtime rows exist, and whether they still can be
+ * redeemed. Kept structural so this module never imports the registry class.
+ */
+type HostMeshDeviceRegistry = {
+  listDevices: (options?: { fresh?: boolean }) => readonly HostMeshDeviceRow[]
+  removeDevice: (deviceId: string) => boolean
+}
+
+type HostMeshDeviceRow = {
+  deviceId: string
+  scope: string
+  lastSeenAt: number
+  offerExpiresAt?: number
 }
 
 /**
@@ -111,7 +209,7 @@ function depsFromApp(server: HostMeshRuntimeServer): HostMeshDriverDeps {
     mintRuntimeOffer: async ({ environmentId }) => {
       const offer = await createOwnerPairingOffer(
         server,
-        { scope: 'runtime', ...(await reachOfExistingPairing(environmentId)) },
+        { scope: 'runtime', ...(await reachOfExistingPairing(server, environmentId)) },
         undefined,
         undefined,
         {
@@ -127,7 +225,31 @@ function depsFromApp(server: HostMeshRuntimeServer): HostMeshDriverDeps {
       if (!offer.available) {
         throw new Error(offer.reason)
       }
-      return { offerUrl: offer.pairingUrl, deviceId: offer.deviceId }
+      // Why the minted endpoint is dropped from the list: it is the address this box already names, so repeating it
+      // would spend one of the four candidate slots on the path the recipient is about to try first anyway.
+      const endpointCandidates = (await ownEndpoints(server)).filter(
+        (endpoint) => endpoint !== offer.endpoint
+      )
+      return { offerUrl: offer.pairingUrl, deviceId: offer.deviceId, endpointCandidates }
+    },
+    ownEndpoints: () => ownEndpoints(server),
+    // Why the pooled transport is dropped after a move: everything that resolves the pairing row per call already
+    // dials the new address, while a connection opened before the move keeps the one the row no longer names.
+    invalidateTransport: (environmentId) => {
+      // Why swallowed: the endpoint was moved either way, and an environment whose status cannot be re-read must not
+      // become an unhandled rejection in the middle of a pass.
+      void invalidateRuntimeEnvironmentTransport(environmentId).catch(() => undefined)
+    },
+    adoptReachableEndpoint: (args) => adoptReachableEndpoint(userDataPath, args),
+    pruneExpiredOffers: () => {
+      try {
+        const minted = new Set(
+          [...store.readPeerIndex().values()].flatMap((entry) => entry.deviceRowIds)
+        )
+        return pruneExpiredMeshOffers(server, minted)
+      } catch {
+        return []
+      }
     },
     redeemOffer: async (offerUrl, expectedHostKey, label) => {
       const offer = await parseRemotePairingCode(userDataPath, offerUrl)
@@ -231,8 +353,10 @@ function depsFromApp(server: HostMeshRuntimeServer): HostMeshDriverDeps {
         SEND_TIMEOUT_MS
       )
       // A code and not the payload: the driver records a reason, and a peer's own words belong in its log.
+      // Why the code is marked as the peer's: an answer proves the address works, and the driver must not adopt another
+      // one for a member that simply refused — only a path that stopped working is a route problem.
       if (!response.ok) {
-        throw new Error(response.error.code)
+        throw Object.assign(new Error(response.error.code), { peerCode: response.error.code })
       }
       return response.result
     },

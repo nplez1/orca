@@ -175,6 +175,51 @@ schedules one reconcile in the main process:
 `migrateFromPairings` deliberately still runs once and unrecorded when mesh mode is off, so an owner who turns the
 mesh on later still upgrades the fleet that was already paired.
 
+## Finding a member after it moves
+
+A pairing row holds exactly one endpoint — the address the pair was made on — and nothing in it can be updated by
+a machine that changed networks. A tailnet switched off is the everyday version: the studio keeps dialing an
+address that no longer answers, the pair reads half-joined, and every other feature that resolves that row
+(host-sync, the host graph, any paired client) fails with it.
+
+Two stale-credential facts go with it, because both made the panel lie about the fleet:
+
+- **An offer nobody redeemed before its own TTL is not an active link.** It cannot pair anything, and the mesh mints
+  one per failed reverse offer, so counting them turned a one-way pair into "77 active links" in Settings. A live
+  unredeemed offer still counts, because it is revocable and still scannable — the filter is in
+  `isExpiredPairingOffer`, and `mobile.ts`'s grant list only calls it.
+- **A pass revokes the expired offers that mesh minted**, rather than leaving them for the count to filter
+  forever. "That mesh minted" is the peer index, not the whole device table: an offer the owner minted by hand
+  expires on the same TTL and is theirs to clear.
+
+So a member publishes where it is, and the pass acts on it:
+
+- **Both directions of every sync carry the sender's own endpoints**, best first — LAN before tailnet, because the
+  directly-attached path is the one that works without an overlay being up. The field is optional, so a peer on an
+  older build keeps syncing and the receiver keeps the routes it had. The receiver records what a request carried
+  (only from a member), which is what makes the one-way case repairable: the machine that can dial _here_ publishes
+  its addresses on the call it makes, and the pass that cannot dial it back has them anyway.
+- **Routes are remembered per member, merged rather than replaced**, capped at four, with one slot spent on the
+  best address held before — a machine that reports a full set would otherwise erase the only address a failed dial
+  can fall back on. On the publishing side one slot is likewise reserved for a tailnet address, because four bridge
+  or docker adapters would otherwise consume the cap with addresses no other machine can reach. A host that lost
+  its tailnet address therefore reports only the LAN one, and the address it held before stays.
+- **A failed dial is retried on those routes before the member is called unreachable.** Each candidate must answer
+  a `status.get` with the pairing's _own_ credential — an address that answers without it is some other machine —
+  and the one that does is adopted: the pairing row's endpoint is rewritten, and the connections pooled for that
+  environment are dropped. The rewrite keeps the credential and `pairingRevision`, because a re-pairing would read
+  to worker stop/observe and the automation owner keys as a different machine. That is why this stays a mesh-only
+  change: everything that resolves the row per call (host-sync, the host graph, a paired client) picks the repair
+  up on its next dial instead of each feature learning about routes.
+- **An offer carries the same set.** The sealed payload already had `endpointCandidates`; it is now filled, so a
+  freshly paired host knows the other machine's addresses before it has ever synced.
+
+What this does not do: a host in no mesh group has no pass to repair it, so it keeps the single stale endpoint. An
+SSH-tunnel pairing is never repaired — its endpoint is a local port the tunnel owns, so rewriting it would point the
+row at an address nothing serves — and neither is a row carrying an access link or a managed deployment, whose own
+schema pins the address it prefers. Learning needs one direction to still work: a pair dead at both ends, or one
+whose local addresses all changed at once, still needs a re-pair.
+
 ## Leaving, and why this half matters more
 
 A mesh that cannot shrink is a liability, so removal is the failure-intolerant half:
@@ -205,29 +250,36 @@ refused introduction shows as a gap instead of a false pairing; a stalled pair r
 removal cuts both directions and a tombstone refuses re-introduction. 81 unit tests.
 
 **Not verified, and not verifiable on one machine:** endpoint reachability across LAN and Tailscale — the
-likeliest cause of a half-join — and removal while a member is asleep. `verifyPairingCode` refuses loopback
-outside tests, so a real offer exchange needs two real Electron main processes. Until a Studio-plus-laptop-plus-VM
-run happens, a group is proven on one network and unproven across two.
+likeliest cause of a half-join — and removal while a member is asleep. The route failover above is the answer to
+the first, and it is proved only against a fake transport: a real Studio-plus-laptop run with Tailscale toggled
+mid-day is what would show it working on two networks. `verifyPairingCode` refuses loopback outside tests, so a
+real offer exchange needs two real Electron main processes. Until that run happens, a group is proven on one
+network and unproven across two.
 
 ## Upstream sync surface
 
-This feature is 10k lines, and 42 of them are in files upstream owns. That ratio is deliberate and it is
-checked: `node local/checks/host-mesh-upstream-seams.mjs` (wired into `local/gate-lint.mjs`) fails when a
-declared seam grows past its budget, and reports an upstream file it does not declare as a note — `--strict`
-is for this feature's own branches, where that note is the sprawl the check was built to catch.
+This feature is 10k lines, and 107 of them are allowed in files upstream owns, across 22 declared seams. That ratio is
+deliberate and it is checked: `node local/checks/host-mesh-upstream-seams.mjs` (wired into `local/gate-lint.mjs`) fails
+when a declared seam grows past its budget, and reports an upstream file it does not declare as a note — `--strict`
+is for this feature's own branches, where that note is the sprawl the check was built to catch. Budgets are per diff,
+not cumulative: the 22 are the register's ceiling for any one branch, and the busiest (this one, at 11 lines across
+four files) is far below it.
 
-| Upstream file                                                        | Lines | What it is                                                          | If a sync conflicts                                                                                                                                                             |
-| -------------------------------------------------------------------- | ----- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `status-bar/host-connections/SshStatusSegment.tsx`                   | 21    | the relayed-fleet menu block                                        | keep our call site, the hook destructure, and the two counts (`relayed` in the early return, `relayed` in `connectedHostCount`); the JSX lives in `RelayedFleetStatusItems.tsx` |
-| `settings/.../server-rows/runtime-server-row.tsx`                    | 2     | one import and `<MeshMemberAffordance />` in the chips slot         | keep both; a host row carries its mesh state and its Eject, so the pane does not repeat every host in a second list                                                             |
-| `cli/hosts/host-handler-groups.ts`                                   | 6     | one import and `HOST_MESH_HANDLER_GROUP`                            | keep both; the entry itself is in `host-mesh-handler-group.ts`                                                                                                                  |
-| `startup/runtime-startup/main-process-runtime-launch.ts`             | 3     | import, `installHostMeshRuntime(runtimeRpc)`, `max-lines` directive | keep all three; the directive is only there because upstream's file sits exactly at the 300-line cap                                                                            |
-| `settings/.../RuntimeEnvironmentsPane.tsx`                           | 3     | one import and `<HostGroupSection />`                               | keep both                                                                                                                                                                       |
-| `runtime/rpc/methods/rpc-method-registry.ts`                         | 2     | `FORK_RPC_METHODS` import and spread                                | keep both                                                                                                                                                                       |
-| `shared/remote-runtime/protocol/protocol-version.ts`                 | 2     | the runtime capability entry                                        | keep; it is how peers negotiate the fleet                                                                                                                                       |
-| `runtime-environments/runtime-environment-connection-observation.ts` | 2     | one call to `notifyHostGraphOfConnectionChange`                     | keep                                                                                                                                                                            |
-| `cli/specs/index.ts`                                                 | 2     | `HOST_MESH_COMMAND_SPECS` import and spread                         | keep                                                                                                                                                                            |
-| `cli/dispatch/remote-selection-scope.ts`                             | 1     | `commandPath[0] === 'group'`                                        | keep                                                                                                                                                                            |
+| Upstream file                                                        | Lines | What it is                                                          | If a sync conflicts                                                                                                                                                                  |
+| -------------------------------------------------------------------- | ----- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `status-bar/host-connections/SshStatusSegment.tsx`                   | 21    | the relayed-fleet menu block                                        | keep our call site, the hook destructure, and the two counts (`relayed` in the early return, `relayed` in `connectedHostCount`); the JSX lives in `RelayedFleetStatusItems.tsx`      |
+| `settings/.../server-rows/runtime-server-row.tsx`                    | 3     | one import, `<MeshMemberAffordance />`, and the `meshItems` slot    | keep all three; the chip, both actions and both dialogs are fork-owned, so a host row carries its mesh state and its Eject instead of the pane repeating every host in a second list |
+| `settings/.../server-rows/runtime-server-row-menu.tsx`               | 3     | the optional `meshItems` slot in the row's menu                     | keep; it is a prop on the component that owns the menu, and what it renders is fork-owned                                                                                            |
+| `settings/host-rows/ServerListRow.tsx`                               | 2     | `py-px`/`leading-4` off the shared chip                             | keep; without it a Mesh, Default or SSH-tunnel chip sits taller than the row's name beside it                                                                                        |
+| `main/ipc/mobile.ts`                                                 | 3     | one import and one predicate in the runtime-grant list              | keep both; the predicate is `host-mesh-runtime-grants.ts`, and an offer past its TTL is not a link                                                                                   |
+| `cli/hosts/host-handler-groups.ts`                                   | 6     | one import and `HOST_MESH_HANDLER_GROUP`                            | keep both; the entry itself is in `host-mesh-handler-group.ts`                                                                                                                       |
+| `startup/runtime-startup/main-process-runtime-launch.ts`             | 3     | import, `installHostMeshRuntime(runtimeRpc)`, `max-lines` directive | keep all three; the directive is only there because upstream's file sits exactly at the 300-line cap                                                                                 |
+| `settings/.../RuntimeEnvironmentsPane.tsx`                           | 3     | one import and `<HostGroupSection />`                               | keep both                                                                                                                                                                            |
+| `runtime/rpc/methods/rpc-method-registry.ts`                         | 2     | `FORK_RPC_METHODS` import and spread                                | keep both                                                                                                                                                                            |
+| `shared/remote-runtime/protocol/protocol-version.ts`                 | 2     | the runtime capability entry                                        | keep; it is how peers negotiate the fleet                                                                                                                                            |
+| `runtime-environments/runtime-environment-connection-observation.ts` | 2     | one call to `notifyHostGraphOfConnectionChange`                     | keep                                                                                                                                                                                 |
+| `cli/specs/index.ts`                                                 | 2     | `HOST_MESH_COMMAND_SPECS` import and spread                         | keep                                                                                                                                                                                 |
+| `cli/dispatch/remote-selection-scope.ts`                             | 1     | `commandPath[0] === 'group'`                                        | keep                                                                                                                                                                                 |
 
 Rules this follows, each learned the expensive way:
 

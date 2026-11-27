@@ -4,6 +4,7 @@ import type { RuntimeAccessGrant } from '../../shared/remote-runtime/host-catalo
 import type { MobilePairingConnectionMode } from '../../shared/remote-runtime/pairing/mobile-pairing-connection-mode'
 import type { RuntimePairingReach } from '../../shared/remote-runtime/pairing/runtime-pairing-reach'
 import { isPairedMobileDevice, type DeviceEntry } from '../runtime/rpc/server/pairing/device-entry'
+import { isLiveRuntimeGrant } from '../host-mesh/host-mesh-runtime-grants'
 import {
   requestMobilePairingOffer,
   requestRuntimePairingOffer
@@ -181,7 +182,7 @@ export function registerMobileHandlers(
     const all = registry.listDevices({ fresh: true })
     return {
       grants: all
-        .filter((d) => d.scope === 'runtime')
+        .filter(isLiveRuntimeGrant)
         .sort((a, b) => b.pairedAt - a.pairedAt)
         .map((d) => toRuntimeAccessGrant(d, all))
     }

@@ -133,6 +133,14 @@ export type HostMeshStore = {
     }
   ): void
   forgetPeer(hostKey: string): void
+  /**
+   * Drops device rows this host has already revoked from every peer's index.
+   *
+   * Why the index needs this at all: an entry keeps every row ever minted for that machine, because removal
+   * revokes the whole set. A row that expired unredeemed is already dead, so keeping its id only makes the
+   * entry grow by one per failed offer.
+   */
+  forgetPeerDeviceRows(deviceRowIds: ReadonlySet<string>): void
   readPeerIndex(): ReadonlyMap<string, HostMeshPeerIndexEntry>
   readSettings(): HostMeshSettings
   writeSettings(settings: HostMeshSettings): void
@@ -154,6 +162,25 @@ export type HostMeshStore = {
 
 export function createHostMeshStore({ userDataPath }: { userDataPath: string }): HostMeshStore {
   const path = hostMeshStorePath(userDataPath)
+
+  /**
+   * The one read-modify-write of the peer index: a mutation is derived from the file it is about to replace, so
+   * three copy-pasted versions of that sequence cannot drift apart.
+   *
+   * Why returning the same object means "nothing to write": the pass calls this for every row it revoked, and a
+   * synchronous rewrite per row is work the render path does not need.
+   */
+  function mutatePeerIndex(
+    update: (peerIndex: Readonly<Record<string, unknown>>) => Record<string, unknown>
+  ): void {
+    const file = readOrRefuse(path) ?? emptyFile()
+    const next = update(file.peerIndex)
+    if (next === file.peerIndex) {
+      return
+    }
+    file.peerIndex = next
+    writeStoredFile(path, file)
+  }
 
   return {
     read: () => {
@@ -180,38 +207,61 @@ export function createHostMeshStore({ userDataPath }: { userDataPath: string }):
     },
 
     recordPeer: (hostKey, entry) => {
-      const file = readOrRefuse(path) ?? emptyFile()
-      const raw = file.peerIndex[hostKey]
-      // Merged field by field over the raw entry, so a field a newer build wrote survives a record.
-      const held = isRecord(raw) ? raw : {}
-      const known = peerEntrySchema.safeParse(raw)
-      const deviceRowIds = known.success ? known.data.deviceRowIds : []
-      const environmentId = known.success ? known.data.environmentId : null
-      const redeemedLabel = entry.redeemedLabel ?? (known.success ? known.data.redeemedLabel : null)
-      file.peerIndex = {
-        ...file.peerIndex,
-        [hostKey]: {
-          ...held,
-          deviceRowIds:
-            entry.deviceRowId === undefined || deviceRowIds.includes(entry.deviceRowId)
-              ? deviceRowIds
-              : [...deviceRowIds, entry.deviceRowId],
-          environmentId: entry.environmentId ?? environmentId,
-          // Why omitted when this host named nothing: an entry written before names existed keeps its own shape.
-          ...(redeemedLabel === null || redeemedLabel === undefined ? {} : { redeemedLabel })
+      mutatePeerIndex((peerIndex) => {
+        const raw = peerIndex[hostKey]
+        // Merged field by field over the raw entry, so a field a newer build wrote survives a record.
+        const held = isRecord(raw) ? raw : {}
+        const known = peerEntrySchema.safeParse(raw)
+        const deviceRowIds = known.success ? known.data.deviceRowIds : []
+        const environmentId = known.success ? known.data.environmentId : null
+        const redeemedLabel =
+          entry.redeemedLabel ?? (known.success ? known.data.redeemedLabel : null)
+        return {
+          ...peerIndex,
+          [hostKey]: {
+            ...held,
+            deviceRowIds:
+              entry.deviceRowId === undefined || deviceRowIds.includes(entry.deviceRowId)
+                ? deviceRowIds
+                : [...deviceRowIds, entry.deviceRowId],
+            environmentId: entry.environmentId ?? environmentId,
+            // Why omitted when this host named nothing: an entry written before names existed keeps its own shape.
+            ...(redeemedLabel === null || redeemedLabel === undefined ? {} : { redeemedLabel })
+          }
         }
-      }
-      writeStoredFile(path, file)
+      })
     },
 
     forgetPeer: (hostKey) => {
-      const file = readOrRefuse(path) ?? emptyFile()
-      if (!(hostKey in file.peerIndex)) {
+      mutatePeerIndex((peerIndex) => {
+        if (!(hostKey in peerIndex)) {
+          return peerIndex
+        }
+        const { [hostKey]: _forgotten, ...withoutPeer } = peerIndex
+        return withoutPeer
+      })
+    },
+
+    forgetPeerDeviceRows: (deviceRowIds) => {
+      if (deviceRowIds.size === 0) {
         return
       }
-      const { [hostKey]: _forgotten, ...peerIndex } = file.peerIndex
-      file.peerIndex = peerIndex
-      writeStoredFile(path, file)
+      mutatePeerIndex((peerIndex) => {
+        let changed = false
+        const kept: Record<string, unknown> = {}
+        for (const [hostKey, raw] of Object.entries(peerIndex)) {
+          const held = isRecord(raw) ? raw : {}
+          const ids = Array.isArray(held.deviceRowIds) ? held.deviceRowIds : []
+          const remaining = ids.filter((id) => typeof id !== 'string' || !deviceRowIds.has(id))
+          if (remaining.length !== ids.length) {
+            changed = true
+            kept[hostKey] = { ...held, deviceRowIds: remaining }
+          } else {
+            kept[hostKey] = raw
+          }
+        }
+        return changed ? kept : peerIndex
+      })
     },
 
     readPeerIndex: () => {

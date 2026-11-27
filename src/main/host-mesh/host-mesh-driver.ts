@@ -44,8 +44,10 @@ import {
   removeHostMeshMember,
   setHostMeshInboundLink,
   setHostMeshOutboundLink,
+  setHostMeshRoutes,
   summarizeHostMesh
 } from '../../shared/host-mesh/host-mesh-membership'
+import { dialCandidates } from '../../shared/host-mesh/host-mesh-routes'
 import { mergeHostMeshNames, setHostMeshName } from '../../shared/host-mesh/host-mesh-names'
 import { orcaHostKeyOf } from '../host-graph/host-graph-self-identity'
 import { createHostMeshStore, type HostMeshStore } from './host-mesh-store'
@@ -93,6 +95,26 @@ function epochAfter(...values: readonly number[]): number {
   return Math.max(0, ...values) + 1
 }
 
+/**
+ * What this launch knows about the offer it made to one member.
+ *
+ * Why the mint time is separate from the attempt time: each mint is a device row on this host, so minting is
+ * what has to be bounded. An attempt is just a send, and the box an earlier attempt produced can be sent
+ * again inside its own lifetime.
+ */
+type ReverseOffer = {
+  /** When a credential was last minted for this member. Never moved forward by a retry. */
+  mintedAt: number
+  /** When the request was last sent. */
+  attemptedAt: number
+  refused: string | null
+  /** The sealed request, kept so a retry resends it rather than minting a second credential. */
+  request: HostMeshOfferBackRequest | null
+  mintedRowId: string | null
+  /** Set by a connection change: the last attempt failed technically, so repeating it now is worth it. */
+  retryNow: boolean
+}
+
 export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
   const store: HostMeshStore = createHostMeshStore({ userDataPath: deps.userDataPath })
   const keypair = () => deps.ownKeypair()
@@ -113,7 +135,40 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
    * remembering is "do not mint another one this minute" — and a fresh launch retrying once is the behaviour a
    * fleet that was asleep when the first offer was made needs.
    */
-  const reverseOffers = new Map<string, { at: number; refused: string | null }>()
+  const reverseOffers = new Map<string, ReverseOffer>()
+
+  /**
+   * Drops the offers nobody redeemed and the peer index kept an id for.
+   *
+   * Why the pass does this: every retry mints a device row, and an owner cannot tell thirty spent offers from
+   * thirty pairings — Settings lists them as active links because that is what they are until they expire.
+   * The rows are dead once their own TTL has passed, so the pass that made them is the pass that clears them.
+   */
+  function pruneStaleOffers(): void {
+    if (deps.pruneExpiredOffers === undefined) {
+      return
+    }
+    try {
+      const pruned = deps.pruneExpiredOffers()
+      if (pruned.length > 0) {
+        store.forgetPeerDeviceRows(new Set(pruned))
+      }
+    } catch (error) {
+      // Why swallowed: spent offers are bookkeeping, and a device registry that refuses a revoke must not cost the
+      // whole pass the members it would otherwise reach.
+      console.debug('[host-mesh] could not prune expired offers', error)
+    }
+  }
+
+  /**
+   * Whether the failure came from the peer rather than from the path to it.
+   *
+   * Why the distinction exists: a peer that answered and refused proves its address works, so adopting another one
+   * would be a repair aimed at the wrong fact.
+   */
+  function isPeerRefusal(error: unknown): boolean {
+    return typeof error === 'object' && error !== null && 'peerCode' in error
+  }
 
   /** Read once per snapshot, and never allowed to fail a snapshot: it only annotates one. */
   function storedMigration(): { appliedAt: number; peerCount: number } | null {
@@ -299,10 +354,27 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
   async function mintFor(args: {
     environmentId: string
     recipientHostKey: string
-  }): Promise<{ offerUrl: string; deviceId: string }> {
+  }): Promise<{ offerUrl: string; deviceId: string; endpointCandidates: string[] }> {
     const minted = await deps.mintRuntimeOffer(args)
     store.recordPeer(args.recipientHostKey, { deviceRowId: minted.deviceId })
     return minted
+  }
+
+  /**
+   * Keeps the addresses a minter published with its offer, so this host can dial it there if this path dies.
+   *
+   * Why an offer carries them: the endpoint inside a pairing code is the only one it names, and a machine that has
+   * not synced since it moved has no other way to say where it can be reached.
+   */
+  function rememberOfferedRoutes(
+    state: HostMeshState,
+    hostKey: string,
+    endpoints: readonly string[] | undefined
+  ): HostMeshState {
+    if (endpoints === undefined || endpoints.length === 0) {
+      return state
+    }
+    return setHostMeshRoutes(state, { hostKey, endpoints })
   }
 
   /**
@@ -522,6 +594,7 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
     if (reply.sealedForJoiner !== null) {
       const opened = openFrom(reply.sealedForJoiner, hello.publicKeyB64)
       if (opened.payload !== null && (await redeem(opened.payload)) !== null) {
+        state = rememberOfferedRoutes(state, hello.selfKey, opened.payload.endpointCandidates)
         state = setHostMeshOutboundLink(state, { hostKey: hello.selfKey, link: { kind: 'ok' } })
         state = setHostMeshInboundLink(state, { hostKey: hello.selfKey, link: { kind: 'active' } })
       }
@@ -647,6 +720,11 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
           state.names[sealed.senderHostKey]?.label ?? member?.label
         )) !== null
       ) {
+        state = rememberOfferedRoutes(
+          state,
+          sealed.senderHostKey,
+          opened.payload.endpointCandidates
+        )
         state = setHostMeshOutboundLink(state, {
           hostKey: sealed.senderHostKey,
           link: { kind: 'ok' }
@@ -675,85 +753,145 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
   }): Promise<HostMeshState> {
     const { member } = args
     const known = reverseOffers.get(member.hostKey)
+    // Why a resend and not a fresh offer: the box already minted is valid for exactly the window the retry
+    // interval covers, so sending it again costs nothing. Minting again for every attempt is what left an
+    // owner reading hundreds of spent offers as "active links", each one a live credential until it expired.
+    if (known?.request != null) {
+      // Why an aged box is dropped rather than resent: the retry interval and the offer lifetime are the same value,
+      // so a resend that comes due is also one the recipient can only refuse — a round trip spent to learn the clock.
+      if (deps.now() - known.mintedAt >= HOST_MESH_OFFER_TTL_MS) {
+        known.request = null
+        known.mintedRowId = null
+      } else if (
+        !known.retryNow &&
+        deps.now() - known.attemptedAt < HOST_MESH_REVERSE_OFFER_RETRY_MS
+      ) {
+        return args.state
+      } else {
+        return deliverOfferBack({
+          state: args.state,
+          member,
+          environmentId: args.environmentId,
+          known
+        })
+      }
+    }
     // Why a refusal is a wait and not an end: the owner at that machine can turn the mesh on at any time, and this
     // launch will not restart to notice. The wait is the retry interval, which is what bounds the minting.
-    if (known !== undefined && deps.now() - known.at < HOST_MESH_REVERSE_OFFER_RETRY_MS) {
+    if (known !== undefined && deps.now() - known.mintedAt < HOST_MESH_REVERSE_OFFER_RETRY_MS) {
       return args.state
     }
     // Why the key is checked before minting: a member with no public key can never receive a sealed offer, so
     // minting one for it would leave a live credential behind that nothing could ever redeem.
+    const now = deps.now()
+    const entry: ReverseOffer = {
+      mintedAt: now,
+      attemptedAt: now,
+      refused: null,
+      request: null,
+      mintedRowId: null,
+      retryNow: false
+    }
+    // Recorded before the mint, so a mint that throws is throttled like any other attempt instead of retried
+    // on every pass.
+    reverseOffers.set(member.hostKey, entry)
     if (toBytes(member.publicKeyB64 ?? '') === null) {
-      reverseOffers.set(member.hostKey, { at: deps.now(), refused: 'no-public-key' })
+      entry.refused = 'no-public-key'
       return args.state
     }
-    reverseOffers.set(member.hostKey, { at: deps.now(), refused: null })
 
     const epoch = epochAfter(args.state.epoch)
-    let sealed: HostMeshSealedOffer | null = null
-    let mintedRowId: string | null = null
     try {
       const minted = await mintFor({
         environmentId: args.environmentId,
         recipientHostKey: member.hostKey
       })
-      mintedRowId = minted.deviceId
-      sealed = sealTo({
+      entry.mintedRowId = minted.deviceId
+      const sealed = sealTo({
         recipientHostKey: member.hostKey,
         recipientPublicKeyB64: member.publicKeyB64,
         groupId: args.state.groupId,
         epoch,
         introducedBy: selfKey(),
-        offerUrl: minted.offerUrl
+        offerUrl: minted.offerUrl,
+        endpoints: minted.endpointCandidates
       })
+      // A member with no sealable key is nothing to try until a sync brings one.
+      if (sealed !== null) {
+        entry.request = {
+          version: HOST_MESH_PAYLOAD_VERSION,
+          groupId: args.state.groupId,
+          epoch,
+          offerer: {
+            hostKey: selfKey(),
+            label: myName(args.state),
+            publicKeyB64: keypair().publicKeyB64
+          },
+          sealed
+        }
+      }
     } catch (error) {
       lastError = error instanceof Error ? error.message : 'offer-mint-failed'
       return args.state
     }
-    // A member with no public key cannot be sealed a box, so there is nothing to try until a sync brings one.
-    if (sealed === null) {
+    if (entry.request === null) {
       return args.state
     }
+    return deliverOfferBack({
+      state: args.state,
+      member,
+      environmentId: args.environmentId,
+      known: entry
+    })
+  }
 
-    const request: HostMeshOfferBackRequest = {
-      version: HOST_MESH_PAYLOAD_VERSION,
-      groupId: args.state.groupId,
-      epoch,
-      offerer: {
-        hostKey: selfKey(),
-        label: myName(args.state),
-        publicKeyB64: keypair().publicKeyB64
-      },
-      sealed
-    }
+  /** Sends the member the box this launch already holds for it, and records what came back. */
+  async function deliverOfferBack(args: {
+    state: HostMeshState
+    member: HostMeshMember
+    environmentId: string
+    known: ReverseOffer
+  }): Promise<HostMeshState> {
+    const { known, member } = args
+    known.attemptedAt = deps.now()
+    known.retryNow = false
     try {
       const reply = await deps.send<HostMeshOfferBackReply>(
         args.environmentId,
         HOST_MESH_OFFER_BACK_METHOD,
-        request
+        known.request
       )
       if (reply.kind !== 'accepted') {
-        reverseOffers.set(member.hostKey, { at: deps.now(), refused: reply.reason })
-        // Why the row is revoked: the far side answered, and its answer was no — so this credential can never be
-        // redeemed and is pure residue. A timeout below is different: a queued call may still be redeemed.
-        if (mintedRowId !== null) {
-          deps.revokeMintedRow(mintedRowId)
+        known.refused = reply.reason
+        // Why the box is dropped: the far side answered, and its answer was no — so it can never be redeemed and
+        // there is nothing left to resend. A replay is the exception: that reason means the member already opened
+        // this box, so its link exists and revoking the row would cut the credential that link uses.
+        known.request = null
+        if (known.mintedRowId !== null && reply.reason !== 'offer-replayed') {
+          deps.revokeMintedRow(known.mintedRowId)
+          known.mintedRowId = null
         }
         return args.state
       }
+      // Accepted, so the box is spent and there is nothing left to resend.
+      known.request = null
+      known.refused = null
     } catch (error) {
       // A machine on a build without this method, and a transport that dropped mid-call, are both "no answer
-      // yet" rather than a refusal. The retry interval is what stops either from minting an offer per pass.
+      // yet" rather than a refusal. Keeping the box is what stops either from minting an offer per pass.
       const reason = error instanceof Error ? error.message : 'offer-back-failed'
       if (reason !== 'method_not_found') {
         lastError = reason
       }
       // Why this one row is revoked even though the call failed: an unknown method means the box was never read, so
       // the credential is dead weight on a machine that will keep being retried. A dropped connection is not the same
-      // fact — the box may have arrived and be redeeming — so that row is left to its TTL.
-      if (reason === 'method_not_found' && mintedRowId !== null) {
-        deps.revokeMintedRow(mintedRowId)
+      // fact — the box may have arrived and be redeeming — so that box stays and is resent instead.
+      if (reason === 'method_not_found' && known.mintedRowId !== null) {
+        deps.revokeMintedRow(known.mintedRowId)
+        known.mintedRowId = null
+        known.request = null
       }
-      reverseOffers.set(member.hostKey, { at: deps.now(), refused: null })
+      known.refused = null
       return args.state
     }
     // Why the inbound link is taken from the reply: the member answered `accepted` only after redeeming the
@@ -772,66 +910,163 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
   async function pullMemberViews(start: HostMeshState): Promise<HostMeshState> {
     let state = start
     let reached = 0
+    // Where this host can be dialed right now, read once for the pass: it is the same answer for every member.
+    const endpoints = await deps.ownEndpoints().catch(() => [])
     for (const member of state.members) {
       const environmentId = deps.environmentIdForHostKey(member.hostKey)
       if (environmentId === null) {
         continue
       }
       try {
-        const payload = await deps.send<HostMeshSyncPayload>(environmentId, HOST_MESH_SYNC_METHOD, {
-          version: HOST_MESH_PAYLOAD_VERSION,
-          groupId: state.groupId,
-          hostKey: selfKey()
-        } satisfies HostMeshPendingRequest)
-        if (confirmKey(payload.selfKey, payload.publicKeyB64)) {
+        const view = await readMemberView({ state, member, environmentId, endpoints })
+        state = view.state
+        if (view.reached) {
           reached += 1
-          // Why a reply proves the outbound link: the peer authenticated this host and answered on a
-          // credential this host holds, which is exactly what `ok` claims. Leaving it at `awaitingOffer`
-          // would also mean a migrated group can never start repairing itself — the repair needs one member
-          // that already works to carry the others' offers, and nothing else would ever mark one.
-          state = setHostMeshOutboundLink(state, { hostKey: member.hostKey, link: { kind: 'ok' } })
-          // Why adoption precedes the merge: two hosts upgraded from the same fleet derive their own group
-          // ids, and the merge refuses a payload from a group it is not in — so without this the fleet
-          // would stay split with each half convinced the other is a stranger.
-          const adoption = adoptHostMeshGroup(
-            state,
-            {
-              groupId: payload.groupId,
-              epoch: payload.epoch,
-              hostKeys: [payload.selfKey, ...payload.members.map((view) => view.hostKey)]
-            },
-            {
-              isTrusted: (hostKey) => deps.environmentIdForHostKey(hostKey) !== null,
-              // The member that sent this payload vouches for the list it sent, which is the same standing an
-              // introduction has: a machine we are paired with saying "this one is in the group too". Anything
-              // we have not been told about is still refused, so a stranger cannot arrive unnoticed.
-              vouched: payload.members.map((view) => view.hostKey)
+        }
+        continue
+      } catch (error) {
+        // Why a peer's own refusal is not a route problem: that host answered, so its address works — moving the row
+        // to another of its addresses would trade a proven path for an unproven one, on every pass.
+        const adopted = isPeerRefusal(error)
+          ? false
+          : await adoptRoute({ state, member, environmentId })
+        // Why another route is tried before the member is called unreachable: the pairing row names the one endpoint
+        // the pair was made on, so a machine that changed networks — a tailnet switched off, a new DHCP lease —
+        // fails there while an address it published on an earlier pass still answers. Adoption repairs that row, so
+        // every other feature dials the live path too, without any of them knowing about routes.
+        if (adopted) {
+          try {
+            const view = await readMemberView({ state, member, environmentId, endpoints })
+            state = view.state
+            if (view.reached) {
+              reached += 1
             }
-          )
-          if (adoption.kind === 'adopt') {
-            state = adoption.state
-          }
-          state = applyHostMeshSync(state, payload)
-          // Why after the merge and not before: a member that reported a working link back here is already
-          // paired, and one that reported nothing is exactly the half this pass exists to close.
-          if (state.links.inbound[member.hostKey]?.kind !== 'active') {
-            state = await offerBackTo({ state, member, environmentId })
+            continue
+          } catch (retryError) {
+            state = markUnreachable(state, member, retryError)
+            continue
           }
         }
-      } catch (error) {
-        // A peer from before this feature answers `method_not_found`: it is not a broken network, it is a
-        // machine that has not updated yet, and during a staggered rollout that is the normal state.
-        const unsupported = error instanceof Error && error.message === 'method_not_found'
-        state = setHostMeshOutboundLink(state, {
-          hostKey: member.hostKey,
-          link: unsupported
-            ? { kind: 'unsupported', since: deps.now() }
-            : { kind: 'unreachable', since: deps.now() }
-        })
+        state = markUnreachable(state, member, error)
+        continue
       }
     }
     lastPassReached = reached
     return state
+  }
+
+  /**
+   * Tries the member's other known addresses and adopts the one that answers.
+   *
+   * Why it is the routes of the member and not this host's interfaces: only the far side knows where the far side
+   * is, and what it published in an earlier sync is the newest answer this host has.
+   */
+  async function adoptRoute(args: {
+    state: HostMeshState
+    member: HostMeshMember
+    environmentId: string
+  }): Promise<boolean> {
+    const adopt = deps.adoptReachableEndpoint
+    if (adopt === undefined) {
+      return false
+    }
+    const candidates = dialCandidates({
+      current: null,
+      routes: args.state.routes[args.member.hostKey]
+    })
+    if (candidates.length === 0) {
+      return false
+    }
+    try {
+      const adopted = await adopt({ environmentId: args.environmentId, candidates })
+      if (adopted === null) {
+        return false
+      }
+      // Why the pooled transport is dropped as well: everything that resolves the row per call already dials the new
+      // address, while a connection opened before the move keeps the one the row no longer names.
+      deps.invalidateTransport?.(args.environmentId)
+      return true
+    } catch (error) {
+      // Why swallowed: a path that could not be adopted is the same fact as one that did not answer, and the pass
+      // already reports the member as unreachable.
+      console.debug('[host-mesh] could not adopt a route to', args.member.hostKey, error)
+      return false
+    }
+  }
+
+  /** The link state a failed pass leaves behind: a peer too old for this protocol is not a broken network. */
+  function markUnreachable(
+    state: HostMeshState,
+    member: HostMeshMember,
+    error: unknown
+  ): HostMeshState {
+    const unsupported = error instanceof Error && error.message === 'method_not_found'
+    return setHostMeshOutboundLink(state, {
+      hostKey: member.hostKey,
+      link: unsupported
+        ? { kind: 'unsupported', since: deps.now() }
+        : { kind: 'unreachable', since: deps.now() }
+    })
+  }
+
+  /**
+   * One member's view, merged — the whole of a pass that reaches it.
+   *
+   * Why its own function: an unreachable path is retried on another route, and the retry has to run exactly this
+   * rather than a copy of it.
+   */
+  async function readMemberView(args: {
+    state: HostMeshState
+    member: HostMeshMember
+    environmentId: string
+    endpoints: readonly string[]
+  }): Promise<{ state: HostMeshState; reached: boolean }> {
+    const { member, environmentId } = args
+    let state = args.state
+    const payload = await deps.send<HostMeshSyncPayload>(environmentId, HOST_MESH_SYNC_METHOD, {
+      version: HOST_MESH_PAYLOAD_VERSION,
+      groupId: state.groupId,
+      hostKey: selfKey(),
+      // Why this host publishes its own addresses on every request: the member that can still be reached learns
+      // where to look before the path it is using dies.
+      ...(args.endpoints.length === 0 ? {} : { endpoints: [...args.endpoints] })
+    } satisfies HostMeshPendingRequest)
+    if (!confirmKey(payload.selfKey, payload.publicKeyB64)) {
+      return { state, reached: false }
+    }
+    // Why a reply proves the outbound link: the peer authenticated this host and answered on a
+    // credential this host holds, which is exactly what `ok` claims. Leaving it at `awaitingOffer`
+    // would also mean a migrated group can never start repairing itself — the repair needs one member
+    // that already works to carry the others' offers, and nothing else would ever mark one.
+    state = setHostMeshOutboundLink(state, { hostKey: member.hostKey, link: { kind: 'ok' } })
+    // Why adoption precedes the merge: two hosts upgraded from the same fleet derive their own group
+    // ids, and the merge refuses a payload from a group it is not in — so without this the fleet
+    // would stay split with each half convinced the other is a stranger.
+    const adoption = adoptHostMeshGroup(
+      state,
+      {
+        groupId: payload.groupId,
+        epoch: payload.epoch,
+        hostKeys: [payload.selfKey, ...payload.members.map((view) => view.hostKey)]
+      },
+      {
+        isTrusted: (hostKey) => deps.environmentIdForHostKey(hostKey) !== null,
+        // The member that sent this payload vouches for the list it sent, which is the same standing an
+        // introduction has: a machine we are paired with saying "this one is in the group too". Anything
+        // we have not been told about is still refused, so a stranger cannot arrive unnoticed.
+        vouched: payload.members.map((view) => view.hostKey)
+      }
+    )
+    if (adoption.kind === 'adopt') {
+      state = adoption.state
+    }
+    state = applyHostMeshSync(state, payload)
+    // Why after the merge and not before: a member that reported a working link back here is already
+    // paired, and one that reported nothing is exactly the half this pass exists to close.
+    if (state.links.inbound[member.hostKey]?.kind !== 'active') {
+      state = await offerBackTo({ state, member, environmentId })
+    }
+    return { state, reached: true }
   }
 
   /**
@@ -842,9 +1077,11 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
    * again. A refusal on the merits is kept, because a connection does not change that machine's mind.
    */
   function noteConnectionChange(): void {
-    for (const [hostKey, entry] of reverseOffers) {
+    for (const entry of reverseOffers.values()) {
       if (entry.refused === null) {
-        reverseOffers.delete(hostKey)
+        // Why the mint window is left alone: a member whose connection flaps would otherwise cost one device row
+        // per flap. What a reconnect changes is that the box this launch already minted is worth sending again.
+        entry.retryNow = entry.request !== null
       }
     }
   }
@@ -875,6 +1112,7 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
     // Why before the pull: this is the pass that tells the members what this host calls them, so seeding after it
     // would postpone every repair by one cycle.
     state = namesForPass(state)
+    pruneStaleOffers()
     const membersBefore = new Set(state.members.map((member) => member.hostKey))
     state = await pullMemberViews(state)
     // Why a tombstone learned from a member tears down: this is the only path a member that was asleep ever

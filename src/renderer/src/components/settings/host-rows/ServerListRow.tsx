@@ -31,7 +31,7 @@ const STATUS_LABEL_CLASS: Record<ServerRowStatusTone, string> = {
 
 export function ServerRowChip({ children }: { children: React.ReactNode }): React.JSX.Element {
   return (
-    <span className="max-w-full shrink-0 truncate rounded border border-border bg-accent px-1.5 py-px text-3xs leading-4 text-muted-foreground">
+    <span className="max-w-full shrink-0 truncate rounded border border-border bg-accent px-1.5 text-3xs text-muted-foreground">
       {children}
     </span>
   )

@@ -29,6 +29,7 @@ type RuntimeServerRowMenuProps = {
   connectDisabled: boolean
   /** Managed-server lifecycle items, placed between setup and removal. */
   managedItems?: React.ReactNode
+  meshItems?: React.ReactNode
   onUpdate: () => void
   onConnect: () => void
   onDisconnect: () => void
@@ -50,6 +51,7 @@ export function RuntimeServerRowMenuItems({
   isBusy,
   connectDisabled,
   managedItems,
+  meshItems,
   onUpdate,
   onConnect,
   onDisconnect,
@@ -111,6 +113,7 @@ export function RuntimeServerRowMenuItems({
           : t('auto.components.settings.serverList.details', 'Details')}
       </DropdownMenuItem>
       <DropdownMenuSeparator />
+      {meshItems}
       {managedItems}
       <DropdownMenuItem variant="destructive" disabled={isBusy} onSelect={onRemove}>
         <Trash2 />

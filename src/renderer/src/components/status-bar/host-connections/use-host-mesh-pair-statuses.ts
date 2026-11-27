@@ -32,16 +32,14 @@ export function useHostMeshPairStatuses(menuOpen: boolean): HostMeshPairStatuses
       return
     }
     inFlightRef.current = true
-    try {
-      const next = await api.read()
-      if (mountedRef.current) {
-        setSnapshot(next)
-      }
-    } catch {
-      // Why silent: the mesh is a second fact about a row that already renders its transport state, so a
-      // failed read leaves the glyph off rather than turning a healthy host row into an error.
-    } finally {
-      inFlightRef.current = false
+    // Why a `catch` and not `try/finally`: a `finally` in a component body is one of the React compiler's bailouts,
+    // so the flag is cleared on both paths here instead. Why silent about the failure: the mesh is a second fact
+    // about a row that already renders its transport state, so a failed read leaves the glyph off rather than
+    // turning a healthy host row into an error.
+    const next = await api.read().catch(() => null)
+    inFlightRef.current = false
+    if (next !== null && mountedRef.current) {
+      setSnapshot(next)
     }
   }, [])
 
