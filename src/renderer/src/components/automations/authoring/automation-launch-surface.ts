@@ -82,6 +82,19 @@ export function automationChatSupport(
       : null
 }
 
+export function automationSaveSurface(
+  state: AgentLaunchRouteStore,
+  draft: AutomationDraft,
+  requested: 'chat' | 'terminal',
+  destination?: AutomationCreateDestinationResolution
+): 'chat' | 'terminal' {
+  return requested === 'chat' &&
+    draft.surface === undefined &&
+    automationChatSupport(state, draft, automationLaunchWorkspace(draft, destination)) === false
+    ? 'terminal'
+    : requested
+}
+
 export function automationDraftSurface(
   draft: AutomationDraft,
   settings: GlobalSettings | null,
@@ -130,8 +143,12 @@ export function automationCopyLaunchSetup(
   if (!current && input.launchSetupPatch?.sources === undefined) {
     return input
   }
+  const agentId = current && updates.agentId === undefined ? current.agentId : input.agentId
+  if (!agentId || (current && !current.agentId)) {
+    return input
+  }
   const copied = applyAutomationLaunchSetupPatch(
-    current ? { ...updates, agentId: updates.agentId ?? current.agentId } : input,
+    current ? { ...updates, agentId } : { ...input, agentId },
     current ?? undefined
   )
   const canonical = automationCanonicalLaunchSetup(copied)

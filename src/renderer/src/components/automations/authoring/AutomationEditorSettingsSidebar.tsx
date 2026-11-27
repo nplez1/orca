@@ -27,6 +27,8 @@ import { AutomationBotEventsField } from './AutomationBotEventsField'
 import { openBotHomeTab, useBotThreadReplies } from '@/lib/bot-catalog'
 import { isSameBot, type BotRef } from '@/lib/bot-hosts'
 import { botEventsHaveThreads } from '../../../../../shared/automations/bot-automation-target-edit'
+import { AutomationRunsField } from './AutomationRunsField'
+import { isCommandDraft } from './automation-draft-action'
 
 const SETTINGS_SIDEBAR_CLASS =
   'flex w-[320px] shrink-0 flex-col overflow-auto border-l border-border/50 bg-muted/20 px-5 py-5 scrollbar-sleek @max-[35rem]:w-full @max-[35rem]:overflow-visible @max-[35rem]:border-t @max-[35rem]:border-l-0'
@@ -86,6 +88,7 @@ export function AutomationEditorSettingsSidebar({
 }: AutomationEditorSettingsSidebarProps): React.JSX.Element {
   const t = useTranslate()
   const botTarget = draft.bot
+  const runsScript = isCommandDraft(draft)
   // Edit drafts carry no botHostId, so they match by id alone.
   const targetBot = botTarget
     ? (bots.find(
@@ -174,6 +177,11 @@ export function AutomationEditorSettingsSidebar({
       : null
     return (
       <aside className={SETTINGS_SIDEBAR_CLASS}>
+        <AutomationRunsField
+          draft={draft}
+          botAgentId={targetBot?.agent}
+          onDraftChange={onDraftChange}
+        />
         {targetPicker}
         {schedulePicker(
           t('automations.botTarget.when', 'When'),
@@ -209,7 +217,7 @@ export function AutomationEditorSettingsSidebar({
           target={botTarget}
           bot={targetBot}
           agentField={
-            targetBot ? (
+            targetBot && !runsScript ? (
               <AutomationBotAgentField
                 target={botTarget}
                 bot={targetBot}
@@ -227,29 +235,32 @@ export function AutomationEditorSettingsSidebar({
   return (
     <aside className={SETTINGS_SIDEBAR_CLASS}>
       <div className="flex flex-col">
-        <div className="mb-4 flex flex-col gap-5">
-          <Field
-            labelClassName={AUTOMATION_EDITOR_SECTION_LABEL_CLASS}
-            label={t('auto.components.automations.AutomationEditorDialog.57b722cbba', 'Agent')}
-          >
-            <AutomationAgentLaunchPicker
-              draft={draft}
-              authority={launchAuthority}
-              workspace={
-                launchWorkspace ?? {
-                  kind: 'git-worktree',
-                  repoId: draft.projectId,
-                  worktreeId: draft.workspaceId || undefined
+        <AutomationRunsField draft={draft} onDraftChange={onDraftChange} />
+        {runsScript ? null : (
+          <div className="mb-4 flex flex-col gap-5">
+            <Field
+              labelClassName={AUTOMATION_EDITOR_SECTION_LABEL_CLASS}
+              label={t('auto.components.automations.AutomationEditorDialog.57b722cbba', 'Agent')}
+            >
+              <AutomationAgentLaunchPicker
+                draft={draft}
+                authority={launchAuthority}
+                workspace={
+                  launchWorkspace ?? {
+                    kind: 'git-worktree',
+                    repoId: draft.projectId,
+                    worktreeId: draft.workspaceId || undefined
+                  }
                 }
-              }
-              visibleAgents={visibleAgents}
-              settings={settings}
-              surface={surface}
-              chatSupported={chatSupported}
-              onDraftChange={onDraftChange}
-            />
-          </Field>
-        </div>
+                visibleAgents={visibleAgents}
+                settings={settings}
+                surface={surface}
+                chatSupported={chatSupported}
+                onDraftChange={onDraftChange}
+              />
+            </Field>
+          </div>
+        )}
         {destination ? (
           <div className="mb-4">
             <AutomationDestinationField
@@ -269,9 +280,11 @@ export function AutomationEditorSettingsSidebar({
             onDraftChange={onDraftChange}
           />
         </div>
-        <div className="mb-4">
-          <AutomationSessionField draft={draft} onDraftChange={onDraftChange} />
-        </div>
+        {runsScript ? null : (
+          <div className="mb-4">
+            <AutomationSessionField draft={draft} onDraftChange={onDraftChange} />
+          </div>
+        )}
         {schedulePicker(
           t('auto.components.automations.AutomationEditorDialog.c4b19094c2', 'Schedule')
         )}
@@ -283,24 +296,28 @@ export function AutomationEditorSettingsSidebar({
             onDraftChange={onDraftChange}
           />
         </div>
-        <div className="mb-4">
-          <div className="flex flex-col gap-5">
-            <AutomationPrecheckFields
-              disabled={false}
+        {runsScript ? null : (
+          <>
+            <div className="mb-4">
+              <div className="flex flex-col gap-5">
+                <AutomationPrecheckFields
+                  disabled={false}
+                  draft={draft}
+                  pickerTriggerClassName={pickerTriggerClassName}
+                  onDraftChange={onDraftChange}
+                />
+              </div>
+            </div>
+            <AutomationSetupDecisionField
               draft={draft}
-              pickerTriggerClassName={pickerTriggerClassName}
+              repos={repos}
+              projectHostSetups={projectHostSetups}
+              yamlHooks={automationYamlHooksByRepoKey[getAutomationHooksCacheKey(draft.projectId)]}
               onDraftChange={onDraftChange}
+              onSetupDecisionTouched={onSetupDecisionTouched}
             />
-          </div>
-        </div>
-        <AutomationSetupDecisionField
-          draft={draft}
-          repos={repos}
-          projectHostSetups={projectHostSetups}
-          yamlHooks={automationYamlHooksByRepoKey[getAutomationHooksCacheKey(draft.projectId)]}
-          onDraftChange={onDraftChange}
-          onSetupDecisionTouched={onSetupDecisionTouched}
-        />
+          </>
+        )}
       </div>
     </aside>
   )

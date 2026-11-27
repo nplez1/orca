@@ -131,7 +131,7 @@ export function useAutomationEditorActions({
     setEditingHostStableKey(
       initialDestination?.entry.stableKey ?? (movingToServer ? initialHost.stableKey : null)
     )
-    const nextDraft = buildAutomationEditDraft(latest)
+    const nextDraft = buildAutomationEditDraft(latest, defaultAgent)
     setDraft(nextDraft)
     setDraftAtOpen(nextDraft)
     setTargetEdited(movingToServer)

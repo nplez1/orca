@@ -11,8 +11,13 @@ import {
 import type { AutomationDraft } from './AutomationEditorDialog'
 import { AUTOMATION_DEFAULT_TIME, formatTimeInput } from './automation-draft-model'
 import { getAutomationSetupDecisionDraftValue } from './automation-setup-decision'
+import { buildScriptDraftFields } from './automation-draft-action'
+import type { TuiAgent } from '../../../../../shared/agent-launch/catalog/tui-agent'
 
-export function buildAutomationEditDraft(automation: Automation): AutomationDraft {
+export function buildAutomationEditDraft(
+  automation: Automation,
+  defaultAgent: TuiAgent
+): AutomationDraft {
   const setup = automationCanonicalLaunchSetup(automation)
   // An events-only automation's sentinel schedule is no cadence: picking one starts from a new one's.
   const scheduled = hasAutomationSchedule(automation)
@@ -21,7 +26,8 @@ export function buildAutomationEditDraft(automation: Automation): AutomationDraf
   return {
     name: automation.name,
     prompt: automation.prompt,
-    agentId: automation.agentId,
+    agentId: automation.agentId ?? defaultAgent,
+    ...buildScriptDraftFields(automation),
     surface: automation.launchSetup?.surface ?? automation.surface ?? 'terminal',
     extraAgentArgs: setup.extraAgentArgs ?? '',
     ...(setup.launchPreferences !== undefined

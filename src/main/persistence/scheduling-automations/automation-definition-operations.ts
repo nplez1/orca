@@ -14,6 +14,7 @@ import type {
 import type { AutomationRun } from '../../../shared/automations/history/automation-run'
 import type { PersistedState } from '../../../shared/orca-profiles/persisted-state-types'
 import { normalizeAutomationPrecheck } from '../../../shared/automations/launch/automation-precheck'
+import { normalizeAutomationAction } from '../../../shared/automations/launch/automation-command'
 import {
   assertAutomationExtraAgentArgs,
   storedExtraAgentArgs
@@ -104,13 +105,19 @@ export function createAutomation(
   const contexts = getAutomationContextsForRepo(repo, operations.state.projectHostSetups ?? [])
   const setup = applyAutomationLaunchSetupPatch(input)
   const extraAgentArgs = storedExtraAgentArgs(setup.extraAgentArgs)
+  const action = normalizeAutomationAction(input.action)
+  const agentId = action ? null : input.agentId
+  if (!action && !agentId) {
+    throw new Error('An automation needs an agent, or a command to run.')
+  }
   const automation: Automation = {
     id: options?.id ?? randomUUID(),
     ...automationCreateIdentity(input),
     name: input.name.trim() || 'Untitled automation',
     prompt: input.prompt,
     precheck: normalizeAutomationPrecheck(input.precheck),
-    agentId: input.agentId,
+    ...(action ? { action } : {}),
+    agentId,
     ...(setup.surface ? { surface: setup.surface } : {}),
     ...(setup.launchPreferences !== undefined
       ? { launchPreferences: setup.launchPreferences }

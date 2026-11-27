@@ -1,5 +1,6 @@
 import type {
   Automation,
+  AutomationAction,
   AutomationBotTarget,
   AutomationCreateInput,
   AutomationUpdateInput
@@ -16,6 +17,8 @@ import {
   resolveAutomationCreateDestination
 } from './automation-create-destination'
 import { buildDraftSchedule } from './automation-draft-model'
+import { buildDraftCommandFields, isCommandDraft } from './automation-draft-action'
+import { isCommandAutomation } from '../../../../../shared/automations/launch/automation-command'
 import {
   createAutomationOnDestination,
   saveExistingAutomation
@@ -86,6 +89,15 @@ export async function saveBotAutomation(
   const { draft, editingAutomationId, editingRowKey } = local
   const bot = trimmedBotTarget(target)
   const { timezone, rrule, missedRunGraceMinutes } = buildDraftSchedule(draft, time)
+  const command = isCommandDraft(draft) ? buildDraftCommandFields(draft) : null
+  // The host records the agent runs start on; the draft holds the bot's.
+  const agentAction: AutomationAction = { kind: 'agent' }
+  const agentFields = {
+    action: agentAction,
+    agentId: isBotAgent(draft.agentId)
+      ? botAutomationSetup(bot, { agent: draft.agentId }).agent
+      : draft.agentId
+  }
 
   if (editingAutomationId !== null) {
     const reread = await dispatchAutomationReread(
@@ -107,7 +119,10 @@ export async function saveBotAutomation(
     // The bot supplies the agent, folder and session, so only what the bot form shows is sent.
     const updates: AutomationUpdateInput = {
       name: draft.name,
-      prompt: draft.prompt,
+      ...(command ?? {
+        prompt: draft.prompt,
+        ...(current && isCommandAutomation(current) ? agentFields : {})
+      }),
       // Unchanged, it is left out, so an automation whose bot was deleted can still be renamed.
       ...(isSameBotTarget(current?.bot, bot) ? {} : { bot }),
       timezone,
@@ -145,11 +160,8 @@ export async function saveBotAutomation(
   }
   const input: AutomationCreateInput = {
     name: draft.name,
-    prompt: draft.prompt,
-    // The host records the agent runs start on; the draft holds the bot's.
-    agentId: isBotAgent(draft.agentId)
-      ? botAutomationSetup(bot, { agent: draft.agentId }).agent
-      : draft.agentId,
+    prompt: command ? '' : draft.prompt,
+    ...(command ?? agentFields),
     bot,
     projectId: '',
     workspaceMode: 'existing',

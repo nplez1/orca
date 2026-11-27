@@ -132,6 +132,7 @@ export function useAutomationDraftEffects({
     (template: AutomationTemplate): void => {
       setDraft((current) => ({
         ...current,
+        actionKind: 'agent',
         name: template.name,
         prompt: template.prompt,
         preset: template.preset,

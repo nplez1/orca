@@ -1,19 +1,16 @@
-import { botAgentLabel } from '@/components/bots/bot-presentation'
 import { botAutomationWhen } from '../../bots/bot-automation-when'
 import { AutomationWontFireNote } from './AutomationWontFireNote'
 import React from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { getAgentCatalog } from '@/lib/agent-catalog/agent-catalog'
-import { AgentIcon } from '@/components/agent/icons/AgentIcon'
+import { getAutomationRunnerLabel } from '../automation-runner-label'
+import { AutomationRunnerIcon } from '../AutomationRunnerIcon'
+import { getAutomationScriptDetailProperties } from './automation-script-detail-properties'
 import type { Automation } from '../../../../../shared/automations/automation-definition'
 import type { AutomationRun } from '../../../../../shared/automations/history/automation-run'
 import { formatUiAutomationSchedule } from './automation-schedule-label'
 import { formatUiNarrowDuration } from '@/i18n/relative-time-format'
-import {
-  AUTOMATION_EDITOR_SECTION_LABEL_CLASS,
-  AutomationRunErrorNotice
-} from '../automation-page-parts'
+import { AutomationRunErrorNotice } from '../automation-page-parts'
 import { indexLatestAutomationRuns } from '../../../../../shared/automation-last-run'
 import type { AutomationTargetAvailability } from '../hosts/automation-target-availability-types'
 import type { AutomationHostCatalogEntry } from '../hosts/automation-host-catalog-types'
@@ -25,6 +22,7 @@ import { AutomationPromptDisclosure } from './AutomationPromptDisclosure'
 import { automationRunErrorText } from '../runs/automation-run-error-copy'
 import { getAgentLabel } from '../authoring/automation-draft-model'
 import { AutomationDetailHealth } from './AutomationDetailHealth'
+import { DetailPropertySection, type DetailProperty } from './AutomationDetailPropertySection'
 import { AutomationRecentRunsRail } from './AutomationRecentRunsRail'
 import { AutomationsPageTitle } from '../AutomationsPageFrame'
 import type { AutomationActionNotice } from '../hosts/automation-row-action-dispatch'
@@ -49,45 +47,6 @@ type AutomationDetailProps = {
   /** Moves a row its host's Orca server now serves onto that server. */
   onMigrate?: (automation: Automation) => void
   isMigrating?: boolean
-}
-
-type DetailProperty = {
-  key: string
-  label: string
-  value: React.ReactNode
-  title?: string
-  mono?: boolean
-}
-
-function DetailPropertySection({
-  title,
-  properties
-}: {
-  title: string
-  properties: DetailProperty[]
-}): React.JSX.Element {
-  return (
-    <section className="min-w-0 rounded-lg border border-border/60">
-      <h3
-        className={`border-b border-border/60 px-4 py-2.5 text-muted-foreground ${AUTOMATION_EDITOR_SECTION_LABEL_CLASS}`}
-      >
-        {title}
-      </h3>
-      <dl className="grid grid-cols-[minmax(6rem,auto)_minmax(0,1fr)] gap-x-6 gap-y-2.5 px-4 py-3 text-[13px]">
-        {properties.map((property) => (
-          <React.Fragment key={property.key}>
-            <dt className="text-muted-foreground">{property.label}</dt>
-            <dd
-              className={`min-w-0 break-words ${property.mono ? 'font-mono text-xs leading-5' : ''}`}
-              title={property.title}
-            >
-              {property.value}
-            </dd>
-          </React.Fragment>
-        ))}
-      </dl>
-    </section>
-  )
 }
 
 function formatGrace(minutes: number, t: Translate = translate): string {
@@ -146,10 +105,8 @@ export function AutomationDetail({
       </div>
     )
   }
-  const agentLabel = automation.bot
-    ? botAgentLabel(automation.agentId)
-    : (getAgentCatalog().find((agent) => agent.id === automation.agentId)?.label ??
-      automation.agentId)
+  const agentLabel = getAutomationRunnerLabel(automation, t)
+  const script = automation.action?.kind === 'command' ? automation.action.script : null
   const runLocationLabel =
     automation.workspaceMode === 'new_per_run'
       ? (automation.baseBranch ??
@@ -166,7 +123,10 @@ export function AutomationDetail({
   const latestRun = indexLatestAutomationRuns(runs).get(automation.id)
   const latestRunError =
     latestRun?.status === 'dispatch_failed'
-      ? automationRunErrorText(latestRun, getAgentLabel(automation.agentId))
+      ? automationRunErrorText(
+          latestRun,
+          automation.agentId ? getAgentLabel(automation.agentId) : undefined
+        )
       : null
 
   const scheduleLabel = formatUiAutomationSchedule(automation.rrule, t, intlLocale)
@@ -192,33 +152,39 @@ export function AutomationDetail({
       label: t('auto.components.automations.AutomationDetail.missedRunGrace', 'Missed-run grace'),
       value: formatGrace(automation.missedRunGraceMinutes, t)
     },
-    {
-      key: 'precheck',
-      label: t('auto.components.automations.AutomationDetail.e353ab9516', 'Precheck'),
-      value: automation.precheck
-        ? t(
-            'auto.components.automations.AutomationDetail.precheckEnabled',
-            'Enabled, {{timeout}}',
-            {
-              timeout: formatUiNarrowDuration(
-                automation.precheck.timeoutSeconds,
-                'second',
-                intlLocale
-              )
-            }
-          )
-        : t('auto.components.automations.AutomationDetail.precheckNone', 'None'),
-      title: automation.precheck?.command
-    }
+    ...(script
+      ? []
+      : [
+          {
+            key: 'precheck',
+            label: t('auto.components.automations.AutomationDetail.e353ab9516', 'Precheck'),
+            value: automation.precheck
+              ? t(
+                  'auto.components.automations.AutomationDetail.precheckEnabled',
+                  'Enabled, {{timeout}}',
+                  {
+                    timeout: formatUiNarrowDuration(
+                      automation.precheck.timeoutSeconds,
+                      'second',
+                      intlLocale
+                    )
+                  }
+                )
+              : t('auto.components.automations.AutomationDetail.precheckNone', 'None'),
+            title: automation.precheck?.command
+          }
+        ])
   ]
 
   const executionProperties: DetailProperty[] = [
     {
       key: 'agent',
-      label: t('auto.components.automations.AutomationDetail.2df8970cd5', 'Agent'),
+      label: script
+        ? t('automations.command.runs', 'Runs')
+        : t('auto.components.automations.AutomationDetail.2df8970cd5', 'Agent'),
       value: (
         <span className="flex min-w-0 items-center gap-2">
-          <AgentIcon agent={automation.agentId} size={14} />
+          <AutomationRunnerIcon agentId={automation.agentId} size={14} />
           <span className="truncate">{agentLabel}</span>
         </span>
       )
@@ -238,13 +204,20 @@ export function AutomationDetail({
       value: runLocationLabel,
       mono: automation.workspaceMode === 'new_per_run'
     },
-    {
-      key: 'session',
-      label: t('auto.components.automations.AutomationDetail.15ea446b93', 'Session'),
-      value: automation.reuseSession
-        ? t('auto.components.automations.AutomationDetail.reuseLiveSession', 'Reuse live session')
-        : t('auto.components.automations.AutomationDetail.freshEachRun', 'Fresh each run')
-    },
+    ...(script
+      ? getAutomationScriptDetailProperties(script, t, intlLocale)
+      : [
+          {
+            key: 'session',
+            label: t('auto.components.automations.AutomationDetail.15ea446b93', 'Session'),
+            value: automation.reuseSession
+              ? t(
+                  'auto.components.automations.AutomationDetail.reuseLiveSession',
+                  'Reuse live session'
+                )
+              : t('auto.components.automations.AutomationDetail.freshEachRun', 'Fresh each run')
+          }
+        ]),
     ...(sourceDisplay
       ? [
           {
@@ -286,7 +259,7 @@ export function AutomationDetail({
           }
         ]
       : []),
-    ...(automation.extraAgentArgs
+    ...(!script && automation.extraAgentArgs
       ? [
           {
             key: 'extraArgs',
@@ -386,8 +359,9 @@ export function AutomationDetail({
           />
           <div className="@container flex min-w-0 flex-col gap-5 @4xl:col-start-1 @4xl:row-start-1">
             <AutomationPromptDisclosure
-              key={`${automation.id}:${automation.prompt}`}
-              prompt={automation.prompt}
+              key={`${automation.id}:${script?.command ?? automation.prompt}`}
+              prompt={script?.command ?? automation.prompt}
+              isCommand={script !== null}
             />
             <div className="grid grid-cols-1 gap-4 @xl:grid-cols-2">
               <DetailPropertySection

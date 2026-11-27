@@ -10,14 +10,15 @@ import {
   PLUGIN_AUTOMATION_SCHEDULE_MAX
 } from '../../../../shared/plugins/workers/plugin-host-api-automation-methods'
 
-/** The parts of a stored automation plugins may read; the rest (precheck, agent arguments,
+/** The parts of a stored automation plugins may read; the rest (precheck, action, agent arguments,
  *  launch setup, setup trust, owner) never reaches them. */
 export const automationAnswer = lazyZodSchema(() =>
   z.object({
     id: z.string(),
     name: z.string(),
     prompt: z.string(),
-    agentId: z.string(),
+    // Null on a command automation, which has no agent and is never projected.
+    agentId: z.string().nullable(),
     projectId: z.string(),
     runContext: z
       .object({ repoId: z.string().optional(), hostId: z.string().optional() })
@@ -39,7 +40,8 @@ export const automationAnswer = lazyZodSchema(() =>
         endedAt: z.number().optional()
       })
       .optional(),
-    // Read only to tell whether runs use extra agent settings; never projected.
+    // Read only to tell whether runs use extra settings; never projected.
+    action: z.object({ kind: z.string() }).optional(),
     precheck: z.object({ command: z.string() }).nullable().optional(),
     agentArgs: z.string().nullable().optional(),
     extraAgentArgs: z.string().optional(),
@@ -63,6 +65,7 @@ export function pluginOwnsAutomation(
  *  permission mode, or a precheck command. Only the person can set these. */
 export function automationRunsElevated(automation: PluginAutomationRecord): boolean {
   return Boolean(
+    automation.action?.kind === 'command' ||
     automation.precheck ||
     automation.agentArgs ||
     automation.extraAgentArgs?.trim() ||
@@ -82,14 +85,20 @@ export function projectPluginAutomations(
   workspaceIds: ReadonlyMap<string, string>
 ): PluginHostResult<'automation.list'> {
   return {
-    automations: automations.slice(0, PLUGIN_AUTOMATION_LIST_LIMIT).map((automation) => {
-      const raw = automation.workspaceMode === 'existing' ? automation.workspaceId : null
-      // A workspace `workspace.list` no longer lists keeps its raw id, when that fits the field.
-      const workspaceId = raw ? (workspaceIds.get(raw) ?? fittingId(raw)) : null
-      return {
-        id: automation.id,
-        name: automation.name.slice(0, 512),
-        agent: automation.agentId.slice(0, 64),
+    automations: automations
+      .flatMap((automation) => {
+        // A command automation runs a shell line as the person; a plugin neither sees nor owns one.
+        const agent = automation.agentId
+        if (!agent) {
+          return []
+        }
+        const raw = automation.workspaceMode === 'existing' ? automation.workspaceId : null
+        // A workspace `workspace.list` no longer lists keeps its raw id, when that fits the field.
+        const workspaceId = raw ? (workspaceIds.get(raw) ?? fittingId(raw)) : null
+        return {
+          id: automation.id,
+          name: automation.name.slice(0, 512),
+          agent: agent.slice(0, 64),
         prompt: automation.prompt.slice(0, PLUGIN_HOST_TEXT_MAX_LENGTH),
         promptTruncated: automation.prompt.length > PLUGIN_HOST_TEXT_MAX_LENGTH,
         projectId: fittingId(automation.runContext?.repoId ?? automation.projectId),

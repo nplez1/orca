@@ -2,7 +2,7 @@ import { getAutomationRunRepoId } from '../../../../../shared/automations/histor
 import type { Automation } from '../../../../../shared/automations/automation-definition'
 import type { Repo } from '../../../../../shared/repository/repo-types'
 import type { AutomationListRow } from './automation-list-row-identity'
-import { getAgentLabel } from '../authoring/automation-draft-model'
+import { getAutomationRunnerLabel } from '../automation-runner-label'
 import {
   automationListSearchIndexMatches,
   buildAutomationListSearchFingerprint,
@@ -60,10 +60,11 @@ export function buildAutomationSearchFields(
       path: repo?.path
     }),
     workspace: buildAutomationWorkspaceSearchText(automation, context.worktreeMap),
-    agent: getAgentLabel(automation.agentId),
+    agent: getAutomationRunnerLabel({ agentId: automation.agentId }),
     // Use the row’s own host; bare-ID lookup would give colliding authorities the same search label.
     host: row.hostLabel,
-    prompt: automation.prompt
+    prompt:
+      automation.action?.kind === 'command' ? automation.action.script.command : automation.prompt
   }
 }
 

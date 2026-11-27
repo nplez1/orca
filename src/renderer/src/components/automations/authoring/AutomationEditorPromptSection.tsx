@@ -6,6 +6,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useTranslate } from '@/i18n/use-translate'
 import type { AutomationDraft } from './AutomationEditorDialog'
 import { AutomationEditorPromptEditor } from './AutomationEditorPromptEditor'
+import { AutomationEditorScriptSection } from './AutomationEditorScriptSection'
+import { isCommandDraft } from './automation-draft-action'
 
 type AutomationEditorPromptSectionProps = {
   draft: AutomationDraft
@@ -75,6 +77,27 @@ export function AutomationEditorPromptSection({
           </TooltipContent>
         </Tooltip>
       </div>
+      {isCommandDraft(draft) ? (
+        <AutomationEditorScriptSection draft={draft} onDraftChange={onDraftChange} />
+      ) : (
+        <AutomationEditorPromptFields
+          draft={draft}
+          onDraftChange={onDraftChange}
+          onDismiss={onDismiss}
+        />
+      )}
+    </div>
+  )
+}
+
+function AutomationEditorPromptFields({
+  draft,
+  onDraftChange,
+  onDismiss
+}: AutomationEditorPromptSectionProps): React.JSX.Element {
+  const t = useTranslate()
+  return (
+    <>
       <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
         {draft.bot
           ? t('automations.botTarget.prompt', 'What should it do?')
@@ -100,6 +123,6 @@ export function AutomationEditorPromptSection({
         </code>
         .
       </p>
-    </div>
+    </>
   )
 }

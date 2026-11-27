@@ -17,6 +17,7 @@ import type {
   AutomationLaunchSetupPatch
 } from '../../../../../shared/automations/launch/automation-launch-types'
 import type {
+  AutomationAction,
   AutomationBotTarget,
   AutomationSchedulePreset,
   AutomationWorkspaceMode
@@ -42,6 +43,7 @@ import { getAutomationPromptEditorRoot } from './AutomationEditorPromptEditor'
 import { AutomationEditorPromptSection } from './AutomationEditorPromptSection'
 import { AutomationEditorSettingsSidebar } from './AutomationEditorSettingsSidebar'
 import { getAutomationTemplates, type AutomationTemplate } from './automation-templates'
+import { isCommandDraft, type AutomationScriptDraft } from './automation-draft-action'
 
 export const AUTOMATION_EDITOR_PICKER_TRIGGER_CLASS =
   'border-input bg-input/30 shadow-xs hover:bg-accent/60 dark:bg-input/30 dark:hover:bg-input/50'
@@ -50,6 +52,8 @@ export type AutomationDraft = {
   name: string
   prompt: string
   agentId: TuiAgent
+  actionKind?: AutomationAction['kind']
+  script?: AutomationScriptDraft
   surface?: 'chat' | 'terminal'
   /** Saved as-is; empty means none. */
   extraAgentArgs: string
@@ -289,7 +293,9 @@ export function AutomationEditorDialog({
         <AutomationEditorDialogFooter
           isEditing={isEditing}
           isSaving={isSaving}
-          canSave={canSave && (surface !== 'chat' || chatSupported === true)}
+          canSave={
+            canSave && (isCommandDraft(draft) || surface !== 'chat' || chatSupported === true)
+          }
           hasProjects={repos.length > 0 || draft.bot !== null}
           onOpenChange={onOpenChange}
           onSave={onSave}

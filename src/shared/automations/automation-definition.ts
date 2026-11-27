@@ -31,6 +31,23 @@ export type AutomationPrecheck = {
   timeoutSeconds: number
 }
 
+/** How a command runs: `login` reads the host's login files, so PATH pins like ~/.zshenv apply. */
+export type AutomationCommandShell = 'login' | 'plain'
+
+/** What reaches the run's chat: nothing, whatever it printed, or a line either way. */
+export type AutomationCommandReport = 'silent' | 'on-output' | 'always'
+
+/** The command a script automation runs, as it is stored. */
+export type AutomationScript = {
+  command: string
+  timeoutSeconds: number
+  shell: AutomationCommandShell
+  report: AutomationCommandReport
+}
+
+/** What an automation does when its time comes: launch an agent, or run a command with no agent. */
+export type AutomationAction = { kind: 'agent' } | { kind: 'command'; script: AutomationScript }
+
 /** Who created an automation, when Orca knows it was not the person. Set by Orca, never by the
  *  creator; `name` is the plugin's name then, so the label survives the plugin's removal. */
 export type AutomationCreator = {
@@ -49,7 +66,10 @@ export type Automation = {
   name: string
   prompt: string
   precheck: AutomationPrecheck | null
-  agentId: TuiAgent
+  /** Absent on every record written before command automations: absent means an agent. */
+  action?: AutomationAction
+  /** Null only for a command automation, which launches no agent. */
+  agentId: TuiAgent | null
   surface?: 'chat' | 'terminal'
   launchSetup?: AutomationLaunchSetup
   launchPreferences?: AutomationLaunchPreferences
@@ -110,7 +130,8 @@ export type AutomationCreateInput = {
   name: string
   prompt: string
   precheck?: AutomationPrecheck | null
-  agentId: TuiAgent
+  action?: AutomationAction | null
+  agentId: TuiAgent | null
   launchSetupPatch?: AutomationLaunchSetupPatch
   /** Empty or whitespace means no extras. */
   extraAgentArgs?: string
@@ -137,7 +158,11 @@ export type AutomationCreateInput = {
   createdBy?: AutomationCreator
 }
 
-export type AutomationUpdateInput = { launchSetupPatch?: AutomationLaunchSetupPatch } & Partial<
+export type AutomationUpdateInput = {
+  launchSetupPatch?: AutomationLaunchSetupPatch
+  /** Null turns a command automation back into an agent one; absent keeps whatever it is. */
+  action?: AutomationAction | null
+} & Partial<
   Pick<
     Automation,
     | 'name'

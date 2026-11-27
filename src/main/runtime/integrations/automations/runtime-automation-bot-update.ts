@@ -69,7 +69,10 @@ export async function patchBotAutomationUpdate(
     : patch.bot
       ? botAutomationAgent(patch.bot, bot)
       : botAutomationSetup(current.bot, bot).agent
-  assertNoBotOwnedSettings(updates, agent)
+  // A command automation holds no agent, so there is no agent part to refuse.
+  if (agent) {
+    assertNoBotOwnedSettings({ ...updates, agentId: updates.agentId ?? undefined }, agent)
+  }
   patch.bot &&= await withCheckedBotChat(patch.bot, bot, lookups.botChat, current.bot)
   if (bot) {
     assertBotHearsEventTriggers(

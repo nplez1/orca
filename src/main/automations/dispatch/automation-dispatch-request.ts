@@ -35,6 +35,8 @@ import {
 } from '../ownership/orcad-fenced-automation'
 import { AutomationDispatchCancelledError } from './automation-dispatch-cancelled-error'
 import { isTuiAgent } from '../../../shared/agent-launch/catalog/tui-agent-config'
+import { isCommandAutomation } from '../../../shared/automations/launch/automation-command'
+import { runAutomationCommandRun } from './automation-command-run'
 
 export { AutomationDispatchCancelledError }
 
@@ -230,6 +232,19 @@ export async function requestAutomationDispatch(
         return dispatcher({ ...request, target: latestTarget })
       }
     })
+  // A command automation launches nothing: it runs its own command here and records the outcome.
+  if (isCommandAutomation(automation)) {
+    return await runAutomationCommandRun({
+      automation,
+      run,
+      target: {
+        cwd: target.cwd,
+        sshConnectionId:
+          automation.executionTargetType === 'ssh' ? automation.executionTargetId : undefined
+      },
+      runs: ctx.runs
+    })
+  }
   if ('bot' in target) {
     return ctx.botDispatcher
       ? launchInMain(

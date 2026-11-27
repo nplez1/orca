@@ -116,7 +116,13 @@ export const AUTOMATION_METHODS = [
           ? await targetInCallerChat(context.runtime, caller, params.bot, Boolean(params.once))
           : params.bot
       const { plugin } = context
-      const input = { ...params, bot }
+      // A command automation stores neither a prompt nor an agent; null is how a record says so.
+      const input = {
+        ...params,
+        prompt: params.prompt ?? '',
+        agentId: params.agentId ?? null,
+        bot
+      }
       const automation = plugin
         ? await context.runtime.createAutomation(
             // Provenance comes from the in-process caller only; params cannot claim it.
@@ -136,11 +142,16 @@ export const AUTOMATION_METHODS = [
     params: AutomationUpdate,
     handler: async (params, context) => {
       refuseFromLookAround(params.callerSessionId, context)
-      const automation = await context.runtime.updateAutomation(params.id, params.updates, {
-        expectedOwner: mutationOwner(params.id, params.expectedOwner, context),
-        destination: params.destination,
-        expectedWorkspaceMode: params.expectedWorkspaceMode
-      })
+      const automation = await context.runtime.updateAutomation(
+        params.id,
+        // Null clears the action back to an agent automation; absent leaves it as it is.
+        { ...params.updates, action: params.updates.action ?? undefined },
+        {
+          expectedOwner: mutationOwner(params.id, params.expectedOwner, context),
+          destination: params.destination,
+          expectedWorkspaceMode: params.expectedWorkspaceMode
+        }
+      )
       const caller = chatOfCaller(params.callerSessionId, context)
       recordAutomationSavedCard(caller, 'updated', automation)
       return { automation: automationForClient(automation, context) }

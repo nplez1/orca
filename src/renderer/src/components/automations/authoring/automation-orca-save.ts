@@ -4,10 +4,9 @@ import {
 } from './automation-recorded-target'
 import { capturedAutomationOwner } from '../hosts/automation-captured-owner'
 import {
-  automationChatSupport,
+  automationSaveSurface,
   automationDraftLaunchSetup,
-  automationCopyLaunchSetup,
-  automationLaunchWorkspace
+  automationCopyLaunchSetup
 } from './automation-launch-surface'
 import { toast } from 'sonner'
 import type {
@@ -23,7 +22,9 @@ import {
   dispatchAutomationReread,
   type AutomationDispatchResult
 } from '../hosts/automation-row-action-dispatch'
-import { buildDraftPrecheck, buildDraftSchedule } from './automation-draft-model'
+import { buildDraftSchedule } from './automation-draft-model'
+import { buildDraftActionUpdates, isCommandDraft } from './automation-draft-action'
+import { isCommandAutomation } from '../../../../../shared/automations/launch/automation-command'
 import { buildAutomationRunContextForRepo } from './automation-run-context'
 import { resolveAutomationSetupDecisionForSave } from './automation-setup-decision'
 import { confirmAutomationSaveSetup } from './automation-setup-review'
@@ -95,7 +96,7 @@ export async function saveOrcaAutomation(
   const scheduleEdited = (['preset', 'time', 'dayOfWeek', 'customSchedule'] as const).some(edited)
   const timezone = currentAutomation?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone
   const { rrule, missedRunGraceMinutes } = buildDraftSchedule(draft, time)
-  const precheck = buildDraftPrecheck(draft)
+  const actionUpdates = buildDraftActionUpdates(draft, currentAutomation, edited)
   const recordedContext =
     currentAutomation && editingDestination && isSameAutomationWorkspace(currentAutomation, draft)
       ? recordedAutomationRunContext(
@@ -167,32 +168,29 @@ export async function saveOrcaAutomation(
     return
   }
 
-  const surface =
-    time.surface === 'chat' &&
-    draft.surface === undefined &&
-    automationChatSupport(
-      useAppStore.getState(),
-      draft,
-      automationLaunchWorkspace(draft, setupResolution ?? undefined)
-    ) === false
-      ? 'terminal'
-      : time.surface
-  const launchSetup = automationDraftLaunchSetup(
-    {
-      launchSetupPatch: draft.launchSetupPatch,
-      extraAgentArgs: edited('extraAgentArgs')
-        ? draft.extraAgentArgs
-        : (currentAutomation?.extraAgentArgs ?? '')
-    },
-    edited('surface') ? surface : (currentAutomation?.surface ?? surface),
-    currentAutomation
+  const surface = automationSaveSurface(
+    useAppStore.getState(),
+    draft,
+    time.surface,
+    setupResolution ?? undefined
   )
+  const launchSetup = isCommandDraft(draft)
+    ? {}
+    : automationDraftLaunchSetup(
+        {
+          launchSetupPatch: draft.launchSetupPatch,
+          extraAgentArgs: edited('extraAgentArgs')
+            ? draft.extraAgentArgs
+            : (currentAutomation?.extraAgentArgs ?? '')
+        },
+        edited('surface') ? surface : (currentAutomation?.surface ?? surface),
+        currentAutomation
+      )
   const updates: AutomationUpdateInput = {
     ...(edited('name') ? { name: draft.name } : {}),
-    ...(edited('prompt') ? { prompt: draft.prompt } : {}),
-    ...(edited('precheckCommand') || edited('precheckTimeoutSeconds') ? { precheck } : {}),
-    ...(edited('agentId') ? { agentId: draft.agentId } : {}),
+    ...actionUpdates,
     ...(!currentAutomation ||
+    isCommandAutomation(currentAutomation) ||
     draft.launchSetupPatch ||
     edited('surface') ||
     edited('extraAgentArgs')
@@ -223,7 +221,8 @@ export async function saveOrcaAutomation(
   const createInput: AutomationCreateInput = automationCopyLaunchSetup(currentAutomation, updates, {
     name: currentAutomation ? currentAutomation.name : draft.name,
     prompt: currentAutomation ? currentAutomation.prompt : draft.prompt,
-    precheck: currentAutomation ? currentAutomation.precheck : precheck,
+    precheck: currentAutomation?.precheck ?? null,
+    ...(currentAutomation?.action ? { action: currentAutomation.action } : {}),
     agentId: currentAutomation ? currentAutomation.agentId : draft.agentId,
     ...launchSetup,
     runContext: currentAutomation ? currentAutomation.runContext : runContext,

@@ -13,11 +13,13 @@ import {
 } from '../../../shared/agent-session/requests/structured-agent-session-send-mutation'
 import { automationRunAcceptedTarget } from './automation-agent-run-result'
 import { publishChatTabInBackground } from '../../runtime/session-tabs/chat/background-chat-tab-publication'
+import { requireAutomationAgent } from '../../../shared/automations/launch/automation-command'
 
 export async function reuseAutomationChat(
   runtime: OrcaRuntimeService,
   { automation, run, runs }: AutomationChatLaunchRequest
 ): Promise<AutomationChatAgentLaunch | null> {
+  const agent = requireAutomationAgent(automation)
   let preparationError: { error: unknown } | undefined
   const store = await runtime.openAgentSessionRecordStore().catch((error: unknown) => {
     preparationError = { error }
@@ -64,10 +66,7 @@ export async function reuseAutomationChat(
       if (!current) {
         throw new Error('Chat record is unavailable')
       }
-      if (
-        current.provider !== automation.agentId ||
-        current.location.workspaceId !== automation.workspaceId
-      ) {
+      if (current.provider !== agent || current.location.workspaceId !== automation.workspaceId) {
         continue
       }
       target.workspaceId = current.location.workspaceId
@@ -103,13 +102,7 @@ export async function reuseAutomationChat(
       }
       throw new Error('send refused')
     } catch (error) {
-      const accepted = await automationRunAcceptedTarget(
-        runtime,
-        run,
-        target,
-        error,
-        automation.agentId
-      )
+      const accepted = await automationRunAcceptedTarget(runtime, run, target, error, agent)
       if (host && accepted.chatSessionId) {
         await openReusedAutomationChat(runtime, host, accepted.chatSessionId)
       }

@@ -15,6 +15,9 @@ const AUTOMATION_TARGET_FLAGS = [
 ]
 const AUTOMATION_SCHEDULE_FLAGS = ['trigger', 'schedule', 'time', 'day', 'timezone']
 const AUTOMATION_PRECHECK_FLAGS = ['precheck', 'precheck-timeout']
+const AUTOMATION_SCRIPT_FLAGS = ['script', 'script-timeout', 'script-shell', 'report']
+const SCRIPT_NOTE =
+  'Use --script "<command>" instead of --prompt/--provider to run a command with no agent, in the same directory an agent run would use: the workspace for a repo automation, the bot folder for --bot. --script-timeout <seconds> defaults to 600 and caps at 3600; --script-shell login (the default) runs it through your login shell so your PATH applies, plain runs it as a precheck does; --report silent|on-output|always decides whether the output is kept on the run. An empty --script turns it back into an agent automation.'
 const AUTOMATION_STATE_FLAGS = [
   'enabled',
   'disabled',
@@ -66,6 +69,7 @@ export const AUTOMATION_COMMAND_SPECS: CommandSpec[] = [
       ...AUTOMATION_STATE_FLAGS
     ],
     notes: [
+      SCRIPT_NOTE,
       '--trigger accepts a preset: hourly, daily, weekdays or weekly (--time HH:MM, default 09:00; --day 0-6 for weekly, default 1 = Monday), e.g. --trigger daily --time 08:30. Or a 5-field cron expression, e.g. --trigger "*/10 * * * *" (every 10 minutes) or "0 9 * * 1-5" (weekdays at 9:00). Or an RRULE: FREQ=HOURLY with BYMINUTE (FREQ=HOURLY;BYMINUTE=15), FREQ=DAILY with BYHOUR and BYMINUTE (FREQ=DAILY;BYHOUR=9;BYMINUTE=0), or FREQ=WEEKLY with BYDAY, BYHOUR and BYMINUTE (FREQ=WEEKLY;BYDAY=MO,WE;BYHOUR=9;BYMINUTE=0), with no RRULE: prefix, DTSTART, UNTIL or COUNT. Times are the host\'s local time unless --timezone names a zone.',
       TRIGGER_REPEATS_NOTE,
       'When --repo is omitted, the CLI uses the enclosing Orca worktree when one can be resolved from cwd.',
@@ -148,6 +152,7 @@ export const AUTOMATION_COMMAND_SPECS: CommandSpec[] = [
       'once',
       'by',
       ...AUTOMATION_PRECHECK_FLAGS,
+      ...AUTOMATION_SCRIPT_FLAGS,
       ...AUTOMATION_TARGET_FLAGS,
       ...AUTOMATION_SCHEDULE_FLAGS,
       ...AUTOMATION_STATE_FLAGS

@@ -1783,5 +1783,35 @@
       "insideSource": "Can't move a folder into itself",
       "partialListing": "Only part of this folder is listed."
     }
+  },
+  "automations": {
+    "command": {
+      "command": "Command",
+      "commandMissing": "Enter a command before saving.",
+      "commandPlaceholder": "./scripts/nightly-report.sh",
+      "commandTooLong": "Keep the command to {{max}} characters or fewer.",
+      "copyCommand": "Copy command",
+      "locationMissing": "Choose a run location before saving.",
+      "report": "Report",
+      "reportAlways": "Every run",
+      "reportAlwaysHelp": "Reports each run, even when it prints nothing.",
+      "reportOnOutput": "When it prints something",
+      "reportOnOutputHelp": "Delivers the output; a run that prints nothing stays quiet.",
+      "reportSilent": "Never",
+      "reportSilentHelp": "Output is only kept in the run’s details.",
+      "runHasNoSession": "A script run has no session to open.",
+      "runs": "Runs",
+      "runsAgent": "An agent",
+      "runsScript": "A script",
+      "script": "Script",
+      "shell": "Shell",
+      "shellLogin": "Login shell",
+      "shellLoginHelp": "Your login shell, so your PATH applies.",
+      "shellPlain": "Plain shell",
+      "shellPlainHelp": "Skips your shell’s login files.",
+      "timeout": "Timeout",
+      "timeoutInvalid": "Enter a timeout from 1 to {{max}} seconds.",
+      "timeoutSeconds": "Timeout (seconds)"
+    }
   }
 }

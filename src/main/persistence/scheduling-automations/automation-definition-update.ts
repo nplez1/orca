@@ -12,6 +12,7 @@ import type {
   AutomationUpdateInput
 } from '../../../shared/automations/automation-definition'
 import { normalizeAutomationPrecheck } from '../../../shared/automations/launch/automation-precheck'
+import { normalizeAutomationAction } from '../../../shared/automations/launch/automation-command'
 import { assertAutomationExtraAgentArgs } from '../../../shared/automations/launch/automation-extra-agent-args-record'
 import { settleAutomationTriggers } from '../../webhooks/webhook-rule-check'
 import {
@@ -150,6 +151,18 @@ export function mergeAutomationUpdate(
     selectorMoveRequested && repo ? getAutomationSchedulerOwner(repo) : current.schedulerOwner
   const contexts = getAutomationContextsForRepo(repo, operations.state.projectHostSetups ?? [])
   const workspaceMode = updates.workspaceMode ?? current.workspaceMode
+  // A command automation launches no agent; clearing the action gives the automation its agent back.
+  const action = Object.hasOwn(definedUpdates, 'action')
+    ? normalizeAutomationAction(definedUpdates.action)
+    : normalizeAutomationAction(current.action)
+  const agentId = action
+    ? null
+    : definedUpdates.agentId !== undefined
+      ? definedUpdates.agentId
+      : current.agentId
+  if (!action && !agentId) {
+    throw new Error('An automation needs an agent, or a command to run.')
+  }
   const merged: Automation = {
     ...current,
     ...definedUpdates,
@@ -157,6 +170,8 @@ export function mergeAutomationUpdate(
     precheck: Object.hasOwn(definedUpdates, 'precheck')
       ? normalizeAutomationPrecheck(definedUpdates.precheck)
       : normalizeAutomationPrecheck(current.precheck),
+    action,
+    agentId,
     projectId: repoId,
     // Why the wire object is ignored: contexts are the storing authority's own
     // registry speaking. A move restates them from that registry, anything else
@@ -214,6 +229,10 @@ export function mergeAutomationUpdate(
   }
   Object.assign(merged, automationCanonicalLaunchSetup(launchSetupUpdate))
   assertAutomationExtraAgentArgs(merged)
+  // The key would otherwise stay on a record that went back to an agent.
+  if (!action) {
+    delete merged.action
+  }
   settleAutomationTriggers(merged)
   const previousPin = automationWorkspaceSshPin(operations.state, current.workspaceId)
   const workspaceSshPin = automationWorkspaceSshPin(operations.state, merged.workspaceId)

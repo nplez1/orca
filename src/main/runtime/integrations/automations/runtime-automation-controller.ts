@@ -147,7 +147,11 @@ export class RuntimeAutomationController {
       throw new Error('runtime_unavailable')
     }
     const createAutomation = store.createAutomation.bind(store)
-    const bot = requireCreatableAutomationBot(store, input, this.webhooks)
+    const bot = requireCreatableAutomationBot(
+      store,
+      { ...input, agentId: input.agentId ?? undefined },
+      this.webhooks
+    )
     assertThreadReplies(this.takesThreadReplies, input.bot)
     const target = bot
       ? botAutomationTarget(bot)

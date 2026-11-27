@@ -39,6 +39,7 @@ import {
   getEnabledFlag,
   getOptionalProviderFlag,
   getPrecheckFlag,
+  getScriptActionFlag,
   getProviderFlag,
   getReuseSessionFlag,
   getSourceContextFlag,
@@ -163,11 +164,13 @@ export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
       getWorkspaceModeFlag(flags) ?? (target.workspace ? 'existing' : 'new_per_run')
     assertAutomationSetupMode(setupDecision, workspaceMode, flags)
     // Built before the destination read so a contradictory flag still fails without a runtime call.
+    const action = getScriptActionFlag(flags)
     const create = {
       name: getRequiredStringFlag(flags, 'name'),
-      prompt: getRequiredStringFlag(flags, 'prompt'),
+      prompt: getOptionalStringFlag(flags, 'prompt') ?? '',
       precheck: getPrecheckFlag(flags),
-      agentId: getProviderFlag(flags),
+      ...(action ? { action } : {}),
+      agentId: action ? null : getProviderFlag(flags),
       extraAgentArgs: getExtraAgentArgsFlag(flags),
       ...(setupDecision !== undefined ? { setupDecision } : {}),
       ...(target.runContext ? { runContext: target.runContext } : {}),
@@ -214,12 +217,14 @@ export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
     const agentEdit = getBotAgentSetupEdit(flags)
     const sourceContext = getSourceContextFlag(flags)
     const id = getRequiredStringFlag(flags, 'id')
+    const action = getScriptActionFlag(flags)
     // Built before the owner read so a contradictory flag still fails without a runtime call.
     const updates = {
       name: getOptionalStringFlag(flags, 'name'),
       prompt: getOptionalStringFlag(flags, 'prompt'),
       precheck: getPrecheckFlag(flags),
-      agentId: getOptionalProviderFlag(flags),
+      ...(action !== undefined ? { action } : {}),
+      agentId: action ? null : getOptionalProviderFlag(flags),
       extraAgentArgs: getExtraAgentArgsFlag(flags),
       ...(setupDecision !== undefined ? { setupDecision } : {}),
       ...(target.runContext ? { runContext: target.runContext } : {}),
