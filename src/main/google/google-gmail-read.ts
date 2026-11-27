@@ -2,12 +2,14 @@
 // thread or message as text, paged by character offset across its bodies. Mail is someone else's
 // words; the CLI shows it fenced as content.
 import { z } from 'zod'
+import { lazyZodSchema } from '../../shared/schema/lazy-zod-schema'
 import type {
   GmailAttachment,
   GmailMessageView,
   GmailReadView,
   GmailSearchView
 } from '../../shared/google/google-read-types'
+import { sliceAtCodeUnitLimit } from '../../shared/text/surrogate-safe-text-slice'
 import {
   formatMegabytes,
   TOOL_DOWNLOAD_MAX_BYTES,
@@ -31,7 +33,9 @@ import { htmlToText } from './google-html-text'
 export const GMAIL = 'https://gmail.googleapis.com/gmail/v1/users/me'
 // Gmail's per-user concurrency limit answers 429 well before 50 parallel reads.
 export const GMAIL_CALLS_AT_ONCE = 10
-const AttachmentSchema = z.object({ data: z.string(), size: z.number().optional() })
+const AttachmentSchema = lazyZodSchema(() =>
+  z.object({ data: z.string(), size: z.number().optional() })
+)
 
 /** `work` over `items`, at most `limit` at a time, in order. */
 export async function inBatches<T, R>(
@@ -157,7 +161,7 @@ export async function readGmail(
       continue
     }
     // The first message on a page always shows some text, so --offset always moves on.
-    const text = body.slice(from, from + Math.max(room, MIN_FIRST_TEXT_CHARS))
+    const text = sliceAtCodeUnitLimit(body.slice(from), Math.max(room, MIN_FIRST_TEXT_CHARS))
     shown += text.length + framing
     if (from + text.length < body.length) {
       nextOffset = before + from + text.length

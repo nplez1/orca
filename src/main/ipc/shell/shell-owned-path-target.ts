@@ -1,14 +1,15 @@
-import { realpath, stat } from 'node:fs/promises'
+import { realpath } from 'node:fs/promises'
 import type { Stats } from 'node:fs'
 import { extname, isAbsolute, normalize, win32 } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseRoutableExecutionHostId } from '../../../shared/execution-host/execution-host'
+import { statWithoutArchiveLock } from '../../filesystem/asar-transparent-fs'
 import type { ShellOpenLocalPathFailureReason } from '../../../shared/shell/opening/shell-open-types'
 import { resolveWindowsPathAccess } from '../../windows/windows-path-access-host'
 
 export async function pathExists(pathValue: string): Promise<boolean> {
   try {
-    await stat(pathValue)
+    await statWithoutArchiveLock(pathValue)
     return true
   } catch {
     return false
@@ -40,7 +41,7 @@ function statLocalTarget(
   if (!pathApi.isAbsolute(normalizedPath)) {
     return Promise.resolve({ ok: false, reason: 'not-absolute' })
   }
-  return stat(normalizedPath).then(
+  return statWithoutArchiveLock(normalizedPath).then(
     (stats) => ({ ok: true as const, path: normalizedPath, stats }),
     () => ({ ok: false as const, reason: 'not-found' as const })
   )

@@ -4,7 +4,7 @@ import type {
   NestedRepoCandidate,
   NestedRepoScanResult
 } from '../../shared/project/groups/project-group-types'
-import { isGitRepoAsync } from '../git/repositories/discovery/repo-detection'
+import { inspectGitRepoAccessAsync } from '../git/repositories/discovery/repo-detection'
 import { awaitWindowsHostGitEnvironmentReady } from '../git/command-runner/host-routing/windows-host-git-environment'
 import { parseWslUncPath } from '../../shared/file-access/wsl-paths'
 import {
@@ -136,7 +136,7 @@ export async function scanNestedRepos(args: {
     isSelectedPathGitRepo: async (path: string) =>
       (await mayNeedGitDiscovery(path, args.signal)) &&
       !args.signal?.aborted &&
-      ((await hasGitMarker(path)) || (await isGitRepoAsync(path)))
+      ((await hasGitMarker(path)) || (await inspectGitRepoAccessAsync(path)).isRepo)
   }
   const buildResult = (selectedPathKind: NestedRepoScanResult['selectedPathKind']) => ({
     selectedPath: args.path,

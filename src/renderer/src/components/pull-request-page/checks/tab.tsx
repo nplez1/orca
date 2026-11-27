@@ -303,6 +303,7 @@ export function ChecksTab({
       canFixBrokenChecks,
       failedChecksCount: failedChecks.length,
       listLength: list.length,
+      holdRerunSlot: loading && list.length === 0,
       onRefresh: () => {
         void handleRefresh()
       },
@@ -331,6 +332,7 @@ export function ChecksTab({
       summaryLabel={summaryLabel}
       counts={overallCounts}
       showSummary={isCompletePRCheckOwner(checkOwner)}
+      summaryLoading={loading && list.length === 0}
       listLength={list.length}
       refreshAction={refreshAction}
       rerunAction={rerunAction}

@@ -34,7 +34,6 @@ function settled(overrides: Partial<RateLimitState> = {}): RateLimitState {
     codex: unavailable('codex'),
     opencodeGo: unavailable('opencode-go'),
     kimi: unavailable('kimi'),
-    antigravity: unavailable('antigravity'),
     minimax: unavailable('minimax'),
     grok: unavailable('grok'),
     cursor: unavailable('cursor'),

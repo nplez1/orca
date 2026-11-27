@@ -51,7 +51,11 @@ export function useSettingsNavigationModel(
   )
 
   const displayedGitUsername = model.repos[0]?.gitUsername ?? ''
-  const baseNavSections = useSettingsNavigationMetadata(model.settingsHostScope.target ?? undefined)
+  const baseNavSections = useSettingsNavigationMetadata(
+    model.settingsHostScope.target ?? undefined,
+    true,
+    model.optInOnlyExperimentRows
+  )
   const { installed: orchestrationSkillInstalled, loading: orchestrationSkillLoading } =
     model.orchestrationSkill
   const {

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { aiVaultHostListQuery } from '../../ai-vault/session-display/ai-vault-session-filters'
+import { lazyZodSchema } from '../../schema/lazy-zod-schema'
 import { parseExecutionHostId } from '../../execution-host/execution-host'
 import { AI_VAULT_AGENTS, boundedAiVaultScopeArgs } from '../../ai-vault/contracts/ai-vault-types'
 import { OptionalBoolean } from '../rpc-param-primitives'
@@ -14,140 +15,158 @@ export const AI_VAULT_LIMIT_MAX = 2000
 // cursor that can address a list far past any scan.
 export const AI_VAULT_LIST_OFFSET_MAX = 1_000_000
 
-export const executionHostIdSchema = z.string().transform((value, ctx): `runtime:${string}` => {
-  const parsed = parseExecutionHostId(value)
-  if (parsed?.kind === 'runtime') {
-    return parsed.id
-  }
-  ctx.addIssue({
-    code: 'custom',
-    message: 'Invalid runtime execution host id'
-  })
-  return z.NEVER
-})
-
-export const AiVaultListSessionsParams = z
-  .object({
-    limit: z
-      .unknown()
-      .transform((value) =>
-        typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined
-      )
-      .pipe(z.union([z.number().int(), z.undefined()]))
-      .optional(),
-    includeAntigravityIdeSessions: OptionalBoolean,
-    unlimited: OptionalBoolean,
-    force: OptionalBoolean,
-    afterFingerprint: z
-      .string()
-      .regex(/^[0-9a-f]{64}$/)
-      .nullable()
-      .optional(),
-    scopePaths: z.array(z.string().min(1).max(AI_VAULT_SCOPE_PATH_MAX_LENGTH)).optional(),
-    scopeOnly: OptionalBoolean,
-    // Why a transform and not a rejection, like scopePaths: the client and the
-    // host both reduce this with `aiVaultHostListQuery`, so an operator query or
-    // an oversized one arrives as "no host filter" — the client filters it itself
-    // — rather than failing a listing over a refinement the host cannot express.
-    query: z
-      .string()
-      .transform((value) => aiVaultHostListQuery(value))
-      .optional(),
-    // Why: desktop/web callers name the runtime host they are addressing; mobile
-    // omits it. The scan itself is host-local either way, so the id must never
-    // change what is scanned — it only restamps the shared cached result.
-    executionHostId: executionHostIdSchema.optional(),
-    // Why a separate field and not "offset was sent": page 0 must be bounded too,
-    // and a client that predates paging must keep receiving one complete reply.
-    paged: OptionalBoolean,
-    // A client's own held-list fingerprint; only a paging client keeps one to send back.
-    syncFromFingerprint: z
-      .string()
-      .regex(/^[0-9a-f]{64}$/)
-      .optional(),
-    // Why reject rather than coerce: an offset a client cannot follow would silently restart the
-    // listing at page 0, and the drain would append the same rows twice.
-    offset: z.number().int().min(0).max(AI_VAULT_LIST_OFFSET_MAX).optional()
-  })
-  .superRefine((params, ctx) => {
-    if (params.unlimited !== true && params.limit && params.limit > AI_VAULT_LIMIT_MAX) {
-      ctx.addIssue({ code: 'custom', path: ['limit'], message: 'Limit exceeds maximum' })
+export const executionHostIdSchema = lazyZodSchema(() =>
+  z.string().transform((value, ctx): `runtime:${string}` => {
+    const parsed = parseExecutionHostId(value)
+    if (parsed?.kind === 'runtime') {
+      return parsed.id
     }
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Invalid runtime execution host id'
+    })
+    return z.NEVER
   })
-  // Clamp to preserve older uncapped clients; scopes only widen discovery.
-  .transform(({ scopePaths, scopeOnly, ...params }) => ({
-    ...params,
-    ...boundedAiVaultScopeArgs(scopePaths, scopeOnly)
-  }))
+)
 
-const AiVaultRowResumeParams = z
-  .object({
-    agent: z.enum(AI_VAULT_AGENTS),
-    sessionId: z.string().min(1).max(512).optional(),
-    filePath: z.string().min(1).max(AI_VAULT_SCOPE_PATH_MAX_LENGTH),
-    codexHome: z.string().min(1).max(AI_VAULT_SCOPE_PATH_MAX_LENGTH).nullable(),
-    executionHostId: z.string().optional(),
-    fork: z.boolean().optional()
-  })
-  .strict()
-
-export const AiVaultPrepareSessionResumeParams = z.union([
-  AiVaultRowResumeParams,
+export const AiVaultListSessionsParams = lazyZodSchema(() =>
   z
     .object({
-      sourceChat: z
-        .object({
-          sessionId: z.string().min(1).max(512),
-          workspaceId: z.string().min(1).max(512)
-        })
-        .strict(),
+      limit: z
+        .unknown()
+        .transform((value) =>
+          typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined
+        )
+        .pipe(z.union([z.number().int(), z.undefined()]))
+        .optional(),
+      includeAntigravityIdeSessions: OptionalBoolean,
+      unlimited: OptionalBoolean,
+      force: OptionalBoolean,
+      afterFingerprint: z
+        .string()
+        .regex(/^[0-9a-f]{64}$/)
+        .nullable()
+        .optional(),
+      scopePaths: z.array(z.string().min(1).max(AI_VAULT_SCOPE_PATH_MAX_LENGTH)).optional(),
+      scopeOnly: OptionalBoolean,
+      // Why a transform and not a rejection, like scopePaths: the client and the
+      // host both reduce this with `aiVaultHostListQuery`, so an operator query or
+      // an oversized one arrives as "no host filter" — the client filters it itself
+      // — rather than failing a listing over a refinement the host cannot express.
+      query: z
+        .string()
+        .transform((value) => aiVaultHostListQuery(value))
+        .optional(),
+      // Why: desktop/web callers name the runtime host they are addressing; mobile
+      // omits it. The scan itself is host-local either way, so the id must never
+      // change what is scanned — it only restamps the shared cached result.
+      executionHostId: executionHostIdSchema.optional(),
+      // Why a separate field and not "offset was sent": page 0 must be bounded too,
+      // and a client that predates paging must keep receiving one complete reply.
+      paged: OptionalBoolean,
+      // A client's own held-list fingerprint; only a paging client keeps one to send back.
+      syncFromFingerprint: z
+        .string()
+        .regex(/^[0-9a-f]{64}$/)
+        .optional(),
+      // Why reject rather than coerce: an offset a client cannot follow would silently restart the
+      // listing at page 0, and the drain would append the same rows twice.
+      offset: z.number().int().min(0).max(AI_VAULT_LIST_OFFSET_MAX).optional()
+    })
+    .superRefine((params, ctx) => {
+      if (params.unlimited !== true && params.limit && params.limit > AI_VAULT_LIMIT_MAX) {
+        ctx.addIssue({ code: 'custom', path: ['limit'], message: 'Limit exceeds maximum' })
+      }
+    })
+    // Clamp to preserve older uncapped clients; scopes only widen discovery.
+    .transform(({ scopePaths, scopeOnly, ...params }) => ({
+      ...params,
+      ...boundedAiVaultScopeArgs(scopePaths, scopeOnly)
+    }))
+)
+
+const AiVaultRowResumeParams = lazyZodSchema(() =>
+  z
+    .object({
+      agent: z.enum(AI_VAULT_AGENTS),
+      sessionId: z.string().min(1).max(512).optional(),
+      filePath: z.string().min(1).max(AI_VAULT_SCOPE_PATH_MAX_LENGTH),
+      codexHome: z.string().min(1).max(AI_VAULT_SCOPE_PATH_MAX_LENGTH).nullable(),
       executionHostId: z.string().optional(),
-      fork: z.literal(true)
+      fork: z.boolean().optional()
     })
     .strict()
-])
+)
 
-export const AiVaultSessionTitlesParams = z.object({
-  requests: z
-    .array(
-      z.object({
-        agent: z.enum(['claude', 'codex']),
-        sessionId: z.string().min(1).max(512),
-        transcriptPath: z.string().min(1).max(32_768).optional()
+export const AiVaultPrepareSessionResumeParams = lazyZodSchema(() =>
+  z.union([
+    AiVaultRowResumeParams,
+    z
+      .object({
+        sourceChat: z
+          .object({
+            sessionId: z.string().min(1).max(512),
+            workspaceId: z.string().min(1).max(512)
+          })
+          .strict(),
+        executionHostId: z.string().optional(),
+        fork: z.literal(true)
       })
-    )
-    .max(AI_VAULT_SESSION_TITLE_REQUEST_MAX_COUNT)
-})
+      .strict()
+  ])
+)
+
+export const AiVaultSessionTitlesParams = lazyZodSchema(() =>
+  z.object({
+    requests: z
+      .array(
+        z.object({
+          agent: z.enum(['claude', 'codex']),
+          sessionId: z.string().min(1).max(512),
+          transcriptPath: z.string().min(1).max(32_768).optional()
+        })
+      )
+      .max(AI_VAULT_SESSION_TITLE_REQUEST_MAX_COUNT)
+  })
+)
 
 // The host revalidates the path against its own roots; no host id travels because the host deletes only its own files.
-export const AiVaultDeleteSessionParams = z.object({
-  agent: z.enum(AI_VAULT_AGENTS),
-  sessionId: z.string().min(1).max(512).optional(),
-  filePath: z.string().min(1).max(AI_VAULT_SCOPE_PATH_MAX_LENGTH)
-})
+export const AiVaultDeleteSessionParams = lazyZodSchema(() =>
+  z.object({
+    agent: z.enum(AI_VAULT_AGENTS),
+    sessionId: z.string().min(1).max(512).optional(),
+    filePath: z.string().min(1).max(AI_VAULT_SCOPE_PATH_MAX_LENGTH)
+  })
+)
 
 // Only the row identity travels; the host reads its own database and writes the snapshot locally.
-export const AiVaultPrepareSessionHandoffParams = z.object({
-  agent: z.enum(AI_VAULT_AGENTS),
-  sessionId: z.string().min(1).max(512).optional(),
-  filePath: z.string().min(1).max(AI_VAULT_SCOPE_PATH_MAX_LENGTH)
-})
+export const AiVaultPrepareSessionHandoffParams = lazyZodSchema(() =>
+  z.object({
+    agent: z.enum(AI_VAULT_AGENTS),
+    sessionId: z.string().min(1).max(512).optional(),
+    filePath: z.string().min(1).max(AI_VAULT_SCOPE_PATH_MAX_LENGTH)
+  })
+)
 
 // Longer preview text is cut, not refused: the host bounds the transcript it builds anyway.
 const HANDOFF_PREVIEW_TEXT_MAX = 16 * 1024
-const handoffText = z.string().transform((value) => value.slice(0, HANDOFF_PREVIEW_TEXT_MAX))
+const handoffText = lazyZodSchema(() =>
+  z.string().transform((value) => value.slice(0, HANDOFF_PREVIEW_TEXT_MAX))
+)
 
 // The phone sends the History row it shows; the host saves a database row and builds desktop's prompt.
-export const AiVaultPrepareSessionHandoffPromptParams = AiVaultPrepareSessionHandoffParams.extend({
-  title: handoffText,
-  cwd: z.string().max(AI_VAULT_SCOPE_PATH_MAX_LENGTH).nullable(),
-  lastUserPrompt: handoffText.nullable().optional(),
-  previewMessages: z
-    .array(
-      z.object({
-        role: z.enum(['user', 'assistant', 'system', 'tool', 'unknown']),
-        text: handoffText
-      })
-    )
-    .max(200)
-})
+export const AiVaultPrepareSessionHandoffPromptParams = lazyZodSchema(() =>
+  AiVaultPrepareSessionHandoffParams.extend({
+    title: handoffText,
+    cwd: z.string().max(AI_VAULT_SCOPE_PATH_MAX_LENGTH).nullable(),
+    lastUserPrompt: handoffText.nullable().optional(),
+    previewMessages: z
+      .array(
+        z.object({
+          role: z.enum(['user', 'assistant', 'system', 'tool', 'unknown']),
+          text: handoffText
+        })
+      )
+      .max(200)
+  })
+)

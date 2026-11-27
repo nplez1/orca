@@ -24,7 +24,6 @@ import { fetchKimiRateLimits } from './providers/kimi/kimi-fetcher'
 import { fetchOpenCodeGoUsage } from './providers/opencode-go/opencode-go-usage-source-selection'
 import { fetchZcodeRateLimits } from './providers/zcode/zcode-usage-fetcher'
 import { fetchMuseRateLimits } from './providers/muse/muse-usage-fetcher'
-import { fetchAntigravityRateLimits } from './providers/antigravity/antigravity-usage-fetcher'
 import { fetchMiniMaxRateLimits } from './providers/minimax/minimax-fetcher'
 import { fetchDeepSeekRateLimits } from './deepseek/deepseek-fetcher'
 import { fetchFireworksRateLimits } from './fireworks/fireworks-fetcher'
@@ -73,10 +72,6 @@ vi.mock('./providers/zcode/zcode-usage-fetcher', () => ({
 
 vi.mock('./providers/muse/muse-usage-fetcher', () => ({
   fetchMuseRateLimits: vi.fn()
-}))
-
-vi.mock('./providers/antigravity/antigravity-usage-fetcher', () => ({
-  fetchAntigravityRateLimits: vi.fn()
 }))
 
 vi.mock('./providers/minimax/minimax-fetcher', () => ({
@@ -208,13 +203,7 @@ function createCredentialReadSpies() {
     deepInfraConfig: vi.fn(() => ({ apiKey: 'di-live' })).mockName('deepInfraConfig'),
     copilotConfig: vi
       .fn(() => ({ token: 'ghp_live', enterpriseSlug: '' }))
-      .mockName('copilotConfig'),
-    antigravityAccountUsage: {
-      begin: vi.fn(async () => null).mockName('antigravityAccountUsage.begin'),
-      finish: vi
-        .fn(async () => ({ switched: true as const }))
-        .mockName('antigravityAccountUsage.finish')
-    }
+      .mockName('copilotConfig')
   }
 }
 
@@ -254,10 +243,6 @@ function providerWiring(
     grok: {
       query: skipped(() => vi.mocked(fetchGrokRateLimits)),
       credentialReads: [() => vi.mocked(readGrokAuthSession)]
-    },
-    antigravity: {
-      query: skipped(() => vi.mocked(fetchAntigravityRateLimits)),
-      credentialReads: [() => spies.antigravityAccountUsage.begin]
     },
     cursor: {
       query: skipped(() => vi.mocked(fetchCursorRateLimits)),
@@ -309,8 +294,6 @@ function configureLiveProviderAccess(service: RateLimitService, spies: Credentia
   service.setFireworksConfigResolver(spies.fireworksConfig)
   service.setDeepInfraConfigResolver(spies.deepInfraConfig)
   service.setCopilotConfigResolver(spies.copilotConfig)
-  service.setAntigravityAccountUsageRecorder(spies.antigravityAccountUsage)
-  service.setAntigravityUsageEnabledResolver(() => true)
   service.setMuseUsageEnabledResolver(() => true)
 }
 

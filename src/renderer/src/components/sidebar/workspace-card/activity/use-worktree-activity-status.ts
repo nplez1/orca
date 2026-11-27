@@ -8,6 +8,7 @@ import {
 import { EMPTY_BROWSER_TABS, EMPTY_TABS } from './worktree-card-empty-inputs'
 import {
   selectLivePtyIdsForWorktree,
+  selectPaneForegroundAgentsForWorktree,
   selectTerminalLayoutRootsForWorktree,
   selectRuntimePaneTitlesForWorktree
 } from './worktree-card-status-inputs'
@@ -118,6 +119,7 @@ function resolveMemoizedStatus(
     // Why the optional read: several suites mock @/store with a hand-built partial
     // state, so a missing slice must read as "not setting up", not throw.
     statusInputs.setupRunningWorktreeIds?.[worktreeId] === true,
+    selectPaneForegroundAgentsForWorktree(statusInputs, worktreeId),
     summary
   ] as const
   if (memo && inputs.every((input, index) => input === memo.inputs[index])) {
@@ -131,7 +133,8 @@ function resolveMemoizedStatus(
     stoppedEnvironmentId,
     runtimePaneTitlesByTabId,
     terminalLayoutRootsByTabId,
-    setupRunning
+    setupRunning,
+    paneForegroundAgentByPaneKey
   ] = inputs
   const { status, heuristic } = resolveWorktreeStatusParts({
     tabs,
@@ -145,6 +148,7 @@ function resolveMemoizedStatus(
     stalePaneIdsByTabId: summary.stalePaneIdsByTabId,
     terminalLayoutRootsByTabId,
     setupRunning,
+    paneForegroundAgentByPaneKey,
     hasPermission: summary.hasPermission,
     hasLiveWorking: summary.hasLiveWorking,
     hasLiveMonitoring: summary.hasLiveMonitoring,

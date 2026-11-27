@@ -107,13 +107,13 @@ export abstract class RateLimitServiceFetchPolicy extends RateLimitServiceFetchT
     )
   }
 
-  // Claude's Retry-After and agy's sign-in hold bind automated checks; user refreshes may pass.
+  // Claude's Retry-After binds automated checks; user refreshes may pass.
   protected shouldSkipAutomatedFetch(
     provider: ActiveRateLimitProvider,
     limits: ProviderRateLimits | null
   ): boolean {
     return (
-      (provider === 'claude' || provider === 'antigravity') &&
+      provider === 'claude' &&
       this.isRetryAfterActive(limits) &&
       !this.canRefreshThroughRetryAfter(provider)
     )

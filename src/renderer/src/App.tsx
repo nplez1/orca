@@ -44,7 +44,7 @@ import { SpaceWindowStatePublisher } from './components/workspace-space/SpaceWin
 import { useUiHangDiagnostics } from './lib/ui-hang-diagnostics/use-ui-hang-diagnostics'
 import { PlainSshTerminalPanels } from './components/plain-ssh-terminal/PlainSshTerminalPanels'
 import { PluginShotReplayMount } from './components/plugins/view/PluginShotReplayMount'
-import { AddToChatPointMenuHost } from './components/native-chat/selection-quotes/AddToChatMenu'
+import { AddToChatPointMenuHost } from './components/native-chat/selection-quotes/AddToChatPointMenuHost'
 import { useContextualLinkRouter } from './app-shell/use-contextual-link-router'
 import { installActiveWorktreeRemovalSuccessor } from './lib/workspace/activation/active-worktree-removal-successor'
 import { useAppStore } from './store'

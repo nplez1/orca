@@ -30,10 +30,10 @@ describe('CLAUDE_MANAGED_HOOK_COMMAND_PATTERN', () => {
   )
 
   it('recognizes every command form Orca writes for Claude', () => {
-    const posix = '/home/u/.orca/agent-hooks/claude-hook.sh'
-    const nativeExe = 'C:\\Users\\u\\.orca\\agent-hooks\\orca-agent-hook.exe'
+    const posix = '/home/u/.orca-np/agent-hooks/claude-hook.sh'
+    const nativeExe = 'C:\\Users\\u\\.orca-np\\agent-hooks\\orca-agent-hook.exe'
     const encoded = getWindowsManagedLifecycleHook(
-      'C:\\Users\\Zoë & Co\\.orca\\agent-hooks\\claude-hook.cmd'
+      'C:\\Users\\Zoë & Co\\.orca-np\\agent-hooks\\claude-hook.cmd'
     ).command
 
     expect(encoded).toMatch(/^\S+powershell\.exe -NoProfile -EncodedCommand \S+$/)
@@ -42,12 +42,13 @@ describe('CLAUDE_MANAGED_HOOK_COMMAND_PATTERN', () => {
     expect(detects(getRemoteManagedEventCommand('PostCompact', posix))).toBe(true)
     expect(
       detects(
-        getWindowsManagedLifecycleHook('C:\\Users\\u\\.orca\\agent-hooks\\claude-hook.cmd').command
+        getWindowsManagedLifecycleHook('C:\\Users\\u\\.orca-np\\agent-hooks\\claude-hook.cmd')
+          .command
       )
     ).toBe(true)
     expect(detects(`${wrapWindowsDirectCmdHookCommand(nativeExe)} claude`)).toBe(true)
     expect(detects(nativeExe)).toBe(true)
-    expect(detects('C:\\Users\\u\\.orca\\agent-hooks\\claude-hook.cmd')).toBe(true)
+    expect(detects('C:\\Users\\u\\.orca-np\\agent-hooks\\claude-hook.cmd')).toBe(true)
   })
 
   it("leaves a user's own hooks alone", () => {

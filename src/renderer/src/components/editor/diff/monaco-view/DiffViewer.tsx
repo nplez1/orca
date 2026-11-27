@@ -280,7 +280,7 @@ export default function DiffViewer({
   useLayoutEffect(() => {
     onSaveRef.current = onSave
     onContentChangeRef.current = onContentChange
-  }, [language, onSave, onContentChange, relativePath])
+  })
 
   const { setupCopy, toastNode } = useContextualCopySetup()
 

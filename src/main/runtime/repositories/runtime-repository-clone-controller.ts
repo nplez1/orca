@@ -15,6 +15,7 @@ import {
   cleanupClaimedCloneTarget,
   claimCloneTarget,
   deriveValidatedClonePath,
+  ensureCloneDestination,
   getClonePathComparisonKey,
   getSavedProjectPathKeys,
   resolveCloneDestination
@@ -169,7 +170,7 @@ export class RuntimeRepositoryCloneController {
       return reused
     }
 
-    await mkdir(destination, { recursive: true })
+    await ensureCloneDestination(destination)
     // fork-comment-ok: the claim below is non-recursive, so a nested project folder must exist first.
     await mkdir(dirname(clonePath), { recursive: true })
     const claimedTarget = await claimCloneTarget(clonePath)

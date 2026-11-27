@@ -140,7 +140,18 @@ async function readClaudeUsage(
     return claudeUsageEndpointGatedResult(metadata, gatedRetryAtMs)
   }
   try {
-    const usage = await fetchClaudeOAuthUsage(token, options?.signal)
+    const authPreparation = options?.authPreparation
+    const usage = await fetchClaudeOAuthUsage(
+      token,
+      options?.signal,
+      // A WSL guest's proxy address may not resolve from the Windows host.
+      authPreparation && authPreparation.runtime !== 'wsl'
+        ? {
+            configDir: authPreparation.configDir,
+            networkProxySettings: options?.networkProxySettings
+          }
+        : undefined
+    )
     // Name the login a reading came from so its plan never follows another account's reading.
     return usage.status === 'ok'
       ? {

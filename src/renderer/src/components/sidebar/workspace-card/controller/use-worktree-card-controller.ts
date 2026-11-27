@@ -12,6 +12,7 @@ import { useWorktreeCardLinkedDetails } from '../details/use-worktree-card-linke
 import { useWorktreeCardReviewDetails } from '../details/use-worktree-card-review-details'
 import { useWorktreeCardSecondaryDetails } from '../details/use-worktree-card-secondary-details'
 import { useWorktreeCardWorkspaceActions } from './use-worktree-card-workspace-actions'
+import { useAutoNameFailure } from '../identity/use-auto-name-failure'
 import { useWorktreeCardEphemeralLease } from '../../worktree-card-ephemeral-lease'
 
 export function useWorktreeCardController(props: ResolvedWorktreeCardProps) {
@@ -67,6 +68,11 @@ export function useWorktreeCardController(props: ResolvedWorktreeCardProps) {
     },
     [closeHover, setFoundationTitleRenaming]
   )
+  const autoNameFailure = useAutoNameFailure({
+    worktreeId: worktree.id,
+    executionHostId: worktree.hostId,
+    error: worktree.firstAgentMessageRenameError || undefined
+  })
   const referenceDetails = useWorkspaceReferenceDetails(
     worktree,
     repo,
@@ -184,6 +190,7 @@ export function useWorktreeCardController(props: ResolvedWorktreeCardProps) {
     ...linked,
     setTitleRenaming,
     detailsHoverControl,
+    autoNameFailure,
     referenceDetails,
     reviewChecks,
     ephemeralLease,

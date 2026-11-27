@@ -1,8 +1,6 @@
 /* eslint-disable max-lines -- Why: upstream-owned and at its budget (254/300); the fork's +102-line delta rides inside it, and splitting costs a permanent sync hunk. */
-import type { LocalAccountRuntimeTarget } from '../../../shared/agent-accounts/local-account-runtime'
 import type { BrowserWindow } from 'electron'
 import type {
-  AntigravityAccountUsage,
   InactiveAccountUsage,
   ProviderRateLimits,
   RateLimitState
@@ -10,7 +8,6 @@ import type {
 import type { DisableableUsageProviderId } from '../../../shared/usage-provider-enablement'
 import { USAGE_PROVIDER_IDS } from '../../../shared/usage-provider-enablement'
 import { usageProviderPendingReadout } from '../../../shared/usage-providers/usage-provider-readouts'
-import type { AntigravityAccountUsageRecorder } from '../providers/antigravity/antigravity-account-usage'
 import {
   type ActiveRateLimitProvider,
   type InactiveCodexAccountInfo,
@@ -20,7 +17,6 @@ import {
   type ClaudeAuthPreparationResolver,
   type OpenCodeGoRateLimitConfig,
   type MiniMaxRateLimitConfig,
-  type AntigravityUsageEnabledResolver,
   type ClaudeOAuthUsageEnabledResolver,
   type MuseUsageEnabledResolver,
   type ZcodePlanRateLimitConfig,
@@ -58,7 +54,6 @@ export abstract class RateLimitServiceState {
     codex: null,
     opencodeGo: null,
     kimi: null,
-    antigravity: null,
     minimax: null,
     grok: null,
     cursor: null,
@@ -85,7 +80,6 @@ export abstract class RateLimitServiceState {
     kimi: 0,
     minimax: 0,
     grok: 0,
-    antigravity: 0,
     cursor: 0,
     zcode: 0,
     deepseek: 0,
@@ -102,7 +96,6 @@ export abstract class RateLimitServiceState {
     kimi: 0,
     minimax: 0,
     grok: 0,
-    antigravity: 0,
     cursor: 0,
     zcode: 0,
     deepseek: 0,
@@ -145,7 +138,6 @@ export abstract class RateLimitServiceState {
   protected fireworksFetchGeneration = 0
   protected deepinfraFetchGeneration = 0
   protected copilotFetchGeneration = 0
-  protected antigravityFetchGeneration = 0
   protected lastOpencodeConfigHash = ''
   protected lastMiniMaxConfigHash = ''
   protected lastZcodeConfigHash = ''
@@ -187,10 +179,6 @@ export abstract class RateLimitServiceState {
     | (() => CopilotRateLimitConfig | Promise<CopilotRateLimitConfig>)
     | null = null
   protected claudeOAuthUsageEnabledResolver: ClaudeOAuthUsageEnabledResolver | null = null
-  protected antigravityUsageEnabledResolver: AntigravityUsageEnabledResolver | null = null
-  protected antigravityFetchTarget: LocalAccountRuntimeTarget = { runtime: 'host', wslDistro: null }
-  protected antigravityAccountUsageRecorder: AntigravityAccountUsageRecorder | null = null
-  protected antigravityAccounts: AntigravityAccountUsage[] = []
   protected museUsageEnabledResolver: MuseUsageEnabledResolver | null = null
   protected inactiveClaudeAccountsResolver: (() => InactiveClaudeAccount[]) | null = null
   protected inactiveCodexAccountsResolver: (() => InactiveCodexAccountInfo[]) | null = null

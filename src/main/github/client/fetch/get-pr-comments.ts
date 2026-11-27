@@ -89,7 +89,9 @@ async function readPRComments(
         }
       }
 
-      let conversation: ReturnType<typeof parsePRConversationResponse> = { reviewComments: [] }
+      let conversation: Awaited<ReturnType<typeof parsePRConversationResponse>> = {
+        reviewComments: []
+      }
       if (threadsResult) {
         try {
           conversation = await readCompletePRConversation(
@@ -125,7 +127,7 @@ async function readPRComments(
           // The keep-rule is the caller's: the paginated path maps without the flag.
           conversation = {
             ...conversation,
-            reviewSummaries: filterReviewSummaries(
+            reviewSummaries: await filterReviewSummaries(
               conversation.reviewSummaries,
               options?.includeReviewVerdicts
             )
@@ -177,7 +179,7 @@ async function readPRComments(
               ),
               restViewer
             ])
-            const result = parseRestPRCommentPage(stdout, reviews, viewer, {
+            const result = await parseRestPRCommentPage(stdout, reviews, viewer, {
               includeReviewVerdicts: options?.includeReviewVerdicts
             })
             const advanced = result.rawIds.some((id) => !rawIds.has(id))

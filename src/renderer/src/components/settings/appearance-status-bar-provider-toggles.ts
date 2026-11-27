@@ -1,7 +1,6 @@
 import type { StatusBarItem } from '../../../../shared/ui-chrome/ui-chrome-types'
 import { translate } from '@/i18n/i18n'
 import { translateSearchKeyword } from './search/settings-search-keywords'
-import { getAntigravityStatusBarToggleSearchEntry } from './appearance/appearance-status-bar-antigravity-toggle-search'
 import { getGrokStatusBarToggleSearchEntry } from './appearance/appearance-status-bar-grok-toggle-search'
 import { getCursorStatusBarToggleSearchEntry } from './appearance/appearance-status-bar-cursor-toggle-search'
 import { getZcodeStatusBarToggleSearchEntry } from './appearance/appearance-status-bar-zcode-toggle-search'
@@ -77,7 +76,6 @@ export function getProviderUsageStatusBarToggleEntries(): StatusBarToggleSearchE
         'Show Codex token and cost usage for the active workspace.'
       )
     },
-    getAntigravityStatusBarToggleSearchEntry(),
     {
       id: 'opencode-go',
       title: translate(

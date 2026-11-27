@@ -23,6 +23,7 @@ import {
   getWorktreeStatusLabel,
   type WorktreeStatus
 } from '@/lib/workspace/activity/worktree-status'
+import { selectPaneForegroundAgentsForWorktree } from '@/components/sidebar/workspace-card/activity/worktree-card-status-inputs'
 import {
   resolveRecentWorkspaceTabStatus,
   type RecentWorkspaceTabRow
@@ -220,6 +221,9 @@ export function PaletteWorktreeStatusDot({
   const hasStructuredChat = useAppStore((s) =>
     hasAwakeStructuredChat(s.unifiedTabsByWorktree[worktree.id], s.structuredChatSleptAtByPaneKey)
   )
+  const paneForegroundAgentByPaneKey = useAppStore((s) =>
+    selectPaneForegroundAgentsForWorktree(s, worktree.id)
+  )
   if (!live) {
     return null
   }
@@ -234,7 +238,8 @@ export function PaletteWorktreeStatusDot({
       agentStatusPaneIdsByTabId: live.agentStatusPaneIdsByTabId,
       stalePaneIdsByTabId: live.stalePaneIdsByTabId,
       terminalPaneIdsByTabId: live.terminalPaneIdsByTabId,
-      terminalLayoutsByTabId: live.paneSources.terminalLayoutsByTabId
+      terminalLayoutsByTabId: live.paneSources.terminalLayoutsByTabId,
+      paneForegroundAgentByPaneKey
     }
   )
   return (

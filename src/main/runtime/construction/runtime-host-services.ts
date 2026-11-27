@@ -28,8 +28,7 @@ import { reconcileRequestedWorkerTerminalReleases } from '../orchestration/termi
 import { sweepStoppedWorkerTerminals } from '../orchestration/terminal-authority/release/stopped-worker-terminal-release'
 
 import type { RuntimeAccountController } from '../agent-session/environment/runtime-account-controller'
-import type { RuntimeMobileSpeechCatalog } from '../speech/runtime-mobile-speech-catalog'
-import type { RuntimeMobileDictationController } from '../speech/runtime-mobile-dictation-controller'
+import { createLazyMobileSpeechOwners } from '../speech/lazy-mobile-speech-owners'
 import type { RuntimeProjectHostSetupController } from '../repositories/runtime-project-host-setup-controller'
 import type { RuntimeProjectGroupController } from '../repositories/runtime-project-group-controller'
 import type { RuntimeNestedRepoImport } from '../repositories/runtime-nested-repo-import'
@@ -265,9 +264,7 @@ export abstract class OrcaRuntimeWithPreservedBranchCleanup extends RuntimeAgent
     return this.onClaudeAccountSelected(...change)
   }
 
-  declare protected readonly mobileSpeech: RuntimeMobileSpeechCatalog
-
-  declare protected readonly mobileDictation: RuntimeMobileDictationController
+  protected readonly mobileSpeechOwners = createLazyMobileSpeechOwners(() => this.store)
 
   declare protected readonly projectHostSetups: RuntimeProjectHostSetupController
 

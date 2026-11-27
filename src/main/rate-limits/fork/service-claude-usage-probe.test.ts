@@ -28,9 +28,6 @@ vi.mock('../providers/opencode-go/opencode-go-usage-source-selection', () => ({
   fetchOpenCodeGoUsage: vi.fn()
 }))
 vi.mock('../providers/zcode/zcode-usage-fetcher', () => ({ fetchZcodeRateLimits: vi.fn() }))
-vi.mock('../providers/antigravity/antigravity-usage-fetcher', () => ({
-  fetchAntigravityRateLimits: vi.fn()
-}))
 vi.mock('../providers/muse/muse-usage-fetcher', () => ({ fetchMuseRateLimits: vi.fn() }))
 vi.mock('../providers/minimax/minimax-fetcher', () => ({ fetchMiniMaxRateLimits: vi.fn() }))
 vi.mock('../deepseek/deepseek-fetcher', () => ({ fetchDeepSeekRateLimits: vi.fn() }))

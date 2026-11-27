@@ -13,6 +13,7 @@ import {
   type ChecksDetailPollingPolicy
 } from '../../../../../../shared/github/checks/checks-detail-polling-policy'
 import type { ChecksPanelPollingInput, ChecksPanelPollingState } from './use-checks-panel-polling'
+import { runWithFinally } from '@/lib/run-with-finally'
 
 export function useChecksDetailTimer({
   model,
@@ -166,33 +167,35 @@ export function useChecksDetailTimer({
         // back, the panel opening and a changed aggregate state must read fresh.
         const background = trigger === 'timer' && !shown && !force
         inFlightRef.current = { identity: requestIdentity, token, background }
-        try {
-          // Why two flags on the GitLab path: `background` is the host's WSL refusal (upstream E9 —
-          // a wake is a foreground read), while `suppressLoading` is the fork's "rows already shown":
-          // it is only ever set true, and the callee's own default covers the rest.
-          await (isGitLabReview
-            ? fetchGitLabDetails({
-                background: !shown,
-                ...(prevChecksRef.current !== '' ? { suppressLoading: true } : {})
-              })
-            : fetchChecks({
-                force,
-                ...(shown ? { wakeWslDistro: true } : {}),
-                ...(background ? { background: true } : {})
-              }))
-        } finally {
-          if (inFlightRef.current?.token === token) {
-            inFlightRef.current = null
-            if (lastIdentityRef.current === requestIdentity) {
-              if (!background && modelRef.current.isPanelVisible) {
-                wakeNextReadRef.current = false
+        await runWithFinally(
+          () =>
+            isGitLabReview
+              ? // Why two flags on the GitLab path: `background` is the host's WSL refusal (upstream E9 —
+                // a wake is a foreground read), while `suppressLoading` is the fork's "rows already shown":
+                // it is only ever set true, and the callee's own default covers the rest.
+                fetchGitLabDetails({
+                  background: !shown,
+                  ...(prevChecksRef.current !== '' ? { suppressLoading: true } : {})
+                })
+              : fetchChecks({
+                  force,
+                  ...(shown ? { wakeWslDistro: true } : {}),
+                  ...(background ? { background: true } : {})
+                }),
+          () => {
+            if (inFlightRef.current?.token === token) {
+              inFlightRef.current = null
+              if (lastIdentityRef.current === requestIdentity) {
+                if (!background && modelRef.current.isPanelVisible) {
+                  wakeNextReadRef.current = false
+                }
+                const delay = policyDelay()
+                nextAttemptAtRef.current = delay === null ? Infinity : Date.now() + delay
+                refreshRef.current?.()
               }
-              const delay = policyDelay()
-              nextAttemptAtRef.current = delay === null ? Infinity : Date.now() + delay
-              refreshRef.current?.()
             }
           }
-        }
+        )
       },
       getDelayMs: () => {
         const delay = policyDelay()

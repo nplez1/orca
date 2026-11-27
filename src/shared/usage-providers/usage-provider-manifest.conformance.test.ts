@@ -50,7 +50,6 @@ const sorted = (values: Iterable<string>): string[] => [...values].sort()
 const EXPECTED_PENDING_READOUT: Record<ProviderRateLimits['provider'], object> = {
   claude: {},
   codex: {},
-  antigravity: { buckets: [] },
   'opencode-go': { monthly: null },
   kimi: {},
   minimax: {},
@@ -141,13 +140,11 @@ describe('usageProviderPendingReadout', () => {
     }
   })
 
-  it('marks only the providers whose read is gated by an enable switch', () => {
-    // Why: an unset switch publishes no snapshot at all, and treating that as a fetch
-    // in flight is what would hold the setup CTA back forever.
+  it('gates no provider read behind an enable switch, now that Antigravity usage is retired', () => {
     const gated = USAGE_PROVIDER_MANIFEST_IDS.filter((providerId) =>
       usageProviderPendingNeedsSetup(providerId)
     )
-    expect(sorted(gated)).toEqual(['antigravity'])
+    expect(sorted(gated)).toEqual([])
   })
 })
 

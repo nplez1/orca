@@ -1,9 +1,16 @@
 {
   "note": "Fork-modified test files that are gone at HEAD after a sync (deleted by upstream, or by the resolution). Bound to one sync range: a baseline whose base/tip do not match the range being checked records nothing. Regenerate with `node local/sync/lib/deleted-fork-tests.mjs --baseline-init [--accept <reason>]`: a range that adds a path or a case needs a reason, and every case needs one of its own.",
-  "base": "3e227259249d2daa02ce89f927036bb931fcd1b1",
-  "tip": "f9895f13436a2875f35bde0770430b23430ba661",
-  "accepted": "2026-11-26 sync (upstream 3e227259249): the 20 fork-modified test files from the 7daf01d99f range all survive the merge, and every fork-added case is still in a test file at HEAD; this records the range so a later sync compares against it rather than the previous one",
+  "base": "27a700fd8d659a298769e5453bb340d4debbf76a",
+  "tip": "e8321ad760971f5cc9df7e23908315315a5167c9",
+  "accepted": "re-bound for the 2026-11-27 merge of 27a700fd8d6; 0 fork-modified test files are gone at HEAD",
   "total": 0,
   "files": {},
-  "cases": {}
+  "cases": {
+    "src/renderer/src/components/status-bar/status-bar-provider-visibility.test.ts": {
+      "does not count an enable-gated provider that is switched off as pending": "the only enable-gated usage provider was Antigravity, retired in the 2026-11-27 merge (289e3c029e2), so the case has no subject"
+    },
+    "src/shared/usage-providers/usage-provider-manifest.conformance.test.ts": {
+      "marks only the providers whose read is gated by an enable switch": "the only enable-gated usage provider was Antigravity, retired in the 2026-11-27 merge (289e3c029e2), so the case has no subject"
+    }
+  }
 }

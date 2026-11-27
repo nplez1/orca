@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its 400-line budget; keeping the Antigravity accounts section standalone after the usage retirement added the seam. */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { withManagedAccountDisplayNames } from '../../../../../shared/agent-accounts/managed-account-display-names'
 import type {
@@ -18,7 +19,10 @@ import {
   getProviderAccountsOwnerKey,
   watchProviderAccounts
 } from '@/runtime/provider-accounts/observations/runtime-provider-accounts-client'
-import { getAccountsLocationSearchEntries } from './accounts-search'
+import {
+  getAccountsAntigravitySearchEntries,
+  getAccountsLocationSearchEntries
+} from './accounts-search'
 import { getRemoteAccountsPaneScope } from '../../provider-accounts/provider-account-scope'
 import { ProviderHostScopeControl } from '../../provider-accounts/ProviderHostScopeControl'
 import { SettingsSectionStack } from '../section-layout/SettingsSectionStack'
@@ -47,6 +51,7 @@ import { renderAccountsLocationSection } from './scope/accounts-pane-location-se
 import { isSystemDefaultActive } from './scope/system-default-lanes'
 import { useUsageHostSettings } from './usage/use-usage-host-settings'
 import { ManagedDataAccountsSection } from './providers/ManagedDataAccountsSection'
+import { AntigravityAccountsSection } from './providers/AntigravityAccountsSection'
 import { useUsageProviderEnablement } from '../use-usage-provider-enablement'
 import {
   getProviderAccountsSections,
@@ -382,6 +387,16 @@ export function AccountsPane({
     matchesSettingsSearch(searchQuery, getAccountsLocationSearchEntries())
       ? renderAccountsLocationSection(model, t)
       : null,
+    // Why outside the switchable catalog: native agy accounts are not a metered usage provider.
+    matchesSettingsSearch(searchQuery, getAccountsAntigravitySearchEntries()) ? (
+      <AntigravityAccountsSection
+        key={`antigravity:${accountOwnerKey}:${accountRuntime.runtime}:${accountRuntime.wslDistro ?? ''}`}
+        owner={accountOwner}
+        target={{ runtime: accountRuntime.runtime, wslDistro: accountRuntime.wslDistro }}
+        label={accountRuntimeSentenceLabel}
+        ownerPlatform={accountOwnerPlatform}
+      />
+    ) : null,
     ...shownProviderSections.map((provider) => (
       <ProviderAccountsSection
         key={provider.id}

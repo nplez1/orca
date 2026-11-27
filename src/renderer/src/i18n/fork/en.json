@@ -923,10 +923,7 @@
           "atCap": "The mesh is full at {{count}} members.",
           "inGroup": "Every member is paired with this computer, so each host lists the same workspaces.",
           "notInGroup": "This computer is not in a mesh yet. A computer that has paired with it joins it on its next sync; nothing else is needed here.",
-          "inGroupIncomplete": "Not every pair is joined yet: each host above says which, and this computer keeps retrying on its own.",
-          "autoSyncFirst": "Checks itself on its own, and whenever a computer appears.",
-          "autoSyncJustNow": "Kept current · checked just now",
-          "autoSyncMinutes": "Kept current · checked {{count}}m ago"
+          "inGroupIncomplete": "Not every pair is joined yet: each host above says which, and this computer keeps retrying on its own."
         }
       },
       "sidebar": {
@@ -1175,12 +1172,6 @@
             "cloneFromUrlHelp": null,
             "title": null
           }
-        }
-      },
-      "skills": {
-        "SkillsPage": {
-          "closeSkills": null,
-          "closeTooltip": null
         }
       },
       "diff": {
@@ -1627,11 +1618,6 @@
     },
     "activity": {
       "setup": "Setting up…"
-    }
-  },
-  "accounts": {
-    "antigravity": {
-      "scope": "Manage the native agy account on {{host}}."
     }
   },
   "bots": {

@@ -1,12 +1,11 @@
-import { antigravityUsageDisabledSnapshot } from '../providers/antigravity/antigravity-usage-snapshot'
 import type { ForkUsageStateKey } from '../../../shared/usage-providers/usage-provider-manifest'
-import { RateLimitServiceAntigravityAccounts } from './service-antigravity-accounts'
+import { RateLimitServiceFetchPolicy } from './service-fetch-policy'
 import type { InternalRateLimitState, ProviderRateLimits } from './service-types'
 
 /** The two pieces of fetch-cycle bookkeeping a full cycle needs but that carry no
  *  provider logic of their own: which in-flight fetch each generation stamp
  *  belongs to, and the state a cycle publishes while every provider is fetching. */
-export abstract class RateLimitServiceCycleFetchState extends RateLimitServiceAntigravityAccounts {
+export abstract class RateLimitServiceCycleFetchState extends RateLimitServiceFetchPolicy {
   /** Bump a provider's fetch generation when its credential fingerprint moved, and
    *  answer the generation an in-flight fetch is stamped with. A stale response
    *  whose stamp no longer matches is discarded by the apply phase. */
@@ -92,16 +91,9 @@ export abstract class RateLimitServiceCycleFetchState extends RateLimitServiceAn
     previousState: InternalRateLimitState
     codexFetchGated: boolean
     codexStateBeforeFetch: ProviderRateLimits | null
-    antigravityUsageEnabled: boolean
     changed: Record<'opencodeGo' | 'minimax' | 'zcode' | ForkUsageStateKey, boolean>
   }): void {
-    const {
-      previousState,
-      codexFetchGated,
-      codexStateBeforeFetch,
-      antigravityUsageEnabled,
-      changed
-    } = args
+    const { previousState, codexFetchGated, codexStateBeforeFetch, changed } = args
     this.updateState({
       ...previousState,
       // Upstream's OAuth gate rides here: a switched-off Claude slot shows the disabled reading,
@@ -115,9 +107,6 @@ export abstract class RateLimitServiceCycleFetchState extends RateLimitServiceAn
         ? this.withFetchingStatus(null, 'opencode-go')
         : this.withFetchingStatus(previousState.opencodeGo, 'opencode-go'),
       kimi: this.withFetchingStatus(previousState.kimi, 'kimi'),
-      antigravity: antigravityUsageEnabled
-        ? this.withFetchingStatus(previousState.antigravity, 'antigravity')
-        : (previousState.antigravity ?? antigravityUsageDisabledSnapshot()),
       minimax: changed.minimax
         ? this.withFetchingStatus(null, 'minimax')
         : this.withFetchingStatus(previousState.minimax, 'minimax'),

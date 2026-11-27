@@ -24,7 +24,7 @@ import { openJiraIssueWorkspace } from '@/lib/jira-issue-workspace-open'
 import { TaskPageJiraBoard } from './Board'
 import { TaskPageJiraBoardUnavailableNotice } from './BoardUnavailableNotice'
 import { useJiraBoardMode } from './use-jira-board-mode'
-import { getEnvironmentRuntimeContextKey } from '@/runtime/hosts/observations/provider-runtime-context'
+import { useEnvironmentRuntimeContextKey } from '@/runtime/hosts/observations/provider-runtime-context'
 import { getJiraBoardColumnOrderScopeKey } from './boards/task-page-jira-board-column-order'
 export function TaskPageJiraContent({
   model
@@ -82,9 +82,12 @@ export function TaskPageJiraContent({
   const boardTarget = ipcOrRuntimeTargetForHostId(
     jiraTaskSourceContext?.hostId ?? accountBackedTaskSourceHostId
   )
+  const boardTargetContextKey = useEnvironmentRuntimeContextKey(
+    boardTarget ? runtimeTargetEnvironmentId(boardTarget) : null
+  )
   const boardScopeKey = JSON.stringify([
     jiraTaskSourceScopeKey,
-    boardTarget ? getEnvironmentRuntimeContextKey(runtimeTargetEnvironmentId(boardTarget)) : null
+    boardTarget ? boardTargetContextKey : null
   ])
   // Why two board surfaces: the configured agile board (its own columns, and drops
   // that transition) is what `jiraBoardViewMode` picks, while `jiraViewMode` picks

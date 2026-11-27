@@ -1,13 +1,23 @@
 import { sortByUpdatedAtDescending } from '../../shared/collections/updated-at-order'
-import type { JiraIssue, JiraIssueFilter, JiraIssueListFilters } from '../../shared/jira/jira-types'
+import type {
+  JiraIssue,
+  JiraIssueFilter,
+  JiraIssueListFilters,
+  JiraProject
+} from '../../shared/jira/jira-types'
 import { buildJiraPresetJql, searchJiraPreset } from '../../shared/jira/jira-preset-jql'
+import { restrictJiraQueryToProjectIds } from '../../shared/jira/jira-project-reference'
 import { apiBasePath, jiraRequest, type JiraClientForSite } from './authenticated-request'
+import { JiraApiError } from './jira-api-error'
 import { ISSUE_LIST_FIELDS, mapJiraIssue, type JiraAgileFieldIds } from './jira-issue-mapping'
 import { agileFieldIdList } from './jira-agile-fields'
 import { asFiniteNumber, resolveJiraPageIsLast, type JiraSearchResponse } from './jira-record-pages'
-import { readProjectsForClient } from './jira-project-queries'
+import { readFirstCloudProjectPage, readProjectsForClient } from './jira-project-queries'
 
 const PROJECTS_PER_QUERY = 100
+const BOUNDED_RETRY_SKIP_MS = 5 * 60_000
+// Site id -> when to stop skipping the unbounded-JQL retry; set when its projects did not fit one query.
+const sitesSkippingBoundedRetry = new Map<string, number>()
 
 export type JiraIssueQuery =
   | { filter: JiraIssueFilter; filters?: JiraIssueListFilters }
@@ -50,10 +60,7 @@ async function resolveProjectChunkJql(
     return null
   }
   const projects = await readProjectsForClient(entry, signal, true)
-  const projectIds = [...new Set(projects.map((project) => project.id || project.key))]
-  if (projectIds.some((id) => !id)) {
-    throw new Error('Jira returned a project without an ID or key.')
-  }
+  const projectIds = uniqueProjectIds(projects)
   const presetJql = buildJiraPresetJql(query.filter, query.filters)
   const chunks: string[] = []
   for (let start = 0; start < projectIds.length; start += PROJECTS_PER_QUERY) {
@@ -214,6 +221,45 @@ async function collectIssuesForClient(
   throw new Error('Jira issue search exceeded the page limit. Select a project with JQL instead.')
 }
 
+function isUnboundedJqlError(error: unknown): boolean {
+  return (
+    error instanceof JiraApiError && error.status === 400 && /unbounded jql/i.test(error.message)
+  )
+}
+
+function uniqueProjectIds(projects: JiraProject[]): string[] {
+  const projectIds = [...new Set(projects.map((project) => project.id || project.key))]
+  if (projectIds.some((id) => !id)) {
+    throw new Error('Jira returned a project without an ID or key.')
+  }
+  return projectIds
+}
+
+// Merging per-chunk results would replace the caller's ORDER BY with recency, so retry only when
+// one project page lists every visible project and they fit one bounded query.
+async function searchBoundedToVisibleProjects(
+  entry: JiraClientForSite,
+  jql: string,
+  limit: number,
+  agileFields: JiraAgileFieldIds,
+  signal: AbortSignal
+): Promise<JiraIssue[] | null> {
+  if ((sitesSkippingBoundedRetry.get(entry.site.id) ?? 0) > Date.now()) {
+    return null
+  }
+  const page = await readFirstCloudProjectPage(entry, PROJECTS_PER_QUERY, signal)
+  if (!page.complete) {
+    sitesSkippingBoundedRetry.set(entry.site.id, Date.now() + BOUNDED_RETRY_SKIP_MS)
+    return null
+  }
+  const projectIds = uniqueProjectIds(page.projects)
+  if (projectIds.length === 0) {
+    return null
+  }
+  const boundedJql = restrictJiraQueryToProjectIds(jql, projectIds)
+  return collectIssuesForClient(entry, { jql: boundedJql }, limit, agileFields, signal)
+}
+
 export async function readIssuesForClient(
   entry: JiraClientForSite,
   query: JiraIssueQuery,
@@ -225,8 +271,27 @@ export async function readIssuesForClient(
   if (!chunks) {
     // One page, as the array reads always asked for: a caller that wants more asks for a
     // bigger limit, so following a cursor here would change every existing caller's cost.
-    const page = await readIssuePageForClient(entry, query, limit, agileFields, signal)
-    return page.issues.slice(0, limit)
+    try {
+      const page = await readIssuePageForClient(entry, query, limit, agileFields, signal)
+      return page.issues.slice(0, limit)
+    } catch (error) {
+      // Cloud rejects a JQL with no project restriction; Server has no such rule to retry.
+      if (!('jql' in query) || entry.site.authType === 'server' || !isUnboundedJqlError(error)) {
+        throw error
+      }
+      // Any retry failure keeps Jira's 400 so the renderer's text fallback still runs.
+      const issues = await searchBoundedToVisibleProjects(
+        entry,
+        query.jql,
+        limit,
+        agileFields,
+        signal
+      ).catch(() => null)
+      if (!issues) {
+        throw error
+      }
+      return issues
+    }
   }
   const issues: JiraIssue[] = []
   for (const chunkJql of chunks) {

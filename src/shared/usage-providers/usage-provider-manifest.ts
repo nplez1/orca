@@ -105,25 +105,6 @@ export const USAGE_PROVIDER_MANIFEST = {
       { kind: 'tool-owned', reason: 'The Codex CLI keeps its own auth.json in its runtime home.' }
     ]
   },
-  antigravity: {
-    owner: 'upstream',
-    stateKey: 'antigravity',
-    configuredFlags: [],
-    pendingReadout: ['buckets'],
-    // Why: agy is read only while `antigravityUsageConfigured` is set, so an unset
-    // switch publishes no snapshot at all — which must not read as a fetch in flight.
-    pendingNeedsSetup: true,
-    credentials: [
-      {
-        kind: 'local-only',
-        storeModule: 'antigravity/native-account-store',
-        // Why: the vault holds each account's credential string, so it is Orca's own
-        // encrypted store rather than the CLI's login — and no port carries it.
-        reason: 'Encrypted account vault this build owns; replication has no port for it.'
-      },
-      { kind: 'tool-owned', reason: 'agy keeps the native login this reads.' }
-    ]
-  },
   'opencode-go': {
     owner: 'upstream',
     stateKey: 'opencodeGo',
