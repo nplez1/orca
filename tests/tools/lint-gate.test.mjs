@@ -6,6 +6,7 @@ import {
   classifyRun,
   entryProblem,
   extractFailureLines,
+  FAST_LINT_STEPS,
   finalize,
   FORK_LINT_STEPS,
   matchesEntry,
@@ -61,6 +62,16 @@ describe('fork-only steps run from the gate, not from package.json', () => {
       'check-upstream-identity-literals'
     )
     expect(FORK_LINT_STEPS.map((step) => step.id)).toContain('check-upstream-identity-literals')
+  })
+
+  // Why against the real tree: `--fast` rejects an unknown id the way `--only` does, so a step a sync
+  // renamed would break the inner loop rather than shrink it — this catches that before an agent does.
+  it('names only steps the gate resolves in its --fast subset', () => {
+    const { scripts } = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8'))
+    const ids = new Set(resolveGateSteps(scripts).map((step) => step.id))
+    expect(FAST_LINT_STEPS.filter((id) => !ids.has(id))).toEqual([])
+    expect(new Set(FAST_LINT_STEPS).size).toBe(FAST_LINT_STEPS.length)
+    expect(FAST_LINT_STEPS).toContain('check-upstream-file-comments')
   })
 
   it('runs the fork comment ratchet on this repository', () => {
