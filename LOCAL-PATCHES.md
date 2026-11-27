@@ -941,7 +941,7 @@ background shell, because a shell the agent started as part of its turn is still
 reserved for Claude session-cron callbacks and for a running **monitor**, which is upstream's own
 verdict and the one `claude-background-task-inventory.test.ts` pins. The fork owner chose (2026-09-25)
 to keep this policy and express it on upstream's fold rather than revert to upstream's semantics; the
-2026-11-28 sync narrowed it to the shell kind alone, because the fork's justification names a shell
+2026-11-27 sync narrowed it to the shell kind alone, because the fork's justification names a shell
 and a monitor is `kind: 'monitor'`, not a shell (`classifyClaudeBackgroundTaskKind`).
 
 Anchors, both on upstream-owned files and marked `LOCAL(nplez1)`:
@@ -3621,29 +3621,6 @@ section stays readable. `tests/tools/fork-process-docs.test.mjs` holds the three
   - **Opened clean:** `pnpm tc` was green on the merged tip, `post-sync.mjs` passed 16 of 18 rows with
     2 info, and `check:code-quality:changed` reported 0 findings across 2,982 changed files.
 
-### Fork comment rationale moved out of upstream-owned files (2026-11-27 sync)
-
-The ratchet (`local/check-upstream-file-comments.mjs`) forbids rationale paragraphs above upstream's
-code, so this sync's were moved here and into the ledger. Kept verbatim because the code they explain
-is upstream's and the next sync will bring it again:
-
-- **`src/main/jira/jira-api-error.ts`** — the class must be declared here rather than re-exported from
-  `authenticated-request.ts`: a re-export makes it part of that module's surface, so anything mocking the
-  request layer erases every `instanceof` against it. `fieldErrors` is present when Jira answered with an
-  `errors` object, which is how a transition or edit names the field it refused; `scopeMismatch` means
-  the credential is valid but under-scoped, so it must not be cleared.
-- **`src/main/jira/jira-issue-search.ts`** — the fork extracted `runPerSite` out of `searchIssues`, so
-  three of upstream's own comments (discovery-before-search slot order, cancellation through queue
-  admission, the partial-success rule) now sit inside the helper and read as fork additions. They are
-  marked `fork-comment-ok` in place rather than reworded, because they must stay byte-identical to what
-  the next sync brings. The fork's own two cursor comments explain the guard in the line below them.
-- **`src/shared/agent-hook-listener/listener-state.ts`** — `piScheduledWorkByPaneKey` is kept on the
-  listener state rather than read off the current event because a republish can be triggered by something
-  that carries no inventory at all (a descendant draining, a resumed session's placeholder), and reading
-  absence there would drop a hold nothing has cleared; its fire times are relative to the post that armed
-  it. `descendantLeadStateByPaneKey` is deliberately not a state claim: it only refines a republish an
-  incoming descendant event already triggered, and never creates a row on its own.
-
 - **2026-11-24 — merge of upstream `7daf01d99f3` (1,350 commits) into the release line, from
   `cc4fefcbaad`** (merge base `0c6207e3d7`, rollback tag `archive/pre-sync-cc4fefcbaa`, merge commit
   `a8c508f5fb7`). **323 conflicted paths** —
@@ -3738,6 +3715,29 @@ is upstream's and the next sync will bring it again:
     upstream-owned _and_ under budget upstream, so the overage is the fork's delta; splitting one costs
     a permanent hunk on every sync (this file's `local(lint)` rule). The ratchet grew by 31 entries and
     the review gate should see it.
+
+### Fork comment rationale moved out of upstream-owned files (2026-11-27 sync)
+
+The ratchet (`local/check-upstream-file-comments.mjs`) forbids rationale paragraphs above upstream's
+code, so this sync's were moved here and into the ledger. Kept verbatim because the code they explain
+is upstream's and the next sync will bring it again:
+
+- **`src/main/jira/jira-api-error.ts`** — the class must be declared here rather than re-exported from
+  `authenticated-request.ts`: a re-export makes it part of that module's surface, so anything mocking the
+  request layer erases every `instanceof` against it. `fieldErrors` is present when Jira answered with an
+  `errors` object, which is how a transition or edit names the field it refused; `scopeMismatch` means
+  the credential is valid but under-scoped, so it must not be cleared.
+- **`src/main/jira/jira-issue-search.ts`** — the fork extracted `runPerSite` out of `searchIssues`, so
+  three of upstream's own comments (discovery-before-search slot order, cancellation through queue
+  admission, the partial-success rule) now sit inside the helper and read as fork additions. They are
+  marked `fork-comment-ok` in place rather than reworded, because they must stay byte-identical to what
+  the next sync brings. The fork's own two cursor comments explain the guard in the line below them.
+- **`src/shared/agent-hook-listener/listener-state.ts`** — `piScheduledWorkByPaneKey` is kept on the
+  listener state rather than read off the current event because a republish can be triggered by something
+  that carries no inventory at all (a descendant draining, a resumed session's placeholder), and reading
+  absence there would drop a hold nothing has cleared; its fire times are relative to the post that armed
+  it. `descendantLeadStateByPaneKey` is deliberately not a state claim: it only refines a republish an
+  incoming descendant event already triggered, and never creates a row on its own.
 
 ### `local(ci)`: release workflow
 

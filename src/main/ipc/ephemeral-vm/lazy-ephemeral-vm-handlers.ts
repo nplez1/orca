@@ -24,7 +24,9 @@ export const EPHEMERAL_VM_IPC_CHANNELS = [
   'ephemeralVm:cleanup',
   'ephemeralVm:stopCleanup',
   'ephemeralVm:forgetRuntime',
-  'ephemeralVm:getCleanupCommand'
+  'ephemeralVm:getCleanupCommand',
+  'ephemeralVm:extendLifetime',
+  'ephemeralVm:runContextMenuItem'
 ] as const
 
 async function hasPersistedEphemeralVmState(userDataPath: string): Promise<boolean> {

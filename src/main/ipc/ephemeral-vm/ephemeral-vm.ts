@@ -44,15 +44,15 @@ export function registerEphemeralVmHandlers(
     }
   }
   registerEphemeralVmRuntimeHandlers(store, ipc)
+  startEphemeralVmRuntimeReclaim({
+    userDataPath: app.getPath('userData'),
+    getMainWindow: getCurrentMainWindow
+  })
+  // Why here: a create runs detached, so this is the only point at which an attempt that never
+  // reported can be told apart from one whose app was killed mid-flight. It warns and records the
+  // flag; nothing can destroy the machine, because no recipe result ever arrived to build destroy from.
+  flagInterruptedEphemeralVmProvisioning({ userDataPath: app.getPath('userData') })
   if (!options?.skipStartupReconcile) {
-    startEphemeralVmRuntimeReclaim({
-      userDataPath: app.getPath('userData'),
-      getMainWindow: getCurrentMainWindow
-    })
-    // Why here: a create runs detached, so this is the only point at which an attempt that never
-    // reported can be told apart from one whose app was killed mid-flight. It warns and records the
-    // flag; nothing can destroy the machine, because no recipe result ever arrived to build destroy from.
-    flagInterruptedEphemeralVmProvisioning({ userDataPath: app.getPath('userData') })
     reconcileInterruptedEphemeralVmProvisionsOnStartup(app.getPath('userData'))
   }
 

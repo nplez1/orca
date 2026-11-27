@@ -63,13 +63,12 @@ const GitHubInstallMount = lazy(() =>
 const Terminal = lazy(() => import('../components/terminal/workbench/Terminal'))
 
 // Views whose page renders its own top row and reserves the window-controls band itself, so the shell
-// must not stack an empty titlebar above it. Automations and artifacts are deliberately absent: they
-// rely on that stripe for the band (upstream #47038), and they sit under it for the same reason.
+// must not stack an empty titlebar above it. Automations, artifacts and skills are deliberately absent:
+// they are `RailPage` views that rely on that stripe for the band (upstream #47038).
 // The landing page still takes the stripe; converting it is a separate change.
 const VIEWS_OWNING_CONTENT_HEADER: ReadonlySet<TopLevelView> = new Set([
   'tasks',
   'dashboard',
-  'skills',
   'mobile'
 ])
 

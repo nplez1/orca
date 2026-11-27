@@ -132,12 +132,6 @@
         "setLocationOnHost": null,
         "setLocationTooltip": null
       },
-      "skills": {
-        "SkillsPage": {
-          "closeSkills": null,
-          "closeTooltip": null
-        }
-      },
       "new": {
         "workspace": {
           "SetProjectLocationDialog": {

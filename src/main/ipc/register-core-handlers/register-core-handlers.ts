@@ -28,7 +28,6 @@ import { registerAiVaultSearchHandlers } from '../ai-vault/ai-vault-search'
 import { registerNativeChatHandlers } from '../native-chat'
 import { registerNotificationHandlers } from '../notifications/notifications'
 import { registerOnboardingHandlers } from '../onboarding'
-import { registerDashboardPopoutHandlers } from '../dashboard/dashboard-popout'
 import { setAgentBrowserBridgeRef, registerBrowserHandlers } from '../browser/browser'
 import { setTrustedBrowserRendererWebContentsId } from '../browser/browser-renderer-trust'
 import { registerSessionHandlers } from '../session'
@@ -147,7 +146,6 @@ export async function registerCoreHandlers(
     registerStatsHandlers(stats)
     registerNotificationHandlers(store, runtime)
     registerOnboardingHandlers(store)
-    registerDashboardPopoutHandlers(store, keybindings)
     registerSettingsHandlers(store, agentAwakeService)
     registerLazySkillsHandlers(store, runtime)
     registerLazySkillDeleteIpcHandlers(store, runtime)

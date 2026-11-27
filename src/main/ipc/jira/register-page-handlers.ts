@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron'
+import type { IpcHandleRegistrar } from '../lazy-ipc-handle-group'
 import { JiraIssueListFiltersParam } from '../../../shared/rpc-contract/jira/jira-quick-filter-params'
 import type {
   JiraIssueFilter,
@@ -36,8 +36,11 @@ function readIssuePageCursor(args?: {
 
 /** The list's paged reads. They share `searchRequests` so the existing cancel channel also
  *  abandons a page, rather than leaving it to hold a shared Jira pool slot. */
-export function registerJiraPageHandlers(deps: { searchRequests: JiraCancellableRequests }): void {
-  ipcMain.handle(
+export function registerJiraPageHandlers(
+  ipc: IpcHandleRegistrar,
+  deps: { searchRequests: JiraCancellableRequests }
+): void {
+  ipc.handle(
     'jira:searchIssuesPage',
     async (
       _event,
@@ -66,7 +69,7 @@ export function registerJiraPageHandlers(deps: { searchRequests: JiraCancellable
     }
   )
 
-  ipcMain.handle(
+  ipc.handle(
     'jira:listIssuesPage',
     async (
       _event,

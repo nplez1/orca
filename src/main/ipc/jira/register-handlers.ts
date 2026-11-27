@@ -40,7 +40,7 @@ const issueSummaryRequests = new JiraCancellableRequests()
 const searchRequests = new JiraCancellableRequests()
 
 export function registerJiraHandlers(ipc: IpcHandleRegistrar = ipcMain): void {
-  registerJiraPageHandlers({ searchRequests })
+  registerJiraPageHandlers(ipc, { searchRequests })
   ipc.handle('jira:connect', async (_event, args: JiraConnectArgs) => {
     if (
       typeof args?.siteUrl !== 'string' ||
