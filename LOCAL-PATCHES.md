@@ -6596,3 +6596,40 @@ and `45779423920` at `12957a82e44` (34,636 ms), each green on all three legs.
 Those numbers are the measurement behind the fix. The test that reddened at 33,065 ms against a 30 s cap
 has since taken 26.2 s, 26.6 s, 26.8 s and 34.6 s on the same runner — one of four still over the old
 cap, and the margin that let the other three through is the coin flip this entry is about.
+
+### `local(test)`: the card test that charged its module graph to a 20s test budget
+
+`fork-main-tests` reddened on `main` at `830852634b4` (run
+[45942815750](https://github.com/nplez1/orca/actions/runs/45942815750), 2026-11-27): shard 17/24 failed
+`src/renderer/src/components/sidebar/WorktreeCard.merge-marker.test.tsx` with `Test timed out in
+20000ms` on the first test, and then failed the second test too, 281 ms later, on an assertion about a
+metadata row.
+
+**The cost was the card's module graph, not the assertions.** Each test opened with its own
+`await import('./workspace-card/surface/WorktreeCard')`, so the cold transform and load of that graph
+was charged to the test's own timeout — and the file's line in the run the night before
+([45758341047](https://github.com/nplez1/orca/actions/runs/45758341047), green) is **17,462 ms**. On a
+warm Mac the same file is 1.5 s, and the two tests inside it are 20 ms and 3 ms: a 20 s budget against a
+17.5 s cost, decided by how loaded the runner is.
+
+**The second failure was the first one's shadow.** A timed-out test body is abandoned, not cancelled, so
+the first test's continuation ran during the second, left the module-level `settings` on the experimental
+card style, and the default-style metadata row the last assertion reads was never rendered. Both tests
+assert the same product behaviour in either style, so one red was reported as two.
+
+**What the fork changed**, in the same commit as this entry: one static
+`import WorktreeCard from './workspace-card/surface/WorktreeCard'` replaces both dynamic imports, and the
+two `}, 20_000)` timeouts go with them. Module scope has no per-test budget to cross, both bodies are now
+synchronous (so an abandoned body has no point to resume from), and nothing left in either body can
+await — which is why removing the timeouts is the fix rather than a wider one. The file is fork-added, so
+this costs nothing in `check-upstream-file-comments` (4,764/4,764) and needs no
+`host-mesh-upstream-seams` row; no allowlist moved, and both tests still run and assert the same markup.
+
+**Verified on the runner that reddened.** Dispatch
+[45953273363](https://github.com/nplez1/orca/actions/runs/45953273363) at `9a0bd1b944c` — the commit this
+entry ships with — is green on all 24 shards, and the file's own line reads **137 ms** for its two tests
+where the same line read 17,462 ms the night before. The 17.3 s did not disappear: it is the collection
+phase now, where the shard job's 60-minute budget covers it.
+
+The anchors are the file and its two `it(...)` titles. A future edit that puts an `await` back inside
+either body re-creates the exposure this entry removes, because the timeout that would cover it is gone.
