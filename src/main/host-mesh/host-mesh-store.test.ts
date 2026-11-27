@@ -39,7 +39,8 @@ function groupState(): HostMeshState {
       },
       inbound: { 'key-a': { kind: 'active' }, 'key-b': { kind: 'absent' } }
     },
-    names: { 'key-a': { label: 'Studio', version: 2 } }
+    names: { 'key-a': { label: 'Studio', version: 2 } },
+    routes: { 'key-a': ['ws://192.168.1.20:6768'] }
   }
 }
 
@@ -176,6 +177,22 @@ describe('the group on disk', () => {
       deviceRowIds: ['row-1', 'row-2'],
       environmentId: 'env-1'
     })
+  })
+
+  it('drops revoked rows from the index and keeps every row it was not told about', () => {
+    // Why this matters: an entry keeps everything ever minted for that machine so removal can revoke the set, and
+    // the mesh minted one row per failed offer. Without this the index grew by one entry per retry forever.
+    store().recordPeer('key-a', { deviceRowId: 'row-1', environmentId: 'env-1' })
+    store().recordPeer('key-a', { deviceRowId: 'row-2' })
+    store().recordPeer('key-b', { deviceRowId: 'row-3' })
+
+    store().forgetPeerDeviceRows(new Set(['row-2', 'row-3']))
+
+    expect(store().readPeerIndex().get('key-a')).toEqual({
+      deviceRowIds: ['row-1'],
+      environmentId: 'env-1'
+    })
+    expect(store().readPeerIndex().get('key-b')).toEqual({ deviceRowIds: [], environmentId: null })
   })
 
   it('treats a file past the byte cap as unreadable rather than loading it', () => {

@@ -2,7 +2,7 @@ import { defineFixture } from '../../../../component-fixtures/component-fixture'
 import type { HostMeshSnapshot } from '../../../../../../preload/api/host-mesh-api'
 import { ServerListRow, ServerRowChip } from '../../host-rows/ServerListRow'
 import { HostGroupSection } from './HostGroupSection'
-import { MeshMemberAffordance } from './mesh-member-affordance'
+import { MeshMemberChip, MeshMemberMenuItems } from './mesh-member-affordance'
 import { publishHostMeshSnapshot } from './host-mesh-shared-state'
 
 /**
@@ -68,19 +68,19 @@ function section(value: HostMeshSnapshot) {
           <ServerListRow
             name="studio"
             meta={<span className="truncate">ws://192.0.2.12:6768</span>}
-            chips={<MeshMemberAffordance environmentId="env-studio" />}
+            chips={<MeshMemberChip environmentId="env-studio" />}
             status={{ label: 'Connected', tone: 'success' }}
           />
           <ServerListRow
             name="macbook-pro-16"
             meta={<span className="truncate">ws://192.0.2.13:6768</span>}
-            chips={<MeshMemberAffordance environmentId="env-laptop" />}
+            chips={<MeshMemberChip environmentId="env-laptop" />}
             status={{ label: 'Connected', tone: 'success' }}
           />
           <ServerListRow
             name="unpaired-box"
             meta={<span className="truncate">ws://192.0.2.14:6768</span>}
-            chips={<MeshMemberAffordance environmentId="env-unpaired" />}
+            chips={<MeshMemberChip environmentId="env-unpaired" />}
             status={{ label: 'Connected', tone: 'success' }}
           />
         </div>
@@ -126,7 +126,7 @@ export const notInMesh = section(
   })
 )
 
-/** The row affordance alone, both states, so the chip and the Eject are reviewable on their own. */
+/** The row affordance alone, both states, so the chip and the menu actions are reviewable on their own. */
 export const rowAffordance = defineFixture({
   width: 480,
   setup: () => installMeshApi(snapshot()),
@@ -134,12 +134,13 @@ export const rowAffordance = defineFixture({
     <div className="divide-y divide-border rounded-lg border border-border bg-card">
       <ServerListRow
         name="studio"
-        chips={<MeshMemberAffordance environmentId="env-studio" />}
+        chips={<MeshMemberChip environmentId="env-studio" />}
+        menuItems={<MeshMemberMenuItems environmentId="env-studio" onAction={() => {}} />}
         status={{ label: 'Connected', tone: 'success' }}
       />
       <ServerListRow
         name="macbook-pro-16"
-        chips={<MeshMemberAffordance environmentId="env-laptop" />}
+        chips={<MeshMemberChip environmentId="env-laptop" />}
         status={{ label: 'Connected', tone: 'success' }}
       />
       <ServerListRow
@@ -147,7 +148,7 @@ export const rowAffordance = defineFixture({
         chips={
           <>
             <ServerRowChip>SSH tunnel</ServerRowChip>
-            <MeshMemberAffordance environmentId="env-unpaired" />
+            <MeshMemberChip environmentId="env-unpaired" />
           </>
         }
         status={{ label: 'Connected', tone: 'success' }}

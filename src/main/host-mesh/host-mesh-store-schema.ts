@@ -62,7 +62,9 @@ export const stateSchema = z.looseObject({
     outbound: z.record(z.string().min(1), outboundLinkSchema),
     inbound: z.record(z.string().min(1), inboundLinkSchema)
   }),
-  names: z.record(z.string().min(1), nameSchema).default({})
+  names: z.record(z.string().min(1), nameSchema).default({}),
+  // A file written before routes existed has none, and an empty map is the right "nothing learned yet".
+  routes: z.record(z.string().min(1), z.array(z.string())).default({})
 })
 
 export const peerEntrySchema = z.looseObject({
