@@ -115,7 +115,16 @@ suite run. Measured
 on the last 40 commits, 15 touched `src/shared` or `src/packages`, so roughly a third of changes still
 carry the full gate — the third with the blast radius.
 
-`--waive-gate <1|2>:<reason>` records a deliberate exception and writes `Gate <n> waived: <reason>`
+Gate 3 is **lint**: the script requires the PASS marker a full, clean `orca-queue node local/gate-lint.mjs`
+writes for the head itself — not an ancestor, because lint reads Markdown (`check:readme-local-links`,
+`verify:bundled-skill-guides`), so a docs-only commit can still turn it red. An upstream PR is
+exempt, because upstream's CI lints it. Measured 2026-11-13 →
+11-27, 37 of 118 `Fork PR gates` runs went red, every one of them at the lint verdict, while the PR
+opener never asked. Iterate with `node local/gate-lint.mjs --fast` — 16 steps in about 45 s, no queue,
+no marker — which every one of those 37 runs would have failed locally; then run the full gate once on
+the committed head.
+
+`--waive-gate <1|2|3>:<reason>` records a deliberate exception and writes `Gate <n> waived: <reason>`
 into the PR body, because a waiver a reader cannot find is not recorded. Gate 1 is fork-local either
 way, so an upstream PR carries no verdict for it and always needs an explicit
 `--waive-gate 1:"upstream PR, gated by upstream CI"`. `--dry-run` reports a refusal instead of

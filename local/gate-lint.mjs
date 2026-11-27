@@ -17,10 +17,11 @@
  * left a grandchild holding the output pipe and the gate waited ~48 minutes for a stream that could
  * not close (#446). See `runStep`.
  *
- * Usage: node local/gate-lint.mjs [--allowlist PATH] [--only id,id] [--timeout-ms N] [--prune]
- *                                 [--verbose]
+ * Usage: node local/gate-lint.mjs [--allowlist PATH] [--only id,id | --fast] [--timeout-ms N]
+ *                                 [--prune] [--verbose]
  *
  *   --only     run just these step ids, for iterating on one ratchet.
+ *   --fast     run `FAST_LINT_STEPS`, the inner-loop subset: under a minute, no queue, no marker.
  *   --prune    drop entries that no longer reproduce and the steps that no longer exist.
  *   --timeout-ms N   per-step deadline, default 10 minutes; an overrun fails the gate.
  *
@@ -34,10 +35,11 @@
 import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
+import { FAST_LINT_STEPS } from './gate-lint-fast-steps.mjs'
 import { lintVerdictTarget, writeLintVerdict } from './gate-lint-verdict.mjs'
 import { entryProblem, matchesEntry } from './lib/known-red.mjs'
 
-export { entryProblem, matchesEntry }
+export { entryProblem, matchesEntry, FAST_LINT_STEPS }
 
 const ROOT = resolve(import.meta.dirname, '..')
 const DEFAULT_ALLOWLIST = join(ROOT, 'local', 'lint-known-red.json')
@@ -76,10 +78,10 @@ export function tailLines(output, limit = TAIL_LINES) {
 }
 
 function usage() {
-  return 'usage: node local/gate-lint.mjs [--allowlist PATH] [--only id,id] [--timeout-ms N] [--prune] [--verbose]'
+  return 'usage: node local/gate-lint.mjs [--allowlist PATH] [--only id,id | --fast] [--timeout-ms N] [--prune] [--verbose]'
 }
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
   const options = {
     allowlist: DEFAULT_ALLOWLIST,
     only: null,
@@ -98,6 +100,8 @@ function parseArgs(argv) {
         .filter(Boolean)
     } else if (arg === '--timeout-ms') {
       options.timeoutMs = Number(argv[(index += 1)])
+    } else if (arg === '--fast') {
+      options.only = [...FAST_LINT_STEPS]
     } else if (arg === '--prune' || arg === '--verbose') {
       options[arg.slice(2)] = true
     } else if (arg === '--help' || arg === '-h') {
@@ -785,7 +789,21 @@ async function main(argv = process.argv.slice(2)) {
       prune: options.prune,
       allowlist: options.allowlist,
       manifest,
-      recordVerdict: (verdict) => gitCommonDir && writeLintVerdict({ ...verdict, gitCommonDir }),
+      recordVerdict: (verdict) => {
+        // Why these refusals: the marker is what `open-pr.mjs` gate 3 accepts, so it must name the
+        // default allowlist and the revision that actually ran. A run against another allowlist, or
+        // one whose HEAD moved or tree changed while the steps ran, says nothing about this commit.
+        const after = lintVerdictTarget(git)
+        if (
+          !gitCommonDir ||
+          options.allowlist !== DEFAULT_ALLOWLIST ||
+          after.fullRevision !== fullRevision ||
+          after.dirty
+        ) {
+          return null
+        }
+        return writeLintVerdict({ ...verdict, gitCommonDir })
+      },
       out: writeOut,
       err: writeErr
     }

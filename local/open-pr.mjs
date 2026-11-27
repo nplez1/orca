@@ -21,6 +21,11 @@
 // deliberate exception and writes it into the PR body, because a waiver a reader cannot find is not
 // recorded.
 //
+// Why lint is a third gate: AGENTS.md has always put `gate-lint` in PR gate 1, and nothing read it.
+// Measured 2026-11-13 → 11-27, 37 of 118 `Fork PR gates` runs went red, every one of them at the lint
+// verdict, and each cost a CI cycle, a fix and a re-push. `gate-lint.mjs` already writes a PASS marker
+// per revision for the release boundary; this reads the same marker, for the head itself.
+//
 //   body=$(mktemp "${TMPDIR:-/tmp}/orca-pr-body.XXXXXX")
 //   node local/open-pr.mjs --title "fix(git): ..." --body-file "$body"
 //   node local/open-pr.mjs --title "..." --body-file "$body" --dry-run
@@ -47,6 +52,7 @@ import {
   toolchainVersions
 } from './gate-verdict-cache.mjs'
 import { changedPathsIn, forkOwnedPathsInRange } from './fork-owned-paths.mjs'
+import { readLintVerdict } from './gate-lint-verdict.mjs'
 
 // Why re-exported rather than owned here: `.husky/commit-msg` enforces the same set at commit time,
 // so it lives in `fork-owned-paths.mjs`; this module stays the name its callers already import.
@@ -135,7 +141,7 @@ export function usage() {
   --base <branch>     base branch (defaults: ${FORK_BASE}, or ${UPSTREAM_BASE} with --upstream)
   --branch <branch>   head branch (defaults to the checked-out branch)
   --waive-gate <n>:<reason>
-                      open the PR without gate <n> (1 = unit gate, 2 = review), and write
+                      open the PR without gate <n> (1 = unit gate, 2 = review, 3 = lint), and write
                       \`Gate <n> waived: <reason>\` into the PR body
   --dry-run           print the gh command instead of running it, and report a gate refusal
                       instead of aborting on it
@@ -150,6 +156,9 @@ line in the body shaped like:
 Where that line names a round, the round needs a closed verdict of its own — \`clean\`, or a count of
 blocking findings that were fixed — and the reviewer has to be the one \`REVIEWER\` in
 \`pr-body-claims.mjs\` names, at the level that object names.
+Gate 3 needs a full, clean PASS from \`orca-queue node local/gate-lint.mjs\` on the head itself.
+Iterate with \`node local/gate-lint.mjs --fast\`
+first: it runs the steps that reddened PRs most, in under a minute, and writes no marker.
 `
 }
 
@@ -162,9 +171,9 @@ export function fail(message) {
 export function parseGateWaivers(entries = []) {
   const waivers = new Map()
   for (const entry of entries) {
-    const match = /^\s*([12])\s*:\s*(\S.*)$/.exec(entry)
+    const match = /^\s*([123])\s*:\s*(\S.*)$/.exec(entry)
     if (!match) {
-      throw new Error(`--waive-gate expects <1|2>:<reason>, got "${entry}"`)
+      throw new Error(`--waive-gate expects <1|2|3>:<reason>, got "${entry}"`)
     }
     waivers.set(Number(match[1]), match[2].trim())
   }
@@ -300,8 +309,34 @@ export function requireUnitGate(head, options) {
 }
 
 /**
- * The decision both gates make, separated from printing and exiting so it can be tested: `problems`
+ * Gate 3's question: is there a full, clean lint PASS for `head` itself? Null when there is, otherwise
+ * the refusal with the command that fixes it.
+ *
+ * Why the head's own marker and not the docs-only walk the release boundary takes: that walk counts any
+ * `*.md` as neutral, and lint reads Markdown — `check:readme-local-links` and
+ * `verify:bundled-skill-guides` are both steps that have reddened PRs. A README edit after a PASS would
+ * pass here and go red in CI, which is the failure this gate exists to stop. A re-run costs ~2 minutes.
+ */
+export function lintGateProblem(head, { commonDir } = {}) {
+  const dir = commonDir ?? tryGit(['rev-parse', '--path-format=absolute', '--git-common-dir'])
+  if (!dir) {
+    return 'cannot resolve the git common dir, so no lint verdict can be found'
+  }
+  const short = String(head).slice(0, 12)
+  const verdict = readLintVerdict(dir, String(head))
+  if (verdict?.allPassed === true) {
+    return null
+  }
+  if (verdict) {
+    return `lint FAILED on ${short} (${(verdict.failed ?? []).join(', ') || 'no step ids recorded'}); fix it, then: orca-queue node local/gate-lint.mjs`
+  }
+  return `no full lint verdict for ${short}, and one for an ancestor does not count; run it on the committed head: orca-queue node local/gate-lint.mjs`
+}
+
+/**
+ * The decision the gates make, separated from printing and exiting so it can be tested: `problems`
  * is what the PR boundary refuses on, `passes` is what it reports, `waived` is what a person chose.
+ * `lintProblem` is injected so a test can answer gate 3 without a repository behind it.
  */
 export function evaluateGates({
   upstream,
@@ -309,7 +344,8 @@ export function evaluateGates({
   head,
   body,
   gateOne = {},
-  changedPaths = null
+  changedPaths = null,
+  lintProblem = lintGateProblem
 } = {}) {
   const problems = []
   const passes = []
@@ -347,6 +383,23 @@ export function evaluateGates({
         `gate 2 needs a review claim in the PR body: ${claim.reason}.\n` +
           `Expected a line shaped like:\n  ${REVIEW_CLAIM_EXAMPLE}`
       )
+    }
+  }
+  if (!waivers.has(3)) {
+    if (upstream) {
+      // Why not required: the gate's fork steps judge a branch against `origin/main`, which an
+      // upstream branch is not cut from; upstream's own CI lints what it receives.
+      passes.push('gate 3 not required — an upstream PR is linted by upstream CI')
+    } else {
+      const problem = lintProblem(head)
+      if (problem) {
+        problems.push(
+          `gate 3 (lint): ${problem}\n` +
+            `Iterate with \`node local/gate-lint.mjs --fast\` (under a minute), then run the full gate once.`
+        )
+      } else {
+        passes.push(`gate 3 PASS — a full lint verdict covers ${String(head).slice(0, 10)}`)
+      }
     }
   }
   return { problems, passes, waived: [...waivers.entries()] }

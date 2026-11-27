@@ -118,9 +118,12 @@ it('collects a waiver per gate, and refuses one without a reason', () => {
   expect(waivers.get(1)).toBe('no suite on this box')
   expect(waivers.get(2)).toBe('review pending')
 
-  expect(() => parseGateWaivers(['1'])).toThrow(/<1\|2>:<reason>/)
-  expect(() => parseGateWaivers(['3:not a gate'])).toThrow(/<1\|2>:<reason>/)
-  expect(() => parseGateWaivers(['1:'])).toThrow(/<1\|2>:<reason>/)
+  expect(() => parseGateWaivers(['1'])).toThrow(/<1\|2\|3>:<reason>/)
+  expect(() => parseGateWaivers(['4:not a gate'])).toThrow(/<1\|2\|3>:<reason>/)
+  expect(() => parseGateWaivers(['1:'])).toThrow(/<1\|2\|3>:<reason>/)
+  expect(parseGateWaivers(['3:lint gate run in CI on this head']).get(3)).toBe(
+    'lint gate run in CI on this head'
+  )
 })
 
 it('accepts the review claim AGENTS.md asks for', () => {
@@ -300,8 +303,13 @@ it('refuses gate 1 when the commit has no allowlist to fingerprint', () => {
   })
 })
 
+// Gate 3 is answered by an injected reader in the gate 1 and 2 tests, so they do not depend on the
+// lint markers of whichever clone runs them.
+const LINT_GREEN = { lintProblem: () => null }
+
 it('refuses an upstream PR at gate 1 unless the exemption is recorded', () => {
   const refused = evaluateGates({
+    ...LINT_GREEN,
     upstream: true,
     head: REVISION,
     body: REVIEW_CLAIM_EXAMPLE
@@ -309,6 +317,7 @@ it('refuses an upstream PR at gate 1 unless the exemption is recorded', () => {
   expect(refused.problems).toEqual([expect.stringContaining('gate 1 is fork-local')])
 
   const waived = evaluateGates({
+    ...LINT_GREEN,
     upstream: true,
     waivers: parseGateWaivers(['1:upstream PR, gated by upstream CI']),
     head: REVISION,
@@ -322,6 +331,7 @@ it('refuses an upstream PR at gate 1 unless the exemption is recorded', () => {
 it('reports both gates together, so one refusal does not hide the other', () => {
   const { gitDir } = gateFixture(passingVerdict())
   const result = evaluateGates({
+    ...LINT_GREEN,
     waivers: new Map(),
     head: REVISION,
     body: 'Fixes #152\n',
@@ -332,6 +342,7 @@ it('reports both gates together, so one refusal does not hide the other', () => 
   expect(result.passes[0]).toContain('gate 1 PASS')
 
   const both = evaluateGates({
+    ...LINT_GREEN,
     waivers: new Map(),
     head: REVISION,
     body: 'Fixes #152\n',
@@ -419,6 +430,7 @@ it('needs the full suite only when a changed path is global', () => {
 
 it('skips gate 1 for a targeted diff and names a global one when it refuses', () => {
   const skipped = evaluateGates({
+    ...LINT_GREEN,
     waivers: new Map(),
     head: REVISION,
     body: REVIEW_CLAIM_EXAMPLE,
@@ -431,6 +443,7 @@ it('skips gate 1 for a targeted diff and names a global one when it refuses', ()
   // Why the reason is appended: a refusal that says "no verdict" without saying "because this
   // touched package.json" sends the reader looking for a cache bug instead of a suite run.
   const refused = evaluateGates({
+    ...LINT_GREEN,
     waivers: new Map(),
     head: REVISION,
     body: REVIEW_CLAIM_EXAMPLE,
@@ -443,6 +456,7 @@ it('skips gate 1 for a targeted diff and names a global one when it refuses', ()
   // And the same global diff still passes when the verdict is there.
   const { gitDir } = gateFixture(passingVerdict())
   const passed = evaluateGates({
+    ...LINT_GREEN,
     waivers: new Map(),
     head: REVISION,
     body: REVIEW_CLAIM_EXAMPLE,
@@ -469,7 +483,7 @@ it('refuses a malformed waiver before it fetches anything', () => {
   }
 
   expect(failure?.status).toBe(1)
-  expect(String(failure?.stderr)).toContain('--waive-gate expects <1|2>:<reason>')
+  expect(String(failure?.stderr)).toContain('--waive-gate expects <1|2|3>:<reason>')
 })
 
 it('reads the body file it was given, not a fixed path', () => {
