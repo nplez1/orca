@@ -156,7 +156,8 @@ const COPY: Record<
     return typeof bot === 'string'
       ? translate('automations.runFailures.botPaused', EN.botPaused, { bot })
       : null
-  }
+  },
+  overlap: () => EN.overlap
 }
 
 function isAutomationRunFailureCode(code: unknown): code is AutomationRunFailureCode {
