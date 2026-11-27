@@ -57,15 +57,17 @@ export const SearchIssues = lazyZodSchema(() =>
   })
 )
 
-const ListIssuesFields = {
-  filter: z.enum(VALID_FILTERS).optional(),
-  limit: OptionalFiniteNumber,
-  siteId: OptionalString,
-  strict: z.boolean().optional(),
-  filters: JiraIssueListFiltersParam.optional()
-}
+const ListIssuesFields = lazyZodSchema(() =>
+  z.object({
+    filter: z.enum(VALID_FILTERS).optional(),
+    limit: OptionalFiniteNumber,
+    siteId: OptionalString,
+    strict: z.boolean().optional(),
+    filters: JiraIssueListFiltersParam.optional()
+  })
+)
 
-export const ListIssues = lazyZodSchema(() => z.object(ListIssuesFields).optional())
+export const ListIssues = lazyZodSchema(() => ListIssuesFields.optional())
 
 // Why separate from SearchIssues: an older host strips the cursor fields it does
 // not declare, so a "load more" sent through the array method would silently
@@ -78,7 +80,7 @@ const IssuePageCursor = {
 export const SearchIssuesPage = lazyZodSchema(() => SearchIssues.extend(IssuePageCursor))
 
 export const ListIssuesPage = lazyZodSchema(() =>
-  z.object({ ...ListIssuesFields, ...IssuePageCursor }).optional()
+  ListIssuesFields.extend(IssuePageCursor).optional()
 )
 
 export const IssueKey = lazyZodSchema(() =>
@@ -113,11 +115,13 @@ export const CreateIssue = lazyZodSchema(() =>
 // Why: the field-edit path targets custom fields; system fields have dedicated
 // update fields, and the transition screen is the one place a workflow names
 // them. Matches the local IPC narrowing so both hosts refuse the same payloads.
-const CustomFieldUpdateMap = z
-  .record(z.string(), z.unknown())
-  .refine((value) => Object.keys(value).every((key) => key.startsWith('customfield_')), {
-    message: 'Custom-field updates may only name custom fields'
-  })
+const CustomFieldUpdateMap = lazyZodSchema(() =>
+  z
+    .record(z.string(), z.unknown())
+    .refine((value) => Object.keys(value).every((key) => key.startsWith('customfield_')), {
+      message: 'Custom-field updates may only name custom fields'
+    })
+)
 
 export const IssueUpdate = lazyZodSchema(() =>
   z.object({

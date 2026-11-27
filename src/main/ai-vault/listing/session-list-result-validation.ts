@@ -194,7 +194,7 @@ function parseSessions(rows: readonly unknown[]): {
   return { sessions, malformed, wellFormed, rejectedIds }
 }
 
-const namedRowIdSchema = z.object({ id: z.string().min(1) })
+const namedRowIdSchema = lazyZodSchema(() => z.object({ id: z.string().min(1) }))
 
 /** The id an unreadable row still names, so a delta can drop it from the list it holds. */
 function namedRowId(row: unknown): string | null {

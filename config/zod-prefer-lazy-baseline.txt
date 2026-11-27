@@ -157,7 +157,6 @@
 2 src/shared/rpc-contract/client-ui/client-settings-params.ts
 2 src/shared/rpc-contract/filesystem/files-params.ts
 1 src/shared/rpc-contract/filesystem/files-staged-save-params.ts
-1 src/shared/rpc-contract/github/github-account-binding-params.ts
 1 src/shared/rpc-contract/google-call-params.ts
 1 src/shared/rpc-contract/google-files-params.ts
 1 src/shared/rpc-contract/preflight/preflight-params.ts

@@ -2,8 +2,9 @@
 // text it. Settings › Bots drives them, so the methods stay the surface and the card stays a client of
 // it. Every method refuses politely when the channel is not connected rather than half-doing the work.
 import * as z from 'zod'
+import { lazyZodSchema } from '../schema/lazy-zod-schema'
 
-const Id = z.string().min(1).max(256)
+const Id = lazyZodSchema(() => z.string().min(1).max(256))
 
 /** A phone number, or an Apple-ID email: both are handles the provider assigns a line to. */
 export function isPhotonHandle(value: string): boolean {
@@ -15,46 +16,56 @@ export function isPhotonHandle(value: string): boolean {
   )
 }
 
-const Handle = z
-  .string()
-  .trim()
-  .min(3)
-  .max(320)
-  .refine(isPhotonHandle, { message: 'Give a phone number or an email address.' })
+const Handle = lazyZodSchema(() =>
+  z
+    .string()
+    .trim()
+    .min(3)
+    .max(320)
+    .refine(isPhotonHandle, { message: 'Give a phone number or an email address.' })
+)
 
 /** Connect once. The account key is stored only when the owner says so; off is the default. */
-export const PhotonConnectParams = z.object({
-  organizationId: Id,
-  accountKey: z.string().trim().min(8).max(512),
-  storesKey: z.boolean().default(false)
-})
+export const PhotonConnectParams = lazyZodSchema(() =>
+  z.object({
+    organizationId: Id,
+    accountKey: z.string().trim().min(8).max(512),
+    storesKey: z.boolean().default(false)
+  })
+)
 
 /** Create the bot's project, mint its key and give it a number, in one retryable step. `accountKey` is
  *  the per-call alternative to storing the account service key: it is held in memory for the session
  *  and never written unless `bots.photon.connect` was told to keep it. */
-export const PhotonCreateBotParams = z.object({
-  botId: Id,
-  handle: Handle,
-  accountKey: z.string().trim().min(8).max(512).optional()
-})
+export const PhotonCreateBotParams = lazyZodSchema(() =>
+  z.object({
+    botId: Id,
+    handle: Handle,
+    accountKey: z.string().trim().min(8).max(512).optional()
+  })
+)
 
 /** Add someone by creating their assignment, which is the same call that returns their number. */
-export const PhotonAddMemberParams = z.object({ botId: Id, handle: Handle })
+export const PhotonAddMemberParams = lazyZodSchema(() => z.object({ botId: Id, handle: Handle }))
 
 /** Remove someone by releasing their number. Reversible: adding them again gives it back. */
-export const PhotonReleaseMemberParams = z.object({ botId: Id, handle: Handle })
+export const PhotonReleaseMemberParams = lazyZodSchema(() =>
+  z.object({ botId: Id, handle: Handle })
+)
 
 /** Delete a bot. Releases its numbers and revokes its key; the project stays. */
-export const PhotonReleaseBotParams = z.object({ botId: Id })
+export const PhotonReleaseBotParams = lazyZodSchema(() => z.object({ botId: Id }))
 
 /** Finish a half-provisioned bot: re-mint a missing key, rebuild the assignment list from the
  *  provider's, and say what was repaired. */
-export const PhotonReconcileParams = z.object({ botId: Id })
+export const PhotonReconcileParams = lazyZodSchema(() => z.object({ botId: Id }))
 
 /** The one irreversible step. `confirmSlug` must name the slug that will be burned. */
-export const PhotonDeleteProjectParams = z.object({ botId: Id, confirmSlug: Id })
+export const PhotonDeleteProjectParams = lazyZodSchema(() =>
+  z.object({ botId: Id, confirmSlug: Id })
+)
 
-export const PhotonStatusParams = z.object({ botId: Id.optional() })
+export const PhotonStatusParams = lazyZodSchema(() => z.object({ botId: Id.optional() }))
 
 export type PhotonConnectInput = z.infer<typeof PhotonConnectParams>
 export type PhotonCreateBotInput = z.infer<typeof PhotonCreateBotParams>

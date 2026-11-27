@@ -48,11 +48,13 @@ export const RepoSetBaseRef = lazyZodSchema(() =>
   })
 )
 
-export const RepoRelocate = z.object({
-  repo: requiredString('Missing repo selector'),
-  /** Report the decision without moving anything. */
-  dryRun: z.boolean().optional()
-})
+export const RepoRelocate = lazyZodSchema(() =>
+  z.object({
+    repo: requiredString('Missing repo selector'),
+    /** Report the decision without moving anything. */
+    dryRun: z.boolean().optional()
+  })
+)
 
 export const RepoUpdate = createRepoUpdateSchema(RepoSelector.shape)
 

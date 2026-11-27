@@ -3,21 +3,26 @@
 // starts a new one. Persisted per bot, so a restart mid-conversation continues the thread instead of
 // starting over — and the bot only ever answers a conversation it already has.
 import { z } from 'zod'
+import { lazyZodSchema } from '../../../shared/schema/lazy-zod-schema'
 import { readPhotonJson, writePhotonJson } from './photon-files'
 import type { PhotonStore } from './photon-store'
 
-const ThreadSchema = z.object({
-  chatId: z.string().min(1),
-  /** The number this conversation was answered on, as the provider reported it. */
-  phoneNumber: z.string().min(1).optional(),
-  /** The sender's handle, so a reply can name who it is talking to without re-reading the inbox. */
-  handle: z.string().min(1),
-  createdAt: z.number(),
-  updatedAt: z.number()
-})
+const ThreadSchema = lazyZodSchema(() =>
+  z.object({
+    chatId: z.string().min(1),
+    /** The number this conversation was answered on, as the provider reported it. */
+    phoneNumber: z.string().min(1).optional(),
+    /** The sender's handle, so a reply can name who it is talking to without re-reading the inbox. */
+    handle: z.string().min(1),
+    createdAt: z.number(),
+    updatedAt: z.number()
+  })
+)
 export type PhotonThread = z.infer<typeof ThreadSchema>
 
-const ThreadFileSchema = z.object({ threads: z.record(z.string(), ThreadSchema) })
+const ThreadFileSchema = lazyZodSchema(() =>
+  z.object({ threads: z.record(z.string(), ThreadSchema) })
+)
 type ThreadFile = z.infer<typeof ThreadFileSchema>
 
 /** A thread map Orca cannot read. Binding on top of it would rewrite the file and lose every

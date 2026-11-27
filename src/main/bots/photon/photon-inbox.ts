@@ -7,34 +7,37 @@
 // for Photon to redeliver them.
 import { createHash } from 'node:crypto'
 import { z } from 'zod'
+import { lazyZodSchema } from '../../../shared/schema/lazy-zod-schema'
 import { PhotonInboundMessageSchema, type PhotonInboundMessage } from './photon-contract'
 import { listPhotonDir, readPhotonJson, writePhotonJson } from './photon-files'
 import { photonPathSegmentId } from './photon-store-paths'
 import type { PhotonStore } from './photon-store'
 
-const InboxEntrySchema = z.object({
-  messageId: z.string().min(1),
-  /** The stream position it arrived on. Kept so an unhandled entry can be replayed and its cursor
-   *  advanced without Photon redelivering it. */
-  seq: z.number().int().nonnegative().safe().optional(),
-  projectId: z.string().min(1),
-  conversationId: z.string().min(1),
-  sender: PhotonInboundMessageSchema.shape.sender,
-  text: z.string(),
-  createdAt: z.number(),
-  /** When Orca took it, which is what the turn's transcript says rather than the sender's clock. */
-  receivedAt: z.number(),
-  /** Set once the message has been dispatched to a turn or deliberately ignored. Absent means a crash
-   *  landed between the write and the dispatch, so a replay must run it. */
-  handledAt: z.number().optional(),
-  /** How many times a dispatch has been attempted and failed, and when the first one was: the horizon is
-   *  measured from the clock, so a restart cannot restart it either. */
-  attempts: z.number().int().nonnegative().default(0),
-  firstFailedAt: z.number().optional(),
-  /** Set when Orca gave up: the message is kept, named, and out of the stream's way. */
-  parkedAt: z.number().optional(),
-  parkedReason: z.string().optional()
-})
+const InboxEntrySchema = lazyZodSchema(() =>
+  z.object({
+    messageId: z.string().min(1),
+    /** The stream position it arrived on. Kept so an unhandled entry can be replayed and its cursor
+     *  advanced without Photon redelivering it. */
+    seq: z.number().int().nonnegative().safe().optional(),
+    projectId: z.string().min(1),
+    conversationId: z.string().min(1),
+    sender: PhotonInboundMessageSchema.shape.sender,
+    text: z.string(),
+    createdAt: z.number(),
+    /** When Orca took it, which is what the turn's transcript says rather than the sender's clock. */
+    receivedAt: z.number(),
+    /** Set once the message has been dispatched to a turn or deliberately ignored. Absent means a crash
+     *  landed between the write and the dispatch, so a replay must run it. */
+    handledAt: z.number().optional(),
+    /** How many times a dispatch has been attempted and failed, and when the first one was: the horizon is
+     *  measured from the clock, so a restart cannot restart it either. */
+    attempts: z.number().int().nonnegative().default(0),
+    firstFailedAt: z.number().optional(),
+    /** Set when Orca gave up: the message is kept, named, and out of the stream's way. */
+    parkedAt: z.number().optional(),
+    parkedReason: z.string().optional()
+  })
+)
 export type PhotonInboxEntry = z.infer<typeof InboxEntrySchema>
 
 /** What a caller should do with a delivery it just claimed. */

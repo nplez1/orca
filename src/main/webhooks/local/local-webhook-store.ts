@@ -7,6 +7,7 @@
 import { readFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { z } from 'zod'
+import { lazyZodSchema } from '../../../shared/schema/lazy-zod-schema'
 import {
   WEBHOOK_CALL_ID_PATTERN,
   WEBHOOK_HOOK_ID_PATTERN
@@ -23,40 +24,48 @@ export const LOCAL_MINT_GRACE_MS = 10 * 60 * 1000
 /** Local hooks have no revocation generation: one token, until the rule goes. */
 export const LOCAL_WEBHOOK_EPOCH = 1
 
-const HookId = z.string().regex(WEBHOOK_HOOK_ID_PATTERN)
-const CallId = z.string().regex(WEBHOOK_CALL_ID_PATTERN)
+const HookId = lazyZodSchema(() => z.string().regex(WEBHOOK_HOOK_ID_PATTERN))
+const CallId = lazyZodSchema(() => z.string().regex(WEBHOOK_CALL_ID_PATTERN))
 
-const LocalHook = z.object({
-  hookId: HookId,
-  token: z.string().min(16),
-  automationId: z.string().min(1),
-  botId: z.string().min(1),
-  epoch: z.literal(LOCAL_WEBHOOK_EPOCH),
-  created: z.number()
-})
+const LocalHook = lazyZodSchema(() =>
+  z.object({
+    hookId: HookId,
+    token: z.string().min(16),
+    automationId: z.string().min(1),
+    botId: z.string().min(1),
+    epoch: z.literal(LOCAL_WEBHOOK_EPOCH),
+    created: z.number()
+  })
+)
 export type LocalHook = z.infer<typeof LocalHook>
 
 /** Where a call's body went; the body itself is beside it, in its own file. */
-const LocalCall = z.object({
-  callId: CallId,
-  hookId: HookId,
-  createdAt: z.number()
-})
+const LocalCall = lazyZodSchema(() =>
+  z.object({
+    callId: CallId,
+    hookId: HookId,
+    createdAt: z.number()
+  })
+)
 export type LocalCall = z.infer<typeof LocalCall>
 
 /** A hook minted for an automation that has not been saved yet, so a change in between cannot drop it. */
-const LocalIntent = z.object({
-  automationId: z.string().min(1),
-  hookId: HookId,
-  createdAt: z.number()
-})
+const LocalIntent = lazyZodSchema(() =>
+  z.object({
+    automationId: z.string().min(1),
+    hookId: HookId,
+    createdAt: z.number()
+  })
+)
 export type LocalIntent = z.infer<typeof LocalIntent>
 
-const StoredStore = z.object({
-  hooks: z.array(LocalHook),
-  calls: z.array(LocalCall),
-  intents: z.array(LocalIntent).default([])
-})
+const StoredStore = lazyZodSchema(() =>
+  z.object({
+    hooks: z.array(LocalHook),
+    calls: z.array(LocalCall),
+    intents: z.array(LocalIntent).default([])
+  })
+)
 type StoredStore = z.infer<typeof StoredStore>
 
 const emptyStore = (): StoredStore => ({ hooks: [], calls: [], intents: [] })

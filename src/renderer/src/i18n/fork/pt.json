@@ -155,6 +155,22 @@
     },
     "App": {
       "5096cbbc86": null
+    },
+    "runtime": {
+      "jira": {
+        "transitionFieldsNeedsUpdate": null
+      }
+    },
+    "main": {
+      "window": {
+        "dashboard": {
+          "popout": {
+            "window": {
+              "title": null
+            }
+          }
+        }
+      }
     }
   },
   "tray": {

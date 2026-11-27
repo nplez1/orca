@@ -3,35 +3,40 @@
 import { readFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { z } from 'zod'
+import { lazyZodSchema } from '../../../shared/schema/lazy-zod-schema'
 import { getSecretStore, hasSecretStore } from '../../../shared/secure-storage/secret-store'
 import { writeSecureFileAsync } from '../../../shared/secure-storage/secure-file-async-write'
 import { githubAppBotLogin } from '../../../shared/github/app/github-app-identity'
 import { getCanonicalUserDataPath } from '../../persistence/loading-store/user-data-path'
 
 /** Sealed only: Orca never writes a key in the clear, so an envelope it cannot unseal is not one of ours. */
-const Envelope = z.string().regex(/^sealed:[A-Za-z0-9+/=]*$/)
+const Envelope = lazyZodSchema(() => z.string().regex(/^sealed:[A-Za-z0-9+/=]*$/))
 
-const Installation = z.object({
-  id: z.number().int().positive(),
-  /** The account the App is installed on, for display. */
-  account: z.string().min(1),
-  repositorySelection: z.enum(['all', 'selected']),
-  /** `owner/name`, lowercase-compared when checked against a repo. */
-  repositories: z.array(z.string().min(1)),
-  /** Contents: write, which a push needs; null when GitHub did not report the installation's permissions. */
-  contentsWrite: z.boolean().nullish(),
-  /** Workflows: write, which a push that touches .github/workflows needs; null when not reported. */
-  workflowsWrite: z.boolean().nullish()
-})
+const Installation = lazyZodSchema(() =>
+  z.object({
+    id: z.number().int().positive(),
+    /** The account the App is installed on, for display. */
+    account: z.string().min(1),
+    repositorySelection: z.enum(['all', 'selected']),
+    /** `owner/name`, lowercase-compared when checked against a repo. */
+    repositories: z.array(z.string().min(1)),
+    /** Contents: write, which a push needs; null when GitHub did not report the installation's permissions. */
+    contentsWrite: z.boolean().nullish(),
+    /** Workflows: write, which a push that touches .github/workflows needs; null when not reported. */
+    workflowsWrite: z.boolean().nullish()
+  })
+)
 
-const Stored = z.object({
-  version: z.literal(1),
-  appId: z.number().int().positive(),
-  /** The App's slug, from which its login follows: `<slug>[bot]`. */
-  slug: z.string().min(1),
-  privateKey: Envelope,
-  installations: z.array(Installation)
-})
+const Stored = lazyZodSchema(() =>
+  z.object({
+    version: z.literal(1),
+    appId: z.number().int().positive(),
+    /** The App's slug, from which its login follows: `<slug>[bot]`. */
+    slug: z.string().min(1),
+    privateKey: Envelope,
+    installations: z.array(Installation)
+  })
+)
 
 export type GithubAppInstallation = z.infer<typeof Installation>
 export type GithubAppCredentials = {

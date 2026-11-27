@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { lazyZodSchema } from './schema/lazy-zod-schema'
 import { REMOTE_RPC_MAX_CONTENT_BYTES } from './remote-runtime/rpc/remote-rpc-content-budget'
 import { MAX_MESSAGE_SIZE } from './remote-runtime/relay/relay-frame-decoder'
 import {
@@ -32,16 +33,18 @@ export const RELAY_WORKSPACE_PATH_SEARCH_CAPABILITY_DESCRIPTOR = {
 export const WORKSPACE_PATH_SEARCH_CAPABILITY_DOCUMENT_KEY =
   WORKSPACE_PATH_SEARCH_NAME_FILTER_CAPABILITY
 
-const WorkspacePathSearchCapabilityDescriptorSchema = z.object({
-  matcherVersion: z.literal(1),
-  supportedScopes: z.array(z.enum(['included', 'all'])),
-  supportsDotfileVisibility: z.boolean(),
-  supportsIgnoredFileVisibility: z.boolean(),
-  supportsExcludePathSegments: z.boolean(),
-  maxPagePaths: z.number().int().positive(),
-  maxPageSerializedBytes: z.number().int().positive(),
-  freshnessMetadata: z.boolean()
-})
+const WorkspacePathSearchCapabilityDescriptorSchema = lazyZodSchema(() =>
+  z.object({
+    matcherVersion: z.literal(1),
+    supportedScopes: z.array(z.enum(['included', 'all'])),
+    supportsDotfileVisibility: z.boolean(),
+    supportsIgnoredFileVisibility: z.boolean(),
+    supportsExcludePathSegments: z.boolean(),
+    maxPagePaths: z.number().int().positive(),
+    maxPageSerializedBytes: z.number().int().positive(),
+    freshnessMetadata: z.boolean()
+  })
+)
 
 export function parseWorkspacePathSearchCapabilityDescriptor(
   value: unknown

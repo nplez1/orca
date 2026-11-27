@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { lazyZodSchema } from './schema/lazy-zod-schema'
 import type {
   WorkspacePathSearchCountProvenance,
   WorkspacePathSearchFenceIdentity,
@@ -6,44 +7,48 @@ import type {
   WorkspacePathSearchRowClassificationFlags
 } from './workspace-path-search-contract'
 
-const WorkspacePathSearchFenceIdentitySchema = z.object({
-  query: z.string(),
-  consumer: z.object({ consumerId: z.string(), sequence: z.number().int().nonnegative() }),
-  owner: z.object({
-    executionHost: z.object({ provider: z.string(), incarnationId: z.string() }),
-    authorizedCanonicalRoot: z.string()
-  }),
-  generationId: z.string().nullable(),
-  mode: z.literal('name-filter'),
-  scope: z.object({
-    pathSet: z.enum(['included', 'all']),
-    includeDotfiles: z.boolean(),
-    includeIgnoredFiles: z.boolean(),
-    excludePathSegments: z.array(z.array(z.string()))
-  }),
-  pageBudget: z.object({
-    maxPaths: z.number().int().positive(),
-    maxSerializedBytes: z.number().int().positive()
+const WorkspacePathSearchFenceIdentitySchema = lazyZodSchema(() =>
+  z.object({
+    query: z.string(),
+    consumer: z.object({ consumerId: z.string(), sequence: z.number().int().nonnegative() }),
+    owner: z.object({
+      executionHost: z.object({ provider: z.string(), incarnationId: z.string() }),
+      authorizedCanonicalRoot: z.string()
+    }),
+    generationId: z.string().nullable(),
+    mode: z.literal('name-filter'),
+    scope: z.object({
+      pathSet: z.enum(['included', 'all']),
+      includeDotfiles: z.boolean(),
+      includeIgnoredFiles: z.boolean(),
+      excludePathSegments: z.array(z.array(z.string()))
+    }),
+    pageBudget: z.object({
+      maxPaths: z.number().int().positive(),
+      maxSerializedBytes: z.number().int().positive()
+    })
   })
-})
+)
 
-const WireWorkspacePathSearchResponseSchema = z.object({
-  requestIdentity: WorkspacePathSearchFenceIdentitySchema,
-  generationId: z.string(),
-  scopeFingerprint: z.string(),
-  scopeRuleVersion: z.string(),
-  rows: z.array(z.object({ relativePath: z.string() })),
-  rowClassificationFlags: z.array(z.number().int()),
-  retainedCount: z.number().int().nonnegative(),
-  state: z.object({
-    coverage: z.string(),
-    freshness: z.string(),
-    countProvenance: z.string(),
-    searchComplete: z.boolean()
-  }),
-  count: z.object({ value: z.number().int().nonnegative().nullable(), provenance: z.string() }),
-  degradationReason: z.string().optional()
-})
+const WireWorkspacePathSearchResponseSchema = lazyZodSchema(() =>
+  z.object({
+    requestIdentity: WorkspacePathSearchFenceIdentitySchema,
+    generationId: z.string(),
+    scopeFingerprint: z.string(),
+    scopeRuleVersion: z.string(),
+    rows: z.array(z.object({ relativePath: z.string() })),
+    rowClassificationFlags: z.array(z.number().int()),
+    retainedCount: z.number().int().nonnegative(),
+    state: z.object({
+      coverage: z.string(),
+      freshness: z.string(),
+      countProvenance: z.string(),
+      searchComplete: z.boolean()
+    }),
+    count: z.object({ value: z.number().int().nonnegative().nullable(), provenance: z.string() }),
+    degradationReason: z.string().optional()
+  })
+)
 
 export function parseWorkspacePathSearchWireResponse(
   value: unknown,

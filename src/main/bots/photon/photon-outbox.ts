@@ -3,28 +3,31 @@
 // the turn ending and the send going out replays instead of losing the answer. One entry per finished
 // turn: the quota rule is a shape of this store, not a counter that has to be remembered.
 import { z } from 'zod'
+import { lazyZodSchema } from '../../../shared/schema/lazy-zod-schema'
 import { readPhotonJson, writePhotonJson } from './photon-files'
 import type { PhotonStore } from './photon-store'
 
-const OutboxEntry = z.object({
-  id: z.string().min(1),
-  botId: z.string().min(1),
-  projectId: z.string().min(1),
-  conversationId: z.string().min(1),
-  body: z.string(),
-  /** Whether the answer was cut to fit one message, which the retry line reports rather than hiding. */
-  truncated: z.boolean().default(false),
-  createdAt: z.number(),
-  attempts: z.number().int().nonnegative().default(0),
-  /** When the first attempt failed: the retry horizon is measured from here, not from a count. */
-  firstFailedAt: z.number().optional(),
-  lastError: z.string().optional(),
-  /** Set when Orca stopped trying: the answer is kept, named, and no longer retried. */
-  droppedAt: z.number().optional()
-})
+const OutboxEntry = lazyZodSchema(() =>
+  z.object({
+    id: z.string().min(1),
+    botId: z.string().min(1),
+    projectId: z.string().min(1),
+    conversationId: z.string().min(1),
+    body: z.string(),
+    /** Whether the answer was cut to fit one message, which the retry line reports rather than hiding. */
+    truncated: z.boolean().default(false),
+    createdAt: z.number(),
+    attempts: z.number().int().nonnegative().default(0),
+    /** When the first attempt failed: the retry horizon is measured from here, not from a count. */
+    firstFailedAt: z.number().optional(),
+    lastError: z.string().optional(),
+    /** Set when Orca stopped trying: the answer is kept, named, and no longer retried. */
+    droppedAt: z.number().optional()
+  })
+)
 export type PhotonOutboxEntry = z.infer<typeof OutboxEntry>
 
-const OutboxFile = z.object({ entries: z.array(OutboxEntry).default([]) })
+const OutboxFile = lazyZodSchema(() => z.object({ entries: z.array(OutboxEntry).default([]) }))
 type OutboxFile = z.infer<typeof OutboxFile>
 
 /**

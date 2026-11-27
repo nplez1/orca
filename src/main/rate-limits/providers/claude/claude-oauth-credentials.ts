@@ -52,14 +52,16 @@ const schema = lazyZodSchema(() =>
 )
 
 // fork-comment-ok: fork-only source; see LOCAL-PATCHES.md `local(usage)`.
-const settingsEnvSchema = z.object({
-  env: z
-    .object({
-      CLAUDE_CODE_OAUTH_TOKEN: z.string().optional(),
-      ANTHROPIC_AUTH_TOKEN: z.string().optional()
-    })
-    .optional()
-})
+const settingsEnvSchema = lazyZodSchema(() =>
+  z.object({
+    env: z
+      .object({
+        CLAUDE_CODE_OAUTH_TOKEN: z.string().optional(),
+        ANTHROPIC_AUTH_TOKEN: z.string().optional()
+      })
+      .optional()
+  })
+)
 const OAUTH_TOKEN_PREFIX = 'sk-ant-oat'
 
 function settingsEnvToken(raw: string | undefined): string | null {

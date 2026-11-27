@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { lazyZodSchema } from '../../schema/lazy-zod-schema'
 import type { GithubAppRepositorySelection } from '../../github/app/github-app-identity'
 import { requiredNumber, requiredString } from '../rpc-param-primitives'
 import { RepoSelector } from './github-repo-target-params'
@@ -9,10 +10,12 @@ const GithubAppId = requiredNumber('Missing app id').refine(
 )
 
 /** `github.app.connect`: the id GitHub shows on the App's settings page, and its downloaded key. */
-export const GithubAppConnect = z.object({
-  appId: GithubAppId,
-  privateKey: requiredString('Paste the App’s private key, or pick the .pem file GitHub gave you')
-})
+export const GithubAppConnect = lazyZodSchema(() =>
+  z.object({
+    appId: GithubAppId,
+    privateKey: requiredString('Paste the App’s private key, or pick the .pem file GitHub gave you')
+  })
+)
 
 export type GithubAppConnectParams = z.infer<typeof GithubAppConnect>
 

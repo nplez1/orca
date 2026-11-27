@@ -4,6 +4,7 @@
 // never read as an empty one. Keeping it in a single file makes a wrong guess one edit.
 import { createHash } from 'node:crypto'
 import { z } from 'zod'
+import { lazyZodSchema } from '../../../shared/schema/lazy-zod-schema'
 
 /** Beta's API root. Provisioning is plain HTTPS; nothing here needs a public inbound endpoint. */
 export const PHOTON_API_BASE = 'https://api.photon.codes/v1'
@@ -35,41 +36,53 @@ export const PHOTON_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 export const PHOTON_SLUG_MIN = 3
 export const PHOTON_SLUG_MAX = 63
 
-const NonEmpty = z.string().min(1)
+const NonEmpty = lazyZodSchema(() => z.string().min(1))
 
-export const PhotonProjectSchema = z.object({
-  id: NonEmpty,
-  slug: NonEmpty,
-  name: z.string(),
-  organizationId: NonEmpty
-})
+export const PhotonProjectSchema = lazyZodSchema(() =>
+  z.object({
+    id: NonEmpty,
+    slug: NonEmpty,
+    name: z.string(),
+    organizationId: NonEmpty
+  })
+)
 export type PhotonProject = z.infer<typeof PhotonProjectSchema>
 
 /** The secret comes back only on the mint and on an idempotent replay of it; it is never readable. */
-export const PhotonProjectKeySchema = z.object({
-  id: NonEmpty,
-  secret: NonEmpty
-})
+export const PhotonProjectKeySchema = lazyZodSchema(() =>
+  z.object({
+    id: NonEmpty,
+    secret: NonEmpty
+  })
+)
 export type PhotonProjectKey = z.infer<typeof PhotonProjectKeySchema>
 
 /** An assignment is also the allowlist: only the assigned handle reaches the shared-line stream. */
-export const PhotonAssignmentSchema = z.object({
-  id: NonEmpty,
-  handle: NonEmpty,
-  assignedPhoneNumber: NonEmpty
-})
+export const PhotonAssignmentSchema = lazyZodSchema(() =>
+  z.object({
+    id: NonEmpty,
+    handle: NonEmpty,
+    assignedPhoneNumber: NonEmpty
+  })
+)
 export type PhotonAssignment = z.infer<typeof PhotonAssignmentSchema>
 
-export const PhotonAssignmentListSchema = z.object({
-  assignments: z.array(PhotonAssignmentSchema)
-})
+export const PhotonAssignmentListSchema = lazyZodSchema(() =>
+  z.object({
+    assignments: z.array(PhotonAssignmentSchema)
+  })
+)
 
 /** The organization's projects, for adopting a slug that is already taken. */
-export const PhotonProjectListSchema = z.object({ projects: z.array(PhotonProjectSchema) })
+export const PhotonProjectListSchema = lazyZodSchema(() =>
+  z.object({ projects: z.array(PhotonProjectSchema) })
+)
 
 /** Project deletion is asynchronous and irreversible: the slug is burned for every future project. */
 export const PHOTON_CLOSURE_STATES = ['closing', 'closed', 'failed'] as const
-export const PhotonClosureSchema = z.object({ state: z.enum(PHOTON_CLOSURE_STATES) })
+export const PhotonClosureSchema = lazyZodSchema(() =>
+  z.object({ state: z.enum(PHOTON_CLOSURE_STATES) })
+)
 export type PhotonClosure = z.infer<typeof PhotonClosureSchema>
 
 /** Only `closed` is a finished cleanup; `closing` is reported as still closing, never as success. */
@@ -78,46 +91,56 @@ export function photonClosureIsTerminal(closure: PhotonClosure): boolean {
 }
 
 /** A sender, as the stream reports them. The handle is the phone number or Apple-ID email. */
-export const PhotonSenderSchema = z.object({
-  handle: NonEmpty,
-  name: z.string().optional()
-})
+export const PhotonSenderSchema = lazyZodSchema(() =>
+  z.object({
+    handle: NonEmpty,
+    name: z.string().optional()
+  })
+)
 export type PhotonSender = z.infer<typeof PhotonSenderSchema>
 
-export const PhotonAttachmentSchema = z.object({
-  id: NonEmpty,
-  url: z.string().url().optional(),
-  mimeType: z.string().optional(),
-  filename: z.string().optional()
-})
+export const PhotonAttachmentSchema = lazyZodSchema(() =>
+  z.object({
+    id: NonEmpty,
+    url: z.string().url().optional(),
+    mimeType: z.string().optional(),
+    filename: z.string().optional()
+  })
+)
 export type PhotonAttachment = z.infer<typeof PhotonAttachmentSchema>
 
 /** One inbound message. `id` is the dedupe key — replay is not exactly-once, so it is mandatory. */
-export const PhotonInboundMessageSchema = z.object({
-  id: NonEmpty,
-  conversationId: NonEmpty,
-  sender: PhotonSenderSchema,
-  text: z.string(),
-  createdAt: z.number(),
-  attachments: z.array(PhotonAttachmentSchema).optional()
-})
+export const PhotonInboundMessageSchema = lazyZodSchema(() =>
+  z.object({
+    id: NonEmpty,
+    conversationId: NonEmpty,
+    sender: PhotonSenderSchema,
+    text: z.string(),
+    createdAt: z.number(),
+    attachments: z.array(PhotonAttachmentSchema).optional()
+  })
+)
 export type PhotonInboundMessage = z.infer<typeof PhotonInboundMessageSchema>
 
 /** A stream frame. Cursors are opaque non-negative safe integers and may contain gaps, so nothing here
  *  ever computes `seq + 1`. */
-export const PhotonStreamFrameSchema = z.object({
-  seq: z.number().int().nonnegative().safe(),
-  message: PhotonInboundMessageSchema
-})
+export const PhotonStreamFrameSchema = lazyZodSchema(() =>
+  z.object({
+    seq: z.number().int().nonnegative().safe(),
+    message: PhotonInboundMessageSchema
+  })
+)
 export type PhotonStreamFrame = z.infer<typeof PhotonStreamFrameSchema>
 
 /** `startSeq: 0` is new-events-only, and a positive cursor resumes *after* it. */
 export const PHOTON_STREAM_START_NEW = 0
 
-export const PhotonSubscribeAckSchema = z.object({
-  projectId: NonEmpty,
-  startSeq: z.number().int().nonnegative().safe()
-})
+export const PhotonSubscribeAckSchema = lazyZodSchema(() =>
+  z.object({
+    projectId: NonEmpty,
+    startSeq: z.number().int().nonnegative().safe()
+  })
+)
 
 /** What a refused frame or response reports, so a wrong shape names itself in the log. */
 export class PhotonContractError extends Error {

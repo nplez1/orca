@@ -1,4 +1,5 @@
 import * as z from 'zod'
+import { lazyZodSchema } from './schema/lazy-zod-schema'
 
 /**
  * Provider-enforced lease metadata for an ephemeral host.
@@ -121,14 +122,18 @@ export type EphemeralVmLifetimeReadResult =
   | { ok: true; lifetime: EphemeralVmLifetime | null }
   | { ok: false; error: string }
 
-const OpaqueIdentifierSchema = z.union([z.string().min(1), z.number().finite()])
+const OpaqueIdentifierSchema = lazyZodSchema(() =>
+  z.union([z.string().min(1), z.number().finite()])
+)
 
-const EphemeralVmLifetimeSchema = z.object({
-  provider: OpaqueIdentifierSchema.optional(),
-  resourceId: OpaqueIdentifierSchema.optional(),
-  releaseAt: z.iso.datetime({ offset: true }),
-  lifetimeSeconds: z.number().int().positive().optional()
-})
+const EphemeralVmLifetimeSchema = lazyZodSchema(() =>
+  z.object({
+    provider: OpaqueIdentifierSchema.optional(),
+    resourceId: OpaqueIdentifierSchema.optional(),
+    releaseAt: z.iso.datetime({ offset: true }),
+    lifetimeSeconds: z.number().int().positive().optional()
+  })
+)
 
 function toOpaqueIdentifier(value: string | number | undefined): string | undefined {
   return value === undefined ? undefined : String(value)

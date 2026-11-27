@@ -3,14 +3,17 @@
 // keeps Photon from replaying work Orca already owns. Cursors are opaque non-negative integers that may
 // contain gaps, so nothing here does arithmetic on one — a resume passes the stored value as it is.
 import { z } from 'zod'
+import { lazyZodSchema } from '../../../shared/schema/lazy-zod-schema'
 import { PHOTON_CONSUMER_PURPOSE, PHOTON_STREAM_START_NEW } from './photon-contract'
 import { readPhotonJson, writePhotonJson } from './photon-files'
 import type { PhotonStore } from './photon-store'
 
-const CursorFileSchema = z.object({
-  seq: z.number().int().nonnegative().safe(),
-  updatedAt: z.number()
-})
+const CursorFileSchema = lazyZodSchema(() =>
+  z.object({
+    seq: z.number().int().nonnegative().safe(),
+    updatedAt: z.number()
+  })
+)
 
 /** A cursor file Orca cannot read. Refusing is the only safe answer: `0` reads as "new events only",
  *  which would skip the whole retained backlog and look like a healthy start. */
