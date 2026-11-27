@@ -14,11 +14,24 @@ describe('keeping a member’s routes', () => {
   })
 
   it('never keeps the same address twice, or more than an offer may carry', () => {
-    const reported = [LAN, LAN, LAN2, TAILNET, LAN]
+    const reported = [LAN, LAN2, TAILNET, 'ws://192.168.1.22:6768', LAN]
     const kept = rememberRoutes({ reported })
 
     expect(kept).toEqual([...new Set(kept)])
-    expect(kept.length).toBeLessThanOrEqual(HOST_MESH_MAX_ENDPOINT_CANDIDATES)
+    expect(kept.length).toBe(HOST_MESH_MAX_ENDPOINT_CANDIDATES)
+  })
+
+  it('spends one slot on the address a failed dial would fall back on', () => {
+    // Why: a machine reporting a full set would otherwise erase every address held before, and the one address a
+    // failed path has to try is exactly the one that was held before.
+    const previous = [TAILNET]
+    const reported = [LAN, LAN2, 'ws://192.168.1.22:6768', 'ws://192.168.1.23:6768']
+
+    const kept = rememberRoutes({ previous, reported })
+
+    expect(kept).toHaveLength(HOST_MESH_MAX_ENDPOINT_CANDIDATES)
+    expect(kept).toContain(TAILNET)
+    expect(kept[0]).toBe(LAN)
   })
 
   it('refuses anything that is not an endpoint this host would dial', () => {

@@ -254,7 +254,8 @@ export function applyHostMeshSync(
   const routes = Object.fromEntries(
     Object.entries(state.routes).filter(([hostKey]) => !removed.has(hostKey))
   )
-  if (payload.selfKey !== state.selfKey && payload.endpoints !== undefined) {
+  const senderIsKnown = state.members.some((member) => member.hostKey === payload.selfKey)
+  if (payload.selfKey !== state.selfKey && senderIsKnown && payload.endpoints !== undefined) {
     const remembered = rememberRoutes({
       previous: routes[payload.selfKey],
       reported: payload.endpoints

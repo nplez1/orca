@@ -735,3 +735,19 @@ describe('finding a member again after it changes networks', () => {
     expect(laptopState?.routes[studio.hostKey]).toEqual([LAN, TAILNET])
   })
 })
+
+describe('the addresses a member publishes on its own call', () => {
+  it('are kept by the host it called, so a pair it cannot dial back is still repairable', async () => {
+    const mesh = new Mesh()
+    const studio = mesh.add('studio')
+    const laptop = mesh.add('laptop')
+    mesh.seedPairing(laptop, studio)
+    expect((await laptop.driver.join(mesh.environmentFor(laptop, studio))).kind).toBe('joined')
+
+    laptop.endpoints = ['ws://10.0.0.4:6768', 'ws://100.64.0.4:6768']
+    await laptop.driver.sync()
+
+    const state = createHostMeshStore({ userDataPath: studio.userDataPath }).read()
+    expect(state?.routes[laptop.hostKey]).toEqual(['ws://10.0.0.4:6768', 'ws://100.64.0.4:6768'])
+  })
+})

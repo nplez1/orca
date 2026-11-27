@@ -3,6 +3,7 @@ import {
   DEFAULT_HOST_MESH_SETTINGS,
   type HostMeshSettings
 } from '../../shared/host-mesh/host-mesh-admission'
+import { HOST_MESH_MAX_ENDPOINT_CANDIDATES } from '../../shared/host-mesh/host-mesh-contract'
 
 /**
  * The file's shape, kept apart from the store that reads and writes it.
@@ -64,7 +65,9 @@ export const stateSchema = z.looseObject({
   }),
   names: z.record(z.string().min(1), nameSchema).default({}),
   // A file written before routes existed has none, and an empty map is the right "nothing learned yet".
-  routes: z.record(z.string().min(1), z.array(z.string())).default({})
+  routes: z
+    .record(z.string().min(1), z.array(z.string()).max(HOST_MESH_MAX_ENDPOINT_CANDIDATES))
+    .default({})
 })
 
 export const peerEntrySchema = z.looseObject({

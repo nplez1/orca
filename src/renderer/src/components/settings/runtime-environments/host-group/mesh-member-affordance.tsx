@@ -139,12 +139,18 @@ export function MeshMemberDialogs({
             disabled={busy}
             onClick={() => {
               setBusy(true)
+              // Why the dialog closes only on success: a refused Eject leaves the member in place, and a dialog that
+              // vanished would read as one that worked.
               void runHostMeshAction((api) => api.remove(member.hostKey))
+                .then(() => {
+                  if (mountedRef.current) {
+                    onClose()
+                  }
+                })
                 .catch(() => undefined)
                 .finally(() => {
                   if (mountedRef.current) {
                     setBusy(false)
-                    onClose()
                   }
                 })
             }}

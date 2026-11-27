@@ -166,6 +166,14 @@ export type HostMeshDriverDeps = {
     candidates: readonly string[]
   }) => Promise<string | null>
   /**
+   * Drops the connections this process pools for an environment, after its pairing row moved to a new address.
+   *
+   * Why it is a dependency: the pool lives in the catalog the renderer reads, and this module is a leaf. Without it a
+   * repaired row is picked up by everything that resolves the row per call, while a long-lived socket keeps dialing
+   * the address the row no longer names.
+   */
+  invalidateTransport?: (environmentId: string) => void
+  /**
    * Revokes this host's own expired, never-redeemed runtime offers and returns the device ids it dropped.
    *
    * Why the pass does this: every reverse offer mints one runtime device row, so a member that never takes the

@@ -148,10 +148,26 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
     if (deps.pruneExpiredOffers === undefined) {
       return
     }
-    const pruned = deps.pruneExpiredOffers()
-    if (pruned.length > 0) {
-      store.forgetPeerDeviceRows(new Set(pruned))
+    try {
+      const pruned = deps.pruneExpiredOffers()
+      if (pruned.length > 0) {
+        store.forgetPeerDeviceRows(new Set(pruned))
+      }
+    } catch (error) {
+      // Why swallowed: spent offers are bookkeeping, and a device registry that refuses a revoke must not cost the
+      // whole pass the members it would otherwise reach.
+      console.debug('[host-mesh] could not prune expired offers', error)
     }
+  }
+
+  /**
+   * Whether the failure came from the peer rather than from the path to it.
+   *
+   * Why the distinction exists: a peer that answered and refused proves its address works, so adopting another one
+   * would be a repair aimed at the wrong fact.
+   */
+  function isPeerRefusal(error: unknown): boolean {
+    return typeof error === 'object' && error !== null && 'peerCode' in error
   }
 
   /** Read once per snapshot, and never allowed to fail a snapshot: it only annotates one. */
@@ -741,15 +757,24 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
     // interval covers, so sending it again costs nothing. Minting again for every attempt is what left an
     // owner reading hundreds of spent offers as "active links", each one a live credential until it expired.
     if (known?.request != null) {
-      if (!known.retryNow && deps.now() - known.attemptedAt < HOST_MESH_REVERSE_OFFER_RETRY_MS) {
+      // Why an aged box is dropped rather than resent: the retry interval and the offer lifetime are the same value,
+      // so a resend that comes due is also one the recipient can only refuse — a round trip spent to learn the clock.
+      if (deps.now() - known.mintedAt >= HOST_MESH_OFFER_TTL_MS) {
+        known.request = null
+        known.mintedRowId = null
+      } else if (
+        !known.retryNow &&
+        deps.now() - known.attemptedAt < HOST_MESH_REVERSE_OFFER_RETRY_MS
+      ) {
         return args.state
+      } else {
+        return deliverOfferBack({
+          state: args.state,
+          member,
+          environmentId: args.environmentId,
+          known
+        })
       }
-      return deliverOfferBack({
-        state: args.state,
-        member,
-        environmentId: args.environmentId,
-        known
-      })
     }
     // Why a refusal is a wait and not an end: the owner at that machine can turn the mesh on at any time, and this
     // launch will not restart to notice. The wait is the retry interval, which is what bounds the minting.
@@ -900,11 +925,16 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
         }
         continue
       } catch (error) {
+        // Why a peer's own refusal is not a route problem: that host answered, so its address works — moving the row
+        // to another of its addresses would trade a proven path for an unproven one, on every pass.
+        const adopted = isPeerRefusal(error)
+          ? false
+          : await adoptRoute({ state, member, environmentId })
         // Why another route is tried before the member is called unreachable: the pairing row names the one endpoint
         // the pair was made on, so a machine that changed networks — a tailnet switched off, a new DHCP lease —
         // fails there while an address it published on an earlier pass still answers. Adoption repairs that row, so
         // every other feature dials the live path too, without any of them knowing about routes.
-        if (await adoptRoute({ state, member, environmentId })) {
+        if (adopted) {
           try {
             const view = await readMemberView({ state, member, environmentId, endpoints })
             state = view.state
@@ -948,7 +978,14 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
       return false
     }
     try {
-      return (await adopt({ environmentId: args.environmentId, candidates })) !== null
+      const adopted = await adopt({ environmentId: args.environmentId, candidates })
+      if (adopted === null) {
+        return false
+      }
+      // Why the pooled transport is dropped as well: everything that resolves the row per call already dials the new
+      // address, while a connection opened before the move keeps the one the row no longer names.
+      deps.invalidateTransport?.(args.environmentId)
+      return true
     } catch (error) {
       // Why swallowed: a path that could not be adopted is the same fact as one that did not answer, and the pass
       // already reports the member as unreachable.

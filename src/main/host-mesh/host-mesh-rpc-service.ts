@@ -128,6 +128,33 @@ export function createHostMeshRpcService(deps: HostMeshDriverDeps): HostMeshRpcS
     return minted.offerUrl
   }
 
+  /**
+   * Keeps the addresses a caller published, so this host can dial it there if the path it arrived on dies.
+   *
+   * Why here and not only in the pass: a machine that can reach this host and cannot be reached by it publishes its
+   * addresses on exactly this call, and the pass dialing the other way has nothing else to learn them from.
+   *
+   * Why lock-free: `sync` is deliberately outside the write lock — two hosts each holding their own while awaiting
+   * the other's read is the deadlock that lock exists to prevent — and this sequence awaits nothing, so nothing can
+   * interleave inside it. A pass resuming from an older snapshot can still drop the write, which costs one pass: the
+   * member publishes again on the next one.
+   *
+   * Why only a member's: a caller that reaches this host holds a credential, which is not the same as being a
+   * machine this host agreed to dial.
+   */
+  function rememberSyncRoutes(state: HostMeshState, params: HostMeshPendingRequest): void {
+    if (params.endpoints === undefined || params.endpoints.length === 0) {
+      return
+    }
+    if (!state.members.some((member) => member.hostKey === params.hostKey)) {
+      return
+    }
+    const next = setHostMeshRoutes(state, { hostKey: params.hostKey, endpoints: params.endpoints })
+    if (next !== state) {
+      commit(next)
+    }
+  }
+
   function commit(state: HostMeshState): void {
     store.write(state)
     for (const member of state.members) {
@@ -495,9 +522,12 @@ export function createHostMeshRpcService(deps: HostMeshDriverDeps): HostMeshRpcS
 
     sync: async (params: HostMeshPendingRequest): Promise<HostMeshSyncPayload> => {
       const state = loadState()
+      rememberSyncRoutes(state, params)
+      // Why a failed interface read must not fail the reply: an answer with no addresses still tells the caller this
+      // host is reachable, while a throw reads as an unreachable member.
       // Why every reply publishes this host's own addresses: the caller is the one that needs them, and the pass it is
       // running is the only chance to say where this machine is before the path it dialed stops working.
-      const endpoints = await deps.ownEndpoints()
+      const endpoints = await deps.ownEndpoints().catch(() => [])
       const ownEndpoints = endpoints.length === 0 ? {} : { endpoints: [...endpoints] }
       if (state.groupId !== '' && params.groupId !== '' && state.groupId !== params.groupId) {
         // Why a member still gets the list: two hosts upgraded from the same fleet derive different group
@@ -505,6 +535,8 @@ export function createHostMeshRpcService(deps: HostMeshDriverDeps): HostMeshRpcS
         // mismatch would leave the fleet permanently split with each half unable to learn the other exists.
         // Membership is what is trusted here, not the id; a caller that is not a member still gets nothing.
         const isMember = state.members.some((member) => member.hostKey === params.hostKey)
+        // Why the addresses are withheld from a non-member too: where this host can be dialed is a fact about this
+        // host's networks, and a row it never agreed to dial is not an audience for it.
         return {
           version: HOST_MESH_PAYLOAD_VERSION,
           groupId: state.groupId,
@@ -517,7 +549,7 @@ export function createHostMeshRpcService(deps: HostMeshDriverDeps): HostMeshRpcS
           members: isMember ? state.members : [],
           tombstones: [],
           links: {},
-          ...ownEndpoints
+          ...(isMember ? ownEndpoints : {})
         }
       }
       // Why our own key is skipped in `members`: a member's list never contains itself.

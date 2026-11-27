@@ -331,7 +331,7 @@ class Mesh {
         // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the caller built this payload from HostMeshRemoveRequest
         return target.rpc.remove(params as HostMeshRemoveRequest, caller) as Promise<T>
       default:
-        throw new Error(`no such method ${method}`)
+        throw Object.assign(new Error(`no such method ${method}`), { peerCode: 'method_not_found' })
     }
   }
 }

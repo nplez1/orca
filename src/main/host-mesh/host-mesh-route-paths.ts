@@ -1,17 +1,17 @@
 import { HOST_MESH_MAX_ENDPOINT_CANDIDATES } from '../../shared/host-mesh/host-mesh-contract'
 import { isDialableEndpoint } from '../../shared/host-mesh/host-mesh-routes'
+import type { KnownRuntimeEnvironment } from '../../shared/remote-runtime/host-catalog/runtime-environments'
 import { preferredEndpoint } from '../../shared/remote-runtime/host-catalog/runtime-environments'
-import { encodePairingOffer } from '../../shared/remote-runtime/pairing/pairing'
 import { pairedRuntimeConnectionFromOffer } from '../../shared/remote-runtime/pairing/paired-runtime-connection'
 import { sendRemoteRuntimeRequestOnSocket } from '../../shared/remote-runtime/requests/remote-runtime-request-socket'
 import { isTailnetIPv4Address } from '../../shared/network/tailnet-address'
 import {
   resolveEnvironment,
-  resolveEnvironmentPairingOffer,
-  updateEnvironmentFromPairingCode
+  resolveEnvironmentPairingOffer
 } from '../../shared/remote-runtime/host-store/runtime-environment-store'
 import { resolveAdvertisedPairingEndpoint } from '../runtime/rpc/server/pairing/network/pairing-endpoint'
 import { getPairingNetworkInterfaces } from '../runtime/rpc/server/pairing/network/pairing-network-interfaces'
+import { relocatePairingEndpoint } from './host-mesh-pairing-endpoint'
 import type { HostMeshRuntimeServer } from './host-mesh-runtime-deps'
 
 /**
@@ -30,34 +30,61 @@ import type { HostMeshRuntimeServer } from './host-mesh-runtime-deps'
 const PROBE_TIMEOUT_MS = 4_000
 
 /**
+ * How long an interface table is reused.
+ *
+ * Why cached at all: this is read on every inbound sync reply as well as every pass, and on a Windows host with WSL
+ * that table costs a PowerShell start. Interface addresses do not change often enough for a call to need a fresh one.
+ */
+const INTERFACES_TTL_MS = 30_000
+
+type RouteInterface = Awaited<ReturnType<typeof getPairingNetworkInterfaces>>[number]
+
+let interfacesCache: { bindHost: string; at: number; value: RouteInterface[] } | null = null
+
+async function readInterfaces(server: HostMeshRuntimeServer): Promise<RouteInterface[]> {
+  const bindHost = server.getNetworkExposureBindHost()
+  const now = Date.now()
+  if (
+    interfacesCache !== null &&
+    interfacesCache.bindHost === bindHost &&
+    now - interfacesCache.at < INTERFACES_TTL_MS
+  ) {
+    return interfacesCache.value
+  }
+  const value = await getPairingNetworkInterfaces(bindHost)
+  interfacesCache = { bindHost, at: now, value }
+  return value
+}
+
+/**
  * This host's own endpoints, best first: every path a member could dial it on right now.
  *
  * Why the interface table and not the pairing's own endpoint: that endpoint names the single address the pair was
  * made on, so a member that loses it has nothing left to try. LAN addresses come before tailnet ones because the
  * directly-attached path is the one that works without an overlay being up.
+ *
+ * Why one tailnet slot is reserved: a machine with four bridge or docker adapters would otherwise spend the whole
+ * cap on addresses no other machine can reach, and the overlay is the path that works across networks.
  */
 export async function ownEndpoints(server: HostMeshRuntimeServer): Promise<string[]> {
   const bound = server.getWebSocketEndpoint()
   if (bound === null) {
     return []
   }
-  const interfaces = await getPairingNetworkInterfaces(server.getNetworkExposureBindHost())
-  const ranked = [...interfaces].sort(
-    (left, right) =>
-      Number(isTailnetIPv4Address(left.address)) - Number(isTailnetIPv4Address(right.address))
-  )
-  const endpoints: string[] = []
-  for (const iface of ranked) {
-    const resolved = resolveAdvertisedPairingEndpoint(bound, iface.address)
-    if (!resolved.ok || endpoints.includes(resolved.endpoint)) {
+  const interfaces = await readInterfaces(server)
+  const resolved: { endpoint: string; tailnet: boolean }[] = []
+  for (const iface of interfaces) {
+    const advertised = resolveAdvertisedPairingEndpoint(bound, iface.address)
+    if (!advertised.ok || resolved.some((entry) => entry.endpoint === advertised.endpoint)) {
       continue
     }
-    endpoints.push(resolved.endpoint)
-    if (endpoints.length >= HOST_MESH_MAX_ENDPOINT_CANDIDATES) {
-      break
-    }
+    resolved.push({ endpoint: advertised.endpoint, tailnet: isTailnetIPv4Address(iface.address) })
   }
-  return endpoints
+  const direct = resolved.filter((entry) => !entry.tailnet).map((entry) => entry.endpoint)
+  const tailnet = resolved.filter((entry) => entry.tailnet).map((entry) => entry.endpoint)
+  const directLimit =
+    tailnet.length === 0 ? HOST_MESH_MAX_ENDPOINT_CANDIDATES : HOST_MESH_MAX_ENDPOINT_CANDIDATES - 1
+  return [...direct.slice(0, directLimit), ...tailnet].slice(0, HOST_MESH_MAX_ENDPOINT_CANDIDATES)
 }
 
 /** The endpoint this host's pairing row for a member currently dials, or null when there is no such row. */
@@ -72,8 +99,14 @@ async function environmentEndpoint(
   }
 }
 
-/** Whether this host answers on a candidate path, authenticated with the pairing's own credential. */
-async function endpointAnswers(
+/**
+ * Whether this path answers as the host the pairing is with.
+ *
+ * Why the pairing's own credential: an address that answers without it is some other machine on the network, and
+ * this is the only test that proves the path reaches the host the caller thinks it does. Exported so the boundary is
+ * testable against a real socket that rejects the wrong credential.
+ */
+export async function probePairingEndpoint(
   userDataPath: string,
   environmentId: string,
   endpoint: string
@@ -93,39 +126,54 @@ async function endpointAnswers(
 }
 
 /**
- * Points this host's pairing for a member at the endpoint that answered, so every feature dials the live path.
- *
- * Why the store row and not a private cache: host-sync, the host graph and any paired client resolve the endpoint
- * from this row on each call, so rewriting it is what heals them — none of them needs to learn about routes.
- *
- * Why the rewrite goes through the store's worker: a pairing row is a synchronous file write, and this runs inside a
- * pass that must not stall the main process. Why the code is rebuilt from the offer this host already holds: the
- * credential is unchanged, so the machine on the other end stays the same host and only its address moves.
- *
- * Why a tunnel is refused: its endpoint is a local port that tunnel owns, and rewriting it would point the row at an
- * address nothing serves.
+ * What a failed dial needs from the pairing row and from the network, injected so the order of checks is testable
+ * without a store or a socket.
  */
-async function adoptEnvironmentEndpoint(
-  userDataPath: string,
-  environmentId: string,
-  endpoint: string
-): Promise<boolean> {
-  try {
-    const environment = await resolveEnvironment(userDataPath, environmentId)
-    if (environment.connectionDependency === 'ssh-tunnel') {
-      return false
+export type RouteFailoverDeps = {
+  /** The endpoint the row dials now, or null when there is no row to move. */
+  current: () => Promise<string | null>
+  /**
+   * Whether the row's address is not its own to move: a tunnel endpoint is a local port the tunnel owns, and an
+   * access link or a managed deployment pins the address its own schema requires.
+   */
+  isFixedEndpoint: () => Promise<boolean>
+  probe: (endpoint: string) => Promise<boolean>
+  /** Points the row at the new address, keeping its credential and its pairing revision. */
+  relocate: (endpoint: string) => Promise<boolean>
+}
+
+/**
+ * Tries each candidate in order and stops at the first one that answers as this host and can be adopted.
+ *
+ * Why a candidate that answers but cannot be adopted does not end the search: the row refusing the move is a fact
+ * about that row (it is fixed), and a later candidate is no worse than an earlier one.
+ */
+export async function adoptFirstReachable(
+  deps: RouteFailoverDeps,
+  candidates: readonly string[]
+): Promise<string | null> {
+  const current = await deps.current()
+  for (const candidate of candidates) {
+    if (candidate === current || !isDialableEndpoint(candidate)) {
+      continue
     }
-    if (preferredEndpoint(environment).endpoint === endpoint) {
-      return true
+    if (!(await deps.probe(candidate))) {
+      continue
     }
-    const offer = await resolveEnvironmentPairingOffer(userDataPath, environmentId)
-    await updateEnvironmentFromPairingCode(userDataPath, environmentId, {
-      pairingCode: encodePairingOffer({ ...offer, endpoint })
-    })
-    return true
-  } catch {
-    return false
+    if (await deps.relocate(candidate)) {
+      return candidate
+    }
   }
+  return null
+}
+
+/** Why the row is left alone rather than moved: its address is not the thing that changed. */
+function hasFixedEndpoint(environment: KnownRuntimeEnvironment): boolean {
+  return (
+    environment.connectionDependency === 'ssh-tunnel' ||
+    environment.sshAccess !== undefined ||
+    environment.orcadDeployment !== undefined
+  )
 }
 
 /**
@@ -138,17 +186,25 @@ export async function adoptReachableEndpoint(
   userDataPath: string,
   args: { environmentId: string; candidates: readonly string[] }
 ): Promise<string | null> {
-  const current = await environmentEndpoint(userDataPath, args.environmentId)
-  for (const candidate of args.candidates) {
-    if (candidate === current || !isDialableEndpoint(candidate)) {
-      continue
-    }
-    if (!(await endpointAnswers(userDataPath, args.environmentId, candidate))) {
-      continue
-    }
-    if (await adoptEnvironmentEndpoint(userDataPath, args.environmentId, candidate)) {
-      return candidate
-    }
-  }
-  return null
+  return adoptFirstReachable(
+    {
+      current: () => environmentEndpoint(userDataPath, args.environmentId),
+      isFixedEndpoint: async () => {
+        try {
+          return hasFixedEndpoint(await resolveEnvironment(userDataPath, args.environmentId))
+        } catch {
+          return true
+        }
+      },
+      probe: (endpoint) => probePairingEndpoint(userDataPath, args.environmentId, endpoint),
+      relocate: async (endpoint) =>
+        relocatePairingEndpoint({
+          userDataPath,
+          environmentId: args.environmentId,
+          endpoint,
+          now: Date.now()
+        })
+    },
+    args.candidates
+  )
 }

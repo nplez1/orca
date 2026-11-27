@@ -42,18 +42,28 @@ export function rememberRoutes(args: {
   previous?: readonly string[]
   reported?: readonly string[]
 }): string[] {
+  const previous = args.previous ?? []
+  const reported = args.reported ?? []
+  // Why a slot is reserved for the best address held before: a machine with four live addresses fills the cap on
+  // its own, and a report that used every slot would drop the one address a failed dial has to fall back on.
+  const best = previous[0]
+  const reserved = best !== undefined && !reported.includes(best) ? 1 : 0
   const seen = new Set<string>()
   const kept: string[] = []
-  for (const endpoint of [...(args.reported ?? []), ...(args.previous ?? [])]) {
-    if (kept.length >= HOST_MESH_MAX_ENDPOINT_CANDIDATES) {
-      break
+  const collect = (endpoints: readonly string[], limit: number): void => {
+    for (const endpoint of endpoints) {
+      if (kept.length >= limit) {
+        return
+      }
+      if (seen.has(endpoint) || !isDialableEndpoint(endpoint)) {
+        continue
+      }
+      seen.add(endpoint)
+      kept.push(endpoint)
     }
-    if (seen.has(endpoint) || !isDialableEndpoint(endpoint)) {
-      continue
-    }
-    seen.add(endpoint)
-    kept.push(endpoint)
   }
+  collect(reported, HOST_MESH_MAX_ENDPOINT_CANDIDATES - reserved)
+  collect(previous, HOST_MESH_MAX_ENDPOINT_CANDIDATES)
   return kept
 }
 

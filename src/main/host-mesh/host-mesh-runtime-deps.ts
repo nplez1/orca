@@ -15,6 +15,7 @@ import {
   uniqueEnvironmentName
 } from '../../shared/remote-runtime/host-store/runtime-environment-store-operations'
 import { publishRuntimeEnvironmentCatalogChanged } from '../ipc/runtime-environments/catalog/runtime-environment-catalog-broadcast'
+import { invalidateRuntimeEnvironmentTransport } from '../ipc/runtime-environments/runtime-environments'
 import { pairedRuntimeConnectionFromOffer } from '../../shared/remote-runtime/pairing/paired-runtime-connection'
 import { sendRemoteRuntimeRequestOnSocket } from '../../shared/remote-runtime/requests/remote-runtime-request-socket'
 import { orcaHostKeyOf, selfLabel } from '../host-graph/host-graph-self-identity'
@@ -34,6 +35,7 @@ import {
   hostMeshPlaceholderName
 } from '../../shared/host-mesh/host-mesh-contract'
 import type { HostMeshDriverDeps } from './host-mesh-driver-contract'
+import { pruneExpiredMeshOffers } from './host-mesh-offer-pruning'
 import { createHostMeshWriteLock } from './host-mesh-write-lock'
 import { createHostMeshDriver } from './host-mesh-driver'
 import { createHostMeshRpcService } from './host-mesh-rpc-service'
@@ -178,36 +180,6 @@ type HostMeshDeviceRow = {
 }
 
 /**
- * Revokes this host's own runtime offers that expired without anyone redeeming them.
- *
- * Why revoke and not just filter: the row is still a credential to every reader of the registry, which is why
- * Settings counts it as an active link. An offer past its own `offerExpiresAt` can no longer pair anything, so
- * removing it changes no capability and stops the count from describing a mesh nobody can join.
- */
-function pruneExpiredMeshOffers(server: HostMeshRuntimeServer): readonly string[] {
-  const registry = server.getDeviceRegistry()
-  if (!registry) {
-    return []
-  }
-  const now = Date.now()
-  const pruned: string[] = []
-  for (const device of registry.listDevices({ fresh: true })) {
-    if (
-      device.scope !== 'runtime' ||
-      device.lastSeenAt !== 0 ||
-      device.offerExpiresAt === undefined ||
-      device.offerExpiresAt > now
-    ) {
-      continue
-    }
-    if (server.revokeRuntimeAccess(device.deviceId) || registry.removeDevice(device.deviceId)) {
-      pruned.push(device.deviceId)
-    }
-  }
-  return pruned
-}
-
-/**
  * Why it swallows: a mesh that cannot be wired leaves Settings showing "this build cannot reach the host
  * group", which is true and recoverable; refusing to start the app over it is not.
  */
@@ -261,8 +233,20 @@ function depsFromApp(server: HostMeshRuntimeServer): HostMeshDriverDeps {
       return { offerUrl: offer.pairingUrl, deviceId: offer.deviceId, endpointCandidates }
     },
     ownEndpoints: () => ownEndpoints(server),
+    // Why the pooled transport is dropped after a move: everything that resolves the pairing row per call already
+    // dials the new address, while a connection opened before the move keeps the one the row no longer names.
+    invalidateTransport: (environmentId) => invalidateRuntimeEnvironmentTransport(environmentId),
     adoptReachableEndpoint: (args) => adoptReachableEndpoint(userDataPath, args),
-    pruneExpiredOffers: () => pruneExpiredMeshOffers(server),
+    pruneExpiredOffers: () => {
+      try {
+        const minted = new Set(
+          [...store.readPeerIndex().values()].flatMap((entry) => entry.deviceRowIds)
+        )
+        return pruneExpiredMeshOffers(server, minted)
+      } catch {
+        return []
+      }
+    },
     redeemOffer: async (offerUrl, expectedHostKey, label) => {
       const offer = await parseRemotePairingCode(userDataPath, offerUrl)
       // Refused before any environment record exists for it: a box names the machine it should have come
@@ -365,8 +349,10 @@ function depsFromApp(server: HostMeshRuntimeServer): HostMeshDriverDeps {
         SEND_TIMEOUT_MS
       )
       // A code and not the payload: the driver records a reason, and a peer's own words belong in its log.
+      // Why the code is marked as the peer's: an answer proves the address works, and the driver must not adopt another
+      // one for a member that simply refused — only a path that stopped working is a route problem.
       if (!response.ok) {
-        throw new Error(response.error.code)
+        throw Object.assign(new Error(response.error.code), { peerCode: response.error.code })
       }
       return response.result
     },
