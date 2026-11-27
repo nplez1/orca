@@ -6483,6 +6483,15 @@ upstream-owned file it does not declare as a note. Per-seam resolution notes are
 `check-upstream-file-comments` ratchet measured 162 of 233 sync conflicts coming from exactly that, so this
 patch adds **zero** fork comment lines to upstream files — the register lives here and in the design note.
 
+**The 2026-11-27 sync added six register rows, and none of them is new mesh surface.** That sync brought
+upstream's `check:zod-prefer-lazy-ratchet`, whose baseline is 0, and the merge's resolutions had rebuilt this
+feature's params files eagerly; the repair re-wrapped them in `lazyZodSchema` as upstream writes them. The
+wrappers and their imports are fork lines on upstream-owned files, so each is declared with the lines it
+added — `jira/jira-params.ts` 32, `github-account-binding-params.ts` 21, `claude-oauth-credentials.ts` 18,
+`projects/repo-params.ts` 12, `session-list-result-validation.ts` 2, and one row removed from
+`config/zod-prefer-lazy-baseline.txt`. Measured: `node local/checks/host-mesh-upstream-seams.mjs --base
+<the merge commit>` reports **6 upstream files, 86 lines, every declared seam within budget**.
+
 Where a hook was unavoidable, the upstream line calls a fork-owned module (`installHostMeshRuntime`,
 `FORK_RPC_METHODS`, `HOST_MESH_HANDLER_GROUP`, `notifyHostGraphOfConnectionChange`,
 `RelayedFleetStatusItems`). Where it was avoidable it was deleted instead: the mesh service is a configured

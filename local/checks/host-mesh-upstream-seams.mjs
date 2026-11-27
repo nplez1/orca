@@ -161,6 +161,36 @@ export const SEAMS = [
     path: 'config/main-blocking-helper-baseline.txt',
     budget: 1,
     why: 'one baseline row for the fork-owned rename operation’s single store write; the ratchet charges the module that calls the helper, so the row has to live in upstream’s file'
+  },
+  {
+    path: 'config/zod-prefer-lazy-baseline.txt',
+    budget: 1,
+    why: 'one baseline row removed, not added: the 2026-11-27 sync wrapped this feature’s params files in lazyZodSchema, so the ratchet’s prune had to rewrite upstream’s file'
+  },
+  {
+    path: 'src/shared/rpc-contract/jira/jira-params.ts',
+    budget: 32,
+    why: 'the 2026-11-27 sync’s lazyZodSchema pass over this feature’s Jira params: the schemas were re-wrapped as upstream writes them after the merge rebuilt them eagerly, and `ListIssuesFields` became a schema. Measured lines added by that pass; the params themselves were not new'
+  },
+  {
+    path: 'src/shared/rpc-contract/github/github-account-binding-params.ts',
+    budget: 21,
+    why: 'the same lazyZodSchema pass: both `RepoSelector.extend(...)` calls are wrapped, which also drops the file’s last eager schema'
+  },
+  {
+    path: 'src/shared/rpc-contract/projects/repo-params.ts',
+    budget: 12,
+    why: 'the same lazyZodSchema pass over this feature’s repo params, where the host-graph selectors are declared'
+  },
+  {
+    path: 'src/main/rate-limits/providers/claude/claude-oauth-credentials.ts',
+    budget: 18,
+    why: 'the same lazyZodSchema pass: the fork’s settings-env credential source is a wrapped schema now, so the wrapper and its import are fork lines on upstream’s file'
+  },
+  {
+    path: 'src/main/ai-vault/listing/session-list-result-validation.ts',
+    budget: 2,
+    why: 'the same lazyZodSchema pass: one import and one wrapper around the AI Vault paging schema the fork extended'
   }
 ]
 
