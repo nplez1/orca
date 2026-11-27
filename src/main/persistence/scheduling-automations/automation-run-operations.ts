@@ -11,6 +11,7 @@ import type {
 } from '../../../shared/automations/history/automation-run'
 import type { PersistedState } from '../../../shared/orca-profiles/persisted-state-types'
 import { runHasEvent, type AutomationRunEvent } from '../../../shared/automation-event-triggers'
+import { isCommandAutomation } from '../../../shared/automations/launch/automation-command'
 import {
   nextAutomationRunNumber,
   pruneAutomationRuns
@@ -120,7 +121,7 @@ export function createAutomationRun(
     trigger,
     workspaceId: automation.workspaceId,
     workspaceDisplayName: operations.getWorkspaceDisplayName(automation.workspaceId),
-    sessionKind: automation.bot ? 'chat' : 'terminal',
+    sessionKind: isCommandAutomation(automation) ? 'script' : automation.bot ? 'chat' : 'terminal',
     chatSessionId: null,
     terminalSessionId: null,
     terminalPaneKey: null,
@@ -251,7 +252,12 @@ export function updateAutomationRun(
     ...resultErrorCodeFields(result, previous),
     startedAt: current.startedAt ?? now,
     dispatchedAt:
-      result.status === 'dispatched' ? (result.dispatchedAt ?? now) : current.dispatchedAt,
+      result.status === 'dispatched'
+        ? (result.dispatchedAt ?? now)
+        : result.status === 'completed' || result.status === 'dispatch_failed'
+          ? (result.dispatchedAt ?? current.dispatchedAt)
+          : current.dispatchedAt,
+    ...(Object.hasOwn(result, 'exitCode') ? { exitCode: result.exitCode } : {}),
     ...(result.handledInTurn ? { handledInTurn: true as const } : {}),
     // Launch evidence is durable: the first recorded dispatch-start time survives later rewrites.
     ...((current.launchedAt ?? result.launchedAt) !== undefined

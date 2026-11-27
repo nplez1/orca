@@ -116,7 +116,13 @@ export const AUTOMATION_METHODS = [
           ? await targetInCallerChat(context.runtime, caller, params.bot, Boolean(params.once))
           : params.bot
       const { plugin } = context
-      const input = { ...params, bot }
+      // A command automation stores neither a prompt nor an agent; null is how a record says so.
+      const input = {
+        ...params,
+        prompt: params.prompt ?? '',
+        agentId: params.agentId ?? null,
+        bot
+      }
       const automation = plugin
         ? await context.runtime.createAutomation(
             // Provenance comes from the in-process caller only; params cannot claim it.

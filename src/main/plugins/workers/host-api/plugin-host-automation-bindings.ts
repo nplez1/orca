@@ -158,6 +158,7 @@ export const PLUGIN_AUTOMATION_HANDLERS = {
             kind: 'automation.update',
             fields,
             ...(elevated ? { elevated: true } : {}),
+            ...(elevated && current.action?.kind === 'command' ? { command: true } : {}),
             // Whatever the reason to ask, a new prompt is what the person approves.
             ...(prompt !== undefined ? { prompt } : {})
           }

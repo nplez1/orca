@@ -1,4 +1,5 @@
 import { automationTerminalLaunchInputs } from '../../../shared/automations/launch/automation-launch-setup'
+import { requireAutomationAgent } from '../../../shared/automations/launch/automation-command'
 import { parseWorkspaceKey } from '../../../shared/workspace/identity/workspace-scope'
 import {
   getRepoExecutionHostId,
@@ -44,7 +45,7 @@ export async function launchAutomationTerminalAgent(
   }
 ): Promise<AutomationTerminalAgentLaunch> {
   const { automation, run, target } = request
-  const agent = automation.agentId
+  const agent = requireAutomationAgent(automation)
   const selectedTarget =
     automation.workspaceMode === 'existing'
       ? await resolveLocalExistingWorkspace(runtime, automation, target)
@@ -211,10 +212,11 @@ async function sendToReusableSession(
   physicalHostId: string
 ): Promise<AutomationTerminalAgentLaunch | null> {
   const { automation, text } = request
+  const agent = requireAutomationAgent(automation)
   const worktreeId = requireWorkspaceId(automation)
   const session = findReusableAutomationRun({
     automationId: automation.id,
-    agentId: automation.agentId,
+    agentId: agent,
     worktreeId,
     target: {
       hostId: getRepoExecutionHostId(request.target.repo),
@@ -245,7 +247,7 @@ async function sendToReusableSession(
     !(await deliverTerminalAgentLaunchPrompt({
       runtime,
       handle: session.handle,
-      agent: automation.agentId,
+      agent,
       freshLaunch: false,
       text,
       // Windows cannot prove which agent is foreground; refuse only a proven shell.

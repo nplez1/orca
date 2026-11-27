@@ -3,7 +3,8 @@ import { useBots } from '@/lib/bot-catalog'
 import { automationWebhookUrlCopy } from '@/components/bots/webhooks/automation-webhook-url'
 import { automationTargetLabel } from '../authoring/automation-bot-target-label'
 import { AutomationWontFireMark } from '../details/AutomationWontFireNote'
-import { botAgentLabel } from '@/components/bots/bot-presentation'
+import { getAutomationRunnerLabel } from '../automation-runner-label'
+import { AutomationRunnerIcon } from '../AutomationRunnerIcon'
 import { botAutomationWhen } from '../../bots/bot-automation-when'
 import {
   capturedAutomationOwner,
@@ -26,7 +27,6 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { AgentIcon } from '@/components/agent/icons/AgentIcon'
 import { cn } from '@/lib/class-names'
 import type { AutomationRun } from '../../../../../shared/automations/history/automation-run'
 import { getAutomationRunRepoId } from '../../../../../shared/automations/history/automation-run-identity'
@@ -44,7 +44,6 @@ import {
 import { AutomationListLastRunCell } from './AutomationListLastRunCell'
 import { formatAutomationDateTime, formatAutomationNextRun } from '../automation-page-parts'
 import { getAutomationTargetAvailability } from '../hosts/automation-target-availability'
-import { getAgentLabel } from '../authoring/automation-draft-model'
 import { automationProjectName, type AutomationListRow } from './automation-list-row-identity'
 import { formatAutomationUsageSummary } from '../runs/automation-usage-model'
 import { automationsTableGridClass } from './automations-table-layout'
@@ -168,9 +167,7 @@ export function AutomationListLocalRow({
   const movedToDistro = useAppStore(
     (state) => wslMovedProjectForAutomation(state.wslMovedProjects, automation)?.distro ?? null
   )
-  const agentLabel = automation.bot
-    ? botAgentLabel(automation.agentId)
-    : getAgentLabel(automation.agentId)
+  const agentLabel = getAutomationRunnerLabel(automation, t)
   const hostLabel = automationRowHostLabel(row, automationRepo, hostLabelById)
   const agentTooltipLabel = `${agentLabel} · ${hostLabel} · ${formatAutomationUsageSummary(row.usageSummary ?? undefined, t, intlLocale)}`
   const canRunNow = automationRunAvailability.canRunNow && allows(row, 'run')
@@ -289,7 +286,7 @@ export function AutomationListLocalRow({
             <Tooltip>
               <TooltipTrigger asChild>
                 <span className="flex shrink-0 items-center" aria-label={agentTooltipLabel}>
-                  <AgentIcon agent={automation.agentId} size={16} />
+                  <AutomationRunnerIcon agentId={automation.agentId} size={16} />
                 </span>
               </TooltipTrigger>
               <TooltipContent side="top" sideOffset={4}>

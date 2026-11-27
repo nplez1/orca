@@ -214,7 +214,11 @@ function isMigratedAutomationRun(value: unknown): value is AutomationRun {
     record.workspaceDisplayName,
     'orcad_migration_dormant_automation_run_workspace_name_invalid'
   )
-  if (record.sessionKind !== 'terminal' && record.sessionKind !== 'chat') {
+  if (
+    record.sessionKind !== 'terminal' &&
+    record.sessionKind !== 'chat' &&
+    record.sessionKind !== 'script'
+  ) {
     throw new Error('orcad_migration_dormant_automation_run_session_invalid')
   }
   for (const field of [

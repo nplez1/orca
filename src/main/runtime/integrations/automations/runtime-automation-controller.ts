@@ -41,6 +41,7 @@ import { assertBotPlacesUnchanged } from '../../../automations/bot-automation-pl
 import type { Bot } from '../../../../shared/bot-types'
 import type { TriggerPeopleSearch } from '../../../automations/bot-trigger-people'
 import { botAutomationCreateRules, patchBotAutomationUpdate } from './runtime-automation-bot-update'
+import { normalizeAutomationAction } from '../../../../shared/automations/launch/automation-command'
 import {
   assertAutomationBotAtWrite,
   botAutomationAgent,
@@ -147,7 +148,11 @@ export class RuntimeAutomationController {
       throw new Error('runtime_unavailable')
     }
     const createAutomation = store.createAutomation.bind(store)
-    const bot = requireCreatableAutomationBot(store, input, this.webhooks)
+    const bot = requireCreatableAutomationBot(
+      store,
+      { ...input, agentId: input.agentId ?? undefined },
+      this.webhooks
+    )
     assertThreadReplies(this.takesThreadReplies, input.bot)
     const target = bot
       ? botAutomationTarget(bot)
@@ -158,6 +163,7 @@ export class RuntimeAutomationController {
       throw new Error('Session reuse requires an existing workspace target.')
     }
     const { on: rules, bot: botTarget } = await botAutomationCreateRules(this, bot, input)
+    const command = normalizeAutomationAction(input.action)
     const chosen = destination ?? input.destination
     return await this.webhooks.save(bot && { botId: bot.id }, rules, async (on, id) => {
       assertAutomationBotAtWrite(store, botTarget)
@@ -167,7 +173,9 @@ export class RuntimeAutomationController {
           name: input.name,
           prompt: input.prompt,
           precheck: input.precheck,
-          agentId: bot ? botAutomationAgent(botTarget, bot) : input.agentId,
+          action: input.action,
+          // A command holds no agent, a bot's included.
+          agentId: command ? null : bot ? botAutomationAgent(botTarget, bot) : input.agentId,
           extraAgentArgs: input.extraAgentArgs,
           launchSetupPatch: input.launchSetupPatch,
           runContext: input.runContext,

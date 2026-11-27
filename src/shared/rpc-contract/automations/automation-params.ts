@@ -36,6 +36,46 @@ const ExtraAgentArgs = lazyZodSchema(() =>
   z.string({ message: 'Extra agent arguments must be text.' }).optional()
 )
 
+const AutomationScriptParam = lazyZodSchema(() =>
+  z.strictObject({
+    command: z
+      .string()
+      .trim()
+      .min(1, 'A command automation needs a command.')
+      .max(4000)
+      .refine((value) => !value.includes('\0')),
+    timeoutSeconds: z.number().int().min(1).max(3600),
+    shell: z.enum(['login', 'plain']),
+    report: z.enum(['silent', 'on-output', 'always'])
+  })
+)
+
+const AutomationActionParam = lazyZodSchema(() =>
+  z.discriminatedUnion('kind', [
+    z.strictObject({ kind: z.literal('agent') }),
+    z.strictObject({ kind: z.literal('command'), script: AutomationScriptParam })
+  ])
+)
+
+function assertAutomationActionedFields(
+  value: {
+    prompt?: string
+    agentId?: string | null
+    action?: { kind: 'agent' | 'command' } | null
+  },
+  ctx: z.RefinementCtx
+): void {
+  if (value.action?.kind === 'command') {
+    return
+  }
+  if (!value.prompt?.trim()) {
+    ctx.addIssue({ code: 'custom', message: 'Missing automation prompt', path: ['prompt'] })
+  }
+  if (!value.agentId) {
+    ctx.addIssue({ code: 'custom', message: 'Missing automation agent', path: ['agentId'] })
+  }
+}
+
 export const AutomationCanonicalLaunchSetup = lazyZodSchema(() =>
   z.strictObject({
     surface: z.enum(['chat', 'terminal']).optional(),
@@ -107,9 +147,10 @@ export const AutomationCreate = lazyZodSchema(() =>
     .object({
       creationKey: OptionalString,
       name: requiredString('Missing automation name'),
-      prompt: requiredString('Missing automation prompt'),
+      prompt: OptionalString,
       precheck: AutomationPrecheck,
-      agentId: TuiAgent,
+      action: AutomationActionParam.optional(),
+      agentId: TuiAgent.nullable().optional(),
       extraAgentArgs: ExtraAgentArgs,
       launchSetupPatch: AutomationLaunchSetupPatch.optional(),
       runContext: WorkspaceRunContext,
@@ -139,6 +180,7 @@ export const AutomationCreate = lazyZodSchema(() =>
       waitInCallerChat: z.literal(true).optional()
     })
     .superRefine(refuseUnknownNamedZone)
+    .superRefine(assertAutomationActionedFields)
 )
 
 export const AutomationUpdateFields = lazyZodSchema(() =>
@@ -147,7 +189,8 @@ export const AutomationUpdateFields = lazyZodSchema(() =>
       name: OptionalString,
       prompt: OptionalString,
       precheck: AutomationPrecheck,
-      agentId: TuiAgent.optional(),
+      action: AutomationActionParam.nullable().optional(),
+      agentId: TuiAgent.nullable().optional(),
       extraAgentArgs: ExtraAgentArgs,
       launchSetupPatch: AutomationLaunchSetupPatch.optional(),
       runContext: WorkspaceRunContext,

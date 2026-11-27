@@ -1,4 +1,5 @@
 import { automationTerminalLaunchInputs } from '../../../shared/automations/launch/automation-launch-setup'
+import { requireAutomationAgent } from '../../../shared/automations/launch/automation-command'
 import { hostQualifiedRepoSelector } from '../../runtime/workspaces/catalog/runtime-repo-selector'
 import { getRepoExecutionHostId } from '../../../shared/execution-host/execution-host'
 import type { Automation } from '../../../shared/automations/automation-definition'
@@ -35,6 +36,7 @@ export function buildAutomationWorktreeCreateArgs({
   repo: Repo
   createdAt?: number
 }): RuntimeCreateManagedWorktreeArgs {
+  const agent = requireAutomationAgent(automation)
   const setup = automationTerminalLaunchInputs(automation)
   return {
     repoSelector: hostQualifiedRepoSelector(`id:${repo.id}`, getRepoExecutionHostId(repo)),
@@ -44,8 +46,8 @@ export function buildAutomationWorktreeCreateArgs({
     // Only the approved content runs; a branch that changed it skips setup.
     ...(automation.setupTrustHash ? { approvedSetupHash: automation.setupTrustHash } : {}),
     activate: false,
-    createdWithAgent: automation.agentId,
-    startupAgent: automation.agentId,
+    createdWithAgent: agent,
+    startupAgent: agent,
     startupPrompt: automation.prompt,
     startupSuppressUpdatePrompt: true,
     startupTitle: run.title,

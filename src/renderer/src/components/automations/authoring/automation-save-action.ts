@@ -16,6 +16,7 @@ import {
 } from './automation-draft-model'
 import { saveOrcaAutomation } from './automation-orca-save'
 import { botTargetError, saveBotAutomation } from './automation-bot-save'
+import { getDraftScriptError, isCommandDraft } from './automation-draft-action'
 import type { AutomationSaveContext } from './automation-save-context'
 
 /** Validates editor input then runs the Orca save transaction. */
@@ -43,7 +44,13 @@ export function createAutomationSaveAction(context: AutomationSaveContext) {
       draft.workspaceMode !== draftAtOpen.workspaceMode
     const { hour, minute } = parseDraftTime(draft.time)
     const botTarget = draft.bot
-    if (botTarget && !draft.prompt.trim()) {
+    const runsScript = isCommandDraft(draft)
+    const scriptError = runsScript ? getDraftScriptError(draft) : null
+    if (scriptError) {
+      toast.error(scriptError)
+      return
+    }
+    if (botTarget && !runsScript && !draft.prompt.trim()) {
       toast.error(translate('automations.botTarget.promptMissing', 'Enter what it should do.'))
       return
     }
@@ -51,13 +58,15 @@ export function createAutomationSaveAction(context: AutomationSaveContext) {
       !botTarget &&
       ((targetEdited &&
         (!draft.projectId || (draft.workspaceMode === 'existing' && !draft.workspaceId))) ||
-        !draft.prompt.trim())
+        (!runsScript && !draft.prompt.trim()))
     ) {
       toast.error(
-        translate(
-          'auto.components.automations.AutomationsPage.2430fecf53',
-          'Choose a run location and enter a prompt before saving.'
-        )
+        runsScript
+          ? translate('automations.command.locationMissing', 'Choose a run location before saving.')
+          : translate(
+              'auto.components.automations.AutomationsPage.2430fecf53',
+              'Choose a run location and enter a prompt before saving.'
+            )
       )
       return
     }
@@ -115,7 +124,8 @@ export function createAutomationSaveAction(context: AutomationSaveContext) {
       return
     }
     if (
-      editingAutomationId === null &&
+      !runsScript &&
+      (editingAutomationId === null || draftAtOpen?.actionKind === 'command') &&
       !isTuiAgentEnabled(draft.agentId, settings?.disabledTuiAgents)
     ) {
       toast.error(
@@ -135,7 +145,7 @@ export function createAutomationSaveAction(context: AutomationSaveContext) {
       draft,
       automationLaunchWorkspace(draft, resolution)
     )
-    const surface = automationDraftSurface(draft, settings, chatSupported)
+    const surface = runsScript ? 'terminal' : automationDraftSurface(draft, settings, chatSupported)
     if (surface === 'chat' && chatSupported !== true) {
       return
     }
@@ -151,7 +161,7 @@ export function createAutomationSaveAction(context: AutomationSaveContext) {
             'Extra arguments require a fresh session for every run.'
           )
       : getDraftExtraAgentArgsError(effectiveDraft)
-    if (extrasEdited && extrasError) {
+    if (!runsScript && extrasEdited && extrasError) {
       toast.error(extrasError)
       return
     }

@@ -31,8 +31,13 @@ export function assertAutomationExtraAgentArgs(
     | 'launchSetup'
   >
 ): void {
+  const agent = automation.agentId
+  // A command automation launches no agent, so it holds no agent launch settings.
+  if (!agent) {
+    return
+  }
   const setup = automationCanonicalLaunchSetup(automation)
-  const views = automationLaunchInputs(automation.agentId, setup)
+  const views = automationLaunchInputs(agent, setup)
   const consumed =
     setup.surface === 'chat'
       ? Object.keys(views.chatSessionOptions ?? {}).length > 0
@@ -47,7 +52,7 @@ export function assertAutomationExtraAgentArgs(
     throw new Error(EXTRA_AGENT_ARGS_REQUIRE_FRESH_SESSION)
   }
   const parsed = parseExtraAgentArgs({
-    agent: automation.agentId,
+    agent,
     extraAgentArgs: setup.extraAgentArgs
   })
   if (!parsed.ok) {

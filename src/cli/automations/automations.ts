@@ -43,6 +43,7 @@ import {
   getSourceContextFlag,
   getWorkspaceModeFlag
 } from './automation-handler-flags'
+import { getScriptActionFlag } from './automation-script-flag'
 import { getExtraAgentArgsFlag } from './automation-extra-agent-args-flag'
 import { assertAutomationFieldsSupported } from './automation-host-support'
 import { assertAutomationSetupMode, getAutomationSetupFlag } from './automation-setup-flag'
@@ -68,6 +69,10 @@ import {
 import { callerChat } from './automation-caller-chat'
 import { getOnceFlags } from './automation-once-flag'
 import { watchPrCreateFlags } from './automation-watch-pr'
+import {
+  AUTOMATION_ENABLED_HANDLERS,
+  resolveAutomationMutationState
+} from './automation-enabled-handlers'
 
 type AutomationCreateParams = Omit<AutomationCreateInput, 'projectId' | 'timezone'> & {
   destination?: AutomationDestination
@@ -98,15 +103,6 @@ async function resolveDefaultTarget(
     }
     return {}
   }
-}
-
-// Read the authoritative owner for fencing; older hosts omit it and impose no precondition.
-async function resolveAutomationMutationState(
-  client: Parameters<CommandHandler>[0]['client'],
-  id: string
-): Promise<AutomationShowPayload> {
-  const result = await client.call<AutomationShowPayload>('automation.show', { id })
-  return result.result
 }
 
 export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
@@ -141,11 +137,13 @@ export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
       getWorkspaceModeFlag(flags) ?? (target.workspace ? 'existing' : 'new_per_run')
     assertAutomationSetupMode(setupDecision, workspaceMode, flags)
     // Built before the destination read so a contradictory flag still fails without a runtime call.
+    const action = getScriptActionFlag(flags)
     const create = {
       name: getRequiredStringFlag(flags, 'name'),
-      prompt: getRequiredStringFlag(flags, 'prompt'),
+      prompt: getOptionalStringFlag(flags, 'prompt') ?? '',
       precheck: getPrecheckFlag(flags),
-      agentId: getProviderFlag(flags),
+      ...(action ? { action } : {}),
+      agentId: action ? null : getProviderFlag(flags),
       extraAgentArgs: getExtraAgentArgsFlag(flags),
       ...(setupDecision !== undefined ? { setupDecision } : {}),
       ...(target.runContext ? { runContext: target.runContext } : {}),
@@ -192,12 +190,14 @@ export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
     const agentEdit = getBotAgentSetupEdit(flags)
     const sourceContext = getSourceContextFlag(flags)
     const id = getRequiredStringFlag(flags, 'id')
+    const action = getScriptActionFlag(flags)
     // Built before the owner read so a contradictory flag still fails without a runtime call.
     const updates = {
       name: getOptionalStringFlag(flags, 'name'),
       prompt: getOptionalStringFlag(flags, 'prompt'),
       precheck: getPrecheckFlag(flags),
-      agentId: getOptionalProviderFlag(flags),
+      ...(action !== undefined ? { action } : {}),
+      agentId: action ? null : getOptionalProviderFlag(flags),
       extraAgentArgs: getExtraAgentArgsFlag(flags),
       ...(setupDecision !== undefined ? { setupDecision } : {}),
       ...(target.runContext ? { runContext: target.runContext } : {}),
@@ -249,6 +249,7 @@ export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
       )
     }
   },
+  ...AUTOMATION_ENABLED_HANDLERS,
   'automations remove': async ({ flags, client, json }) => {
     const id = getRequiredStringFlag(flags, 'id')
     const { owner: expectedOwner } = await resolveAutomationMutationState(client, id)

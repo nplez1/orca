@@ -89,6 +89,8 @@ export const ROOT_HELP_TEXT_PRIMARY = [
   '  automations show          Show one Orca automation',
   '  automations create        Create a scheduled Orca automation',
   '  automations edit          Edit an Orca automation',
+  '  automations enable        Switch an Orca automation back on',
+  '  automations disable       Switch an Orca automation off',
   '  automations remove        Remove an Orca automation and its run history',
   '  automations run           Run an Orca automation now',
   '  automations runs          List automation run history',

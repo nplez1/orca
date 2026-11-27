@@ -22,6 +22,7 @@ import type {
 import type { AutomationBotRunTarget } from '../bot-run-target'
 import {
   canDispatchTo,
+  describeCommandOverlap,
   describeScheduledRefusal,
   describeStoppedWslDistroRefusal
 } from './dispatch-refusal'
@@ -35,6 +36,8 @@ import {
 } from '../ownership/orcad-fenced-automation'
 import { AutomationDispatchCancelledError } from './automation-dispatch-cancelled-error'
 import { isTuiAgent } from '../../../shared/agent-launch/catalog/tui-agent-config'
+import { isCommandAutomation } from '../../../shared/automations/launch/automation-command'
+import { startAutomationCommandRun } from './automation-command-run'
 
 export { AutomationDispatchCancelledError }
 
@@ -54,6 +57,7 @@ type DispatchContext = Pick<
   launcher(): AutomationLauncher | null
   botDispatcher: AutomationBotLauncher | null
   chatDispatcher?: AutomationLauncher | null
+  commandSignal: AbortSignal
   resolveTarget(automation: Automation): AutomationRunTargetResult
   /** A claimed run skipped before launch; repeats of one refusal fold before the claim. */
   onRunRefused?(automation: Automation, error: string): void
@@ -141,6 +145,7 @@ export async function requestAutomationDispatch(
   const refusal = describeScheduledRefusal({
     target,
     canDispatch: canDispatchTo(
+      automation,
       {
         repo: Boolean(automation.surface === 'chat' ? ctx.chatDispatcher : ctx.launcher()),
         bot: Boolean(ctx.botDispatcher)
@@ -156,6 +161,11 @@ export async function requestAutomationDispatch(
     run.trigger === 'scheduled' ? await describeStoppedWslDistroRefusal(ctx.store, target) : null
   if (stopped) {
     return refuse(stopped)
+  }
+  // Checked in the same synchronous step as the claim write.
+  const overlap = describeCommandOverlap(ctx.store, automation, run)
+  if (overlap) {
+    return refuse(overlap)
   }
   await ctx.runs.updateRun({
     runId: run.id,
@@ -174,6 +184,13 @@ export async function requestAutomationDispatch(
   if (lateRefusal || !target.ok) {
     return refuse(lateRefusal ?? automationRunFailure('noDispatchHost'))
   }
+  // The status check and the store write share one synchronous step, so a settled run stays settled.
+  const transition: AutomationLaunchContext['transition'] = (result) => {
+    const current = readRun()
+    return current.status === 'dispatching'
+      ? { applied: true, run: ctx.runs.updateRun({ runId: run.id, ...result }) }
+      : { applied: false, run: returnDurable(current) }
+  }
   // Launch in main, rechecking what a long precheck can invalidate.
   const launchInMain = <Target extends RunTarget>(
     launchTarget: Target,
@@ -185,13 +202,7 @@ export async function requestAutomationDispatch(
       automation,
       run,
       target: launchTarget,
-      // The status check and the store write share one synchronous step, so a settled run stays settled.
-      transition: (result) => {
-        const current = readRun()
-        return current.status === 'dispatching'
-          ? { applied: true, run: ctx.runs.updateRun({ runId: run.id, ...result }) }
-          : { applied: false, run: returnDurable(current) }
-      },
+      transition,
       dispatcher: (request) => {
         if (readRun().status !== 'dispatching') {
           throw new AutomationDispatchCancelledError(
@@ -230,6 +241,20 @@ export async function requestAutomationDispatch(
         return dispatcher({ ...request, target: latestTarget })
       }
     })
+  // A command automation launches nothing: its command records its own outcome when it ends.
+  if (isCommandAutomation(automation)) {
+    startAutomationCommandRun({
+      automation,
+      target: {
+        cwd: target.cwd,
+        sshConnectionId:
+          automation.executionTargetType === 'ssh' ? automation.executionTargetId : undefined
+      },
+      signal: ctx.commandSignal,
+      transition
+    })
+    return run
+  }
   if ('bot' in target) {
     return ctx.botDispatcher
       ? launchInMain(

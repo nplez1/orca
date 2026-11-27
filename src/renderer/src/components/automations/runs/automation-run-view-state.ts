@@ -94,6 +94,18 @@ export function getAutomationRunViewState({
       canOpen: true
     }
   }
+  if (run.sessionKind === 'script') {
+    const saved = Boolean(run.outputSnapshot?.content.trim())
+    return {
+      availability: saved ? 'snapshot' : 'metadata',
+      actionLabel: translate('auto.components.automations.runViewState.viewRun', 'View run'),
+      statusLabel: translate(
+        'automations.command.runHasNoSession',
+        'A script run has no session to open.'
+      ),
+      canOpen: false
+    }
+  }
   const hasTerminalIdentity = Boolean(run.terminalPaneKey && run.terminalPtyId)
   // Why the pane alone: a slept run drops its PTY id but keeps its pane, which the server resumes.
   const hasPaneIdentity = Boolean(run.terminalPaneKey)

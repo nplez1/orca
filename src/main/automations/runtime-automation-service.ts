@@ -50,7 +50,7 @@ export function createRuntimeAutomationService(input: {
     subscribeStatusChanges: (listener) => runtime.subscribeAgentStatusRowChanges(listener),
     agentCommandsForRun: (run) =>
       automationAgentCommands(
-        store.listAutomations().find((entry) => entry.id === run.automationId)?.agentId
+        store.listAutomations().find((entry) => entry.id === run.automationId)?.agentId ?? undefined
       )
   })
   const service = new AutomationService(store, {

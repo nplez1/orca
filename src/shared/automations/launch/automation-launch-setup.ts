@@ -16,6 +16,7 @@ import {
   parseExtraAgentArgs
 } from '../../agent-launch/startup/automation-extra-agent-args'
 import type { TuiAgent } from '../../agent-launch/catalog/tui-agent'
+import { requireAutomationAgent } from './automation-command'
 import { retireAutomationChoiceSources } from './automation-launch-source-edits'
 
 export function hasModernAutomationLaunchSetup(setup: AutomationLaunchSetup): boolean {
@@ -24,7 +25,7 @@ export function hasModernAutomationLaunchSetup(setup: AutomationLaunchSetup): bo
 
 export function applyAutomationLaunchSetupPatch<
   T extends {
-    agentId?: TuiAgent
+    agentId?: TuiAgent | null
     extraAgentArgs?: string
     launchSetupPatch?: AutomationLaunchSetupPatch
   }
@@ -47,7 +48,9 @@ export function applyAutomationLaunchSetupPatch<
   const rebind = current !== undefined && agent !== current.agentId
   let setup = current ? automationCanonicalLaunchSetup(current) : {}
   if (rebind) {
-    const visible = input.extraAgentArgs ?? automationLegacyArguments(current.agentId, setup)
+    const visible =
+      input.extraAgentArgs ??
+      (current.agentId ? automationLegacyArguments(current.agentId, setup) : undefined)
     setup = { surface: setup.surface }
     if (
       patch?.arguments === undefined &&
@@ -114,7 +117,9 @@ export function applyAutomationLaunchSetupPatch<
 
 export function automationWithLaunchSetup(automation: Automation): Automation {
   const launchSetup = automationCanonicalLaunchSetup(automation)
-  const extraAgentArgs = automationLegacyArguments(automation.agentId, launchSetup)
+  const extraAgentArgs = automation.agentId
+    ? automationLegacyArguments(automation.agentId, launchSetup)
+    : undefined
   return {
     ...automationCanonicalDefinition(automation),
     ...(extraAgentArgs !== undefined ? { extraAgentArgs } : {}),
@@ -124,7 +129,10 @@ export function automationWithLaunchSetup(automation: Automation): Automation {
 
 export function automationTerminalLaunchInputs(automation: Automation) {
   const setup = automationCanonicalLaunchSetup(automation)
-  const { agentArgs, sessionOptions } = automationLaunchInputs(automation.agentId, setup)
+  const { agentArgs, sessionOptions } = automationLaunchInputs(
+    requireAutomationAgent(automation),
+    setup
+  )
   return {
     ...(agentArgs !== undefined ? { agentArgs } : {}),
     ...(sessionOptions ? { sessionOptions } : {}),

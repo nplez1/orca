@@ -82,7 +82,7 @@ export async function runOnceDue(
       return null
     }
     const target = ctx.resolveTarget(automation)
-    const refusal = await ctx.describeRefusal(target)
+    const refusal = await ctx.describeRefusal(automation, target)
     // A refused deadline run claims nothing, so the next tick tries again.
     if (refusal && (await ctx.runs.repeatSkip(automationId, refusal.error, dueAt))) {
       return null

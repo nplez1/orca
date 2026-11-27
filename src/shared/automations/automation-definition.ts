@@ -31,6 +31,19 @@ export type AutomationPrecheck = {
   timeoutSeconds: number
 }
 
+export type AutomationCommandShell = 'login' | 'plain'
+
+export type AutomationCommandReport = 'silent' | 'on-output' | 'always'
+
+export type AutomationScript = {
+  command: string
+  timeoutSeconds: number
+  shell: AutomationCommandShell
+  report: AutomationCommandReport
+}
+
+export type AutomationAction = { kind: 'agent' } | { kind: 'command'; script: AutomationScript }
+
 /** Who created an automation, when Orca knows it was not the person. Set by Orca, never by the
  *  creator; `name` is the plugin's name then, so the label survives the plugin's removal. */
 export type AutomationCreator = {
@@ -49,7 +62,8 @@ export type Automation = {
   name: string
   prompt: string
   precheck: AutomationPrecheck | null
-  agentId: TuiAgent
+  action?: AutomationAction
+  agentId: TuiAgent | null
   surface?: 'chat' | 'terminal'
   launchSetup?: AutomationLaunchSetup
   launchPreferences?: AutomationLaunchPreferences
@@ -110,7 +124,8 @@ export type AutomationCreateInput = {
   name: string
   prompt: string
   precheck?: AutomationPrecheck | null
-  agentId: TuiAgent
+  action?: AutomationAction | null
+  agentId: TuiAgent | null
   launchSetupPatch?: AutomationLaunchSetupPatch
   /** Empty or whitespace means no extras. */
   extraAgentArgs?: string
@@ -137,7 +152,10 @@ export type AutomationCreateInput = {
   createdBy?: AutomationCreator
 }
 
-export type AutomationUpdateInput = { launchSetupPatch?: AutomationLaunchSetupPatch } & Partial<
+export type AutomationUpdateInput = {
+  launchSetupPatch?: AutomationLaunchSetupPatch
+  action?: AutomationAction | null
+} & Partial<
   Pick<
     Automation,
     | 'name'

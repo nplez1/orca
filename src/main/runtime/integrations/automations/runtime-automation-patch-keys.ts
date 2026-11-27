@@ -3,6 +3,8 @@ export const RUNTIME_AUTOMATION_PATCH_KEYS = [
   'name',
   'prompt',
   'precheck',
+  // Null is a value here and in agentId: it clears the command.
+  'action',
   'agentId',
   'extraAgentArgs',
   'launchSetupPatch',

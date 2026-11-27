@@ -122,8 +122,9 @@ export type AutomationRun = {
   workspaceId: string | null
   /** Keep run history understandable after workspace deletion removes live metadata. */
   workspaceDisplayName?: string | null
-  /** 'chat' for a structured-session run (a bot or a chat-surface automation), whose id is chatSessionId. */
-  sessionKind: 'terminal' | 'chat'
+  /** 'chat' for a structured-session run (a bot or a chat-surface automation), whose id is chatSessionId.
+   *  'script' for a command automation's run, which opened no session at all. */
+  sessionKind: 'terminal' | 'chat' | 'script'
   chatSessionId: string | null
   terminalSessionId: string | null
   /** Retain the executed pane/PTY because terminal tabs may later point elsewhere. */
@@ -131,6 +132,8 @@ export type AutomationRun = {
   terminalPtyId: string | null
   outputSnapshot: AutomationRunOutputSnapshot | null
   precheckResult: AutomationPrecheckResult | null
+  /** A command run's exit code; absent on every agent run, and null when no exit code was reported. */
+  exitCode?: number | null
   usage: AutomationRunUsage | null
   error: string | null
   /** Localizes `error`; old records omit it and clients show `error` as stored. */
@@ -177,7 +180,7 @@ export type AutomationRunsPage = {
 
 export type AutomationDispatchResult = Pick<AutomationRun, 'handledInTurn'> & {
   runId: string
-  sessionKind?: 'terminal' | 'chat'
+  sessionKind?: 'terminal' | 'chat' | 'script'
   chatSessionId?: string | null
   status: AutomationRunStatus
   workspaceId?: string | null
@@ -187,6 +190,7 @@ export type AutomationDispatchResult = Pick<AutomationRun, 'handledInTurn'> & {
   terminalPtyId?: string | null
   outputSnapshot?: AutomationRunOutputSnapshot | null
   precheckResult?: AutomationPrecheckResult | null
+  exitCode?: number | null
   usage?: AutomationRunUsage | null
   error?: string | null
   errorCode?: string | null

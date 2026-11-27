@@ -214,6 +214,13 @@ export function formatAutomationRemoved(result: { removed: boolean; id: string }
     : `Automation ${result.id} not removed.`
 }
 
+export function formatAutomationEnabled(
+  result: { automation: { name: string; enabled: boolean } },
+  enabled: boolean
+): string {
+  return `${enabled ? 'Enabled' : 'Disabled'} automation ${result.automation.name}.`
+}
+
 function formatAutomationRunAcknowledgement(run: { id: string; status: string }): string {
   switch (run.status) {
     case 'pending':

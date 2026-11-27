@@ -3,12 +3,13 @@
 import type { Automation } from '../../shared/automations/automation-definition'
 import type { Bot } from '../../shared/bot-types'
 import { BotAgentSetupSchema, botAutomationSetup } from '../../shared/bots/bot-agent-setup'
+import { isCommandAutomation } from '../../shared/automations/launch/automation-command'
 
-type BotAutomationAgent = Pick<Automation, 'id' | 'agentId' | 'bot'>
+type BotAutomationAgent = Pick<Automation, 'id' | 'agentId' | 'bot' | 'action'>
 
 function runAgent(automation: BotAutomationAgent, bots: readonly Bot[]): Bot['agent'] | null {
-  // A row a damaged store left empty has no bot to follow.
-  const target = automation?.bot
+  // A row a damaged store left empty has no bot to follow; a command follows no agent.
+  const target = isCommandAutomation(automation ?? {}) ? undefined : automation?.bot
   const bot = target && bots.find((entry) => entry.id === target.botId)
   return target && bot ? botAutomationSetup(target, bot).agent : null
 }

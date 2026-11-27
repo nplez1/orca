@@ -7,7 +7,13 @@ import { useTranslate } from '@/i18n/use-translate'
 import { useClipboardTextCopyFeedback } from '@/hooks/clipboard/use-clipboard-text-copy-feedback'
 import { AUTOMATION_EDITOR_SECTION_LABEL_CLASS } from '../automation-page-parts'
 
-export function AutomationPromptDisclosure({ prompt }: { prompt: string }): React.JSX.Element {
+export function AutomationPromptDisclosure({
+  prompt,
+  isCommand = false
+}: {
+  prompt: string
+  isCommand?: boolean
+}): React.JSX.Element {
   const t = useTranslate()
   const contentId = useId()
   const expandedRef = useRef(false)
@@ -21,7 +27,9 @@ export function AutomationPromptDisclosure({ prompt }: { prompt: string }): Reac
       ? t('auto.components.automations.AutomationPromptDisclosure.copied', 'Copied')
       : copyStatus === 'failed'
         ? t('auto.components.automations.AutomationPromptDisclosure.copyFailed', 'Copy failed')
-        : t('auto.components.automations.AutomationPromptDisclosure.copyPrompt', 'Copy prompt')
+        : isCommand
+          ? t('automations.command.copyCommand', 'Copy command')
+          : t('auto.components.automations.AutomationPromptDisclosure.copyPrompt', 'Copy prompt')
 
   const measureOverflow = useCallback((element: HTMLParagraphElement) => {
     const nextOverflows = element.scrollHeight > element.clientHeight + 1
@@ -62,7 +70,9 @@ export function AutomationPromptDisclosure({ prompt }: { prompt: string }): Reac
     <section className="min-w-0 rounded-lg border border-border/60">
       <div className="flex items-center justify-between gap-3 border-b border-border/60 py-1.5 pr-2 pl-4">
         <h3 className={`text-muted-foreground ${AUTOMATION_EDITOR_SECTION_LABEL_CLASS}`}>
-          {t('auto.components.automations.AutomationEditorDialog.058c23cb3f', 'Prompt')}
+          {isCommand
+            ? t('automations.command.command', 'Command')
+            : t('auto.components.automations.AutomationEditorDialog.058c23cb3f', 'Prompt')}
         </h3>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -89,6 +99,7 @@ export function AutomationPromptDisclosure({ prompt }: { prompt: string }): Reac
           tabIndex={-1}
           className={cn(
             'max-w-[80ch] select-text whitespace-pre-wrap text-sm leading-relaxed text-foreground [overflow-wrap:anywhere] focus-visible:outline-none',
+            isCommand && 'font-mono text-xs',
             !expanded && 'line-clamp-8'
           )}
         >

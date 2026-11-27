@@ -7,7 +7,8 @@ import { translate } from '@/i18n/i18n'
 import { useTranslate } from '@/i18n/use-translate'
 import { formatUiRelativeTime } from '@/i18n/relative-time-format'
 import { openBotAutomation } from '@/components/bots/bot-automation-open'
-import { botAgentLabel, botErrorMessage } from '@/components/bots/bot-presentation'
+import { botErrorMessage } from '@/components/bots/bot-presentation'
+import { getAutomationRunnerLabel } from '@/components/automations/automation-runner-label'
 import { botResultsPlace } from '../../../../shared/automation-bot-target'
 import { botTargetChatTitle } from '@/components/automations/authoring/automation-bot-runs-in-chat'
 import { eventTriggerLine } from '@/components/automations/authoring/AutomationBotEventsField'
@@ -17,7 +18,6 @@ import {
   updateAutomationForTarget,
   type AutomationHostTarget
 } from '@/components/automations/hosts/automation-host-client'
-import { getAgentCatalog } from '@/lib/agent-catalog/agent-catalog'
 import { botAutomationWhenParts } from '../../../../shared/bots/bot-automation-when'
 import type {
   Automation,
@@ -51,13 +51,6 @@ function resultsPlace(resultsTo: AutomationBotResultsTo | undefined): string {
     return translate('automations.botTarget.resultsToNone', 'Nowhere')
   }
   return botResultsPlace(resultsTo)
-}
-
-function agentLabel(automation: Automation): string {
-  return automation.bot
-    ? botAgentLabel(automation.agentId)
-    : (getAgentCatalog().find((agent) => agent.id === automation.agentId)?.label ??
-        automation.agentId)
 }
 
 /** One label/value row of a card's opened details, inside a two-column `dl`. */
@@ -176,8 +169,14 @@ function ReadyDetails({
           >
             {resultsPlace(automation.bot?.resultsTo)}
           </NativeChatCardFact>
-          <NativeChatCardFact label={t('components.native-chat.automationSaved.agent', 'Agent')}>
-            {agentLabel(automation)}
+          <NativeChatCardFact
+            label={
+              automation.agentId
+                ? t('components.native-chat.automationSaved.agent', 'Agent')
+                : t('automations.command.runs', 'Runs')
+            }
+          >
+            {getAutomationRunnerLabel(automation, t)}
           </NativeChatCardFact>
         </dl>
         <RecentRuns
@@ -186,7 +185,11 @@ function ReadyDetails({
           runs={runs}
         />
       </div>
-      {automation.prompt ? (
+      {automation.action?.kind === 'command' ? (
+        <p className="mt-3 line-clamp-6 whitespace-pre-wrap break-words rounded-md border border-border px-3 py-2 font-mono text-xs text-foreground">
+          {automation.action.script.command}
+        </p>
+      ) : automation.prompt ? (
         <p className="mt-3 line-clamp-6 whitespace-pre-wrap break-words rounded-md border border-border px-3 py-2 text-sm text-foreground">
           {automation.prompt}
         </p>

@@ -3,11 +3,13 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { CreateFromPicker } from '@/components/repo/CreateFromPicker'
 import { useTranslate } from '@/i18n/use-translate'
+import { cn } from '@/lib/class-names'
 import type { AutomationWorkspaceMode } from '../../../../../shared/automations/automation-definition'
 import type { Repo } from '../../../../../shared/repository/repo-types'
 import type { Worktree } from '../../../../../shared/worktree/types'
 import { AUTOMATION_EDITOR_SECTION_LABEL_CLASS, Field } from '../automation-page-parts'
 import { WorkspaceCombobox } from './WorkspaceCombobox'
+import { isCommandDraft } from './automation-draft-action'
 import type { AutomationDraft } from './AutomationEditorDialog'
 
 type AutomationWorkspaceFieldProps = {
@@ -57,6 +59,7 @@ export function AutomationWorkspaceField({
     >
       <div className="grid gap-2">
         <ToggleGroup
+          className={cn(isCommandDraft(draft) && draft.workspaceMode === 'existing' && 'hidden')}
           type="single"
           spacing={1}
           value={draft.workspaceMode}

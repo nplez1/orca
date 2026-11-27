@@ -11,7 +11,7 @@ import type { Automation } from '../../../../../shared/automations/automation-de
 import type { AutomationRun } from '../../../../../shared/automations/history/automation-run'
 import { automationRunEventSourceKey } from '../../../../../shared/automations/automation-run-row-words'
 import { sayAutomationRun } from '../../native-chat/automation-run/automation-run-wording'
-import { getAgentLabel } from '../authoring/automation-draft-model'
+import { getAutomationRunnerLabel } from '../automation-runner-label'
 import { getAutomationRunContent } from './automation-run-content'
 import { automationRunErrorText } from './automation-run-error-copy'
 import { useFullAutomationRun } from './use-full-automation-run'
@@ -85,7 +85,9 @@ export function AutomationRunDetailsPage({
   const startedAt = getAutomationRunLaunchedAt(run)
   const startedLate =
     startedAt !== null && Math.abs(startedAt - run.scheduledFor) >= RUN_START_DRIFT_LABEL_MS
-  const agentLabel = automation ? getAgentLabel(automation.agentId) : undefined
+  const agentLabel = automation
+    ? getAutomationRunnerLabel({ agentId: automation.agentId }, t)
+    : undefined
   const savedError = automationRunErrorText(run, agentLabel)
   const errorText =
     run.status === 'dispatch_failed' &&

@@ -28,7 +28,7 @@ export type AutomationListViewItem =
       enabled: boolean
       lastRunAt: number | null
       lastRun: AutomationLastRunSnapshot
-      agentId: TuiAgent
+      agentId: TuiAgent | null
       row: AutomationListRow
     }
   | {
@@ -191,7 +191,8 @@ export function filterAutomationListRows(
       matchesHostFilter(row.catalogRef ? hostStableKey(row.catalogRef) : null, hostKeys) &&
       matchesStatusFilter(row.automation.enabled, filter.status) &&
       matchesLastRunFilter(getAutomationRowLastRunSnapshot(row, t), filter.lastRun) &&
-      (filter.agentIds.length === 0 || filter.agentIds.includes(row.automation.agentId))
+      (filter.agentIds.length === 0 ||
+        filter.agentIds.some((agentId) => agentId === row.automation.agentId))
   )
 }
 
