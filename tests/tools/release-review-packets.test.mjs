@@ -523,6 +523,12 @@ describe('prepare', () => {
     expect(prompt).not.toMatch(/\{\{[A-Z_]+\}\}/)
     expect(prompt).toContain(join(out, 'slice-A.patch'))
     expect(prompt).toContain('src/renderer/src/i18n/locales/zh.json: modified')
+    // The patch is in the prompt, whole, before the instructions that judge it, so the reviewer does
+    // not spend a turn per chunk reading it back.
+    const patch = readFileSync(join(out, 'slice-A.patch'), 'utf8')
+    const inline = `\`\`\`diff\n${patch}\`\`\``
+    expect(prompt).toContain(inline)
+    expect(prompt.indexOf(inline)).toBeLessThan(prompt.indexOf('The other slices'))
     expect(readFileSync(join(out, 'slice-A.patch'), 'utf8')).toContain('+resolved')
   })
 

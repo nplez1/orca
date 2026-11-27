@@ -211,7 +211,9 @@ defects, and the cheap tier at fine granularity found 4 of 4 of the ones they dr
 ```bash
 node local/release-review-packets.mjs --prepare              # the reviewer round's packet: diff, filter, slice
 node local/release-review-packets.mjs --prepare --sweep      # the fine sweep packet (24 KB a slice)
-#   fan the sweep's prompt-<id>.txt out to cheap-tier subagents, then record their replies:
+#   fan the sweep's prompt-<id>.txt out to cheap-tier subagents by path (each Reads its own
+#   file; it carries its patch inline, so pasting 153 of them through one context is ~3.7 MB),
+#   then record their replies:
 node local/release-review-packets.mjs --record-sweep ~/answers.json
 node local/release-review-packets.mjs --prepare --adjudicate # REVIEWER judges every sweep finding
 node local/release-review-packets.mjs --run --packet "<git dir>/orca-review/sync-<merge>/adjudicate"

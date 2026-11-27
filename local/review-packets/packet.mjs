@@ -128,6 +128,23 @@ const writePatch = (dir, name, entries) => {
   return join(dir, name)
 }
 
+/**
+ * The patch itself, fenced for the prompt. Why inline and not only the path: a reviewer handed a path
+ * spends a turn per ~1,500-line Read, each of which re-sends the whole conversation, and a Read the CLI
+ * spills to a tool-results file is then read again in pieces. Measured over the 2026-11-13 → 11-27
+ * reviews, those packet reads were 110 calls and 2.05M characters, the largest single share of the
+ * reviewers' turns. The bytes are the same either way; inline they arrive in the one prompt.
+ *
+ * The fence is one backtick longer than the longest run inside the patch, so a patch to a Markdown file
+ * cannot close it early.
+ */
+export function inlinePatch(entries) {
+  const text = entries.map((entry) => entry.text).join('')
+  const longest = Math.max(0, ...[...text.matchAll(/`+/g)].map((match) => match[0].length))
+  const fence = '`'.repeat(Math.max(3, longest + 1))
+  return `${fence}diff\n${text.endsWith('\n') ? text : `${text}\n`}${fence}`
+}
+
 /** Round 1: the remerge diff of a sync merge, sliced, with a prompt per slice. */
 export function prepareSync({
   root,
@@ -181,7 +198,8 @@ export function prepareSync({
       SLICE_SCOPE: slice.scope,
       SLICE_FILES: slice.files,
       SLICE_BYTES: slice.bytes,
-      SLICE_PATCH: slicePatch
+      SLICE_PATCH: slicePatch,
+      SLICE_PATCH_TEXT: inlinePatch(slice.entries)
     })
     writeFileSync(outputPaths(dir, slice.id).prompt, prompt)
   }
@@ -256,6 +274,7 @@ export function prepareDelta({ root, range, findings, parentDir, context, budget
     DELTA_FILES: reviewed.length,
     DELTA_BYTES: bytes,
     DELTA_PATCH: deltaPatch,
+    DELTA_PATCH_TEXT: inlinePatch(reviewed),
     EXCLUDED_NOTE: summary.files
       ? `\nLeft out of the delta, because another gate verifies the content:\n${excludedList(summary)}\nTheir hunks are in ${excludedPatch}.\n`
       : ''
