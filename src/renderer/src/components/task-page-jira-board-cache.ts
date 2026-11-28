@@ -4,7 +4,9 @@ import type { JiraBoardOverview, JiraIssue } from '../../../shared/jira/jira-typ
 // board keeps its last snapshot in memory. Returning to the board renders this
 // snapshot immediately and revalidates behind it instead of flashing a loader.
 export const TASK_PAGE_JIRA_BOARD_CACHE_TTL_MS = 30 * 60_000
-export const TASK_PAGE_JIRA_BOARD_CACHE_MAX_ENTRIES = 3
+// Why six: a curated set is usually a handful of boards, and an entry is one overview plus the
+// loaded pages. Three evicted a four-board set on every cycle, so switching back refetched.
+export const TASK_PAGE_JIRA_BOARD_CACHE_MAX_ENTRIES = 6
 
 export type TaskPageJiraBoardCachedPage = {
   issues: JiraIssue[]

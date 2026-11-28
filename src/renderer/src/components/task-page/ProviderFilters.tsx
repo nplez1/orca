@@ -3,13 +3,20 @@ import { TaskPageGitHubFilters } from './github/listing/Filters'
 import { TaskPageLinearFilters } from './linear/Filters'
 import { TaskPageJiraFilters } from './jira/Filters'
 import { TaskPageGitLabFilters } from './gitlab/Filters'
+import { jiraBoardOwnsSurface } from '../task-page-jira-board-model'
 export function TaskPageProviderFilters({
   model
 }: {
   model: TaskPageComposerActionsModel
 }): React.JSX.Element | null {
-  const { linearConnected, jiraConnected, taskSource, githubMode, settings, jiraBoardViewMode } =
-    model
+  const {
+    linearConnected,
+    jiraConnected,
+    taskSource,
+    githubMode,
+    jiraBoardViewMode,
+    jiraSelectedBoard
+  } = model
   return taskSource === 'github' && githubMode === 'items' ? (
     // Join the filter chrome to the table shell below.
     <TaskPageGitHubFilters model={model} />
@@ -17,7 +24,7 @@ export function TaskPageProviderFilters({
     <TaskPageLinearFilters model={model} />
   ) : taskSource === 'jira' &&
     jiraConnected &&
-    (!settings?.defaultJiraBoard || jiraBoardViewMode === 'list') ? (
+    !jiraBoardOwnsSurface(jiraSelectedBoard, jiraBoardViewMode) ? (
     <TaskPageJiraFilters model={model} />
   ) : taskSource === 'gitlab' ? (
     <TaskPageGitLabFilters model={model} />

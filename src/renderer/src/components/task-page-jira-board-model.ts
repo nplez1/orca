@@ -1,5 +1,6 @@
 import type {
   JiraBoardColumn,
+  JiraBoardSelection,
   JiraConnectionStatus,
   JiraIssue,
   JiraTransition
@@ -20,6 +21,17 @@ export function shouldShowJiraSiteSelector(
 export type TaskPageJiraBoardColumn = {
   column: JiraBoardColumn
   issues: JiraIssue[]
+}
+
+/** One predicate for "the board view owns the Jira surface": the flat list fetch, the filter bar
+ *  and the site selector all have to agree, or the surface shows two chromes or none. The
+ *  capability fallback in `useJiraBoardMode` is a second condition on purpose — a runtime that
+ *  cannot serve the board must fall back to the list without changing this preference. */
+export function jiraBoardOwnsSurface(
+  board: Pick<JiraBoardSelection, 'boardId'> | null | undefined,
+  viewMode: 'board' | 'list'
+): boolean {
+  return Boolean(board) && viewMode === 'board'
 }
 
 export function getTaskPageJiraBoardViewerAccountId(

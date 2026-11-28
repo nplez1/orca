@@ -38,7 +38,7 @@ test('Jira Tasks settings link opens the board settings section', async ({ orcaP
   await expect(orcaPage.locator('[data-settings-section="tasks-jira-board"]')).toBeVisible({
     timeout: 10_000
   })
-  await expect(orcaPage.getByRole('combobox', { name: 'Default board' })).toBeVisible({
+  await expect(orcaPage.getByRole('combobox', { name: 'Add a board' })).toBeVisible({
     timeout: 10_000
   })
 })

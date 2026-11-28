@@ -46,7 +46,8 @@ export type SettingsFieldHostSyncDisposition =
  *   entry here that the credentials policy does not yet cover — see the note at the end.
  * - `telemetry` is `replicated`: consent is a decision the user made, not a property of the machine.
  * - `defaultRepoSelection` is `hostLocal` because a repository registration is host-local, so a
- *   default selection naming one cannot travel; `defaultLinearTeamSelection`, `defaultJiraBoard` and
+ *   default selection naming one cannot travel; `defaultLinearTeamSelection`, `defaultJiraBoard`,
+ *   `defaultJiraBoards` and
  *   `defaultTaskSource` are `replicated` because they name an integration rather than a local path.
  * - `agentCmdOverrides`, `agentStateRulesPath`, `codexSessionSourceHome` and `devPluginPaths` are
  *   `hostLocal`: each is a filesystem path or an executable that exists on the main and may not exist

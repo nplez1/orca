@@ -2,9 +2,36 @@ import { describe, expect, it } from 'vitest'
 import {
   defaultJiraBoardViewPreferences,
   isDefaultJiraBoardViewPreferences,
+  normalizeJiraBoardScopedViewPreferences,
   normalizeJiraBoardViewPreferences,
-  resolveJiraBoardViewPreferences
+  resolveJiraBoardViewPreferences,
+  trimJiraBoardViewPreferencesByBoard,
+  JIRA_BOARD_VIEW_PREFERENCE_BOARD_LIMIT
 } from './jira-board-view-preferences'
+
+describe('per-board view preferences', () => {
+  it('keeps only the fields a board actually set, so the rest still follow the device', () => {
+    expect(normalizeJiraBoardScopedViewPreferences({ filter: 'all', viewMode: 'nope' })).toEqual({
+      filter: 'all'
+    })
+    expect(normalizeJiraBoardScopedViewPreferences({ viewMode: 'nope' })).toBeUndefined()
+  })
+
+  it('keeps the most recently written boards and drops the rest', () => {
+    const boards = Object.fromEntries(
+      Array.from({ length: JIRA_BOARD_VIEW_PREFERENCE_BOARD_LIMIT + 2 }, (_, index) => [
+        `site:${index}`,
+        { filter: 'all' as const }
+      ])
+    )
+
+    const trimmed = trimJiraBoardViewPreferencesByBoard(boards)
+
+    expect(Object.keys(trimmed)).toHaveLength(JIRA_BOARD_VIEW_PREFERENCE_BOARD_LIMIT)
+    expect(trimmed['site:0']).toBeUndefined()
+    expect(trimmed[`site:${JIRA_BOARD_VIEW_PREFERENCE_BOARD_LIMIT + 1}`]).toEqual({ filter: 'all' })
+  })
+})
 
 describe('resolveJiraBoardViewPreferences', () => {
   it('opens on the board, sprint tab, viewer filter, and no query when nothing is persisted', () => {

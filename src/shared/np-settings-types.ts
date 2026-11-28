@@ -23,6 +23,11 @@ export type NpSettings = {
   experimentalAgentDashboardCardClickAction?: AgentDashboardCardClickAction
   /** Which agent and model fold a session summary on view. Separate from source-control AI so summary cost is tunable on its own. */
   sessionSummaryAi?: SessionSummaryAiSettings
-  /** Optional Jira board for the Jira Tasks board view. */
+  /** The Jira boards the Tasks switcher offers, in the user's order. `null` (or empty) means
+   *  sticky-all: every board the account can see. The last board picked on this device is stored
+   *  separately, so the set stays a curated list rather than a selection. */
+  defaultJiraBoards?: JiraBoardSelection[] | null
+  /** Legacy single board, still written as the first of `defaultJiraBoards` so older builds and
+   *  replicated hosts keep showing a board. With no set it is also the one board that shows. */
   defaultJiraBoard: JiraBoardSelection | null
 } & OrcaWorkspaceLayoutSettings

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ComponentProps } from 'react'
+import { useMemo, useState, type ComponentProps } from 'react'
 import type { JiraBoardSelection, JiraIssue } from '../../../../../shared/jira/jira-types'
 import { accountBackedDetailSource } from '@/lib/account-backed-detail-source'
 import type JiraIssueWorkspace from '@/components/task-page/jira/issue-workspace/JiraIssueWorkspace'
@@ -47,7 +47,7 @@ export function useJiraBoardMode(model: TaskPageComposerActionsModel): JiraBoard
     jiraIssueAttachmentIndex,
     handleOpenOrUseJiraItem
   } = model
-  const defaultJiraBoard = model.settings?.defaultJiraBoard ?? null
+  const defaultJiraBoard = model.jiraSelectedBoard ?? null
   const boardOwnerHostId = jiraTaskSourceContext?.hostId ?? accountBackedTaskSourceHostId
   const [jiraDetailRefreshSignal, setJiraDetailRefreshSignal] = useState(0)
   const [jiraBoardRefreshSignal, setJiraBoardRefreshSignal] = useState(0)
@@ -56,10 +56,6 @@ export function useJiraBoardMode(model: TaskPageComposerActionsModel): JiraBoard
   const [unavailableBoardHostId, setUnavailableBoardHostId] = useState<string | null>(null)
   const runtimeBoardUnavailable =
     unavailableBoardHostId !== null && unavailableBoardHostId === boardOwnerHostId
-  const boardSelectionRef = useRef<string | null>(null)
-  const jiraBoardSelectionKey = defaultJiraBoard
-    ? `${defaultJiraBoard.siteId}:${defaultJiraBoard.boardId}`
-    : null
   const notifyJiraIssueMoved = (issue: JiraIssue): void => {
     if (
       selectedJiraIssue?.key === issue.key &&
@@ -74,16 +70,6 @@ export function useJiraBoardMode(model: TaskPageComposerActionsModel): JiraBoard
     setJiraRefreshNonce((value) => value + 1)
     setJiraBoardRefreshSignal((value) => value + 1)
   }
-
-  useEffect(() => {
-    // Why: only a genuine board change forces the board view; the first resolved
-    // selection must not clobber a restored issue-list preference.
-    const previousSelectionKey = boardSelectionRef.current
-    boardSelectionRef.current = jiraBoardSelectionKey
-    if (previousSelectionKey !== null && previousSelectionKey !== jiraBoardSelectionKey) {
-      setJiraBoardViewMode('board')
-    }
-  }, [jiraBoardSelectionKey, setJiraBoardViewMode])
 
   // Why memoised: the workspace refetches on its source's identity, and a fresh object per render
   // would re-run every detail read.
