@@ -137,7 +137,9 @@ export abstract class OrcaRuntimeWithGetWorktreeTerminalProvisioningHost extends
       },
       getPtyId: (handle) => this.getTerminalPtyIdForHandle(handle) ?? undefined,
       recordSetupCompletionToken: (ptyId, token) =>
-        this.setupCompletionTokenByPtyId.set(ptyId, token)
+        this.setupCompletionTokenByPtyId.set(ptyId, token),
+      armWorktreeSetupRunner: (handle, worktreeId, completionToken) =>
+        this.armWorktreeSetupRunner(handle, worktreeId, completionToken)
     }
   }
 

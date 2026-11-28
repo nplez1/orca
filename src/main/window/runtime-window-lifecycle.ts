@@ -1,7 +1,9 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its 300-line budget; the fork's setting-up relay rides inside it, and splitting costs a permanent sync hunk. */
 import {
   registerSleepingMailAvailability,
   resumeSleepingAgentsInWindow
 } from './renderer-relays/sleeping-mail-window-relay'
+import { attachSetupRunnerStateToWindow } from './setup-runner-window-forwarding'
 import { randomUUID } from 'node:crypto'
 
 import { ipcMain, type BrowserWindow } from 'electron'
@@ -264,6 +266,7 @@ export function registerRuntimeWindowLifecycle(
     },
     { consumesTerminalSideEffects: false }
   )
+  attachSetupRunnerStateToWindow(mainWindow, runtime)
   // Only this window's live document speaks for the Agents list; a gone one leaves no verdicts behind.
   const releaseAgentListVerdicts = addFanoutListener(
     ipcMain,

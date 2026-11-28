@@ -1,4 +1,5 @@
 import { createOsc133CommandFinishedScanner } from '../../shared/terminal/output/terminal-osc133-command-finished'
+import { createSetupCompletionScanner } from './orchestration/workers/launch/setup-completion-signal'
 import { OrcaRuntimeWithStartTuiIdleVisibleReadProbe } from './terminal/wait/terminal-wait-visible-probe'
 import type { RuntimeClientEvent } from '../../shared/remote-runtime/session-graph/runtime-client-events'
 
@@ -17,9 +18,75 @@ export const SETUP_RUNNER_WATCHDOG_MS = 60 * 60 * 1000
 
 type SetupRunnerObservation = {
   worktreeId: string
-  /** OSC 133;D on the setup PTY: the command returned to its prompt. */
-  unsubscribeCommandFinished: () => void
-  watchdog: ReturnType<typeof setTimeout>
+  /** Undoes this runner's own end signals: its output subscription and its watchdog. */
+  stop: () => void
+}
+
+/**
+ * Which worktrees are setting up, and which PTYs said so.
+ *
+ * Kept apart from the runtime so the rules that matter are testable: one
+ * announcement per worktree however many runners it has, and the first end
+ * signal for a PTY wins.
+ */
+export class SetupRunnerAnnouncements {
+  private readonly observationByPtyId = new Map<string, SetupRunnerObservation>()
+  private readonly ptyCountByWorktreeId = new Map<string, number>()
+  private readonly runningWorktreeIds = new Set<string>()
+  private readonly announce: (worktreeId: string, running: boolean) => void
+
+  constructor(announce: (worktreeId: string, running: boolean) => void) {
+    this.announce = announce
+  }
+
+  /** A PTY is already watched: a second arm would double-count its worktree. */
+  isObserving(ptyId: string): boolean {
+    return this.observationByPtyId.has(ptyId)
+  }
+
+  runningWorktreeIdsSnapshot(): string[] {
+    return [...this.runningWorktreeIds].sort()
+  }
+
+  start(ptyId: string, worktreeId: string, stop: () => void): void {
+    this.observationByPtyId.set(ptyId, { worktreeId, stop })
+    const count = (this.ptyCountByWorktreeId.get(worktreeId) ?? 0) + 1
+    this.ptyCountByWorktreeId.set(worktreeId, count)
+    // Why: only the first runner announces; a second one for the same worktree
+    // must not be un-announced when the first ends.
+    if (count === 1) {
+      this.setRunning(worktreeId, true)
+    }
+  }
+
+  /** Idempotent: the first end signal for a PTY wins and later ones do nothing. */
+  end(ptyId: string): void {
+    const observation = this.observationByPtyId.get(ptyId)
+    if (!observation) {
+      return
+    }
+    this.observationByPtyId.delete(ptyId)
+    observation.stop()
+    const count = this.ptyCountByWorktreeId.get(observation.worktreeId) ?? 0
+    if (count > 1) {
+      this.ptyCountByWorktreeId.set(observation.worktreeId, count - 1)
+      return
+    }
+    this.ptyCountByWorktreeId.delete(observation.worktreeId)
+    this.setRunning(observation.worktreeId, false)
+  }
+
+  private setRunning(worktreeId: string, running: boolean): void {
+    if (running === this.runningWorktreeIds.has(worktreeId)) {
+      return
+    }
+    if (running) {
+      this.runningWorktreeIds.add(worktreeId)
+    } else {
+      this.runningWorktreeIds.delete(worktreeId)
+    }
+    this.announce(worktreeId, running)
+  }
 }
 
 /**
@@ -40,9 +107,9 @@ type SetupRunnerObservation = {
  * The state is in-memory only, so a main-process restart cannot carry it over.
  */
 export abstract class OrcaRuntimeWithSetupRunnerState extends OrcaRuntimeWithStartTuiIdleVisibleReadProbe {
-  private setupRunnerObservationByPtyId = new Map<string, SetupRunnerObservation>()
-  private setupRunnerPtyCountByWorktreeId = new Map<string, number>()
-  private setupRunnerRunningWorktreeIds = new Set<string>()
+  private readonly setupRunnerAnnouncements = new SetupRunnerAnnouncements((worktreeId, running) =>
+    this.notifyWorktreeSetupRunnerState(worktreeId, running)
+  )
 
   /**
    * Marks `worktreeId` as setting up until its setup runner ends.
@@ -56,14 +123,22 @@ export abstract class OrcaRuntimeWithSetupRunnerState extends OrcaRuntimeWithSta
     const ptyId = this.getLivePtyForHandle(handle)?.pty.ptyId
     // Why: a setup that already exited has nothing to observe, and announcing
     // 'running' now would strand the dot.
-    if (!ptyId || this.setupRunnerObservationByPtyId.has(ptyId)) {
+    if (!ptyId || this.setupRunnerAnnouncements.isObserving(ptyId)) {
       return
     }
+    // Why the runtime records it: a caller that waits for structured setup later
+    // reads the token from here, and arming must not be the only owner of it.
     this.setupCompletionTokenByPtyId.set(ptyId, completionToken)
-    const unsubscribeCommandFinished = this.subscribeToTerminalData(
-      ptyId,
-      createOsc133CommandFinishedScanner(() => this.endWorktreeSetupRunner(ptyId)).scan
-    )
+    const scanCompletion = createSetupCompletionScanner(completionToken, () =>
+      this.endWorktreeSetupRunner(ptyId)
+    ).scan
+    const scanCommandFinished = createOsc133CommandFinishedScanner(() =>
+      this.endWorktreeSetupRunner(ptyId)
+    ).scan
+    const scanOutput = (data: string): void => {
+      scanCommandFinished(data)
+      scanCompletion(data)
+    }
     const watchdog = setTimeout(() => {
       console.warn(
         `[runtime] setup runner for ${worktreeId} never reported an end; clearing its setting-up state`
@@ -72,29 +147,24 @@ export abstract class OrcaRuntimeWithSetupRunnerState extends OrcaRuntimeWithSta
     }, SETUP_RUNNER_WATCHDOG_MS)
     // Why: a pending hour-long timer must not hold the process open.
     watchdog.unref?.()
-    this.setupRunnerObservationByPtyId.set(ptyId, {
-      worktreeId,
-      unsubscribeCommandFinished,
-      watchdog
+    let unsubscribe: () => void = () => {}
+    // Why announce before subscribing: the replayed output below can end the
+    // runner synchronously, and an end before the start would announce nothing.
+    this.setupRunnerAnnouncements.start(ptyId, worktreeId, () => {
+      unsubscribe()
+      clearTimeout(watchdog)
     })
-    this.retainWorktreeSetupRunner(worktreeId)
-    // Why: never rejects outward — the rejection path must clear the dot too.
-    void this.waitForSetupTerminalCompletion(handle).then(
-      () => this.endWorktreeSetupRunner(ptyId),
-      () => this.endWorktreeSetupRunner(ptyId)
-    )
+    // Why its own scanner rather than `waitForSetupTerminalCompletion`: that wait
+    // consumes the shared token, and the structured launch wait needs it too.
+    unsubscribe = this.subscribeToTerminalData(ptyId, scanOutput)
+    // Why replay: setup can print its marker before the observer is registered.
+    const replay = this.recentPtyOutputById.get(ptyId)?.read()
+    if (replay) {
+      scanOutput(replay)
+    }
   }
 
   notifyWorktreeSetupRunnerState(worktreeId: string, running: boolean): void {
-    const wasRunning = this.setupRunnerRunningWorktreeIds.has(worktreeId)
-    if (running === wasRunning) {
-      return
-    }
-    if (running) {
-      this.setupRunnerRunningWorktreeIds.add(worktreeId)
-    } else {
-      this.setupRunnerRunningWorktreeIds.delete(worktreeId)
-    }
     this.emitClientEvent({ type: 'worktreeSetupRunnerState', worktreeId, running })
   }
 
@@ -105,7 +175,7 @@ export abstract class OrcaRuntimeWithSetupRunnerState extends OrcaRuntimeWithSta
    * always the current truth.
    */
   getSetupRunnerClientEventSnapshot(): RuntimeClientEvent[] {
-    return [...this.setupRunnerRunningWorktreeIds].sort().map((worktreeId) => ({
+    return this.setupRunnerAnnouncements.runningWorktreeIdsSnapshot().map((worktreeId) => ({
       type: 'worktreeSetupRunnerState',
       worktreeId,
       running: true
@@ -118,33 +188,6 @@ export abstract class OrcaRuntimeWithSetupRunnerState extends OrcaRuntimeWithSta
   }
 
   private endWorktreeSetupRunner(ptyId: string): void {
-    const observation = this.setupRunnerObservationByPtyId.get(ptyId)
-    if (!observation) {
-      return
-    }
-    this.setupRunnerObservationByPtyId.delete(ptyId)
-    clearTimeout(observation.watchdog)
-    observation.unsubscribeCommandFinished()
-    this.releaseWorktreeSetupRunner(observation.worktreeId)
-  }
-
-  private retainWorktreeSetupRunner(worktreeId: string): void {
-    const count = (this.setupRunnerPtyCountByWorktreeId.get(worktreeId) ?? 0) + 1
-    this.setupRunnerPtyCountByWorktreeId.set(worktreeId, count)
-    // Why: only the first runner announces; a second one for the same worktree
-    // must not be un-announced when the first ends.
-    if (count === 1) {
-      this.notifyWorktreeSetupRunnerState(worktreeId, true)
-    }
-  }
-
-  private releaseWorktreeSetupRunner(worktreeId: string): void {
-    const count = this.setupRunnerPtyCountByWorktreeId.get(worktreeId) ?? 0
-    if (count > 1) {
-      this.setupRunnerPtyCountByWorktreeId.set(worktreeId, count - 1)
-      return
-    }
-    this.setupRunnerPtyCountByWorktreeId.delete(worktreeId)
-    this.notifyWorktreeSetupRunnerState(worktreeId, false)
+    this.setupRunnerAnnouncements.end(ptyId)
   }
 }

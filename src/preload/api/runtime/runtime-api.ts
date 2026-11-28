@@ -84,6 +84,9 @@ export type RuntimeApi = {
     onTerminalDriverChanged: (
       callback: (event: { ptyId: string; driver: RuntimeTerminalDriverState }) => void
     ) => () => void
+    onWorktreeSetupRunnerStateChanged: (
+      callback: (event: { worktreeId: string; running: boolean }) => void
+    ) => () => void
     onNativeChatLaunchDraftResolved?: (
       callback: (event: { tabId: string; text: string; createdAt: number }) => void
     ) => () => void

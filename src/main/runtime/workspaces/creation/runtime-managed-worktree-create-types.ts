@@ -66,7 +66,6 @@ export type RuntimeManagedWorktreeCreateArgs = {
   approvedSetupHashes?: string[]
   setupOnly?: boolean
   awaitTerminalProvisioning?: boolean
-  observeSetupCompletion?: boolean
   createdWithAgent?: TuiAgent
   /** Transient intent: this create will be followed by an agent chat surface. */
   promisedAgentChat?: boolean

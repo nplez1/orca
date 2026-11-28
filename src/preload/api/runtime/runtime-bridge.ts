@@ -107,6 +107,16 @@ export const runtimeApi = {
     ipcRenderer.on('runtime:terminalDriverChanged', listener)
     return () => ipcRenderer.removeListener('runtime:terminalDriverChanged', listener)
   },
+  onWorktreeSetupRunnerStateChanged: (
+    callback: (event: { worktreeId: string; running: boolean }) => void
+  ): (() => void) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      data: { worktreeId: string; running: boolean }
+    ) => callback(data)
+    ipcRenderer.on('runtime:worktreeSetupRunnerStateChanged', listener)
+    return () => ipcRenderer.removeListener('runtime:worktreeSetupRunnerStateChanged', listener)
+  },
   onNativeChatLaunchDraftResolved: (
     callback: (event: { tabId: string; text: string; createdAt: number }) => void
   ): (() => void) => {

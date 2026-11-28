@@ -117,8 +117,7 @@ export function agentLaunchWorkspaceFactory(
           ...(promisedAgentChat ? { promisedAgentChat } : {}),
           ...(onWorkspaceCreated ? { onWorkspaceCreated } : {}),
           // Chats have no startup command to sequence after setup; provision setup synchronously and return its completion token.
-          awaitTerminalProvisioning: true,
-          observeSetupCompletion: true
+          awaitTerminalProvisioning: true
         })
         if (!startupAgent) {
           await waitForStructuredSetup(runtime, result.setupReceipt)

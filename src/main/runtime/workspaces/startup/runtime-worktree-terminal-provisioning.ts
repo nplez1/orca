@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto'
 import type { CreateWorktreeResult } from '../../../../shared/worktree/create-types'
 import { shouldSeedWorktreePrimaryTerminal } from '../../../../shared/worktree/creation/worktree-first-surface'
 import { buildObservedSetupCommand } from '../../orchestration/workers/launch/setup-completion-signal'
-import { buildSetupRunnerCommand } from '../../../../shared/agent-launch/startup/setup-runner-command'
 import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../shared/workspace-layout/layout-owner-switch'
 import type { DefaultTerminalTab } from '../../../../shared/workspace-layout/workspace-layout-command-types'
 import type { TerminalCreateOptions } from '../../terminal/launch/terminal-create-options'
@@ -43,9 +42,10 @@ export type WorktreeTerminalProvisioningHost = {
   ) => Promise<readonly { tabId: string }[] | null>
   getPtyId: (handle: string) => string | undefined
   recordSetupCompletionToken: (ptyId: string, token: string) => void
-  /** Announces the worktree as setting up until its runner ends. Omitted by hosts
-   *  that never produce a completion token, so no dot can be left stuck. */
-  armWorktreeSetupRunner?: (handle: string, worktreeId: string, completionToken: string) => void
+  /** Announces the worktree as setting up until its runner ends. Required, not
+   *  optional: a host that spawns a runner and drops the announcement is exactly
+   *  the gap this feature exists to close. */
+  armWorktreeSetupRunner: (handle: string, worktreeId: string, completionToken: string) => void
 }
 
 export type WorktreeTerminalProvisioningArgs = TerminalSurfacing & {
@@ -62,9 +62,43 @@ export type WorktreeTerminalProvisioningArgs = TerminalSurfacing & {
   callerProvidesSurface?: boolean
   startupNeedsTerminal?: boolean
   setupCommandPlatform: 'windows' | 'posix'
-  observeSetupCompletion?: boolean
   // Why: setup and startup must use the same wrapper when startup waits for setup.
-  wrappedSetup?: { command: string; completionToken?: string }
+  // The token is required: a pre-wrapped command nobody can watch would leave the
+  // sidebar without the setting-up state it already paid for.
+  wrappedSetup?: { command: string; completionToken: string }
+}
+
+export type ObservedSetupLaunch = {
+  command: string
+  env?: Record<string, string>
+  /** The token `command` prints when it ends; the host watches it. */
+  completionToken: string
+}
+
+/**
+ * The setup command plus the completion token it ends with.
+ *
+ * One rule for every host that spawns a repo setup runner: the command always
+ * carries a token, so the runner can always be announced as setting up. A caller
+ * that already wrapped setup around the agent's startup passes that wrapper's
+ * token instead, so both halves print the same line.
+ */
+export function resolveObservedSetupLaunch(
+  setup: NonNullable<CreateWorktreeResult['setup']>,
+  platform: 'windows' | 'posix',
+  wrappedSetup?: { command: string; completionToken: string }
+): ObservedSetupLaunch {
+  if (wrappedSetup) {
+    return { command: wrappedSetup.command, completionToken: wrappedSetup.completionToken }
+  }
+  const completionToken = randomUUID()
+  const observed = buildObservedSetupCommand(
+    setup.runnerScriptPath,
+    platform,
+    completionToken,
+    setup.shell
+  )
+  return { command: observed.command, env: observed.env, completionToken }
 }
 
 export async function createWorktreeDefaultTabTerminals(
@@ -239,34 +273,16 @@ export async function provisionWorktreeTerminals(
       await host.createTerminal(args.worktreeSelector, surfacing)
     }
     if (args.setup) {
-      // A wrapped setup prints the token its wrapper was built with.
-      const completionToken = !args.observeSetupCompletion
-        ? null
-        : args.wrappedSetup
-          ? (args.wrappedSetup.completionToken ?? null)
-          : randomUUID()
-      const observed =
-        completionToken && !args.wrappedSetup
-          ? buildObservedSetupCommand(
-              args.setup.runnerScriptPath,
-              args.setupCommandPlatform,
-              completionToken,
-              args.setup.shell
-            )
-          : null
-      const command =
-        args.wrappedSetup?.command ??
-        observed?.command ??
-        buildSetupRunnerCommand(
-          args.setup.runnerScriptPath,
-          args.setupCommandPlatform,
-          args.setup.shell
-        )
-      const env = { ...args.setup.envVars, ...observed?.env }
+      const launch = resolveObservedSetupLaunch(
+        args.setup,
+        args.setupCommandPlatform,
+        args.wrappedSetup
+      )
+      const env = { ...args.setup.envVars, ...launch.env }
       const setupTerminal = await host.createTerminal(args.worktreeSelector, {
         ...(args.setup.cwd ? { cwd: args.setup.cwd } : {}),
         title: host.getSetupTerminalTitle?.() ?? 'Setup',
-        command,
+        command: launch.command,
         env,
         // Keep failed setup in its pane to show the failure.
         ...(ORCA_LAYOUT_OWNER_IS_MAIN ? { keepPaneOnStartFailure: true as const } : {}),
@@ -275,9 +291,9 @@ export async function provisionWorktreeTerminals(
       setupTerminalHandle = setupTerminal.handle
       setupSpawned = true
       const ptyId = host.getPtyId(setupTerminal.handle)
-      if (completionToken && ptyId) {
-        host.recordSetupCompletionToken(ptyId, completionToken)
-        host.armWorktreeSetupRunner?.(setupTerminal.handle, args.worktreeId, completionToken)
+      if (ptyId) {
+        host.recordSetupCompletionToken(ptyId, launch.completionToken)
+        host.armWorktreeSetupRunner(setupTerminal.handle, args.worktreeId, launch.completionToken)
       }
     }
   } catch (error) {

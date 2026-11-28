@@ -97,7 +97,6 @@ export async function launchFederatedWorkerAgent(args: {
           runHooks: false,
           setupDecision,
           awaitTerminalProvisioning: true,
-          observeSetupCompletion: true,
           createdWithAgent: agent,
           startupAgent: agent,
           startupLaunchSource: 'orchestration',

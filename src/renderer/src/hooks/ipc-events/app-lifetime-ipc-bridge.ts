@@ -40,6 +40,7 @@ import { registerProjectCatalogIpcBridge } from './workspace-catalog/project-cat
 import { registerRateLimitIpcBridge } from './native-app/rate-limit-ipc-bridge'
 import { registerClaudeAccountSwitchIpcBridge } from '../../lib/provider-accounts/claude-account-switch-ipc-bridge'
 import { registerRuntimeClientIpcBridge } from './runtime-events/runtime-client-ipc-bridge'
+import { registerSetupRunnerIpcBridge } from './runtime-events/setup-runner-ipc-bridge'
 import { registerSessionTabIpcBridge } from './session-tabs/session-tab-ipc-bridge'
 import { registerSettingsAndSidebarIpcBridge } from '../app-commands/settings-sidebar-ipc-bridge'
 import { registerQuitAndStopAllSessionsIpcBridge } from './native-app/quit-and-stop-all-sessions-ipc-bridge'
@@ -147,6 +148,7 @@ export function installAppLifetimeIpcEvents(): () => void {
       .catch((error) => console.error('Failed to read runtime status snapshots:', error))
   }
   const unsubscribeRuntimeEnvironmentStore = registerRuntimeClientIpcBridge(unsubs, worktreeRuntime)
+  registerSetupRunnerIpcBridge(unsubs)
   registerBackgroundWorktreeRemovalBridge(unsubs)
   registerWslHostIpcBridge(unsubs)
   registerRuntimePortForwardsIpcBridge(unsubs)
