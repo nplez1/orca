@@ -109,10 +109,8 @@ export function getPiTitlebarExtensionSource(kind: PiAgentKind = 'pi'): string {
     ...(kind === 'pi'
       ? [
           "  // Child processes inherit pane identity; only the owner may report the pane's needs-input marker.",
-          '  const markerOwnerPid = process.env.ORCA_PI_TITLE_MARKER_OWNED',
-          '  const ownsMarker =',
-          '    !markerOwnerPid || markerOwnerPid === String(process.pid) || !isStatusOwnerAlive(markerOwnerPid)',
-          '  if (ownsMarker) process.env.ORCA_PI_TITLE_MARKER_OWNED = String(process.pid)'
+          "  const ownsMarker = !yieldsPaneOwnership('ORCA_PI_TITLE_MARKER_OWNED')",
+          "  if (ownsMarker) claimPaneOwnership('ORCA_PI_TITLE_MARKER_OWNED')"
         ]
       : []),
 
