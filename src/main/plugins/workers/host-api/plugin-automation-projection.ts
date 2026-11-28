@@ -82,8 +82,6 @@ export function projectPluginAutomations(
   pluginId: string,
   workspaceIds: ReadonlyMap<string, string>
 ): PluginHostResult<'automation.list'> {
-  // Command automations have no agent to run, so they are not listed, and the cap and the
-  // truncated flag count listed rows rather than every stored one.
   const listed = automations.filter((automation) => Boolean(automation.agentId))
   return {
     automations: listed.slice(0, PLUGIN_AUTOMATION_LIST_LIMIT).flatMap((automation) => {
