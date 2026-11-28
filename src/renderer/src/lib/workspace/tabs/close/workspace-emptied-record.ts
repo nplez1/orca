@@ -1,5 +1,5 @@
 import {
-  hasWorkspaceEmptiedRecord,
+  freshWorkspaceEmptiedRecordId,
   recordWorkspaceEmptiedTombstone
 } from '../../../../../../shared/workspace-layout/terminal-surfaces/closed-terminal-tab-tombstones'
 import type {
@@ -7,17 +7,17 @@ import type {
   ClosedTerminalTabTombstonesByTabId
 } from '../../../../../../shared/workspace-layout/terminal-surfaces/closed-terminal-tab-tombstones'
 import { createNonSecureContextUuid } from '../../../../../../shared/identifiers/non-secure-context-uuid'
-import {
-  LOCAL_EXECUTION_HOST_ID,
-  type ExecutionHostId
-} from '../../../../../../shared/execution-host/execution-host'
+import type { ExecutionHostId } from '../../../../../../shared/execution-host/execution-host'
 import type { WorkspaceContentState } from '@/lib/workspace-emptied-on-purpose'
 import { hasNoRenderableWorkspaceContent } from '@/lib/workspace-emptied-on-purpose'
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../../../shared/workspace/identity/floating-workspace-id'
 
 type EmptiedRecordState = WorkspaceContentState & {
-  activeWorkspaceExecutionHostId?: ExecutionHostId | null
   closedTerminalTabTombstonesByTabId?: ClosedTerminalTabTombstonesByTabId
+}
+
+type EmptiedRecordHostState = EmptiedRecordState & {
+  activeWorkspaceExecutionHostId?: ExecutionHostId | null
 }
 
 export type EmptiedWorkspaceRecord = {
@@ -36,6 +36,11 @@ export type EmptiedWorkspaceRecord = {
  *
  * Why re-check the workspace: callers capture this before the close lands, and a close can be
  * refused (a running process, a cancelled save) or leave a sibling tab behind.
+ *
+ * Why refresh rather than skip an existing record: the record's expiry is what keeps the workspace
+ * exempt, and an empty workspace can be re-filled and emptied again long before the first record
+ * lapses. Renewing the same key keeps one record per workspace and restarts the count from the
+ * emptying that actually matters.
  */
 export function prepareEmptiedWorkspaceRecord(
   state: EmptiedRecordState,
@@ -49,19 +54,12 @@ export function prepareEmptiedWorkspaceRecord(
   if (!hasNoRenderableWorkspaceContent(state, worktreeId)) {
     return null
   }
-  if (hasWorkspaceEmptiedRecord(state.closedTerminalTabTombstonesByTabId, worktreeId, now)) {
-    return null
-  }
-  const recordId = createNonSecureContextUuid()
-  const record: ClosedTerminalTabTombstone = {
-    closedAt: now,
-    worktreeId,
-    reason: 'user',
-    scope: 'workspace'
-  }
+  const recordId =
+    freshWorkspaceEmptiedRecordId(state.closedTerminalTabTombstonesByTabId, worktreeId, now) ??
+    createNonSecureContextUuid()
   return {
     recordId,
-    record,
+    record: { closedAt: now, worktreeId, reason: 'user', scope: 'workspace' },
     patch: {
       closedTerminalTabTombstonesByTabId: recordWorkspaceEmptiedTombstone(
         state.closedTerminalTabTombstonesByTabId,
@@ -77,17 +75,18 @@ export function prepareEmptiedWorkspaceRecord(
  * Hands the record to main, which owns this field: a renderer save omits it, so the window cannot be
  * what makes it outlive a restart. Sent as a one-key entries patch, the seam built for "this window
  * changed these keys of a keyed record" — it cannot shrink what main holds.
+ *
+ * Only the workspace on screen is sent: that is the one whose partition this window can name, and a
+ * background workspace's record stays in this window's copy for the surface and the sleep glyph.
  */
 export function commitEmptiedWorkspaceRecord(
-  state: EmptiedRecordState,
+  state: EmptiedRecordHostState,
   worktreeId: string,
   prepared: EmptiedWorkspaceRecord
 ): void {
-  // Only the workspace on screen names the partition it lives in here; a background workspace's
-  // record stays in this window's copy, which is where the surface and the sleep glyph read it.
-  const hostId =
-    state.activeWorktreeId === worktreeId ? state.activeWorkspaceExecutionHostId : undefined
-  const target = hostId && hostId !== LOCAL_EXECUTION_HOST_ID ? hostId : undefined
+  if (state.activeWorktreeId !== worktreeId) {
+    return
+  }
   // Why optional: an older preload, and the paired web client, write whole fields only.
   void globalThis.window?.api?.session
     ?.patchEntries?.(
@@ -100,7 +99,7 @@ export function commitEmptiedWorkspaceRecord(
           }
         }
       },
-      target
+      state.activeWorkspaceExecutionHostId ?? undefined
     )
     ?.catch((error: unknown) => {
       console.warn('[workspace-emptied] main did not keep the emptied-workspace record', error)
@@ -109,7 +108,7 @@ export function commitEmptiedWorkspaceRecord(
 
 /** The same, for callers holding their own store writer (a slice rather than the app store). */
 export function recordEmptiedWorkspaceWith(
-  state: EmptiedRecordState,
+  state: EmptiedRecordHostState,
   worktreeId: string | null | undefined,
   write: (patch: EmptiedWorkspaceRecord['patch']) => void
 ): void {

@@ -57,17 +57,29 @@ export function recordWorkspaceEmptiedTombstone(
   )
 }
 
+export function freshWorkspaceEmptiedRecordId(
+  map: ClosedTerminalTabTombstonesByTabId | undefined,
+  worktreeId: string,
+  now = Date.now()
+): string | undefined {
+  for (const [recordId, record] of Object.entries(map ?? {})) {
+    if (
+      record.scope === 'workspace' &&
+      record.worktreeId === worktreeId &&
+      now - record.closedAt <= CLOSED_TERMINAL_TAB_TOMBSTONE_TTL_MS
+    ) {
+      return recordId
+    }
+  }
+  return undefined
+}
+
 export function hasWorkspaceEmptiedRecord(
   map: ClosedTerminalTabTombstonesByTabId | undefined,
   worktreeId: string,
   now = Date.now()
 ): boolean {
-  return Object.values(map ?? {}).some(
-    (record) =>
-      record.scope === 'workspace' &&
-      record.worktreeId === worktreeId &&
-      now - record.closedAt <= CLOSED_TERMINAL_TAB_TOMBSTONE_TTL_MS
-  )
+  return freshWorkspaceEmptiedRecordId(map, worktreeId, now) !== undefined
 }
 
 export function recordClosedTerminalTabTombstone(

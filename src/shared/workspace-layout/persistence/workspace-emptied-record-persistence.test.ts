@@ -31,7 +31,8 @@ describe('a workspace-scoped emptied record', () => {
   })
 
   it('keeps the record when a build that does not know its scope reads it', () => {
-    // An older build's enum is the downgrade case: the scope is dropped, the close record is not.
+    // What an older build's schema does with a key it has no field for: drop the value, keep the
+    // record. The workspace then reads as a plain closed tab, which is what it was before this.
     const parsed = safeParseWorkspaceSession(
       sessionWith({ [RECORD_ID]: { closedAt: NOW, worktreeId: WT, scope: 'surface' } })
     )

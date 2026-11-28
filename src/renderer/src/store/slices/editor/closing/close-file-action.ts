@@ -299,7 +299,11 @@ export function createCloseFileAction(
       for (const unifiedTabId of unifiedTabIdsToClose) {
         get().closeUnifiedTab(unifiedTabId, { editorRetirementHandled: true })
       }
-      recordEmptiedWorkspaceWith(get(), placementId ?? preClose?.worktreeId, (patch) => set(patch))
+      if (opts?.captureRecentlyClosed !== false) {
+        recordEmptiedWorkspaceWith(get(), placementId ?? preClose?.worktreeId, (patch) =>
+          set(patch)
+        )
+      }
     }
   }
 }
