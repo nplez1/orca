@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { getAgentStatusEpochNow } from '@/lib/agent-status/evidence/agent-status-epoch-clock'
 import {
-  hasFreshClosedTabRecord,
-  hasNoRenderableWorkspaceContent
+  hasNoRenderableWorkspaceContent,
+  isWorkspaceEmptiedForSeeding
 } from '@/lib/workspace-emptied-on-purpose'
 import type { BrowserWorkspace } from '../../../../../shared/browser/workspaces/browser-workspace-types'
 import type { Tab, TabGroup } from '../../../../../shared/workspace-layout/tab-groups/tab-types'
@@ -66,19 +66,17 @@ export function useTabGroupWorkspaceModel({
 
   // Why: an emptied workspace stays selected on its empty-tabs surface (#96), which must not flash
   // while a first tab is still arriving (fresh worktree, host list mirroring, pending chat launch).
-  // Either a terminal close record proves the user emptied it (it survives restart; the row check
-  // matches the seeder), or it was emptied while on screen: a last chat, browser or editor close
-  // writes no record. That mark resets on leaving, so a retained pane cannot carry it into a later
-  // visit (sleep, or re-seeding on return).
+  // A close record proves the user emptied it — a terminal close needs its own empty row, a chat,
+  // browser or editor close leaves a workspace record — and it survives restart. The other half is
+  // emptied while on screen: that mark resets on leaving, so a retained pane cannot carry it into a
+  // later visit (sleep, or re-seeding on return).
   const hasNoContent = useAppStore((state) => hasNoRenderableWorkspaceContent(state, worktreeId))
-  const emptiedByRecordedClose = useAppStore(
-    (state) =>
-      Object.hasOwn(state.tabsByWorktree, worktreeId) &&
-      hasFreshClosedTabRecord(
-        state.closedTerminalTabTombstonesByTabId,
-        worktreeId,
-        getAgentStatusEpochNow(state.agentStatusEpoch ?? 0)
-      )
+  const emptiedByRecordedClose = useAppStore((state) =>
+    isWorkspaceEmptiedForSeeding(
+      state,
+      worktreeId,
+      getAgentStatusEpochNow(state.agentStatusEpoch ?? 0)
+    )
   )
   const isOnScreen = useAppStore((state) => state.activeWorktreeId === worktreeId)
   const [hasShownContentOnScreen, setHasShownContentOnScreen] = useState(

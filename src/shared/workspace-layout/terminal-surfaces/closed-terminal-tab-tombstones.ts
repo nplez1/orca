@@ -13,6 +13,7 @@ export type ClosedTerminalTabTombstone = {
   worktreeId: string
   /** Absent on records an older build wrote, when only user closes were recorded. */
   reason?: RuntimeSessionTabCloseReason
+  scope?: 'workspace'
 }
 
 export type ClosedTerminalTabTombstonesByTabId = Record<string, ClosedTerminalTabTombstone>
@@ -22,7 +23,8 @@ export const closedTerminalTabTombstoneSchema = z.object({
   closedAt: z.number().int().nonnegative(),
   worktreeId: z.string().min(1),
   // Why catch: a reason a newer build adds must not cost this build the record itself.
-  reason: z.enum(TERMINAL_TAB_CLOSE_REASONS).optional().catch(undefined)
+  reason: z.enum(TERMINAL_TAB_CLOSE_REASONS).optional().catch(undefined),
+  scope: z.literal('workspace').optional().catch(undefined)
 })
 
 /** Prune within host partitions so one host’s churn cannot evict another’s records. */
@@ -39,6 +41,33 @@ export function pruneClosedTerminalTabTombstones<Closed extends { closedAt: numb
   )
   entries.sort(([, a], [, b]) => b.closedAt - a.closedAt)
   return Object.fromEntries(entries.slice(0, MAX_CLOSED_TERMINAL_TAB_TOMBSTONES))
+}
+
+export function recordWorkspaceEmptiedTombstone(
+  map: ClosedTerminalTabTombstonesByTabId | undefined,
+  worktreeId: string,
+  recordId: string,
+  now: number
+): ClosedTerminalTabTombstonesByTabId {
+  return recordClosedTerminalTabTombstone(
+    map,
+    recordId,
+    { worktreeId, reason: 'user', scope: 'workspace' },
+    now
+  )
+}
+
+export function hasWorkspaceEmptiedRecord(
+  map: ClosedTerminalTabTombstonesByTabId | undefined,
+  worktreeId: string,
+  now = Date.now()
+): boolean {
+  return Object.values(map ?? {}).some(
+    (record) =>
+      record.scope === 'workspace' &&
+      record.worktreeId === worktreeId &&
+      now - record.closedAt <= CLOSED_TERMINAL_TAB_TOMBSTONE_TTL_MS
+  )
 }
 
 export function recordClosedTerminalTabTombstone(

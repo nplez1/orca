@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   hasNoRenderableWorkspaceContent,
   isActiveEmptyWorkspace,
+  isWorkspaceEmptiedForSeeding,
   isWorkspaceEmptiedOnPurpose
 } from './workspace-emptied-on-purpose'
 import { CLOSED_TERMINAL_TAB_TOMBSTONE_TTL_MS } from '../../../shared/workspace-layout/terminal-surfaces/closed-terminal-tab-tombstones'
@@ -9,6 +10,14 @@ import { CLOSED_TERMINAL_TAB_TOMBSTONE_TTL_MS } from '../../../shared/workspace-
 const WT = 'repo1::/path/wt1'
 const NOW = 10_000
 const FRESH_CLOSE = { closed: { closedAt: NOW - 1_000, worktreeId: WT } }
+const FRESH_WORKSPACE_CLOSE = {
+  minted: {
+    closedAt: NOW - 1_000,
+    worktreeId: WT,
+    reason: 'user' as const,
+    scope: 'workspace' as const
+  }
+}
 
 describe('isWorkspaceEmptiedOnPurpose', () => {
   it('reads an empty workspace whose last tab was closed as emptied', () => {
@@ -67,6 +76,81 @@ describe('isWorkspaceEmptiedOnPurpose', () => {
         NOW
       )
     ).toBe(false)
+  })
+})
+
+describe('isWorkspaceEmptiedForSeeding', () => {
+  it('reads a workspace emptied by its last chat, browser or editor close as emptied', () => {
+    // No terminal row at all: only the workspace record speaks for this build's empty state.
+    expect(
+      isWorkspaceEmptiedForSeeding(
+        { tabsByWorktree: {}, closedTerminalTabTombstonesByTabId: FRESH_WORKSPACE_CLOSE },
+        WT,
+        NOW
+      )
+    ).toBe(true)
+  })
+
+  it('does not read a workspace record while anything is still renderable', () => {
+    expect(
+      isWorkspaceEmptiedForSeeding(
+        {
+          tabsByWorktree: {},
+          unifiedTabsByWorktree: { [WT]: [{ id: 'chat-1' }] },
+          closedTerminalTabTombstonesByTabId: FRESH_WORKSPACE_CLOSE
+        },
+        WT,
+        NOW
+      )
+    ).toBe(false)
+  })
+
+  it('does not read a workspace record past its TTL as emptied', () => {
+    expect(
+      isWorkspaceEmptiedForSeeding(
+        {
+          tabsByWorktree: {},
+          closedTerminalTabTombstonesByTabId: {
+            minted: {
+              closedAt: NOW - CLOSED_TERMINAL_TAB_TOMBSTONE_TTL_MS - 1,
+              worktreeId: WT,
+              scope: 'workspace'
+            }
+          }
+        },
+        WT,
+        NOW
+      )
+    ).toBe(false)
+  })
+
+  it('still requires a terminal row for a terminal close record', () => {
+    expect(
+      isWorkspaceEmptiedForSeeding(
+        { tabsByWorktree: {}, closedTerminalTabTombstonesByTabId: FRESH_CLOSE },
+        WT,
+        NOW
+      )
+    ).toBe(false)
+    expect(
+      isWorkspaceEmptiedForSeeding(
+        { tabsByWorktree: { [WT]: [] }, closedTerminalTabTombstonesByTabId: FRESH_CLOSE },
+        WT,
+        NOW
+      )
+    ).toBe(true)
+  })
+})
+
+describe('isWorkspaceEmptiedOnPurpose', () => {
+  it('reads an empty workspace whose last chat, browser or editor tab was closed as emptied', () => {
+    expect(
+      isWorkspaceEmptiedOnPurpose(
+        { tabsByWorktree: { [WT]: [] }, closedTerminalTabTombstonesByTabId: FRESH_WORKSPACE_CLOSE },
+        WT,
+        NOW
+      )
+    ).toBe(true)
   })
 })
 

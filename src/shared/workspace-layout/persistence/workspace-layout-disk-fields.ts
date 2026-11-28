@@ -256,7 +256,8 @@ const INCARNATION = {
 const CLOSED_TAB = {
   closedAt: own('closedTab', 'closedAt'),
   worktreeId: WORKTREE,
-  reason: own('closedTab', 'reason')
+  reason: own('closedTab', 'reason'),
+  scope: own('closedTab', 'scope')
 } as const satisfies Record<keyof ClosedTerminalTabTombstone, DiskFieldWritten>
 
 type LayoutOwnedSessionField = {

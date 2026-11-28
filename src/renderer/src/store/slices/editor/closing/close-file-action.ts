@@ -1,6 +1,7 @@
 import { closedEditorFileSnapshot } from './closed-editor-file-snapshot'
 import { closedEditorTabOrder } from './recently-closed-editor-tabs'
 import { findAdjacentOpenFileId } from '../tabs/editor-tab-close-target'
+import { recordEmptiedWorkspaceWith } from '@/lib/workspace/tabs/close/workspace-emptied-record'
 import {
   editorContentIsReferenced,
   editorPlacementIndex,
@@ -298,6 +299,7 @@ export function createCloseFileAction(
       for (const unifiedTabId of unifiedTabIdsToClose) {
         get().closeUnifiedTab(unifiedTabId, { editorRetirementHandled: true })
       }
+      recordEmptiedWorkspaceWith(get(), placementId ?? preClose?.worktreeId, (patch) => set(patch))
     }
   }
 }

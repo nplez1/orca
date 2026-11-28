@@ -1,10 +1,15 @@
+import { recordEmptiedWorkspaceWith } from './workspace-emptied-record'
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../../../shared/workspace/identity/floating-workspace-id'
 import { useAppStore } from '../../../../store/index'
 import { armFloatingPanelReclaimIntent } from '@/components/floating-terminal/focus/floating-workspace-focus-reclaim'
 import { isFloatingWorkspacePanelFocused } from '@/components/floating-terminal/workspace/floating-workspace-terminal-actions'
 import { selectFloatingVisibleTabCount } from '@/store/workspaces/floating/floating-workspace-panel-selector'
 
-const NO_REACTION = (): void => {}
+export function recordEmptiedWorkspace(worktreeId: string): void {
+  recordEmptiedWorkspaceWith(useAppStore.getState(), worktreeId, (patch) =>
+    useAppStore.setState(patch)
+  )
+}
 
 /**
  * What a close does if it leaves its workspace with no tabs. Capture it when the close is requested
@@ -16,10 +21,10 @@ export function captureWorkspaceEmptiedReaction(
   options?: { floatingPanelGuestOwned?: boolean }
 ): () => void {
   // Why per workspace: an emptied worktree stays selected and renders its own empty-tabs surface,
-  // so the close has nothing to hand back (#96). The floating panel is never the active worktree —
-  // emptying it from inside instead keeps keyboard ownership for the next Cmd/Ctrl+T.
+  // so the close only records that the user emptied it (#96). The floating panel is never the active
+  // worktree — emptying it from inside instead keeps keyboard ownership for the next Cmd/Ctrl+T.
   if (worktreeId !== FLOATING_TERMINAL_WORKTREE_ID) {
-    return NO_REACTION
+    return () => recordEmptiedWorkspace(worktreeId)
   }
   const panelOwned = options?.floatingPanelGuestOwned === true || isFloatingWorkspacePanelFocused()
   return () => {
