@@ -266,6 +266,7 @@ export function buildDefaultSettings(args: {
     defaultRepoSelection: null,
     defaultLinearTeamSelection: null,
     defaultJiraBoard: null,
+    defaultJiraBoards: null,
     opencodeSessionCookie: '',
     opencodeWorkspaceId: '',
     minimaxGroupId: '',

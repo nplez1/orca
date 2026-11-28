@@ -6,6 +6,7 @@ import { ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 import { shouldShowJiraSiteSelector } from '../task-page-jira-board-model'
 import { TaskPageJiraSettingsLink } from './jira/SettingsLink'
+import { TaskPageJiraBoardSwitcher } from './jira/BoardSwitcher'
 import { cn } from '@/lib/class-names'
 import { LinearScopeSelector } from '@/components/task-page/source-selection/linear-scope-selector'
 import {
@@ -23,8 +24,8 @@ export function TaskPageSourceBar({
 }): React.JSX.Element | null {
   const t = useTranslate()
   const {
-    settings,
     jiraBoardViewMode,
+    jiraSelectedBoard,
     openTaskPage,
     updateSettings,
     selectJiraSite,
@@ -179,10 +180,11 @@ export function TaskPageSourceBar({
         ) : null}
         {jiraSettingsVisible ? (
           <div className="flex items-center gap-2">
+            <TaskPageJiraBoardSwitcher model={model} />
             {taskSource === 'jira' &&
             shouldShowJiraSiteSelector(
               jiraConnected,
-              Boolean(settings?.defaultJiraBoard),
+              Boolean(jiraSelectedBoard),
               jiraBoardViewMode,
               jiraSites.length
             ) ? (

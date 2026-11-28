@@ -112,6 +112,8 @@ export const HOST_SYNC_DISPOSITION_ROWS_B = {
   visibleTaskProviders: 'replicated',
   defaultLinearTeamSelection: 'replicated',
   defaultJiraBoard: 'replicated',
+  // Why replicated, like `defaultJiraBoard`: the curated board list names integrations, not local paths.
+  defaultJiraBoards: 'replicated',
   // Why replicated, like `defaultJiraBoard`: a naming preference for suggested workspace/branch names.
   jiraIssueKeyCasing: 'replicated',
   // Why replicated: deliberate preferences, not bookkeeping or a machine fact.

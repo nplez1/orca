@@ -79,3 +79,74 @@ export function isDefaultJiraBoardViewPreferences(preferences: JiraBoardViewPref
     preferences.query === defaults.query
   )
 }
+
+/** One board's own choices. Only the fields the user actually changed are stored, so a board
+ *  added later still follows the device's habits for everything it did not set. */
+export type JiraBoardScopedViewPreferences = Partial<JiraBoardViewPreferences>
+
+export type JiraBoardViewPreferencesByBoard = {
+  /** The device's pre-upgrade global view was adopted by the first board read, so no other board
+   *  inherits it (and a stale typed query cannot land on a board that never asked for one). */
+  migrated: boolean
+  boards: Record<string, JiraBoardScopedViewPreferences>
+}
+
+/** Bounded like the board cache: browsing many boards must not grow storage without limit. */
+export const JIRA_BOARD_VIEW_PREFERENCE_BOARD_LIMIT = 50
+
+export function normalizeJiraBoardScopedViewPreferences(
+  value: unknown
+): JiraBoardScopedViewPreferences | undefined {
+  if (!isPlainObject(value)) {
+    return undefined
+  }
+  const scoped: JiraBoardScopedViewPreferences = {}
+  if (isMember(JIRA_BOARD_VIEW_MODES, value.viewMode)) {
+    scoped.viewMode = value.viewMode
+  }
+  if (isMember(JIRA_BOARD_ACTIVE_VIEWS, value.activeView)) {
+    scoped.activeView = value.activeView
+  }
+  if (isMember(JIRA_BOARD_FILTERS, value.filter)) {
+    scoped.filter = value.filter
+  }
+  if (typeof value.query === 'string') {
+    scoped.query = value.query
+  }
+  return Object.keys(scoped).length > 0 ? scoped : undefined
+}
+
+// Why `unknown`: this is stored per device, and a hand-edited entry is the crash site.
+export function normalizeJiraBoardViewPreferencesByBoard(
+  value: unknown
+): Record<string, JiraBoardScopedViewPreferences> {
+  const boards: Record<string, JiraBoardScopedViewPreferences> = {}
+  if (!isPlainObject(value)) {
+    return boards
+  }
+  for (const [key, entry] of Object.entries(value)) {
+    const scoped = normalizeJiraBoardScopedViewPreferences(entry)
+    if (key.trim() && scoped) {
+      boards[key] = scoped
+    }
+  }
+  return boards
+}
+
+/** Keep the most recently written boards, in write order. */
+export function trimJiraBoardViewPreferencesByBoard(
+  boards: Record<string, JiraBoardScopedViewPreferences>
+): Record<string, JiraBoardScopedViewPreferences> {
+  const keys = Object.keys(boards)
+  if (keys.length <= JIRA_BOARD_VIEW_PREFERENCE_BOARD_LIMIT) {
+    return boards
+  }
+  const trimmed: Record<string, JiraBoardScopedViewPreferences> = {}
+  for (const key of keys.slice(keys.length - JIRA_BOARD_VIEW_PREFERENCE_BOARD_LIMIT)) {
+    const scoped = boards[key]
+    if (scoped) {
+      trimmed[key] = scoped
+    }
+  }
+  return trimmed
+}

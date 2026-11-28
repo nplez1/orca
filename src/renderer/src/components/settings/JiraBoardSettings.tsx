@@ -1,27 +1,26 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
+import { ChevronDown, ChevronUp, X } from 'lucide-react'
+import { toast } from 'sonner'
 import type { GlobalSettings } from '../../../../shared/settings/global-settings-types'
-import { runtimeHostIdFromEnvironmentId } from '../../../../shared/work-items/task-source-context'
-import type {
-  JiraBoard,
-  JiraBoardSelection,
-  JiraSiteSelection
-} from '../../../../shared/jira/jira-types'
+import type { JiraBoardSelection } from '../../../../shared/jira/jira-types'
+import {
+  addJiraBoardSelection,
+  connectedJiraSiteIds,
+  effectiveJiraBoardSet,
+  jiraBoardSelectionKey,
+  jiraBoardSettingsWrite,
+  moveJiraBoardSelection,
+  normalizeJiraBoardSelection,
+  removeJiraBoardSelection
+} from '../../../../shared/jira/jira-board-selection'
 import { Button } from '@/components/ui/button'
-import { taskSourceRuntimeTarget } from '@/lib/work-items/task-source-runtime-target'
 import { Label } from '@/components/ui/label'
 import { useAppStore } from '@/store'
-import { translate } from '@/i18n/i18n'
 import { useTranslate } from '@/i18n/use-translate'
-import { extractIpcErrorMessage } from '@/runtime/errors/ipc-error'
-import { toast } from 'sonner'
-import { jiraListBoards, type RuntimeJiraSettings } from '../../runtime/jira/runtime-jira-client'
+import { useJiraBoardRuntimeSettings, useJiraBoardSearch } from '../jira-board-search'
 import { SearchableSetting } from './section-layout/SearchableSetting'
-import {
-  boardOptionValue,
-  boardSelectionOptionValue,
-  buildJiraBoardOptions
-} from './jira-settings-combobox-options'
-import { SETTINGS_COMBOBOX_NONE, SettingsCombobox } from './SettingsCombobox'
+import { boardOptionValue, buildJiraBoardOptions } from './jira-settings-combobox-options'
+import { SettingsCombobox } from './SettingsCombobox'
 import { getTasksPaneSearchKeywords } from './tasks/tasks-search'
 
 type JiraBoardSettingsProps = {
@@ -30,14 +29,8 @@ type JiraBoardSettingsProps = {
   updateSettingsOrThrow: (updates: Partial<GlobalSettings>) => Promise<void>
 }
 
-// Why: the picker queries Jira by name, so every keystroke must not become a request.
-const BOARD_SEARCH_DEBOUNCE_MS = 300
-
-function errorMessage(error: unknown): string {
-  return extractIpcErrorMessage(
-    error,
-    translate('jira.settings.boardLoadFailed', 'Jira settings could not be loaded.')
-  )
+function boardLabel(selection: JiraBoardSelection): string {
+  return selection.name?.trim() || selection.boardId
 }
 
 export function JiraBoardSettings({
@@ -47,180 +40,196 @@ export function JiraBoardSettings({
   const t = useTranslate()
   const jiraStatus = useAppStore((state) => state.jiraStatus)
   const checkJiraConnection = useAppStore((state) => state.checkJiraConnection)
-  const selectedSiteId: JiraSiteSelection | undefined =
-    jiraStatus.selectedSiteId === 'all'
-      ? 'all'
-      : (jiraStatus.selectedSiteId ?? jiraStatus.activeSiteId ?? undefined)
-  // Why the host id and not the settings object: the effect below refetches on the target's
-  // identity, so keying on `settings` would re-list the boards — and re-check the connection — on
-  // every unrelated settings write, including this pane's own board selection.
-  const scopeEnvironmentId = settings.activeRuntimeEnvironmentId
-  const runtimeSettings = useMemo<RuntimeJiraSettings>(
-    () => taskSourceRuntimeTarget({ hostId: runtimeHostIdFromEnvironmentId(scopeEnvironmentId) }),
-    [scopeEnvironmentId]
+  useEffect(() => {
+    void checkJiraConnection()
+  }, [checkJiraConnection])
+  const runtimeSettings = useJiraBoardRuntimeSettings(settings)
+  // Why every site: a set spans sites, so the picker must find a board on any connected account.
+  const search = useJiraBoardSearch({ runtimeSettings, siteId: 'all' })
+  const savedBoards = useMemo(() => effectiveJiraBoardSet(settings), [settings])
+  const connectedSiteIds = useMemo(() => connectedJiraSiteIds(jiraStatus, true), [jiraStatus])
+  const siteNames = useMemo(
+    () => new Map((jiraStatus.sites ?? []).map((site) => [site.id, site.displayName])),
+    [jiraStatus.sites]
   )
-  const selectedBoard = settings.defaultJiraBoard
-  const [boards, setBoards] = useState<JiraBoard[]>([])
-  const [boardsLoading, setBoardsLoading] = useState(false)
-  const [loadError, setLoadError] = useState<string | null>(null)
-  const [retryNonce, setRetryNonce] = useState(0)
-  const [boardQuery, setBoardQuery] = useState('')
-  const [appliedBoardQuery, setAppliedBoardQuery] = useState('')
+  const savedKeys = useMemo(
+    () => new Set((savedBoards ?? []).map((selection) => jiraBoardSelectionKey(selection))),
+    [savedBoards]
+  )
+  const boardOptions = useMemo(
+    () =>
+      buildJiraBoardOptions(
+        search.boards.filter(
+          (board) => !savedKeys.has(boardOptionValue({ siteId: board.siteId, id: board.id }))
+        ),
+        null,
+        ''
+      ),
+    [savedKeys, search.boards]
+  )
   // Why: the store only mirrors a settings write once it lands, so a rejected write leaves the
-  // picker on the old board — and without this the user never learns the selection did not stick.
-  const saveBoard = (selection: JiraBoardSelection | null): void => {
-    void updateSettingsOrThrow({ defaultJiraBoard: selection }).catch(() => {
+  // list on the old set — and without this the user never learns the change did not stick.
+  const saveSet = (next: JiraBoardSelection[] | null): void => {
+    void updateSettingsOrThrow(jiraBoardSettingsWrite(next)).catch(() => {
       toast.error(t('sessionHistory.settings.saveError', 'Could not save. Try again.'))
     })
   }
-
-  useEffect(() => {
-    const timer = setTimeout(
-      () => setAppliedBoardQuery(boardQuery.trim()),
-      BOARD_SEARCH_DEBOUNCE_MS
+  const addBoard = (value: string): void => {
+    const board = search.boards.find((candidate) => boardOptionValue(candidate) === value)
+    const selection = normalizeJiraBoardSelection(
+      board ? { boardId: board.id, siteId: board.siteId, name: board.name } : null
     )
-    return () => clearTimeout(timer)
-  }, [boardQuery])
-
-  useEffect(() => {
-    let cancelled = false
-    setBoardsLoading(true)
-    setLoadError(null)
-    void checkJiraConnection()
-    void jiraListBoards(runtimeSettings, selectedSiteId, appliedBoardQuery || undefined)
-      .then((nextBoards) => {
-        if (!cancelled) {
-          setBoards(nextBoards)
-        }
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) {
-          setLoadError(errorMessage(error))
-          setBoards([])
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setBoardsLoading(false)
-        }
-      })
-    return () => {
-      cancelled = true
+    if (selection) {
+      saveSet(addJiraBoardSelection(savedBoards, selection))
     }
-  }, [appliedBoardQuery, checkJiraConnection, retryNonce, runtimeSettings, selectedSiteId])
-
-  const boardOptions = useMemo(
-    () => [
-      {
-        value: SETTINGS_COMBOBOX_NONE,
-        label: t(
-          'auto.components.settings.JiraBoardSettings.useListView',
-          'No default board (use issue list)'
-        )
-      },
-      ...buildJiraBoardOptions(
-        boards,
-        selectedBoard,
-        t('auto.components.settings.JiraBoardSettings.unnamedBoard', 'Board {{value0}}', {
-          value0: selectedBoard?.boardId ?? ''
-        })
-      )
-    ],
-    [boards, selectedBoard, t]
-  )
-  const selectedBoardValue = selectedBoard
-    ? boardSelectionOptionValue(selectedBoard)
-    : SETTINGS_COMBOBOX_NONE
+  }
 
   return (
     <section className="space-y-3" data-settings-section="tasks-jira-board">
       <SearchableSetting
-        title={t('auto.components.settings.JiraBoardSettings.title', 'Jira board view')}
+        title={t('auto.components.settings.JiraBoardSettings.title', 'Jira boards')}
         description={t(
           'auto.components.settings.JiraBoardSettings.description',
-          'Choose the default Jira board shown in Tasks.'
+          'Save the boards you work across, then switch between them in Tasks.'
         )}
         keywords={getTasksPaneSearchKeywords()}
       >
-        <div className="max-w-md space-y-2">
-          <Label htmlFor="tasks-jira-default-board">
-            {t('auto.components.settings.JiraBoardSettings.defaultBoard', 'Default board')}
-          </Label>
-          <SettingsCombobox
-            id="tasks-jira-default-board"
-            value={selectedBoardValue}
-            onValueChange={(value) => {
-              if (value === SETTINGS_COMBOBOX_NONE) {
-                saveBoard(null)
-                return
-              }
-              const board = boards.find((candidate) => boardOptionValue(candidate) === value)
-              if (!board) {
-                return
-              }
-              saveBoard({
-                boardId: board.id,
-                siteId: board.siteId,
-                name: board.name
-              })
-            }}
-            options={boardOptions}
-            placeholder={t(
-              'auto.components.settings.JiraBoardSettings.chooseBoard',
-              'Choose a board'
-            )}
-            searchPlaceholder={t(
-              'auto.components.settings.JiraBoardSettings.searchBoards',
-              'Search boards by name...'
-            )}
-            emptyMessage={
-              boardsLoading
-                ? t('auto.components.settings.JiraBoardSettings.loadingBoards', 'Loading boards...')
-                : t(
-                    'auto.components.settings.JiraBoardSettings.noBoardsMatch',
-                    'No boards match this search.'
-                  )
-            }
-            disabled={boardsLoading && boards.length === 0}
-            onSearchChange={setBoardQuery}
-          />
-          <p className="text-xs text-muted-foreground">
-            {t(
-              'auto.components.settings.JiraBoardSettings.defaultBoardHelp',
-              'The board applies its saved filter. Scrum boards show active-sprint status columns; backlog follows the board filter. Search to find a board on a Jira site with many.'
-            )}
-          </p>
-          {!boardsLoading && !loadError && boards.length === 0 ? (
+        <div className="max-w-md space-y-3">
+          {savedBoards ? (
+            <ul className="space-y-1" aria-label={t('jira.settings.savedBoards', 'Saved boards')}>
+              {savedBoards.map((selection, index) => {
+                const key = jiraBoardSelectionKey(selection)
+                const siteName = siteNames.get(selection.siteId)
+                const unreachable = Boolean(
+                  connectedSiteIds && !connectedSiteIds.has(selection.siteId)
+                )
+                return (
+                  <li
+                    key={key}
+                    className="flex items-center gap-1 rounded-md border border-border/50 bg-muted/30 py-1 pl-2 pr-1 text-xs"
+                  >
+                    <span className="min-w-0 flex-1 truncate">
+                      {boardLabel(selection)}
+                      {siteName ? (
+                        <span className="text-muted-foreground"> · {siteName}</span>
+                      ) : null}
+                    </span>
+                    {unreachable ? (
+                      <span className="shrink-0 text-muted-foreground">
+                        {t('jira.settings.siteNotConnected', 'Site not connected')}
+                      </span>
+                    ) : null}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={t('jira.settings.moveBoardUp', 'Move {{name}} up', {
+                        name: boardLabel(selection)
+                      })}
+                      disabled={index === 0}
+                      onClick={() => saveSet(moveJiraBoardSelection(savedBoards, key, -1))}
+                    >
+                      <ChevronUp />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={t('jira.settings.moveBoardDown', 'Move {{name}} down', {
+                        name: boardLabel(selection)
+                      })}
+                      disabled={index === savedBoards.length - 1}
+                      onClick={() => saveSet(moveJiraBoardSelection(savedBoards, key, 1))}
+                    >
+                      <ChevronDown />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={t('jira.settings.removeBoard', 'Remove {{name}}', {
+                        name: boardLabel(selection)
+                      })}
+                      onClick={() => {
+                        const next = removeJiraBoardSelection(savedBoards, key)
+                        // Why null and not an empty list: an empty set offers nothing to switch
+                        // to, so removing the last board returns the switcher to every board.
+                        saveSet(next.length > 0 ? next : null)
+                      }}
+                    >
+                      <X />
+                    </Button>
+                  </li>
+                )
+              })}
+            </ul>
+          ) : (
             <p className="text-xs text-muted-foreground">
-              {appliedBoardQuery
-                ? t(
-                    'auto.components.settings.JiraBoardSettings.noBoardsForSearch',
-                    'Jira returned no boards matching this search.'
-                  )
-                : t(
-                    'auto.components.settings.JiraBoardSettings.noBoardsReturned',
-                    'Jira returned no boards for this site. Check that the account can see a board.'
-                  )}
+              {t(
+                'jira.settings.noSavedBoards',
+                'No saved boards. The Tasks board switcher lists every board this account can reach, and this device remembers the last one you open.'
+              )}
             </p>
+          )}
+
+          <div className="space-y-1.5">
+            <Label htmlFor="tasks-jira-add-board">
+              {t('jira.settings.addBoard', 'Add a board')}
+            </Label>
+            <SettingsCombobox
+              id="tasks-jira-add-board"
+              value=""
+              onValueChange={addBoard}
+              options={boardOptions}
+              placeholder={t('jira.settings.chooseBoard', 'Choose a board')}
+              searchPlaceholder={t(
+                'auto.components.settings.JiraBoardSettings.searchBoards',
+                'Search boards by name...'
+              )}
+              emptyMessage={
+                search.loading
+                  ? t(
+                      'auto.components.settings.JiraBoardSettings.loadingBoards',
+                      'Loading boards...'
+                    )
+                  : t('jira.settings.noBoardsMatchAdd', 'No other boards match this search.')
+              }
+              disabled={search.loading && search.boards.length === 0}
+              onSearchChange={search.setQuery}
+            />
+            <p className="text-xs text-muted-foreground">
+              {t(
+                'jira.settings.boardListHelp',
+                'Search covers every connected Jira site and shows up to one page of boards per site. The Tasks switcher lists the saved boards in this order.'
+              )}
+            </p>
+            {!search.loading && !search.error && boardOptions.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                {search.query
+                  ? t(
+                      'auto.components.settings.JiraBoardSettings.noBoardsForSearch',
+                      'Jira returned no boards matching this search.'
+                    )
+                  : t(
+                      'jira.settings.noBoardsAvailable',
+                      'Jira returned no other boards. Check that the account can see a board.'
+                    )}
+              </p>
+            ) : null}
+          </div>
+
+          {search.error ? (
+            <div
+              role="alert"
+              className="flex items-center justify-between gap-3 text-xs text-destructive"
+            >
+              <span className="min-w-0">{search.error}</span>
+              <Button type="button" variant="outline" size="xs" onClick={search.retry}>
+                {t('auto.components.settings.JiraBoardSettings.retry', 'Retry')}
+              </Button>
+            </div>
           ) : null}
         </div>
-
-        {loadError ? (
-          <div
-            role="alert"
-            className="flex items-center justify-between gap-3 text-xs text-destructive"
-          >
-            <span className="min-w-0">{loadError}</span>
-            <Button
-              type="button"
-              variant="outline"
-              size="xs"
-              onClick={() => setRetryNonce((nonce) => nonce + 1)}
-            >
-              {t('auto.components.settings.JiraBoardSettings.retry', 'Retry')}
-            </Button>
-          </div>
-        ) : null}
       </SearchableSetting>
     </section>
   )

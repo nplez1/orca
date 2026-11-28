@@ -27,9 +27,10 @@ import { useTaskPageJiraSelectionCleanup } from '../../../use-task-page-jira-sel
 import { ipcOrRuntimeTargetForHostId } from '@/runtime/rpc/targets/runtime-client-target'
 import { searchJiraPreset } from '../../../../../../shared/jira/jira-preset-jql'
 import { restrictJiraQueryToProject } from '../../../../../../shared/jira/jira-project-reference'
+import { jiraBoardOwnsSurface } from '../../../task-page-jira-board-model'
 export function useTaskPageJiraListEffects(model: TaskPageLinearCollectionEffectsModel) {
   const {
-    settings,
+    jiraSelectedBoard,
     jiraBoardViewMode,
     accountBackedTaskSourceHostId,
     jiraHasWorkspace,
@@ -115,7 +116,7 @@ export function useTaskPageJiraListEffects(model: TaskPageLinearCollectionEffect
     }
     const force = previousJiraRefreshNonceRef.current !== jiraRefreshNonce
     previousJiraRefreshNonceRef.current = jiraRefreshNonce
-    if (settings?.defaultJiraBoard && jiraBoardViewMode === 'board') {
+    if (jiraBoardOwnsSurface(jiraSelectedBoard, jiraBoardViewMode)) {
       setJiraIssues([])
       setJiraListPage(null)
       setJiraLoading(false)
@@ -274,8 +275,8 @@ export function useTaskPageJiraListEffects(model: TaskPageLinearCollectionEffect
     jiraConnected,
     selectedJiraSiteId,
     jiraBoardViewMode,
-    settings?.defaultJiraBoard?.boardId,
-    settings?.defaultJiraBoard?.siteId,
+    jiraSelectedBoard?.boardId,
+    jiraSelectedBoard?.siteId,
     jiraRemoteSearch,
     activeJiraPreset,
     jiraHasWorkspace,

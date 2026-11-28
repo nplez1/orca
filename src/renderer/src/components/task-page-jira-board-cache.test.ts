@@ -85,13 +85,15 @@ describe('Jira board cache', () => {
   })
 
   it('evicts the least recently read board past the entry cap', () => {
-    const keys = ['a', 'b', 'c', 'd'].map((boardId) =>
-      taskPageJiraBoardCacheKey({ siteId: 'site-1', boardId })
+    const keys = Array.from({ length: TASK_PAGE_JIRA_BOARD_CACHE_MAX_ENTRIES + 1 }, (_, index) =>
+      taskPageJiraBoardCacheKey({ siteId: 'site-1', boardId: `board-${index}` })
     )
     keys.forEach((cacheKey, index) => patchTaskPageJiraBoardCache(cacheKey, {}, index))
 
     expect(taskPageJiraBoardCacheSize()).toBe(TASK_PAGE_JIRA_BOARD_CACHE_MAX_ENTRIES)
-    expect(readTaskPageJiraBoardCache(keys[0], 3)).toBeNull()
-    expect(readTaskPageJiraBoardCache(keys[3], 3)).not.toBeNull()
+    expect(readTaskPageJiraBoardCache(keys[0], 1)).toBeNull()
+    expect(
+      readTaskPageJiraBoardCache(keys[TASK_PAGE_JIRA_BOARD_CACHE_MAX_ENTRIES], 1)
+    ).not.toBeNull()
   })
 })

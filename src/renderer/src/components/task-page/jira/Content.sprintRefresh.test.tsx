@@ -84,6 +84,7 @@ function model(
     settings: createGlobalSettingsFixture({
       defaultJiraBoard: { boardId: '42', siteId: 'site-1' }
     }),
+    jiraSelectedBoard: { boardId: '42', siteId: 'site-1' },
     jiraStatus: {
       connected: true,
       viewer: { accountId: 'viewer-1', displayName: 'Ada', email: null },

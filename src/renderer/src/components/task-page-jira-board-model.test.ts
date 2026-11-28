@@ -6,6 +6,7 @@ import {
   getTaskPageJiraBoardViewerAccountId,
   groupTaskPageJiraBoardIssues,
   issueMatchesTaskPageJiraBoardQuery,
+  jiraBoardOwnsSurface,
   shouldShowJiraSiteSelector
 } from './task-page-jira-board-model'
 
@@ -37,6 +38,13 @@ describe('Jira board projection', () => {
     expect(shouldShowJiraSiteSelector(true, true, 'list', 2)).toBe(true)
     expect(shouldShowJiraSiteSelector(true, false, 'board', 2)).toBe(true)
     expect(shouldShowJiraSiteSelector(true, true, 'list', 1)).toBe(false)
+  })
+
+  it('gives the board view the surface only with a board and board mode', () => {
+    expect(jiraBoardOwnsSurface({ boardId: '42' }, 'board')).toBe(true)
+    expect(jiraBoardOwnsSurface({ boardId: '42' }, 'list')).toBe(false)
+    expect(jiraBoardOwnsSurface(null, 'board')).toBe(false)
+    expect(jiraBoardOwnsSurface(undefined, 'list')).toBe(false)
   })
 
   it('uses the viewer account associated with the board site, not another active site', () => {

@@ -21,6 +21,7 @@ import {
   loadJiraBoardViewPreferences,
   updateJiraBoardViewPreferences
 } from './jira-board-view-storage'
+import { jiraBoardSelectionKey } from '../../../shared/jira/jira-board-selection'
 
 function describeError(error: unknown): string {
   return extractIpcErrorMessage(
@@ -84,19 +85,26 @@ export function useTaskPageJiraBoard(
   const activeSprintIdRef = useRef(cacheSnapshot?.activeSprintId ?? '')
   const overviewGeneration = useRef(0)
   const lastOverviewRefreshRef = useRef(refreshNonce)
+  const boardViewKey = jiraBoardSelectionKey(selection)
   const [filter, setFilterState] = useState<TaskPageJiraBoardFilter>(
-    () => loadJiraBoardViewPreferences().filter
+    () => loadJiraBoardViewPreferences(boardViewKey).filter
   )
-  const [query, setQueryState] = useState(() => loadJiraBoardViewPreferences().query)
+  const [query, setQueryState] = useState(() => loadJiraBoardViewPreferences(boardViewKey).query)
 
-  const setFilter = useCallback((next: TaskPageJiraBoardFilter) => {
-    setFilterState(next)
-    updateJiraBoardViewPreferences({ filter: next })
-  }, [])
-  const setQuery = useCallback((next: string) => {
-    setQueryState(next)
-    updateJiraBoardViewPreferences({ query: next })
-  }, [])
+  const setFilter = useCallback(
+    (next: TaskPageJiraBoardFilter) => {
+      setFilterState(next)
+      updateJiraBoardViewPreferences({ filter: next }, boardViewKey)
+    },
+    [boardViewKey]
+  )
+  const setQuery = useCallback(
+    (next: string) => {
+      setQueryState(next)
+      updateJiraBoardViewPreferences({ query: next }, boardViewKey)
+    },
+    [boardViewKey]
+  )
   const setActiveSprintId = useCallback(
     (next: string) => {
       activeSprintIdRef.current = next

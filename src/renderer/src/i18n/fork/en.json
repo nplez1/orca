@@ -562,19 +562,12 @@
           "defaultsEditAnotherHost": "These defaults belong to {{value0}}, the default host, not the host selected above."
         },
         "JiraBoardSettings": {
-          "chooseBoard": "Choose a board",
-          "defaultBoard": "Default board",
-          "defaultBoardHelp": "The board applies its saved filter. Scrum boards show active-sprint status columns; backlog follows the board filter. Search to find a board on a Jira site with many.",
-          "description": "Choose the default Jira board shown in Tasks.",
+          "description": "Save the boards you work across, then switch between them in Tasks.",
           "loadingBoards": "Loading boards...",
           "noBoardsForSearch": "Jira returned no boards matching this search.",
-          "noBoardsMatch": "No boards match this search.",
-          "noBoardsReturned": "Jira returned no boards for this site. Check that the account can see a board.",
           "retry": "Retry",
           "searchBoards": "Search boards by name...",
-          "title": "Jira board view",
-          "unnamedBoard": "Board {{value0}}",
-          "useListView": "No default board (use issue list)"
+          "title": "Jira boards"
         },
         "MobilePairingConnectionOptions": {},
         "NativeChatSupportedAgents": {},
@@ -1475,7 +1468,12 @@
     "board": {
       "loadFailed": "Unable to load this Jira board.",
       "noTarget": "No Jira host is available for this move.",
-      "noTransitionSelected": "No status change is selected."
+      "noTransitionSelected": "No status change is selected.",
+      "switcher": "Jira board",
+      "chooseBoard": "Choose board",
+      "searchBoards": "Search boards...",
+      "loadingBoards": "Loading boards...",
+      "noBoards": "No boards match this search."
     },
     "issue": {
       "assignableUsersError": "Failed to load the people assignable to this issue.",
@@ -1486,7 +1484,18 @@
       "writeTimedOut": "Jira did not answer in time, so this change may not have been saved. Reload the issue."
     },
     "settings": {
-      "boardLoadFailed": "Jira settings could not be loaded."
+      "boardLoadFailed": "Jira settings could not be loaded.",
+      "savedBoards": "Saved boards",
+      "siteNotConnected": "Site not connected",
+      "moveBoardUp": "Move {{name}} up",
+      "moveBoardDown": "Move {{name}} down",
+      "removeBoard": "Remove {{name}}",
+      "noSavedBoards": "No saved boards. The Tasks board switcher lists every board this account can reach, and this device remembers the last one you open.",
+      "addBoard": "Add a board",
+      "chooseBoard": "Choose a board",
+      "noBoardsMatchAdd": "No other boards match this search.",
+      "boardListHelp": "Search covers every connected Jira site and shows up to one page of boards per site. The Tasks switcher lists the saved boards in this order.",
+      "noBoardsAvailable": "Jira returned no other boards. Check that the account can see a board."
     },
     "transitions": {
       "completeInJira": null,

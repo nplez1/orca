@@ -6,6 +6,7 @@ import { cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { JiraIssue } from '../../../../../shared/jira/jira-types'
+import { createGlobalSettingsFixture } from '../../../../../shared/settings/global-settings-test-fixture'
 import type { Worktree } from '../../../../../shared/worktree/types'
 import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/work-items/jira/jira-issue-workspace-attachment'
 import { openJiraIssueWorkspace } from '@/lib/jira-issue-workspace-open'
@@ -131,7 +132,8 @@ function model(
   const selectedIssue = issue()
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: TaskPage accumulates one model object across hooks; the test supplies only the members this component reads.
   const rendered = {
-    settings: view === 'board' ? { defaultJiraBoard: { siteId: 'site-1', boardId: '42' } } : null,
+    settings: view === 'board' ? createGlobalSettingsFixture() : null,
+    jiraSelectedBoard: view === 'board' ? { siteId: 'site-1', boardId: '42' } : null,
     jiraStatus: { credentialError: null },
     jiraStatusReady: true,
     jiraBoardViewMode: view,

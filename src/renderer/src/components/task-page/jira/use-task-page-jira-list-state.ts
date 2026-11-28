@@ -7,6 +7,7 @@ import type { JiraSavedFilter } from '../../../../../shared/jira/jira-saved-filt
 import type { TaskPageLinearViewStateModel } from '../linear/use-task-page-linear-view-state'
 import { useState, useMemo, useEffect, useCallback, useRef, type SetStateAction } from 'react'
 import type {
+  JiraBoardSelection,
   JiraIssue,
   JiraProjectStatusOrder,
   JiraPriority
@@ -44,6 +45,8 @@ import {
   loadJiraBoardViewPreferences,
   updateJiraBoardViewPreferences
 } from '../../jira-board-view-storage'
+import { useJiraBoardSelection } from './use-jira-board-selection'
+import { jiraBoardSelectionKey } from '../../../../../shared/jira/jira-board-selection'
 const EMPTY_JIRA_PRIORITIES: JiraPrioritiesBySite = new Map()
 
 export function useTaskPageJiraListState(model: TaskPageLinearViewStateModel) {
@@ -54,13 +57,32 @@ export function useTaskPageJiraListState(model: TaskPageLinearViewStateModel) {
     jiraTaskSourceContext,
     accountBackedTaskSourceHostId
   } = model
-  const [jiraBoardViewMode, setJiraBoardViewModeState] = useState<'board' | 'list'>(
-    () => loadJiraBoardViewPreferences().viewMode
+  const boardSelection = useJiraBoardSelection(model)
+  const boardViewKey = boardSelection.jiraSelectedBoard
+    ? jiraBoardSelectionKey(boardSelection.jiraSelectedBoard)
+    : null
+  const storedBoardViewMode = useMemo(
+    () => loadJiraBoardViewPreferences(boardViewKey).viewMode,
+    [boardViewKey]
   )
-  const setJiraBoardViewMode = useCallback((mode: 'board' | 'list') => {
-    setJiraBoardViewModeState(mode)
-    updateJiraBoardViewPreferences({ viewMode: mode })
-  }, [])
+  const [boardViewModeByKey, setBoardViewModeByKey] = useState<Record<string, 'board' | 'list'>>({})
+  const jiraBoardViewMode = boardViewModeByKey[boardViewKey ?? ''] ?? storedBoardViewMode
+  const setJiraBoardViewMode = useCallback(
+    (mode: 'board' | 'list') => {
+      setBoardViewModeByKey((current) => ({ ...current, [boardViewKey ?? '']: mode }))
+      updateJiraBoardViewPreferences({ viewMode: mode }, boardViewKey)
+    },
+    [boardViewKey]
+  )
+  const selectJiraBoard = useCallback(
+    (selection: JiraBoardSelection | null) => {
+      boardSelection.selectJiraBoard(selection)
+      const key = selection ? jiraBoardSelectionKey(selection) : null
+      setBoardViewModeByKey((current) => ({ ...current, [key ?? '']: 'board' }))
+      updateJiraBoardViewPreferences({ viewMode: 'board' }, key)
+    },
+    [boardSelection]
+  )
   const owner = useMemo(
     () =>
       ipcOrRuntimeTargetForHostId(jiraTaskSourceContext?.hostId ?? accountBackedTaskSourceHostId),
@@ -241,6 +263,10 @@ export function useTaskPageJiraListState(model: TaskPageLinearViewStateModel) {
     setJiraListLoadMoreError,
     jiraBoardViewMode,
     setJiraBoardViewMode,
+    jiraSavedBoards: boardSelection.jiraSavedBoards,
+    jiraSelectedBoard: boardSelection.jiraSelectedBoard,
+    jiraConnectedSiteIds: boardSelection.jiraConnectedSiteIds,
+    selectJiraBoard,
     jiraLoading,
     setJiraLoading,
     jiraError,

@@ -35,6 +35,7 @@ import {
   loadJiraBoardViewPreferences,
   updateJiraBoardViewPreferences
 } from '../../jira-board-view-storage'
+import { jiraBoardSelectionKey } from '../../../../../shared/jira/jira-board-selection'
 
 function loadMoreLabel(loading: boolean, label: string): string {
   return loading ? translate('auto.components.TaskPage.jiraBoardLoadingMore', 'Loading…') : label
@@ -60,14 +61,18 @@ export function TaskPageJiraBoard({
 }): JSX.Element {
   const t = useTranslate()
   const board = useTaskPageJiraBoard(model, selection, refreshSignal)
+  const boardViewKey = jiraBoardSelectionKey(selection)
   const [activeView, setActiveViewState] = useState<'sprint' | 'backlog'>(
-    () => loadJiraBoardViewPreferences().activeView
+    () => loadJiraBoardViewPreferences(boardViewKey).activeView
   )
   const providerSettings = board.providerSettings
-  const setActiveView = useCallback((view: 'sprint' | 'backlog') => {
-    setActiveViewState(view)
-    updateJiraBoardViewPreferences({ activeView: view })
-  }, [])
+  const setActiveView = useCallback(
+    (view: 'sprint' | 'backlog') => {
+      setActiveViewState(view)
+      updateJiraBoardViewPreferences({ activeView: view }, boardViewKey)
+    },
+    [boardViewKey]
+  )
   const legacyRuntimeFallbackApplied = useRef(false)
   const [assigningSprintIssueKey, setAssigningSprintIssueKey] = useState<string | null>(null)
   const filteredColumns = useMemo(

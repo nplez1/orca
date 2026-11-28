@@ -19,7 +19,7 @@ function model(overrides: Partial<TaskPageComposerActionsModel>): TaskPageCompos
     setJiraBoardViewMode: vi.fn(),
     jiraIssueAttachmentIndex: {},
     handleOpenOrUseJiraItem: vi.fn(),
-    settings: { defaultJiraBoard: { boardId: '42', siteId: 'site-1', name: 'Payments' } },
+    jiraSelectedBoard: { boardId: '42', siteId: 'site-1', name: 'Payments' },
     ...overrides
   } as unknown as TaskPageComposerActionsModel
 }
