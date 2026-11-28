@@ -139,11 +139,7 @@ const SLACK_NOT_INSTALLED =
 export type BotPhotonConnector = {
   phoneNumber: string | null
   handles: string[]
-  /** `spectrum` is a project the owner already had: Orca assigns no number there and Spectrum's own
-   *  dashboard decides who reaches it, so the copy must not offer to add anyone. */
   mode?: 'account' | 'spectrum'
-  /** A Spectrum bot whose project secret is not on this computer (session-only, and gone after a
-   *  restart). Nothing reaches it, so the row must not report it as signed in. */
   secretMissing?: boolean
 }
 
@@ -214,8 +210,6 @@ function photonService(photon: BotPhotonConnector): BotConnectorService {
     const detail =
       'Answers on your own Spectrum project. Its lines, and who may reach them, stay in Spectrum.'
     if (photon.secretMissing) {
-      // Never signed in on the strength of a record alone: the secret is the only thing that reaches the
-      // project, and a session-only one is gone when Orca restarts.
       return {
         source: 'photon',
         tool: 'iMessage',

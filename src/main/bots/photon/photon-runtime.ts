@@ -173,6 +173,8 @@ export function photonChannel(runtime: OrcaRuntimeService): PhotonService {
 
 /** One row of the channel a bot has, as `orca bot connectors` and `bots.photon.status` read it. */
 export type PhotonBotConnectorRow = {
+  /** `spectrum` is a project the owner already had: Orca assigns no number there and Spectrum's own
+   *  dashboard decides who reaches it, so a listing must not offer to add anyone. */
   mode: PhotonBotMode
   phoneNumber: string | null
   handles: string[]

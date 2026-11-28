@@ -34,6 +34,7 @@
 23 src/main/bitbucket/credential-store.ts
 1 src/main/bitbucket/pull-request-creation.ts
 1 src/main/bitbucket/resolve-auth.ts
+1 src/main/bots/photon/photon-spectrum-secrets.ts # once per connect or release of an owner's own Spectrum project, through writePhotonJson, the seventh module in local(bots): on POSIX only writeSecureFileAsync's publishing renameSync blocks, and on win32 the helper writes, chmods and fsyncs synchronously; every read here is node:fs/promises, and LOCAL-PATCHES § `local(bots)` carries the measurement for the class
 3 src/main/claude-accounts/claude-oauth-credential-store.ts
 24 src/main/claude-accounts/claude-oauth-pending-rotations.ts
 12 src/main/claude-accounts/claude-oauth-token-refresh.ts
