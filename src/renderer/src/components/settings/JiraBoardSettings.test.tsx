@@ -175,6 +175,33 @@ describe('JiraBoardSettings', () => {
     })
   })
 
+  it('shows a renamed board under its live name and stores it on the next write', async () => {
+    const user = userEvent.setup()
+    mocks.jiraListBoards.mockResolvedValue([payments])
+    const updateSettings = vi.fn().mockResolvedValue(undefined)
+    const settings = createGlobalSettingsFixture({
+      defaultJiraBoards: [
+        { boardId: '42', siteId: 'site-1', name: 'Old name' },
+        { boardId: '7', siteId: 'site-1', name: 'Platform' }
+      ],
+      defaultJiraBoard: { boardId: '42', siteId: 'site-1', name: 'Old name' }
+    })
+
+    render(<JiraBoardSettings settings={settings} updateSettingsOrThrow={updateSettings} />)
+
+    // Why: a rename resolves by id, so it must not read as a board that vanished.
+    expect(await screen.findByText('Payments')).not.toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Move Platform up' }))
+
+    expect(updateSettings).toHaveBeenCalledWith({
+      defaultJiraBoards: [
+        { boardId: '7', siteId: 'site-1', name: 'Platform' },
+        { boardId: '42', siteId: 'site-1', name: 'Payments' }
+      ],
+      defaultJiraBoard: { boardId: '7', siteId: 'site-1', name: 'Platform' }
+    })
+  })
+
   it('shows a legacy single board as a saved board', async () => {
     mocks.jiraListBoards.mockResolvedValue([])
     const settings = createGlobalSettingsFixture({

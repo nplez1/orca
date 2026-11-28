@@ -56,6 +56,18 @@ export function JiraBoardSettings({
     () => new Set((savedBoards ?? []).map((selection) => jiraBoardSelectionKey(selection))),
     [savedBoards]
   )
+  // Why: a board renamed in Jira still resolves by id, so the list shows the live name and the
+  // next write stores it; nothing is deleted on a name mismatch.
+  const liveNames = useMemo(
+    () =>
+      new Map(
+        search.boards.map((board) => [
+          boardOptionValue({ siteId: board.siteId, id: board.id }),
+          board.name
+        ])
+      ),
+    [search.boards]
+  )
   const boardOptions = useMemo(
     () =>
       buildJiraBoardOptions(
@@ -70,7 +82,13 @@ export function JiraBoardSettings({
   // Why: the store only mirrors a settings write once it lands, so a rejected write leaves the
   // list on the old set — and without this the user never learns the change did not stick.
   const saveSet = (next: JiraBoardSelection[] | null): void => {
-    void updateSettingsOrThrow(jiraBoardSettingsWrite(next)).catch(() => {
+    const refreshed = next?.map((selection) => {
+      const liveName = liveNames.get(
+        boardOptionValue({ siteId: selection.siteId, id: selection.boardId })
+      )
+      return liveName && liveName !== selection.name ? { ...selection, name: liveName } : selection
+    })
+    void updateSettingsOrThrow(jiraBoardSettingsWrite(refreshed ?? null)).catch(() => {
       toast.error(t('sessionHistory.settings.saveError', 'Could not save. Try again.'))
     })
   }
@@ -99,6 +117,10 @@ export function JiraBoardSettings({
             <ul className="space-y-1" aria-label={t('jira.settings.savedBoards', 'Saved boards')}>
               {savedBoards.map((selection, index) => {
                 const key = jiraBoardSelectionKey(selection)
+                const label =
+                  liveNames.get(
+                    boardOptionValue({ siteId: selection.siteId, id: selection.boardId })
+                  ) ?? boardLabel(selection)
                 const siteName = siteNames.get(selection.siteId)
                 const unreachable = Boolean(
                   connectedSiteIds && !connectedSiteIds.has(selection.siteId)
@@ -109,7 +131,7 @@ export function JiraBoardSettings({
                     className="flex items-center gap-1 rounded-md border border-border/50 bg-muted/30 py-1 pl-2 pr-1 text-xs"
                   >
                     <span className="min-w-0 flex-1 truncate">
-                      {boardLabel(selection)}
+                      {label}
                       {siteName ? (
                         <span className="text-muted-foreground"> · {siteName}</span>
                       ) : null}
