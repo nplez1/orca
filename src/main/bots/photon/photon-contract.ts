@@ -62,10 +62,21 @@ export type PhotonProject = z.infer<typeof PhotonProjectSchema>
 
 /** The secret comes back only on the mint and on an idempotent replay of it; it is never readable. */
 export const PhotonProjectKeySchema = lazyZodSchema(() =>
-  z.object({
-    id: NonEmpty,
-    secret: NonEmpty
-  })
+  z
+    .object({
+      /** `{ id, secret }` as the docs show it, and `{ apiKey: { apiKeyId }, secret }` as Photon sends it. */
+      id: NonEmpty.optional(),
+      apiKey: z.object({ apiKeyId: NonEmpty.optional(), id: NonEmpty.optional() }).optional(),
+      secret: NonEmpty
+    })
+    .transform((minted, ctx) => {
+      const id = minted.apiKey?.apiKeyId ?? minted.apiKey?.id ?? minted.id
+      if (!id) {
+        ctx.addIssue({ code: 'custom', path: ['id'], message: 'No key id in the mint response' })
+        return z.NEVER
+      }
+      return { id, secret: minted.secret }
+    })
 )
 export type PhotonProjectKey = z.infer<typeof PhotonProjectKeySchema>
 

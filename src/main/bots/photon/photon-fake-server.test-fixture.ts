@@ -165,7 +165,7 @@ export async function startFakePhotonServer(): Promise<FakePhotonServer> {
       if (replay) {
         const existing = state.keys.get(replay)
         if (existing) {
-          send(response, 200, { id: replay, secret: existing.secret })
+          send(response, 200, { apiKey: { apiKeyId: replay }, secret: existing.secret })
           return
         }
       }
@@ -175,7 +175,7 @@ export async function startFakePhotonServer(): Promise<FakePhotonServer> {
       if (idempotencyKey) {
         state.idempotency.set(`key:${idempotencyKey}`, id)
       }
-      send(response, 201, { id, secret })
+      send(response, 201, { apiKey: { apiKeyId: id }, secret })
       return
     }
     if (method === 'DELETE' && parts[0] === 'projects' && parts[2] === 'keys') {
