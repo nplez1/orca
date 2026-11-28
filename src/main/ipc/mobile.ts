@@ -5,6 +5,7 @@ import type { MobilePairingConnectionMode } from '../../shared/remote-runtime/pa
 import type { RuntimePairingReach } from '../../shared/remote-runtime/pairing/runtime-pairing-reach'
 import { isPairedMobileDevice, type DeviceEntry } from '../runtime/rpc/server/pairing/device-entry'
 import { isLiveRuntimeGrant } from '../host-mesh/host-mesh-runtime-grants'
+import { meshOwnedDeviceRowIds } from '../host-mesh/host-mesh-owned-device-rows'
 import {
   requestMobilePairingOffer,
   requestRuntimePairingOffer
@@ -180,9 +181,13 @@ export function registerMobileHandlers(
     }
     // Runtime links are bearer credentials immediately, so unconnected grants must remain revocable.
     const all = registry.listDevices({ fresh: true })
+    // Why the mesh's own rows are absent: a pass mints one per reverse offer and retires the ones it replaced, so
+    // nothing in this list is the owner's to manage or to count — a retry storm read as forty-five links on a
+    // two-machine fleet is what that looked like.
+    const meshOwned = meshOwnedDeviceRowIds()
     return {
       grants: all
-        .filter(isLiveRuntimeGrant)
+        .filter((d) => isLiveRuntimeGrant(d) && !meshOwned.has(d.deviceId))
         .sort((a, b) => b.pairedAt - a.pairedAt)
         .map((d) => toRuntimeAccessGrant(d, all))
     }
