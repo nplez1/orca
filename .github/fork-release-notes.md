@@ -30,6 +30,9 @@ The `.dmg` and the `.zip` contain the same app; either works.
   bundle, its own data (`Application Support/orca-np`), its own settings (`~/.orca-np`), and its own
   command (`orca-np`).
 - Updates from **this repository's releases**, never from stablyai's.
+- Carries its own features and fixes on top of upstream's, not just a rename: the full list is the
+  README's [What's different in this fork](https://github.com/nplez1/orca#whats-different-in-this-fork),
+  and the "…in this fork" groups above name the ones this build added.
 - Sends no diagnostics or usage data.
 
 ## First run

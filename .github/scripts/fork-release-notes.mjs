@@ -13,6 +13,14 @@ import { spawnSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import {
+  countStreams,
+  forkClause,
+  forkGroupTitle,
+  isBookkeepingGroup,
+  isForkCommit,
+  splitEntriesByFork
+} from './fork-release-notes-fork-work.mjs'
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..')
 const DEFAULT_TEMPLATE = resolve(REPO_ROOT, '.github/fork-release-notes.md')
@@ -34,7 +42,7 @@ const GROUP_ORDER = ['feat', 'fix', 'perf', 'refactor', 'local', 'docs', 'test',
 const FORK_PATCH_LIMIT = 6
 
 const GROUP_TITLES = {
-  local: 'Fork patches (`local(...)`) — what makes this build different',
+  local: 'Fork bookkeeping (`local(...)`) — sync and release records',
   feat: 'Features',
   fix: 'Fixes',
   perf: 'Performance',
@@ -169,7 +177,7 @@ function git(args) {
 }
 
 function listCommits(rangeArgs) {
-  const result = git(['log', '--no-color', '--format=%H%x00%s%x00%p', ...rangeArgs])
+  const result = git(['log', '--no-color', '--format=%H%x00%s%x00%p%x00%an%x00%ae', ...rangeArgs])
   if (!result.ok) {
     throw new Error(result.error)
   }
@@ -178,10 +186,12 @@ function listCommits(rangeArgs) {
     .split('\n')
     .filter((line) => line.length > 0)
     .map((line) => {
-      const [sha, subject = '', parents = ''] = line.split('\u0000')
+      const [sha, subject = '', parents = '', author = '', email = ''] = line.split('\u0000')
       return {
         sha,
         subject,
+        author,
+        email,
         parents: parents
           .trim()
           .split(' ')
@@ -429,6 +439,8 @@ function renderLead({
   alreadyInPrev,
   merges,
   forkPatchCount,
+  forkCount,
+  inheritedCount,
   windowSize,
   compareUrl
 }) {
@@ -447,10 +459,9 @@ function renderLead({
           `${alreadyInPrev === 1 ? 'is' : 'are'} already in that release as ` +
           `${alreadyInPrev === 1 ? 'a rebased copy' : 'rebased copies'} — same patch, new commit)`
     const prose =
-      `${total} commit${total === 1 ? '' : 's'} changed since the last release${rangeClause}, including ` +
-      `**${forkPatchCount} fork patch${forkPatchCount === 1 ? '' : 'es'}** (\`local(...)\`)${mergeClause}. ` +
-      `Changes are grouped by type below, newest first; a group that is capped says how many ` +
-      `commits it left out.`
+      `${total} commit${total === 1 ? '' : 's'} changed since the last release${rangeClause}: ` +
+      `${forkClause(forkCount, inheritedCount)}${mergeClause}. Grouped by type below, this ` +
+      `fork's own first; a capped group says how many it left out.`
     return [heading, '', wrap(prose), '', compareLink(rangeTotal ?? total, compareUrl), '']
   }
 
@@ -510,8 +521,9 @@ function buildSummary(options, context) {
       continue
     }
     const classified = classify(commit.subject)
-    buckets.get(classified.group).push(classified)
+    buckets.get(classified.group).push({ ...classified, fork: isForkCommit(commit) })
   }
+  const { forkCount, inheritedCount } = countStreams(commits, classify)
 
   const compareUrl =
     prevTag == null ? undefined : `https://github.com/${options.repo}/compare/${prevTag}...${tag}`
@@ -525,6 +537,8 @@ function buildSummary(options, context) {
     alreadyInPrev,
     merges,
     forkPatchCount: dedupe(buckets.get('local')).length,
+    forkCount,
+    inheritedCount,
     windowSize: options.firstReleaseWindow,
     compareUrl
   })
@@ -539,8 +553,21 @@ function buildSummary(options, context) {
     )
   }
 
+  // The fork's own changes lead: a rebased range is mostly upstream's, and a reader updating this
+  // build is looking for what the fork added. `local(...)` and bookkeeping are not product changes.
+  lines.push(
+    ...GROUP_ORDER.filter((group) => !isBookkeepingGroup(group)).flatMap((group) =>
+      renderGroup(
+        forkGroupTitle(GROUP_TITLES[group]),
+        splitEntriesByFork(dedupe(buckets.get(group))).fork,
+        options.maxPerGroup
+      )
+    )
+  )
+
   for (const group of GROUP_ORDER) {
-    const entries = dedupe(buckets.get(group))
+    const all = dedupe(buckets.get(group))
+    const entries = isBookkeepingGroup(group) ? all : splitEntriesByFork(all).inherited
     if (group === 'chore') {
       lines.push(...renderCompactGroup(GROUP_TITLES[group], entries))
       continue
