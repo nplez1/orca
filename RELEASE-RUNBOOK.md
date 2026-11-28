@@ -318,9 +318,19 @@ node local/dispatch-release.mjs --waive-review "<why>"   # records the reason; n
 It refuses on four preconditions, cheapest first: the review of this exact revision is complete; the tree
 is clean; HEAD is `origin/main`; and the Actions fleet is swept. Nothing is dispatched on a refusal.
 
-The version is stamped `<package.json version>-np.<run number>` by the workflow. That suffix matters
-twice: it keeps fork releases strictly newer than each other, and it makes a fork build identifiable
-if someone reports a bug — upstream has never shipped that version.
+The version is stamped `<upstream base version>-np.<run number>` by the workflow, and the base is the
+newest **upstream release tag** at or before the commit this fork's sync is keyed to
+(`.github/scripts/fork-upstream-base-version.mjs`). Not `package.json`: upstream bumps that on its
+release line, so `main` can sit months behind its own tags — on 2026-11-28 `package.json` said
+`1.4.214` (unchanged since that release, 2026-09-26) while the newest tag was `v1.4.279`, and a build
+carrying `1.4.279`'s code stamped `1.4.214` told a reader nothing about what they were running. The
+base is therefore what a user compares against upstream, and the nearest tag _after_ the sync base is
+deliberately not used: this build does not carry it.
+
+The suffix matters twice: it keeps fork releases strictly newer than each other, and it makes a fork
+build identifiable if someone reports a bug — upstream has never shipped that version. The script
+warns and falls back to `package.json` when the clone carries no eligible tag, so a missing tag mirror
+cannot stall a release.
 
 Two things about it are enforced by the `release-ref` job before any artifact is built
 (`.github/scripts/fork-release-version-guard.mjs`):

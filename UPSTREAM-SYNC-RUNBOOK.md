@@ -59,8 +59,9 @@ Still true either way, so do not "fix" these:
 
 - `.husky/commit-msg` refuses `local(` commits on any branch that does not carry `main` in its
   history — i.e. anywhere upstream-bound. Do not bypass it.
-- `.github/workflows/fork-release.yml` stamps `<package.json version>-np.${GITHUB_RUN_NUMBER}` —
-  history shape is irrelevant to versioning.
+- `.github/workflows/fork-release.yml` stamps `<upstream base version>-np.${GITHUB_RUN_NUMBER}`,
+  where the base is the newest upstream release tag at or before the sync base — history shape is
+  irrelevant to versioning.
 - `local/open-pr.mjs` requires a PR head to descend from its base, and the base must be an ancestor
   of the head _as it stands now_. A merge line preserves ancestry; a stale PR head does not, so a
   branch cut before any sync needs its own catch-up before it can be opened.
@@ -461,4 +462,5 @@ from the new line.
 
 Follow [RELEASE-RUNBOOK.md](./RELEASE-RUNBOOK.md): its gates, then `node local/dispatch-release.mjs`,
 which refuses an unreviewed or unswept dispatch — not a bare `gh workflow run`. The version stamps
-itself as `<package.json version>-np.<run number>`, so no number is chosen by hand.
+itself as `<newest upstream release at or before the sync base>-np.<run number>`, so no number is
+chosen by hand and each release names the upstream version it is comparable to.

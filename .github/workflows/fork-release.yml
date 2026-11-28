@@ -66,7 +66,7 @@ on:
         default: ''
         type: string
       version_suffix:
-        description: 'Suffix appended to package.json version (default: np.<run number>)'
+        description: 'Suffix appended to the upstream base version (default: np.<run number>)'
         required: false
         default: ''
         type: string
@@ -93,8 +93,9 @@ concurrency:
 
 # Why the same version for every job: the mac, windows and linux artifacts of one release must
 # agree, and the updater compares the version baked into each manifest. `release-ref` derives it once,
-# from package.json and the run number, and every later job reads `needs.release-ref.outputs.version`
-# — so the version the guard approved is the version every job stamps, and the formula exists once.
+# from the upstream base version and the run number, and every later job reads
+# `needs.release-ref.outputs.version` — so the version the guard approved is the version every job
+# stamps, and the formula exists once.
 env:
   PUBLISH_OWNER: nplez1
 
@@ -133,7 +134,9 @@ jobs:
             echo "::error::dispatched for $EXPECTED_SHA, but this run is at $GITHUB_SHA — main moved since the review; re-review the new tip and dispatch again"
             exit 1
           fi
-          base="$(node -p "require('./package.json').version")"
+          base="$(node .github/scripts/fork-upstream-base-version.mjs)"
+          # Why the upstream base and not package.json: the base triple names the upstream Orca a build
+          # is comparable to, and upstream bumps package.json on its release line, not on main.
           version="${base}-${SUFFIX:-np.${GITHUB_RUN_NUMBER}}"
           bash .github/scripts/fork-release-ref-guard.sh \
             "$GITHUB_REF" "v$version" "$GITHUB_SHA" "$PUBLISH_OWNER/orca"
@@ -440,11 +443,10 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: node config/scripts/desktop-distribution/macos/verify-macos-release-env.mjs
 
-      # Why stamp the version: upstream's numbering is not a stream this fork can ride — two
-      # builds of the same package.json version compare equal and the updater then reports
-      # "no newer version" forever. Appending the run number gives each release a version
-      # strictly greater than the last, and the -np. pre-release suffix keeps it clearly
-      # distinct from anything upstream publishes.
+      # Why stamp the version: the base triple names the upstream Orca release this build is
+      # comparable to, and two builds of the same version would compare equal — after which the
+      # updater reports "no newer version" forever. The run-number suffix makes each release strictly
+      # greater than the last, and `-np.` keeps it clearly distinct from anything upstream publishes.
       - name: Stamp the release version
         shell: bash
         run: |

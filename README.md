@@ -134,7 +134,7 @@ Additions to upstream's per-workspace environment recipes (Settings → Experime
 ### Running it
 
 - **Own identity** — Orca NP uses its own app id (`com.nplez1.orca`), data directory, home directory (`~/.orca-np`), and CLI (`orca-np`), so it installs and runs beside an official Orca without sharing state.
-- **Own releases and updates** — builds are tagged `v<upstream version>-np.<n>` and the in-app updater follows [this repository's releases](https://github.com/nplez1/orca/releases), not upstream's.
+- **Own releases and updates** — builds are tagged `v<upstream version>-np.<n>`, where the first three numbers are the newest upstream Orca release this build is at least as new as, so a release tells you which upstream version to compare it with; the in-app updater follows [this repository's releases](https://github.com/nplez1/orca/releases), not upstream's.
 - **Signing** — macOS builds are signed and notarized; the Windows installer is unsigned, so SmartScreen warns once on install.
 - **No telemetry** — the release notes state that builds send no diagnostics or usage data.
 - **Skills point at this app** — bundled skills and the published stubs call `orca-np` (and `orca-np-dev` in development) rather than falling through to an official install's `orca`.

@@ -897,8 +897,9 @@ series, `.github/workflows/fork-release.yml` for the release pipeline, and
   cannot demonstrate it, so publish a second trivial one and watch a machine move on its own.
 - **Resolved since this file was written:** the identity question (shipped as **Orca NP** — its own
   bundle id, data directory, home directory and CLI; see LOCAL-PATCHES.md § local(identity)), version
-  numbering (`<package.json version>-np.<run number>`, already what the workflow derives), and the
-  dev-channel leak (one update stream; see LOCAL-PATCHES.md § local(updater)).
+  numbering (`<newest upstream release at or before the sync base>-np.<run number>`, derived by the
+  workflow, so each release names the upstream version it is comparable to), and the dev-channel leak
+  (one update stream; see LOCAL-PATCHES.md § local(updater)).
 - **A full `pnpm test` needs its environment before it can be trusted.** Verified on 2026-09-21, four
   unrelated setup gaps look like regressions and are not: the browser viewport suites need
   `ORCA_BACKGROUND_LAUNCH=1`; the mobile bundle and render suites need `mobile`'s postinstall
