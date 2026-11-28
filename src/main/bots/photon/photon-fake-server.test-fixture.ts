@@ -24,6 +24,14 @@ export type FakePhotonServer = {
 let counter = 0
 const nextId = (prefix: string): string => `${prefix}_${(counter += 1).toString(36)}`
 
+/** Photon names a project's id `projectId` on the wire; the fake says what the real one says. */
+const wireProject = (project: FakeProject): Record<string, unknown> => ({
+  projectId: project.id,
+  slug: project.slug,
+  name: project.name,
+  organizationId: project.organizationId
+})
+
 function readBody(request: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = []
@@ -79,7 +87,7 @@ export async function startFakePhotonServer(): Promise<FakePhotonServer> {
       if (replay) {
         const existing = state.projects.get(replay)
         if (existing) {
-          send(response, 200, existing)
+          send(response, 200, wireProject(existing))
           return
         }
       }
@@ -99,16 +107,16 @@ export async function startFakePhotonServer(): Promise<FakePhotonServer> {
       if (idempotencyKey) {
         state.idempotency.set(`project:${idempotencyKey}`, project.id)
       }
-      send(response, 201, project)
+      send(response, 201, wireProject(project))
       return
     }
 
     // GET /organizations/:id/projects — how a taken slug is looked up rather than retried forever.
     if (method === 'GET' && parts[0] === 'organizations' && parts[2] === 'projects') {
       send(response, 200, {
-        projects: [...state.projects.values()].filter(
-          (project) => project.organizationId === parts[1]
-        )
+        projects: [...state.projects.values()]
+          .filter((project) => project.organizationId === parts[1])
+          .map(wireProject)
       })
       return
     }
@@ -121,7 +129,7 @@ export async function startFakePhotonServer(): Promise<FakePhotonServer> {
         return
       }
       if (method === 'GET') {
-        send(response, 200, project)
+        send(response, 200, wireProject(project))
         return
       }
       state.deleted.push(project.id)
