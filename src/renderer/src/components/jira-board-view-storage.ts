@@ -67,12 +67,6 @@ function writeByBoard(payload: {
   boards: Record<string, JiraBoardScopedViewPreferences>
 }): void {
   try {
-    // Normalization returns an empty payload for all-defaults views, so resetting every board
-    // clears the key instead of pinning today's defaults against a future change.
-    if (!payload.migrated && Object.keys(payload.boards).length === 0) {
-      localStorage.removeItem(BY_BOARD_STORAGE_KEY)
-      return
-    }
     localStorage.setItem(BY_BOARD_STORAGE_KEY, JSON.stringify(payload))
   } catch {
     // The live board stays usable when browser storage is unavailable or full.
