@@ -27,12 +27,14 @@ describe('fork work in a release range', () => {
     expect(isForkCommit(UPSTREAM)).toBe(false)
   })
 
-  it('leaves bookkeeping out of both counts, so the local() series is not fork product work', () => {
+  it('leaves bookkeeping and merges out of both counts', () => {
     const commits = [
-      { ...OWNER, subject: 'fix(hosts): one row per peer' },
-      { ...FORK_BOT, subject: 'fix(pi): pane ownership' },
-      { ...OWNER, subject: 'local(review): the manifest' },
-      { ...UPSTREAM, subject: 'fix(jira): a date pill' }
+      { ...OWNER, subject: 'fix(hosts): one row per peer', parents: ['a'] },
+      { ...FORK_BOT, subject: 'fix(pi): pane ownership', parents: ['b'] },
+      { ...OWNER, subject: 'local(review): the manifest', parents: ['c'] },
+      { ...UPSTREAM, subject: 'fix(jira): a date pill', parents: ['d'] },
+      // A merge names no change of its own: the lead reports it, and the groups skip it.
+      { ...UPSTREAM, subject: 'Merge upstream/main into main', parents: ['e', 'f'] }
     ]
 
     expect(countStreams(commits, classify)).toEqual({ forkCount: 2, inheritedCount: 1 })

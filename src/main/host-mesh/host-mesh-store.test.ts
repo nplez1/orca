@@ -153,6 +153,29 @@ describe('the group on disk', () => {
     expect(peerIndex['key-b']).toEqual({ deviceRowIds: 'not-an-array' })
   })
 
+  it('keeps an older entry’s ids minted when a call adds none', () => {
+    // Why: absence of the field is how an entry written before the distinction said "everything here was minted
+    // here". Writing an empty list on the next call would un-mint those rows for good — the sweep would stop
+    // retiring them and Share this computer would list them again.
+    writeFileSync(
+      statePath(),
+      JSON.stringify({
+        version: 1,
+        state: null,
+        peerIndex: { 'key-a': { deviceRowIds: ['row-1', 'row-2'], environmentId: 'env-1' } }
+      }),
+      'utf-8'
+    )
+
+    store().recordPeer('key-a', { environmentId: 'env-2' })
+
+    expect(store().readPeerIndex().get('key-a')).toEqual({
+      deviceRowIds: ['row-1', 'row-2'],
+      mintedRowIds: ['row-1', 'row-2'],
+      environmentId: 'env-2'
+    })
+  })
+
   it('keeps the index across a state write, and forgets a peer', () => {
     store().recordPeer('key-a', { deviceRowId: 'row-1', environmentId: 'env-1' })
     store().write(groupState())

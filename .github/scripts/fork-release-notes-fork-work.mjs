@@ -32,9 +32,12 @@ export function isBookkeepingGroup(group) {
   return group === 'local' || group === 'chore'
 }
 
-/** Fork and inherited commit counts over the product changes, leaving bookkeeping out of both. */
+/** Fork and inherited commit counts over the product changes, leaving bookkeeping and merges out. */
 export function countStreams(commits, classify) {
-  const product = commits.filter((commit) => !isBookkeepingGroup(classify(commit.subject).group))
+  const product = commits.filter(
+    (commit) =>
+      (commit.parents?.length ?? 1) === 1 && !isBookkeepingGroup(classify(commit.subject).group)
+  )
   const forkCount = product.filter(isForkCommit).length
   return { forkCount, inheritedCount: product.length - forkCount }
 }

@@ -215,7 +215,10 @@ export function createHostMeshStore({ userDataPath }: { userDataPath: string }):
         const held = isRecord(raw) ? raw : {}
         const known = peerEntrySchema.safeParse(raw)
         const deviceRowIds = known.success ? known.data.deviceRowIds : []
-        const mintedRowIds = known.success ? (known.data.mintedRowIds ?? []) : []
+        // Why deviceRowIds when the field is absent: absence means the entry predates the distinction, and every
+        // reader treats such an entry's ids as minted. Seeding keeps that meaning; writing an empty list would
+        // un-mint rows that must still be swept, and they would never be retired again.
+        const mintedRowIds = known.success ? (known.data.mintedRowIds ?? deviceRowIds) : []
         const environmentId = known.success ? known.data.environmentId : null
         const redeemedLabel =
           entry.redeemedLabel ?? (known.success ? known.data.redeemedLabel : null)
@@ -266,7 +269,7 @@ export function createHostMeshStore({ userDataPath }: { userDataPath: string }):
           const held = isRecord(raw) ? raw : {}
           const ids = Array.isArray(held.deviceRowIds) ? held.deviceRowIds : []
           const remaining = ids.filter((id) => typeof id !== 'string' || !deviceRowIds.has(id))
-          const minted = Array.isArray(held.mintedRowIds) ? held.mintedRowIds : []
+          const minted = Array.isArray(held.mintedRowIds) ? held.mintedRowIds : ids
           const mintedRemaining = minted.filter(
             (id) => typeof id !== 'string' || !deviceRowIds.has(id)
           )
