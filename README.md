@@ -37,6 +37,8 @@ Orca NP is [stablyai/orca](https://github.com/stablyai/orca) plus a series of fo
 
 ### Tasks, issues, and Jira
 
+- **Right-click a Jira row or card for its actions** — any board, list or lane, with the same menu on the keyboard path, so Show and Start share one rule rather than drifting per surface.
+- **Split headers for several issues** — a workspace can hold more than one issue; the issue pane's identifier lists every attached one (provider mark, identifier, title) and switches which the pane describes. The choice is the pane's view, not the workspace's active link, so switching across providers never unlinks a sibling.
 - **Several Jira boards, switched from the Tasks view** — keep a set of boards and switch between them in the Tasks source bar instead of going back to Settings. The tab shows columns, the active sprint, and the backlog, with drag-to-move between columns, a filter box, and priority colors — and each board keeps its own view mode, sprint/backlog tab, filter and typed query. Settings → Tasks → Jira board view becomes add/remove/reorder with search across every connected site, and an empty set means every board your account can reach. The board on screen is derived on each render, so a site that is briefly unreachable never rewrites the selection, and the board cache holds six.
 - **A card move moves the ticket** — the board's sync setting used to understand only Linear, so a workspace linked to a Jira issue drifted from its ticket. A card move now applies the transition that reaches the card's column (by destination status, then by the project's column of that name), skips when the issue already holds it, and reports a transition whose screen requires fields instead of submitting it.
 - **The Jira list pages instead of stopping at 50** — a large project reports that its list was truncated and offers Load more issues when one cursor can reach the remainder, and a paired host on an older build is probed rather than silently re-serving page one.
@@ -53,7 +55,9 @@ Orca NP is [stablyai/orca](https://github.com/stablyai/orca) plus a series of fo
 - **Merge readiness at a glance** — the PR icon keeps its CI color and adds a dot for outstanding approvals, conflicts, or blocks, with the reason in the tooltip. Works across GitHub, GitLab, Bitbucket, Azure DevOps, and Gitea.
 - **Review verdicts in the Checks panel** — Approved / Changes requested with reviewer names, and the panel updates when CI changes instead of waiting for a tab switch.
 - **A live Checks panel** — while a run is in flight an open panel refreshes every 10s instead of waiting out the review cadence, slowing to 20s and then 30s while nothing changes, and its verdict updates the sidebar card and activity-bar icons (GitHub).
+- **Split headers for several reviews** — a workspace can hold more than one review attachment; the Checks pane's review number and the Source Control header's link each list every review it holds (`PR #12` / `MR !7`, with the title) and switching drives what the pane reads, not just the label.
 - **Jenkins build details** — expand a Jenkins check to see its stages, which one is running or failed, and the build facts.
+- **Rerun Jenkins builds from the Checks surface** — Jenkins is a read-only source for most of the Checks panel, but its failed checks now carry a write verb too, so Rerun posts a real Jenkins build request instead of answering "no failed GitHub Actions checks".
 - **Admin merge for review-gated PRs** — if your account may bypass branch protection, Merge is offered after a confirmation that names what gets skipped.
 
 ### Agents
@@ -79,6 +83,10 @@ Orca NP is [stablyai/orca](https://github.com/stablyai/orca) plus a series of fo
 ### Workspaces and layout
 
 - **One folder per project** — the main checkout and all its worktrees live together under one folder with a shared `AGENTS.md`; `orca repo relocate` moves existing checkouts into it.
+- **Nested clones and creates** — Nest Workspaces puts the primary checkout at `<destination>/<project>/<branch>` for a clone or a create, not beside the project folder, so a project's main branch is a sibling of the worktrees that land in the same folder, and the destination defaults to the workspace directory.
+- **Add a project or workspace to another host** — a project's context menu adds it to a host that does not have it yet (import, clone or placeholder through the existing add flow), and a workspace's menu opens the composer with the project and branch implied and the host as the only choice — never the host it already lives on.
+- **Delete a branch with the workspace** — the delete dialog can remove the remote branch too, off unless you check it (a setting only pre-checks the box), and it reports what happened: deleted, already absent, no upstream, skipped because the local branch was kept, or failed with Git's own text.
+- **Links open where you chose** — a link in a panel now goes through your open-links-in-app preference instead of straight to the OS browser, including `target=_blank` anchors and bridge calls from a rendered panel; a popout or space window still opens the system browser, and an existing profile's old default is migrated once.
 - **Grouped workspaces across machines** — the same branch on two hosts becomes one card with a host dropdown. A workspace on a paired host reads its GitHub issue and PR from that host, and its status dot stops spinning once the host's agents finish.
 - **Paired clients stay in step** — projects and workspaces a host adds or removes, including ones created in that host's own window or from its CLI, reach its paired clients without a manual refresh.
 - **Status filter** — hide chosen statuses from the sidebar and Cmd+J while the board still shows everything.
