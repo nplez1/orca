@@ -16,15 +16,26 @@ export function registerSetupRunnerIpcBridge(unsubs: (() => void)[]): void {
   if (!onSetupRunnerStateChanged) {
     return
   }
+  let active = true
   const applyRunning = (event: { worktreeId: string; running: boolean }): void => {
     useAppStore.getState().setWorktreeSetupRunning(event.worktreeId, event.running)
   }
-  unsubs.push(onSetupRunnerStateChanged(applyRunning))
-  void runtime.getSetupRunnerState().then((events) => {
-    for (const event of events) {
-      if (event.type === 'worktreeSetupRunnerState') {
-        applyRunning(event)
-      }
-    }
+  const unsubscribe = onSetupRunnerStateChanged(applyRunning)
+  unsubs.push(() => {
+    active = false
+    unsubscribe()
   })
+  void runtime.getSetupRunnerState().then(
+    (events) => {
+      if (!active) {
+        return
+      }
+      for (const event of events) {
+        if (event.type === 'worktreeSetupRunnerState') {
+          applyRunning(event)
+        }
+      }
+    },
+    () => {}
+  )
 }

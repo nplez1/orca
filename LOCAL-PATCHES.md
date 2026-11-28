@@ -89,8 +89,9 @@ Upstream's `worktreeSetupRunnerState` client event reaches paired environments a
 but a local window is not a runtime environment: the renderer's client-event bridge never subscribes
 for it, and the window's own fan-out forwards only the two event types it has IPC for. Issue #87 is
 that gap — the sidebar of the machine running a repo's setup script never showed "Setting up…",
-whichever create flow started it. The relay is fork-owned so a sync keeps it; if upstream ports the
-state to a local channel of its own, both can go.
+whichever create flow started it. The relay is fork-owned so a sync keeps it; it also owns the two
+notices upstream forwards in that file, so a sync that restores upstream's block would deliver those
+twice. If upstream ports the state to a local channel of its own, both can go.
 
 ### `local(updater)`: point the update feed at this fork
 

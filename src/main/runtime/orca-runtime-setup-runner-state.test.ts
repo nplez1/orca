@@ -54,6 +54,16 @@ function observationPorts(recentOutput: string) {
 
 // Whether the marker arrived before or after the observer attached, the arm ends on its own
 // token — and only once, so a replayed buffer cannot clear a later runner's state.
+it('detaches its own scanner when the replayed output ends the runner first', () => {
+  const { listeners, ports } = observationPorts(`installing\n${setupMarker('tok')}`)
+
+  const unsubscribe = observeSetupRunnerEnd('pty-1', 'tok', ports)
+
+  expect(ports.onEnd).toHaveBeenCalledTimes(1)
+  expect(listeners.size).toBe(0)
+  unsubscribe()
+})
+
 it('ends on a setup marker that arrived before the observer attached, and only once', () => {
   const { listeners, ports } = observationPorts(`installing\n${setupMarker('tok')}`)
 

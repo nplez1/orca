@@ -42,11 +42,16 @@ export function observeSetupRunnerEnd(
   ports: SetupRunnerEndPorts
 ): () => void {
   let ended = false
+  let unsubscribe: () => void = () => {}
   const end = (): void => {
     if (ended) {
       return
     }
     ended = true
+    // Why here as well as in the caller: the replay below can end the runner
+    // before the caller has its unsubscribe, and the scanner would stay attached
+    // to a terminal the user keeps working in.
+    unsubscribe()
     ports.onEnd()
   }
   const scanCompletion = createSetupCompletionScanner(completionToken, end).scan
@@ -55,13 +60,15 @@ export function observeSetupRunnerEnd(
     scanCommandFinished(data)
     scanCompletion(data)
   }
-  const unsubscribe = ports.subscribeToTerminalData(ptyId, scanOutput)
+  unsubscribe = ports.subscribeToTerminalData(ptyId, scanOutput)
   // Why replay: a fast setup prints its marker before the observer is attached.
   const replay = ports.readRecentOutput(ptyId)
   if (replay) {
     scanOutput(replay)
   }
-  return unsubscribe
+  return () => {
+    unsubscribe()
+  }
 }
 
 /**
