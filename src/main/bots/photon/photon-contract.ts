@@ -49,7 +49,8 @@ export const PhotonProjectSchema = lazyZodSchema(() =>
       organizationId: NonEmpty
     })
     .transform((project, ctx) => {
-      const id = project.id ?? project.projectId
+      // Photon's own answer, preferred over the docs' name when both arrive.
+      const id = project.projectId ?? project.id
       if (!id) {
         ctx.addIssue({ code: 'custom', path: ['id'], message: 'Neither id nor projectId' })
         return z.NEVER
