@@ -19,6 +19,12 @@ const STORAGE_KEY = 'orca.jira.board-view.v1'
 const BY_BOARD_STORAGE_KEY = 'orca.jira.board-view.by-board.v1'
 const SELECTION_STORAGE_KEY = 'orca.jira.board-selection.v1'
 
+export type JiraBoardDevicePick = {
+  selection: JiraBoardSelection
+  /** Picked while a curated set was in force, so removing every saved board hides it. */
+  curated: boolean
+}
+
 function readJson(key: string): unknown {
   try {
     const raw = localStorage.getItem(key)
@@ -130,9 +136,9 @@ export function saveJiraBoardViewPreferences(
   const boards = { ...payload.boards }
   // Re-insert so write order stays recency order for the cap below.
   delete boards[boardKey]
-  const scoped = isDefaultJiraBoardViewPreferences(preferences)
-    ? undefined
-    : normalizeJiraBoardScopedViewPreferences(preferences)
+  // Why an entry even at the defaults: without it the board would inherit whatever board was
+  // used next, and switching back would silently adopt another board's tab and filter.
+  const scoped = normalizeJiraBoardScopedViewPreferences(preferences)
   if (scoped) {
     boards[boardKey] = scoped
   }
@@ -149,15 +155,22 @@ export function updateJiraBoardViewPreferences(
   saveJiraBoardViewPreferences({ ...loadJiraBoardViewPreferences(boardKey), ...updates }, boardKey)
 }
 
-/** The board this device last picked in the Tasks switcher. A device preference, not a setting:
- *  the curated set is the user's, but which board is open belongs to this machine. */
-export function loadLastSelectedJiraBoard(): JiraBoardSelection | null {
-  return normalizeJiraBoardSelection(readJson(SELECTION_STORAGE_KEY))
+/** The board this device last picked in the Tasks switcher, and whether it was picked from a
+ *  curated set (a setting, so the pick must not outlive the board being removed from it). A
+ *  device preference, not a setting: the curated set is the user's, but which board is open
+ *  belongs to this machine. */
+export function loadJiraBoardDevicePick(): JiraBoardDevicePick | null {
+  const raw = readJson(SELECTION_STORAGE_KEY)
+  const selection = normalizeJiraBoardSelection(raw)
+  if (!selection) {
+    return null
+  }
+  return { selection, curated: isPlainObject(raw) && raw.curated === true }
 }
 
-export function saveLastSelectedJiraBoard(selection: JiraBoardSelection | null): void {
-  const normalized = normalizeJiraBoardSelection(selection)
-  if (!normalized) {
+export function saveJiraBoardDevicePick(pick: JiraBoardDevicePick | null): void {
+  const selection = pick ? normalizeJiraBoardSelection(pick.selection) : null
+  if (!pick || !selection) {
     try {
       localStorage.removeItem(SELECTION_STORAGE_KEY)
     } catch {
@@ -165,5 +178,5 @@ export function saveLastSelectedJiraBoard(selection: JiraBoardSelection | null):
     }
     return
   }
-  writeJson(SELECTION_STORAGE_KEY, normalized)
+  writeJson(SELECTION_STORAGE_KEY, { ...selection, curated: pick.curated })
 }

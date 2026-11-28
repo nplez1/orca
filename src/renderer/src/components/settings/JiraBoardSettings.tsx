@@ -1,11 +1,13 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { ChevronDown, ChevronUp, X } from 'lucide-react'
 import { toast } from 'sonner'
 import type { GlobalSettings } from '../../../../shared/settings/global-settings-types'
+import { runtimeHostIdFromEnvironmentId } from '../../../../shared/work-items/task-source-context'
 import type { JiraBoardSelection } from '../../../../shared/jira/jira-types'
 import {
   addJiraBoardSelection,
   connectedJiraSiteIds,
+  describeJiraBoardSelections,
   effectiveJiraBoardSet,
   jiraBoardSelectionKey,
   jiraBoardSettingsWrite,
@@ -17,7 +19,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { useAppStore } from '@/store'
 import { useTranslate } from '@/i18n/use-translate'
-import { useJiraBoardRuntimeSettings, useJiraBoardSearch } from '../jira-board-search'
+import { useJiraBoardRuntimeSettingsForHost, useJiraBoardSearch } from '../jira-board-search'
 import { SearchableSetting } from './section-layout/SearchableSetting'
 import { boardOptionValue, buildJiraBoardOptions } from './jira-settings-combobox-options'
 import { SettingsCombobox } from './SettingsCombobox'
@@ -27,10 +29,6 @@ type JiraBoardSettingsProps = {
   settings: GlobalSettings
   /** The throwing variant: a board that does not persist has to say so, not log and revert. */
   updateSettingsOrThrow: (updates: Partial<GlobalSettings>) => Promise<void>
-}
-
-function boardLabel(selection: JiraBoardSelection): string {
-  return selection.name?.trim() || selection.boardId
 }
 
 export function JiraBoardSettings({
@@ -43,15 +41,14 @@ export function JiraBoardSettings({
   useEffect(() => {
     void checkJiraConnection()
   }, [checkJiraConnection])
-  const runtimeSettings = useJiraBoardRuntimeSettings(settings)
+  // Why the focused host: this pane edits that host's own settings, so it owns the boards listed
+  // here (same rule as the settings host scope). The Tasks switcher routes by its page's host.
+  const boardOwnerHostId = runtimeHostIdFromEnvironmentId(settings.activeRuntimeEnvironmentId)
+  const runtimeSettings = useJiraBoardRuntimeSettingsForHost(boardOwnerHostId)
   // Why every site: a set spans sites, so the picker must find a board on any connected account.
   const search = useJiraBoardSearch({ runtimeSettings, siteId: 'all' })
   const savedBoards = useMemo(() => effectiveJiraBoardSet(settings), [settings])
   const connectedSiteIds = useMemo(() => connectedJiraSiteIds(jiraStatus, true), [jiraStatus])
-  const siteNames = useMemo(
-    () => new Map((jiraStatus.sites ?? []).map((site) => [site.id, site.displayName])),
-    [jiraStatus.sites]
-  )
   const savedKeys = useMemo(
     () => new Set((savedBoards ?? []).map((selection) => jiraBoardSelectionKey(selection))),
     [savedBoards]
@@ -79,6 +76,29 @@ export function JiraBoardSettings({
       ),
     [savedKeys, search.boards]
   )
+  // Why one description pass: the rows and the switcher must agree on names and on what counts
+  // as unreachable, and deriving it twice is how the two drift apart.
+  const savedRows = useMemo(
+    () =>
+      describeJiraBoardSelections({
+        selections: savedBoards ?? [],
+        sites: jiraStatus.sites ?? [],
+        connectedSiteIds
+      }).map((option) => ({
+        ...option,
+        label:
+          liveNames.get(
+            boardOptionValue({ siteId: option.selection.siteId, id: option.selection.boardId })
+          ) ?? option.label
+      })),
+    [connectedSiteIds, jiraStatus.sites, liveNames, savedBoards]
+  )
+  // Why a ref: the store mirrors a write only once it lands, so two quick edits both computed
+  // from the same stale set, and the second silently undid the first.
+  const pendingSetRef = useRef<JiraBoardSelection[] | null | undefined>(undefined)
+  useEffect(() => {
+    pendingSetRef.current = undefined
+  }, [savedBoards])
   // Why: the store only mirrors a settings write once it lands, so a rejected write leaves the
   // list on the old set — and without this the user never learns the change did not stick.
   const saveSet = (next: JiraBoardSelection[] | null): void => {
@@ -88,17 +108,21 @@ export function JiraBoardSettings({
       )
       return liveName && liveName !== selection.name ? { ...selection, name: liveName } : selection
     })
+    pendingSetRef.current = refreshed ?? null
     void updateSettingsOrThrow(jiraBoardSettingsWrite(refreshed ?? null)).catch(() => {
+      pendingSetRef.current = undefined
       toast.error(t('sessionHistory.settings.saveError', 'Could not save. Try again.'))
     })
   }
+  const currentSet = (): JiraBoardSelection[] | null =>
+    pendingSetRef.current === undefined ? savedBoards : pendingSetRef.current
   const addBoard = (value: string): void => {
     const board = search.boards.find((candidate) => boardOptionValue(candidate) === value)
     const selection = normalizeJiraBoardSelection(
       board ? { boardId: board.id, siteId: board.siteId, name: board.name } : null
     )
     if (selection) {
-      saveSet(addJiraBoardSelection(savedBoards, selection))
+      saveSet(addJiraBoardSelection(currentSet(), selection))
     }
   }
 
@@ -115,28 +139,20 @@ export function JiraBoardSettings({
         <div className="max-w-md space-y-3">
           {savedBoards ? (
             <ul className="space-y-1" aria-label={t('jira.settings.savedBoards', 'Saved boards')}>
-              {savedBoards.map((selection, index) => {
-                const key = jiraBoardSelectionKey(selection)
-                const label =
-                  liveNames.get(
-                    boardOptionValue({ siteId: selection.siteId, id: selection.boardId })
-                  ) ?? boardLabel(selection)
-                const siteName = siteNames.get(selection.siteId)
-                const unreachable = Boolean(
-                  connectedSiteIds && !connectedSiteIds.has(selection.siteId)
-                )
+              {savedRows.map((row, index) => {
+                const key = jiraBoardSelectionKey(row.selection)
                 return (
                   <li
                     key={key}
                     className="flex items-center gap-1 rounded-md border border-border/50 bg-muted/30 py-1 pl-2 pr-1 text-xs"
                   >
                     <span className="min-w-0 flex-1 truncate">
-                      {label}
-                      {siteName ? (
-                        <span className="text-muted-foreground"> · {siteName}</span>
+                      {row.label}
+                      {row.siteLabel ? (
+                        <span className="text-muted-foreground"> · {row.siteLabel}</span>
                       ) : null}
                     </span>
-                    {unreachable ? (
+                    {row.stale ? (
                       <span className="shrink-0 text-muted-foreground">
                         {t('jira.settings.siteNotConnected', 'Site not connected')}
                       </span>
@@ -146,10 +162,10 @@ export function JiraBoardSettings({
                       variant="ghost"
                       size="icon-sm"
                       aria-label={t('jira.settings.moveBoardUp', 'Move {{name}} up', {
-                        name: boardLabel(selection)
+                        name: row.label
                       })}
                       disabled={index === 0}
-                      onClick={() => saveSet(moveJiraBoardSelection(savedBoards, key, -1))}
+                      onClick={() => saveSet(moveJiraBoardSelection(currentSet() ?? [], key, -1))}
                     >
                       <ChevronUp />
                     </Button>
@@ -158,10 +174,10 @@ export function JiraBoardSettings({
                       variant="ghost"
                       size="icon-sm"
                       aria-label={t('jira.settings.moveBoardDown', 'Move {{name}} down', {
-                        name: boardLabel(selection)
+                        name: row.label
                       })}
-                      disabled={index === savedBoards.length - 1}
-                      onClick={() => saveSet(moveJiraBoardSelection(savedBoards, key, 1))}
+                      disabled={index === savedRows.length - 1}
+                      onClick={() => saveSet(moveJiraBoardSelection(currentSet() ?? [], key, 1))}
                     >
                       <ChevronDown />
                     </Button>
@@ -170,10 +186,10 @@ export function JiraBoardSettings({
                       variant="ghost"
                       size="icon-sm"
                       aria-label={t('jira.settings.removeBoard', 'Remove {{name}}', {
-                        name: boardLabel(selection)
+                        name: row.label
                       })}
                       onClick={() => {
-                        const next = removeJiraBoardSelection(savedBoards, key)
+                        const next = removeJiraBoardSelection(currentSet() ?? [], key)
                         // Why null and not an empty list: an empty set offers nothing to switch
                         // to, so removing the last board returns the switcher to every board.
                         saveSet(next.length > 0 ? next : null)

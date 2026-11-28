@@ -150,6 +150,30 @@ describe('JiraBoardSettings', () => {
     })
   })
 
+  it('does not undo a removal when two edits land before the store echoes the first', async () => {
+    const user = userEvent.setup()
+    mocks.jiraListBoards.mockResolvedValue([])
+    const updateSettings = vi.fn().mockResolvedValue(undefined)
+    const settings = createGlobalSettingsFixture({
+      defaultJiraBoards: [
+        { boardId: '42', siteId: 'site-1', name: 'Payments' },
+        { boardId: '7', siteId: 'site-1', name: 'Platform' }
+      ],
+      defaultJiraBoard: { boardId: '42', siteId: 'site-1', name: 'Payments' }
+    })
+
+    render(<JiraBoardSettings settings={settings} updateSettingsOrThrow={updateSettings} />)
+
+    await user.click(screen.getByRole('button', { name: 'Remove Payments' }))
+    await user.click(screen.getByRole('button', { name: 'Remove Platform' }))
+
+    // Why: computed from the original prop, the second write would be [Payments] — a resurrection.
+    expect(updateSettings).toHaveBeenLastCalledWith({
+      defaultJiraBoards: null,
+      defaultJiraBoard: null
+    })
+  })
+
   it('reorders the saved boards', async () => {
     const user = userEvent.setup()
     mocks.jiraListBoards.mockResolvedValue([])

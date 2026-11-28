@@ -2,10 +2,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { defaultJiraBoardViewPreferences } from '../../../shared/jira-board-view-preferences'
 import {
+  loadJiraBoardDevicePick,
   loadJiraBoardViewPreferences,
-  loadLastSelectedJiraBoard,
+  saveJiraBoardDevicePick,
   saveJiraBoardViewPreferences,
-  saveLastSelectedJiraBoard,
   updateJiraBoardViewPreferences
 } from './jira-board-view-storage'
 
@@ -134,16 +134,23 @@ describe('Jira board view preferences per board', () => {
     })
   })
 
-  it('drops a board entry that returns to the defaults instead of pinning them', () => {
+  it('keeps a board own entry even when it is back at the defaults', () => {
     saveJiraBoardViewPreferences(
-      { viewMode: 'list', activeView: 'sprint', filter: 'me', query: '' },
+      { viewMode: 'list', activeView: 'sprint', filter: 'all', query: 'payments' },
       payments
     )
     saveJiraBoardViewPreferences(defaultJiraBoardViewPreferences(), payments)
+    // Why: another board's filter must not leak in once this one is back at the defaults.
+    saveJiraBoardViewPreferences(
+      { ...defaultJiraBoardViewPreferences(), filter: 'all', query: 'platform' },
+      platform
+    )
 
-    expect(JSON.parse(localStorage.getItem(BY_BOARD_KEY) ?? '{}')).toEqual({
-      migrated: true,
-      boards: {}
+    expect(loadJiraBoardViewPreferences(payments)).toEqual(defaultJiraBoardViewPreferences())
+    expect(loadJiraBoardViewPreferences(platform)).toEqual({
+      ...defaultJiraBoardViewPreferences(),
+      filter: 'all',
+      query: 'platform'
     })
   })
 
@@ -165,27 +172,30 @@ describe('Jira board view preferences per board', () => {
   })
 
   it('round-trips the board this device last picked and clears it', () => {
-    saveLastSelectedJiraBoard({ boardId: '42', siteId: 'site-1', name: 'Payments' })
+    saveJiraBoardDevicePick({
+      selection: { boardId: '42', siteId: 'site-1', name: 'Payments' },
+      curated: true
+    })
 
-    expect(loadLastSelectedJiraBoard()).toEqual({
-      boardId: '42',
-      siteId: 'site-1',
-      name: 'Payments'
+    expect(loadJiraBoardDevicePick()).toEqual({
+      selection: { boardId: '42', siteId: 'site-1', name: 'Payments' },
+      curated: true
     })
     expect(JSON.parse(localStorage.getItem(SELECTION_KEY) ?? 'null')).toEqual({
       boardId: '42',
       siteId: 'site-1',
-      name: 'Payments'
+      name: 'Payments',
+      curated: true
     })
 
-    saveLastSelectedJiraBoard(null)
-    expect(loadLastSelectedJiraBoard()).toBeNull()
+    saveJiraBoardDevicePick(null)
+    expect(loadJiraBoardDevicePick()).toBeNull()
     expect(localStorage.getItem(SELECTION_KEY)).toBeNull()
   })
 
   it('ignores a stored pick that is not a board', () => {
     localStorage.setItem(SELECTION_KEY, JSON.stringify({ boardId: '', siteId: 'site-1' }))
 
-    expect(loadLastSelectedJiraBoard()).toBeNull()
+    expect(loadJiraBoardDevicePick()).toBeNull()
   })
 })

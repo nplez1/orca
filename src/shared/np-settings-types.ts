@@ -28,6 +28,6 @@ export type NpSettings = {
    *  separately, so the set stays a curated list rather than a selection. */
   defaultJiraBoards?: JiraBoardSelection[] | null
   /** Legacy single board, still written as the first of `defaultJiraBoards` so older builds and
-   *  replicated hosts keep showing a board. Also the issue-list fallback when the set is empty. */
+   *  replicated hosts keep showing a board. With no set it is also the one board that shows. */
   defaultJiraBoard: JiraBoardSelection | null
 } & OrcaWorkspaceLayoutSettings

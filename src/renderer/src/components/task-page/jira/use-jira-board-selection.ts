@@ -9,7 +9,8 @@ import {
   resolveJiraSelectedBoard
 } from '../../../../../shared/jira/jira-board-selection'
 import type { GlobalSettings } from '../../../../../shared/settings/global-settings-types'
-import { loadLastSelectedJiraBoard, saveLastSelectedJiraBoard } from '../../jira-board-view-storage'
+import { loadJiraBoardDevicePick, saveJiraBoardDevicePick } from '../../jira-board-view-storage'
+import type { JiraBoardDevicePick } from '../../jira-board-view-storage'
 
 type JiraBoardSelectionSource = {
   settings: Pick<GlobalSettings, 'defaultJiraBoards' | 'defaultJiraBoard'> | null | undefined
@@ -34,9 +35,7 @@ export type JiraBoardSelectionModel = {
  *  this device last opened is a preference. Writing the resolved board into either would turn a
  *  temporary condition (a site that is briefly unreachable) into a permanent choice. */
 export function useJiraBoardSelection(model: JiraBoardSelectionSource): JiraBoardSelectionModel {
-  const [lastSelected, setLastSelected] = useState<JiraBoardSelection | null>(
-    loadLastSelectedJiraBoard
-  )
+  const [pick, setPick] = useState<JiraBoardDevicePick | null>(loadJiraBoardDevicePick)
   const savedBoardsSetting = model.settings?.defaultJiraBoards
   const legacyBoardSetting = model.settings?.defaultJiraBoard
   const savedBoards = useMemo(
@@ -52,13 +51,25 @@ export function useJiraBoardSelection(model: JiraBoardSelectionSource): JiraBoar
     [model.jiraStatus, model.jiraStatusReady]
   )
   const jiraSelectedBoard = useMemo(
-    () => resolveJiraSelectedBoard({ savedBoards, lastSelected, connectedSiteIds }),
-    [savedBoards, lastSelected, connectedSiteIds]
+    () =>
+      resolveJiraSelectedBoard({
+        savedBoards,
+        lastSelected: pick?.selection ?? null,
+        lastSelectedFromCuratedSet: pick?.curated ?? false,
+        connectedSiteIds
+      }),
+    [connectedSiteIds, pick, savedBoards]
   )
-  const selectJiraBoard = useCallback((selection: JiraBoardSelection | null): void => {
-    setLastSelected(selection)
-    saveLastSelectedJiraBoard(selection)
-  }, [])
+  // Why the curated flag: a pick made from a curated set belongs to that set, so removing the
+  // last saved board (sticky-all again) must not bring a removed board back.
+  const selectJiraBoard = useCallback(
+    (selection: JiraBoardSelection | null): void => {
+      const next = selection ? { selection, curated: savedBoards !== null } : null
+      setPick(next)
+      saveJiraBoardDevicePick(next)
+    },
+    [savedBoards]
+  )
   return {
     jiraSavedBoards: savedBoards,
     jiraSelectedBoard,

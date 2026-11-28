@@ -120,12 +120,17 @@ export function connectedJiraSiteIds(
 export function resolveJiraSelectedBoard(input: {
   savedBoards: JiraBoardSelection[] | null
   lastSelected: JiraBoardSelection | null
+  /** The pick was made from a curated set, so it must not outlive every board being removed. */
+  lastSelectedFromCuratedSet?: boolean
   connectedSiteIds: ReadonlySet<string> | null
 }): JiraBoardSelection | null {
   const reachable = (selection: JiraBoardSelection): boolean =>
     !input.connectedSiteIds || input.connectedSiteIds.has(selection.siteId)
   if (!input.savedBoards) {
-    return input.lastSelected && reachable(input.lastSelected) ? input.lastSelected : null
+    const remembersSavedSet = input.lastSelectedFromCuratedSet === true
+    return input.lastSelected && !remembersSavedSet && reachable(input.lastSelected)
+      ? input.lastSelected
+      : null
   }
   const available = input.savedBoards.filter(reachable)
   const rememberedKey = input.lastSelected ? jiraBoardSelectionKey(input.lastSelected) : null

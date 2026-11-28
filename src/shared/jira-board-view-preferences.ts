@@ -80,8 +80,8 @@ export function isDefaultJiraBoardViewPreferences(preferences: JiraBoardViewPref
   )
 }
 
-/** One board's own choices. Only the fields the user actually changed are stored, so a board
- *  added later still follows the device's habits for everything it did not set. */
+/** One board's own choices. A write stores the whole view so a board back at the defaults keeps
+ *  its own entry instead of inheriting the next board's tab and filter. */
 export type JiraBoardScopedViewPreferences = Partial<JiraBoardViewPreferences>
 
 export type JiraBoardViewPreferencesByBoard = {

@@ -15,7 +15,7 @@ import {
   jiraBoardSelectionKey,
   jiraBoardSelectionsFromBoards
 } from '../../../../../shared/jira/jira-board-selection'
-import { useJiraBoardRuntimeSettings, useJiraBoardSearch } from '../../jira-board-search'
+import { useJiraBoardRuntimeSettingsForHost, useJiraBoardSearch } from '../../jira-board-search'
 import type { TaskPageComposerActionsModel } from '../use-task-page-composer-actions'
 
 /**
@@ -39,16 +39,29 @@ export function TaskPageJiraBoardSwitcher({
     jiraConnectedSiteIds,
     jiraSites,
     selectJiraBoard,
-    settings
+    jiraTaskSourceContext,
+    accountBackedTaskSourceHostId
   } = model
   const [open, setOpen] = useState(false)
-  const runtimeSettings = useJiraBoardRuntimeSettings(settings)
+  // Why the page's own host and not the settings focus: the board loads through this host, so a
+  // list from anywhere else would offer boards that cannot open.
+  const runtimeSettings = useJiraBoardRuntimeSettingsForHost(
+    jiraTaskSourceContext?.hostId ?? accountBackedTaskSourceHostId
+  )
   // Why only when open: a device that keeps a curated set must not query Jira on every render.
   const search = useJiraBoardSearch({
     runtimeSettings,
     siteId: 'all',
     enabled: open && jiraSavedBoards === null
   })
+  const { setQuery } = search
+  const handleOpenChange = (nextOpen: boolean): void => {
+    setOpen(nextOpen)
+    if (!nextOpen) {
+      // Why: the server searched for the last query, so reopening must start from a clean field.
+      setQuery('')
+    }
+  }
   const options = useMemo(() => {
     const saved = jiraSavedBoards ?? jiraBoardSelectionsFromBoards(search.boards)
     // Why keep the open board in the list: under sticky-all the fetched page may not contain it,
@@ -79,13 +92,15 @@ export function TaskPageJiraBoardSwitcher({
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           type="button"
           variant="outline"
           size="sm"
-          aria-label={t('jira.board.switcher', 'Jira board')}
+          aria-label={`${t('jira.board.switcher', 'Jira board')}: ${
+            currentLabel ?? t('jira.board.chooseBoard', 'Choose board')
+          }`}
           className="w-[200px] justify-between"
         >
           <span className="min-w-0 truncate">
@@ -106,7 +121,7 @@ export function TaskPageJiraBoardSwitcher({
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-72">
-        <Command shouldFilter={jiraSavedBoards === null}>
+        <Command shouldFilter={jiraSavedBoards !== null}>
           <CommandInput
             placeholder={t('jira.board.searchBoards', 'Search boards...')}
             onValueChange={search.setQuery}
@@ -134,12 +149,12 @@ export function TaskPageJiraBoardSwitcher({
               return (
                 <CommandItem
                   key={key}
-                  value={`${option.label} ${option.siteLabel ?? ''}`}
+                  value={`${option.label} ${option.siteLabel ?? ''} ${key}`}
                   disabled={option.stale}
                   data-current={key === selectedKey ? 'true' : undefined}
                   onSelect={() => {
                     selectJiraBoard(option.selection)
-                    setOpen(false)
+                    handleOpenChange(false)
                   }}
                 >
                   <Check

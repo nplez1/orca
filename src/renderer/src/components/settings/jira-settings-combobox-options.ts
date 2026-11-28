@@ -1,14 +1,15 @@
 import type { JiraBoard, JiraBoardSelection } from '../../../../shared/jira/jira-types'
+import { jiraBoardSelectionKey } from '../../../../shared/jira/jira-board-selection'
 import type { SettingsComboboxOption } from './SettingsCombobox'
 
 export function boardOptionValue(board: Pick<JiraBoard, 'siteId' | 'id'>): string {
-  return `${encodeURIComponent(board.siteId)}:${encodeURIComponent(board.id)}`
+  return jiraBoardSelectionKey({ siteId: board.siteId, boardId: board.id })
 }
 
 export function boardSelectionOptionValue(
   selection: Pick<JiraBoardSelection, 'siteId' | 'boardId'>
 ): string {
-  return `${encodeURIComponent(selection.siteId)}:${encodeURIComponent(selection.boardId)}`
+  return jiraBoardSelectionKey(selection)
 }
 
 /**

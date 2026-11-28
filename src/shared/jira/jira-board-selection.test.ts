@@ -158,6 +158,27 @@ describe('resolving the board that shows', () => {
       })
     ).toBeNull()
   })
+
+  it('does not bring a removed board back once the last saved board is gone', () => {
+    // The pick was made from a curated set, so it belongs to that set, not to sticky-all.
+    expect(
+      resolveJiraSelectedBoard({
+        savedBoards: null,
+        lastSelected: platform,
+        lastSelectedFromCuratedSet: true,
+        connectedSiteIds: null
+      })
+    ).toBeNull()
+    // A pick made while every board was offered is a free choice and does survive.
+    expect(
+      resolveJiraSelectedBoard({
+        savedBoards: null,
+        lastSelected: platform,
+        lastSelectedFromCuratedSet: false,
+        connectedSiteIds: null
+      })
+    ).toEqual(platform)
+  })
 })
 
 describe('describing switcher options', () => {
