@@ -7,21 +7,36 @@
 import type { PhotonApi } from './photon-api'
 import { PhotonApiError } from './photon-api'
 import type { PhotonCursorStore } from './photon-cursor'
-import type { PhotonInbound, PhotonPerson } from './photon-inbound'
+import type { PhotonInbound } from './photon-inbound'
 import { normalisePhotonHandle } from './photon-inbound'
+import { replayPhotonBot } from './photon-inbox-replay'
 import type { PhotonInbox } from './photon-inbox'
 import type { PhotonOutbox } from './photon-outbox'
 import type { PhotonProvisioner, ProvisionOutcome } from './photon-provisioning'
 import type { PhotonSendOutcome, PhotonSendPath } from './photon-send'
 import {
   requirePhotonAccount,
+  requirePhotonLiveProvisionedRecord,
   requirePhotonLiveRecord,
   requirePhotonProjectCredential,
+  requirePhotonProvisionedRecord,
   requirePhotonRecord
 } from './photon-credentials'
 import type { PhotonStreamStatus } from './photon-stream'
 import type { PhotonStreams } from './photon-streams'
-import { photonConnectorRow } from './photon-runtime'
+import {
+  assertPhotonBotHasNoSpectrumChannel,
+  connectPhotonSpectrum,
+  photonHealthTick,
+  photonSendCredential,
+  releasePhotonSpectrumChannel,
+  startPhotonChannels,
+  type PhotonSpectrumConnectResult,
+  type PhotonSpectrumProjectProbe
+} from './photon-credential-modes'
+import type { PhotonSpectrumChannels } from './photon-spectrum-channels'
+import type { PhotonSpectrumSecrets } from './photon-spectrum-secrets'
+import { photonConnectorRow, type PhotonBotConnectorRow } from './photon-runtime'
 import { assertPhotonKeyCanBeStored, photonCanSealSecrets as photonSeals } from './photon-secrets'
 import type { PhotonStore } from './photon-store'
 import type {
@@ -45,6 +60,11 @@ export type PhotonServiceDeps = {
   sendPath: PhotonSendPath
   /** The streams and the tick that keeps them honest. */
   streams: PhotonStreams
+  /** The channels for bots that answer on a Spectrum project the owner already had, and their secrets. */
+  spectrum: PhotonSpectrumChannels
+  spectrumSecrets: PhotonSpectrumSecrets
+  /** Injected so a test proves the refusal paths without a network; production reads the project. */
+  probeSpectrum?: PhotonSpectrumProjectProbe
 }
 
 export type PhotonConnectResult = {
@@ -60,11 +80,7 @@ export type PhotonConnectResult = {
 export type PhotonMemberResult = { handle: string; phoneNumber: string; assignmentId: string }
 
 export class PhotonService {
-  private readonly log: (message: string, ...rest: unknown[]) => void
-
-  constructor(private readonly deps: PhotonServiceDeps) {
-    this.log = (message, ...rest) => console.warn(message, ...rest)
-  }
+  constructor(private readonly deps: PhotonServiceDeps) {}
 
   /** Connect once: the account service key, its organization, and the owner's choice about keeping it.
    *  The key works for this session either way — a toggle that had to be on before anything ran would
@@ -95,6 +111,17 @@ export class PhotonService {
     this.deps.store.holdAccountKeyForSession(accountKey)
   }
 
+  /** Connects a bot to a Spectrum project the owner already has. See `connectPhotonSpectrum` for the
+   *  three refusals and what it writes. */
+  async connectSpectrum(input: {
+    botId: string
+    projectId: string
+    projectSecret: string
+    storesSecret: boolean
+  }): Promise<PhotonSpectrumConnectResult> {
+    return connectPhotonSpectrum(this.deps, input)
+  }
+
   /** Create a bot's project, mint its key, give it a number. Retryable end to end. */
   async createBot(input: {
     botId: string
@@ -106,6 +133,7 @@ export class PhotonService {
     if (input.accountKey) {
       this.holdAccountKey(input.accountKey)
     }
+    await assertPhotonBotHasNoSpectrumChannel(this.deps, input.botId)
     const account = await requirePhotonAccount(this.deps.store)
     const outcome = await this.deps.provisioner.provision({
       botId: input.botId,
@@ -113,13 +141,14 @@ export class PhotonService {
       handle: input.handle,
       account
     })
-    this.startStream(input.botId)
+    // Fire-and-forget: a caller that provisioned a bot should not wait on its socket.
+    void this.deps.streams.start(input.botId)
     return outcome
   }
 
   /** Add someone by creating their assignment — the same call that gives them the number. */
   async addMember(input: { botId: string; handle: string }): Promise<PhotonMemberResult> {
-    const record = await requirePhotonLiveRecord(this.deps.store, input.botId)
+    const record = await requirePhotonLiveProvisionedRecord(this.deps.store, input.botId)
     const credential = await requirePhotonProjectCredential(this.deps.store, input.botId)
     const assignment = await this.deps.provisioner.assign({
       botId: input.botId,
@@ -154,7 +183,7 @@ export class PhotonService {
 
   /** Remove someone by releasing their number. Reversible: adding them again gives it back. */
   async releaseMember(input: { botId: string; handle: string }): Promise<{ released: boolean }> {
-    const record = await requirePhotonLiveRecord(this.deps.store, input.botId)
+    const record = await requirePhotonLiveProvisionedRecord(this.deps.store, input.botId)
     const wanted = normalisePhotonHandle(input.handle)
     const assignment = record.assignments.find(
       (entry) => normalisePhotonHandle(entry.handle) === wanted
@@ -181,8 +210,15 @@ export class PhotonService {
     return { released: true }
   }
 
-  /** Deleting a bot releases its numbers and revokes its key. It never deletes the Photon project. */
+  /** Deleting a bot releases its numbers and revokes its key, for a bot on an Orca-provisioned project.
+   *  A bot on the owner's own Spectrum project has neither: Orca stops reading and forgets the sealed
+   *  secret, and the project, its lines and its secret stay exactly as the owner left them. It never
+   *  deletes the Photon project. */
   async deleteBot(botId: string): Promise<PhotonReleaseOutcome> {
+    const spectrumRelease = await releasePhotonSpectrumChannel(this.deps, botId)
+    if (spectrumRelease) {
+      return spectrumRelease
+    }
     // Recorded as released before anything can fail, so a half-finished teardown is retried by the
     // health tick instead of leaving a live stream on a bot that no longer exists.
     // Inside the queue: a `member.add` in flight would otherwise write its stale record back with
@@ -190,7 +226,7 @@ export class PhotonService {
     await this.deps.store.updateBot(botId, (current) =>
       current.released ? null : { ...current, released: true, releasedAt: Date.now() }
     )
-    this.stopStream(botId)
+    this.deps.streams.stop(botId)
     return this.deps.teardown.releaseBot({
       botId,
       account: (await requirePhotonAccount(this.deps.store)).credential
@@ -204,14 +240,14 @@ export class PhotonService {
   }): Promise<PhotonProjectDeletionOutcome> {
     // Validated before the stream is touched: a typo in the slug or a missing account key must not
     // leave the bot deaf until the next restart.
-    const record = await requirePhotonRecord(this.deps.store, input.botId)
+    const record = await requirePhotonProvisionedRecord(this.deps.store, input.botId)
     if (input.confirmSlug !== record.slug) {
       throw new Error(
         `Refusing to delete project ${record.projectId}: the confirmation names "${input.confirmSlug}" but its slug is "${record.slug}", and the slug can never be reused.`
       )
     }
     const account = (await requirePhotonAccount(this.deps.store)).credential
-    this.stopStream(input.botId)
+    this.deps.streams.stop(input.botId)
     const outcome = await this.deps.teardown.deleteProject({
       botId: input.botId,
       account,
@@ -224,6 +260,7 @@ export class PhotonService {
   /** Reads a half-finished saga back and finishes the record, which is what a crash leaves behind. Also
    *  the repair for a bot whose mirror of the provider's allowlist went stale. */
   async reconcile(botId: string): Promise<{ repaired: boolean; notes: string[] }> {
+    await requirePhotonProvisionedRecord(this.deps.store, botId)
     const account = await requirePhotonAccount(this.deps.store)
     const ownerHandle = (await this.deps.store.bot(botId))?.ownerHandle
     const outcome = await this.deps.provisioner.reconcile({
@@ -239,24 +276,9 @@ export class PhotonService {
     return this.deps.store
   }
 
-  /** The bot's people, derived from its assignment list so there is no second ACL to keep in step. */
-  async people(botId: string): Promise<Map<string, PhotonPerson>> {
-    const record = await this.deps.store.bot(botId)
-    const people = new Map<string, PhotonPerson>()
-    for (const assignment of record?.assignments ?? []) {
-      const handle = normalisePhotonHandle(assignment.handle)
-      const owner = record?.ownerHandle
-        ? normalisePhotonHandle(record.ownerHandle) === handle
-        : false
-      people.set(handle, { name: assignment.handle, role: owner ? 'owner' : 'member' })
-    }
-    return people
-  }
-
-  /** The bot's record as `orca bot connectors` needs it: a bot with no number is not connected. */
-  async statusFor(
-    botId: string
-  ): Promise<{ phoneNumber: string | null; handles: string[] } | null> {
+  /** The bot's record as `orca bot connectors` needs it: a bot with no number is not connected, unless it
+   *  answers on a Spectrum project, where nobody texts a number Orca assigned because Orca assigned none. */
+  async statusFor(botId: string): Promise<PhotonBotConnectorRow | null> {
     return photonConnectorRow(this.deps.store, botId)
   }
 
@@ -271,47 +293,15 @@ export class PhotonService {
     return (await this.deps.threads.conversationFor(botId, chatId)) !== null
   }
 
-  /** Follows every bot that has a key and has not been released, and replays what Orca never dealt with. */
+  /** Follows every bot that has a channel and has not been released, and replays what Orca never dealt
+   *  with. Both credential modes start here: a Spectrum project's channel is a stream too. */
   startStreams(): void {
-    void this.deps.streams.startAll().then(() => this.replayPending())
-  }
-
-  /** Replays what Orca wrote down and never dealt with, for every live bot: the crash recovery the inbox
-   *  exists for, run at startup because that is when a crash is discovered. */
-  private async replayPending(): Promise<void> {
-    for (const record of await this.deps.store.bots()) {
-      await this.replayBot(record.botId)
-    }
-  }
-
-  /** Replays a live bot's unhandled messages; a released one has none to replay. Parked messages come
-   *  back first: a restart is when whatever made one undeliverable may have changed, and nothing else
-   *  would ever ask again — a parked entry is marked handled, so `unhandled()` skips it. */
-  private async replayBot(botId: string): Promise<void> {
-    const record = await this.deps.store.bot(botId)
-    if (!record || record.released) {
-      return
-    }
-    const unparked = await this.deps.inbox.unpark(record.projectId)
-    if (unparked > 0) {
-      this.log('[photon] giving', unparked, 'parked message(s) another chance')
-    }
-    this.replay(botId, record.projectId)
+    void startPhotonChannels(this.deps)
   }
 
   /** Replays one bot's held messages, for a bot that has just been resumed from a pause. */
   async releaseHeld(botId: string): Promise<void> {
-    await this.replayBot(botId)
-  }
-
-  /** Fire-and-forget on purpose: a caller that provisioned a bot should not wait on its socket. */
-  startStream(botId: string): void {
-    void this.deps.streams.start(botId)
-  }
-
-  /** Stops one bot's stream, for a release: the stream is long-lived state the service owns. */
-  stopStream(botId: string): void {
-    this.deps.streams.stop(botId)
+    await replayPhotonBot(this.deps, botId)
   }
 
   /** The status a listing shows, or null when this bot has no stream. */
@@ -319,18 +309,17 @@ export class PhotonService {
     return this.deps.streams.status(botId)
   }
 
-  /** The health tick: restarts a deaf stream and retries a queued send. */
+  /** Whether this run is reading a bot's own Spectrum project, which is the only state that channel has. */
+  spectrumRunning(botId: string): boolean {
+    return this.deps.spectrum.running(botId)
+  }
+
   healthTick(): Promise<void> {
-    return this.deps.streams.tick()
+    return photonHealthTick(this.deps)
   }
 
-  private replay(botId: string, projectId: string): void {
-    void this.deps.inbound
-      .recover({ botId, projectId })
-      .catch((error: unknown) => this.log('[photon] could not replay held messages', error))
-  }
-
-  /** One send per finished turn, to the conversation that asked. */
+  /** One send per finished turn, to the conversation that asked. The credential is what the HTTP client
+   *  authenticates with, so a bot on a Spectrum project sends with its channel instead and passes none. */
   async sendTurnResult(input: {
     botId: string
     conversationId: string
@@ -342,7 +331,7 @@ export class PhotonService {
       botId: input.botId,
       projectId: record.projectId,
       conversationId: input.conversationId,
-      credential: await requirePhotonProjectCredential(this.deps.store, input.botId),
+      credential: await photonSendCredential(this.deps, record),
       text: input.text,
       turnId: input.turnId
     })
@@ -379,7 +368,10 @@ export class PhotonService {
 
   /** Retries everything waiting for one bot. Called by the health tick and by an explicit request. */
   async retryPending(botId: string): Promise<PhotonSendOutcome[]> {
-    const credential = await requirePhotonProjectCredential(this.deps.store, botId)
-    return this.deps.sendPath.retryPending(botId, credential)
+    const record = await requirePhotonRecord(this.deps.store, botId)
+    return this.deps.sendPath.retryPending(
+      botId,
+      (await photonSendCredential(this.deps, record)) ?? null
+    )
   }
 }

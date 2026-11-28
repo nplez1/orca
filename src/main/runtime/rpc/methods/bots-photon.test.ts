@@ -8,6 +8,7 @@ import {
   BOT_PHOTON_DELETE_PROJECT_METHOD,
   BOT_PHOTON_RECONCILE_METHOD,
   BOT_PHOTON_RELEASE_MEMBER_METHOD,
+  BOT_PHOTON_SPECTRUM_CONNECT_METHOD,
   BOT_PHOTON_STATUS_METHOD
 } from './bots-photon'
 
@@ -100,5 +101,16 @@ describe('which caller may change a bot’s iMessage channel', () => {
     expect(messageOf(await outcomeOf(BOT_PHOTON_STATUS_METHOD, {}, agent))).not.toMatch(
       /Only the owner/
     )
+  })
+
+  it('lets an agent connect this bot’s own Spectrum project, the one changing call without the gate', async () => {
+    // Deliberate: that credential is one project's own pair, it creates nothing upstream and it can only
+    // reach the bot it names, so it is not the account-wide blast radius the gate exists for.
+    const error = await outcomeOf(
+      BOT_PHOTON_SPECTRUM_CONNECT_METHOD,
+      { botId: 'b1', projectId: 'pho_prj_1', projectSecret: 'pho_sk_project_secret' },
+      agent
+    )
+    expect(messageOf(error)).not.toMatch(/^Only/)
   })
 })

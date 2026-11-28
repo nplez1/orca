@@ -5,6 +5,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import type { Bot } from '../../../shared/bot-types'
 import { botConnectorServices } from '../../../shared/bots/bot-connectors-view'
 import { PhotonApi } from './photon-api'
+import { photonBotPeople } from './photon-bot-people'
 import { PhotonCursorStore } from './photon-cursor'
 import { PhotonInbound } from './photon-inbound'
 import { PhotonInbox } from './photon-inbox'
@@ -13,6 +14,8 @@ import { PhotonProvisioner } from './photon-provisioning'
 import { PhotonSendPath } from './photon-send'
 import { photonChannelStatus } from './photon-runtime'
 import { PhotonService } from './photon-service'
+import { PhotonSpectrumChannels } from './photon-spectrum-channels'
+import { PhotonSpectrumSecrets } from './photon-spectrum-secrets'
 import { PhotonStreams } from './photon-streams'
 import { PhotonStore } from './photon-store'
 import { PhotonTeardown } from './photon-teardown'
@@ -63,6 +66,7 @@ function serviceWith(io: PhotonIoFactory) {
   const cursors = new PhotonCursorStore(store)
   const inbox = new PhotonInbox(store)
   const sendPath = new PhotonSendPath({ api, outbox, threads, log: () => {} })
+  const spectrumSecrets = new PhotonSpectrumSecrets(userDataPath)
   const inbound = new PhotonInbound({
     inbox,
     cursors,
@@ -83,7 +87,18 @@ function serviceWith(io: PhotonIoFactory) {
     teardown: new PhotonTeardown({ api, store, log: () => {}, sleep: async () => {} }),
     inbound,
     sendPath,
-    streams: new PhotonStreams({ store, cursors, inbound, sendPath, io, log: () => {} })
+    streams: new PhotonStreams({ store, cursors, inbound, sendPath, io, log: () => {} }),
+    // No Spectrum project is connected here, and the fake server speaks the Beta API only.
+    spectrum: new PhotonSpectrumChannels({
+      store,
+      cursors,
+      secrets: spectrumSecrets,
+      inbound,
+      sendPath,
+      createApp: () => Promise.reject(new Error('the service tests open no Spectrum stream')),
+      log: () => {}
+    }),
+    spectrumSecrets
   })
   return { runtime, store, threads, outbox, inbox }
 }
@@ -171,17 +186,21 @@ describe('the channel', () => {
   })
 
   it('adds and releases one person, and the handles are the allowlist', async () => {
-    const { runtime } = service()
+    const { runtime, store } = service()
     await runtime.connect({ organizationId: 'org_1', accountKey: 'pho_ask_1', storesKey: true })
     await runtime.createBot({ botId: 'b1', botName: 'Scout', handle: '+15551230000' })
 
     const added = await runtime.addMember({ botId: 'b1', handle: '+15559990000' })
     expect(added.phoneNumber).toBeTruthy()
-    expect((await runtime.people('b1')).get('+15559990000')).toMatchObject({ role: 'member' })
-    expect((await runtime.people('b1')).get('+15551230000')).toMatchObject({ role: 'owner' })
+    expect((await photonBotPeople(store, 'b1')).get('+15559990000')).toMatchObject({
+      role: 'member'
+    })
+    expect((await photonBotPeople(store, 'b1')).get('+15551230000')).toMatchObject({
+      role: 'owner'
+    })
 
     await runtime.releaseMember({ botId: 'b1', handle: '+15559990000' })
-    expect((await runtime.people('b1')).has('+15559990000')).toBe(false)
+    expect((await photonBotPeople(store, 'b1')).has('+15559990000')).toBe(false)
     expect(server.state.assignments.size).toBe(1)
   })
 
@@ -190,7 +209,7 @@ describe('the channel', () => {
     // before that await, the second write erases the first assignment from this computer's mirror — and
     // from then on that member's texts are dropped as an unknown sender, which no reconcile recovers
     // because the mirror is the thing that was wrong.
-    const { runtime } = service()
+    const { runtime, store } = service()
     await runtime.connect({ organizationId: 'org_1', accountKey: 'pho_ask_1', storesKey: true })
     await runtime.createBot({ botId: 'b1', botName: 'Scout', handle: '+15551230000' })
 
@@ -199,7 +218,7 @@ describe('the channel', () => {
       runtime.addMember({ botId: 'b1', handle: '+15558880000' })
     ])
 
-    const people = await runtime.people('b1')
+    const people = await photonBotPeople(store, 'b1')
     expect([...people.keys()].sort()).toEqual(['+15551230000', '+15558880000', '+15559990000'])
     expect(server.state.assignments.size).toBe(3)
   })

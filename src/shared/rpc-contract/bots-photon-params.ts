@@ -65,6 +65,26 @@ export const PhotonDeleteProjectParams = lazyZodSchema(() =>
   z.object({ botId: Id, confirmSlug: Id })
 )
 
+/**
+ * A bot's channel on a Spectrum project the owner already has: the project id from its dashboard's
+ * Settings page (`pho_prj_…`) and that project's own secret. Nothing is created and nothing is assigned
+ * — the project, its lines and who may reach them stay in Spectrum — which is why this needs no
+ * organization and no account service key.
+ */
+export const PhotonSpectrumConnectParams = lazyZodSchema(() =>
+  z.object({
+    botId: Id,
+    /** The project's id, not the organization's: a pasted organization id reads as a project that does
+     *  not exist rather than as this mistake, which is why the copy names it. Trimmed, because an id
+     *  copied out of a dashboard arrives with whitespace around it. */
+    projectId: z.string().trim().min(1).max(256),
+    projectSecret: z.string().trim().min(8).max(512),
+    /** Kept sealed on disk only when the owner says so; off is the default, and off still works for this
+     *  session, which is the same choice `bots.photon.connect` offers for the account key. */
+    storesSecret: z.boolean().default(false)
+  })
+)
+
 export const PhotonStatusParams = lazyZodSchema(() => z.object({ botId: Id.optional() }))
 
 export type PhotonConnectInput = z.infer<typeof PhotonConnectParams>
@@ -73,6 +93,7 @@ export type PhotonAddMemberInput = z.infer<typeof PhotonAddMemberParams>
 export type PhotonReleaseMemberInput = z.infer<typeof PhotonReleaseMemberParams>
 export type PhotonReleaseBotInput = z.infer<typeof PhotonReleaseBotParams>
 export type PhotonDeleteProjectInput = z.infer<typeof PhotonDeleteProjectParams>
+export type PhotonSpectrumConnectInput = z.infer<typeof PhotonSpectrumConnectParams>
 
 /** What the channel looks like right now, for a settings card or `orca bot connectors`. */
 export type PhotonChannelStatus = {
@@ -84,7 +105,12 @@ export type PhotonChannelStatus = {
   accountKeySealed: boolean
   bots: {
     botId: string
-    slug: string
+    /** Which credential the bot's channel runs on: one Orca provisioned with the account key, or the
+     *  owner's own Spectrum project. The rest of a row means what it means in that mode. */
+    mode: 'account' | 'spectrum'
+    /** The project's slug. Null when Spectrum answered a probe without one, which only a bot on an
+     *  existing project can be. */
+    slug: string | null
     projectId: string
     /** The number this bot last answered on, as the provider reported it. */
     phoneNumber: string | null

@@ -246,6 +246,7 @@ import {
   PhotonReconcileParams,
   PhotonReleaseBotParams,
   PhotonReleaseMemberParams,
+  PhotonSpectrumConnectParams,
   PhotonStatusParams
 } from './bots-photon-params'
 import {
@@ -1428,6 +1429,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'bots.photon.member.release': PhotonReleaseMemberParams,
   'bots.photon.project.delete': PhotonDeleteProjectParams,
   'bots.photon.reconcile': PhotonReconcileParams,
+  'bots.photon.spectrum.connect': PhotonSpectrumConnectParams,
   'bots.photon.status': PhotonStatusParams,
   'bots.request.outcome': BotRequestOutcomeParams,
   'bots.roster': BotRoster,

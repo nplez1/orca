@@ -14,6 +14,7 @@ import {
   PhotonReconcileParams,
   PhotonReleaseBotParams,
   PhotonReleaseMemberParams,
+  PhotonSpectrumConnectParams,
   PhotonStatusParams,
   type PhotonChannelStatus
 } from '../../../../shared/rpc-contract/bots-photon-params'
@@ -62,6 +63,30 @@ export const BOT_PHOTON_CONNECT_METHOD = defineMethod({
   handler: async (input, context) => {
     ownerOnly(context, 'Only the owner can connect a Photon account.')
     return photonChannel(context.runtime).connect(input)
+  }
+})
+
+/**
+ * Connects a bot to a Spectrum project the owner already had, which is the one method that changes
+ * something without an owner gate.
+ *
+ * That is deliberate and narrow: this credential is one project's own pair, it creates nothing upstream,
+ * assigns nobody and can only ever reach the bot it names — so the blast radius an agent holding it has
+ * is this bot's own conversation, not the account that pays for every project. The account key
+ * (`bots.photon.connect`) is the opposite and stays owner-only.
+ */
+export const BOT_PHOTON_SPECTRUM_CONNECT_METHOD = defineMethod({
+  name: 'bots.photon.spectrum.connect',
+  permission: 'workspace',
+  params: PhotonSpectrumConnectParams,
+  handler: async ({ botId, projectId, projectSecret, storesSecret }, context) => {
+    await requireChannel({ botId }, context, { releasedOk: false })
+    return photonChannel(context.runtime).connectSpectrum({
+      botId,
+      projectId,
+      projectSecret,
+      storesSecret
+    })
   }
 })
 
@@ -148,6 +173,7 @@ export const BOT_PHOTON_RECONCILE_METHOD = defineMethod({
 export const BOT_PHOTON_METHODS = [
   BOT_PHOTON_STATUS_METHOD,
   BOT_PHOTON_CONNECT_METHOD,
+  BOT_PHOTON_SPECTRUM_CONNECT_METHOD,
   BOT_PHOTON_CREATE_METHOD,
   BOT_PHOTON_ADD_MEMBER_METHOD,
   BOT_PHOTON_RELEASE_MEMBER_METHOD,

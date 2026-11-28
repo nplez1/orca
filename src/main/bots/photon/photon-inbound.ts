@@ -30,6 +30,13 @@ export type PhotonInboundDeps = {
   /** The bot's people by handle. Only an assigned handle reaches the stream, so this is the allowlist
    *  as the provider holds it rather than a second ACL Orca keeps in sync. */
   people: (botId: string) => Promise<Map<string, PhotonPerson>>
+  /** Who to attribute a message to when the bot has no allowlist of its own. A Spectrum project already
+   *  decides who reaches its own lines in the owner's dashboard, so there is no assignment list here to
+   *  mirror and "unknown handle" would mean the wrong thing. */
+  defaultPerson?: (input: {
+    botId: string
+    handle: string
+  }) => PhotonPerson | null | Promise<PhotonPerson | null>
   /** Whether the bot is paused, in which case its mail waits rather than starting a turn. */
   paused?: (botId: string) => boolean
   /** Records that a sender Orca has no assignment for reached the stream, which means this computer's
@@ -270,8 +277,12 @@ export class PhotonInbound {
     botId: string,
     message: PhotonInboundMessage
   ): Promise<BotRequestPerson | null> {
+    const handle = normalisePhotonHandle(message.sender.handle)
     const people = await this.deps.people(botId)
-    const found = people.get(normalisePhotonHandle(message.sender.handle))
+    const fallback = this.deps.defaultPerson
+      ? await this.deps.defaultPerson({ botId, handle })
+      : null
+    const found = people.get(handle) ?? fallback
     if (!found) {
       return null
     }
