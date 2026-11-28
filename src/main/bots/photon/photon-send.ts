@@ -54,9 +54,20 @@ export type PhotonSendDeps = {
   api: PhotonApi
   outbox: PhotonOutbox
   threads: PhotonThreadMap
+  /**
+   * Where this bot's text goes when it is not the HTTP client. An account-provisioned bot sends with its
+   * project key; a bot on an existing Spectrum project sends through its own SDK, which has no key to
+   * pass and is addressed by conversation id. Absent for the account path, so nothing about it changes.
+   */
+  transport?: (botId: string) => PhotonSendTransport | null
   log?: (message: string, ...rest: unknown[]) => void
   /** Reports an answer the retry horizon passed on, so it is visible rather than a console line. */
   noteUndelivered?: (botId: string, reason: string) => void | Promise<void>
+}
+
+/** One message handed to whichever transport a bot has: the conversation it belongs to, and its text. */
+export type PhotonSendTransport = {
+  send(conversationId: string, text: string): Promise<void>
 }
 
 export type PhotonSendOutcome =
@@ -84,12 +95,15 @@ export class PhotonSendPath {
   /**
    * Records the turn's answer and tries to send it. The record is durable before the attempt, so a
    * failure leaves the result retriable instead of vanishing; `retryPending` is what picks it back up.
+   *
+   * `credential` is what the HTTP client authenticates with, and a bot on an existing Spectrum project
+   * has none: its channel is the transport, which is why the key is optional and the attempt says so.
    */
   async sendTurnResult(input: {
     botId: string
     projectId: string
     conversationId: string
-    credential: PhotonCredential
+    credential?: PhotonCredential
     text: string
     /** The turn this answer belongs to. The send is keyed on it rather than on the text, so two
      *  identical answers in one thread are two messages instead of one replayed idempotency key. */
@@ -107,11 +121,14 @@ export class PhotonSendPath {
       body: payload.body,
       truncated: payload.truncated
     })
-    return this.attempt(entry, input.credential)
+    return this.attempt(entry, input.credential ?? null)
   }
 
   /** Retries everything waiting for one bot. A send that lands is forgotten; one that fails is kept. */
-  async retryPending(botId: string, credential: PhotonCredential): Promise<PhotonSendOutcome[]> {
+  async retryPending(
+    botId: string,
+    credential: PhotonCredential | null
+  ): Promise<PhotonSendOutcome[]> {
     const outcomes: PhotonSendOutcome[] = []
     for (const entry of await this.deps.outbox.pendingFor(botId)) {
       outcomes.push(await this.attempt(entry, credential))
@@ -121,18 +138,10 @@ export class PhotonSendPath {
 
   private async attempt(
     entry: PhotonOutboxEntry,
-    credential: PhotonCredential
+    credential: PhotonCredential | null
   ): Promise<PhotonSendOutcome> {
     try {
-      await this.deps.api.sendMessage({
-        credential,
-        projectId: entry.projectId,
-        conversationId: entry.conversationId,
-        text: entry.body,
-        // Derived from the entry, so a retry of a send that may already have landed replays rather
-        // than arriving twice.
-        idempotencyKey: `photon-send-${entry.id}`
-      })
+      await this.deliver(entry, credential)
       await this.deps.outbox.settle(entry.id)
       return { sent: true, entryId: entry.id, truncated: entry.truncated }
     } catch (error) {
@@ -153,6 +162,37 @@ export class PhotonSendPath {
       this.log('[photon] a send failed after its entry was already settled or forgotten', message)
       return { sent: false, entryId: entry.id, error: message, settled: true }
     }
+  }
+
+  /**
+   * Hands one entry to whichever transport this bot has. The Spectrum channel first, because a bot on an
+   * existing project has no project key to send with; the HTTP client otherwise, authenticated with the
+   * key the caller read for this bot. Neither available is a send that cannot happen yet, said as such so
+   * the answer stays queued and the retry horizon — not a silent drop — is what ends it.
+   */
+  private async deliver(
+    entry: PhotonOutboxEntry,
+    credential: PhotonCredential | null
+  ): Promise<void> {
+    const transport = this.deps.transport?.(entry.botId)
+    if (transport) {
+      await transport.send(entry.conversationId, entry.body)
+      return
+    }
+    if (!credential) {
+      throw new Error(
+        `This bot has neither a live Spectrum channel nor a Photon project key on this computer, so its answer stays queued.`
+      )
+    }
+    await this.deps.api.sendMessage({
+      credential,
+      projectId: entry.projectId,
+      conversationId: entry.conversationId,
+      text: entry.body,
+      // Derived from the entry, so a retry of a send that may already have landed replays rather
+      // than arriving twice.
+      idempotencyKey: `photon-send-${entry.id}`
+    })
   }
 }
 

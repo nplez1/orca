@@ -274,3 +274,62 @@ describe('a send that fails', () => {
     expect(server.state.sent[0]?.idempotencyKey).toBe(`photon-send-${pendingKey}`)
   })
 })
+
+describe('a bot that answers on its own Spectrum channel', () => {
+  /** A send path whose transport is the one thing under test: the HTTP client is never reached. */
+  async function withTransport(
+    transport: (botId: string) => { send: (id: string, text: string) => Promise<void> } | null
+  ) {
+    const store = new PhotonStore(userDataPath)
+    const outbox = new PhotonOutbox(store)
+    const threads = new PhotonThreadMap(store)
+    const sendPath = new PhotonSendPath({
+      api: new PhotonApi({ baseUrl: server.baseUrl }),
+      outbox,
+      threads,
+      transport,
+      log: () => {}
+    })
+    await threads.bind('b1', 'conv_1', { chatId: 'chat_1', handle: '+15551230000' })
+    return { sendPath, outbox }
+  }
+
+  it('sends through the channel instead of the HTTP client, and needs no project key to do it', async () => {
+    const sent: string[] = []
+    const test = await withTransport(() => ({
+      send: async (conversationId, text) => {
+        sent.push(`${conversationId}:${text}`)
+      }
+    }))
+
+    // No credential at all: a Spectrum bot has no project key, and the transport is what sends.
+    const outcome = await test.sendPath.sendTurnResult({
+      botId: 'b1',
+      projectId: 'pho_prj_1',
+      conversationId: 'conv_1',
+      text: 'the build is green',
+      turnId: 'turn_1'
+    })
+
+    expect(outcome).toMatchObject({ sent: true })
+    expect(sent).toEqual(['conv_1:the build is green'])
+    expect(server.state.sent).toEqual([])
+    expect(await test.outbox.pendingFor('b1')).toEqual([])
+  })
+
+  it('keeps the answer queued when no channel is live, rather than failing it against the HTTP client', async () => {
+    const test = await withTransport(() => null)
+
+    const outcome = await test.sendPath.sendTurnResult({
+      botId: 'b1',
+      projectId: 'pho_prj_1',
+      conversationId: 'conv_1',
+      text: 'the build is green',
+      turnId: 'turn_1'
+    })
+
+    expect(outcome.sent).toBe(false)
+    expect(await test.outbox.pendingFor('b1')).toHaveLength(1)
+    expect(server.state.sent).toEqual([])
+  })
+})

@@ -5,6 +5,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import type { Bot } from '../../../shared/bot-types'
 import { botConnectorServices } from '../../../shared/bots/bot-connectors-view'
 import { PhotonApi } from './photon-api'
+import { photonBotPeople } from './photon-bot-people'
 import { PhotonCursorStore } from './photon-cursor'
 import { PhotonInbound } from './photon-inbound'
 import { PhotonInbox } from './photon-inbox'
@@ -13,6 +14,8 @@ import { PhotonProvisioner } from './photon-provisioning'
 import { PhotonSendPath } from './photon-send'
 import { photonChannelStatus } from './photon-runtime'
 import { PhotonService } from './photon-service'
+import { PhotonSpectrumChannels, type PhotonSpectrumChannelsDeps } from './photon-spectrum-channels'
+import { PhotonSpectrumSecrets } from './photon-spectrum-secrets'
 import { PhotonStreams } from './photon-streams'
 import { PhotonStore } from './photon-store'
 import { PhotonTeardown } from './photon-teardown'
@@ -54,8 +57,12 @@ const io: PhotonIoFactory = () => {
   throw new Error('the service tests do not open a stream')
 }
 
-/** The service over this test's stores: the transport is the only thing a caller varies. */
-function serviceWith(io: PhotonIoFactory) {
+/** The service over this test's stores: the socket transport and the SDK client are what a caller varies. */
+function serviceWith(
+  io: PhotonIoFactory,
+  createSpectrumApp: PhotonSpectrumChannelsDeps['createApp'] = () =>
+    Promise.reject(new Error('the service tests open no Spectrum stream'))
+) {
   const store = new PhotonStore(userDataPath)
   const api = new PhotonApi({ baseUrl: server.baseUrl })
   const threads = new PhotonThreadMap(store)
@@ -63,6 +70,7 @@ function serviceWith(io: PhotonIoFactory) {
   const cursors = new PhotonCursorStore(store)
   const inbox = new PhotonInbox(store)
   const sendPath = new PhotonSendPath({ api, outbox, threads, log: () => {} })
+  const spectrumSecrets = new PhotonSpectrumSecrets(userDataPath)
   const inbound = new PhotonInbound({
     inbox,
     cursors,
@@ -70,6 +78,17 @@ function serviceWith(io: PhotonIoFactory) {
     people: async () => new Map(),
     startConversation: async () => ({ chatId: 'chat_1' }),
     sendToChat: async () => {},
+    log: () => {}
+  })
+  // Wired the way `photonChannel` wires it: the stream loop owns the clock and ticks this registry too.
+  const spectrum = new PhotonSpectrumChannels({
+    store,
+    cursors,
+    secrets: spectrumSecrets,
+    inbound,
+    inbox,
+    sendPath,
+    createApp: createSpectrumApp,
     log: () => {}
   })
   const runtime = new PhotonService({
@@ -83,9 +102,20 @@ function serviceWith(io: PhotonIoFactory) {
     teardown: new PhotonTeardown({ api, store, log: () => {}, sleep: async () => {} }),
     inbound,
     sendPath,
-    streams: new PhotonStreams({ store, cursors, inbound, sendPath, io, log: () => {} })
+    streams: new PhotonStreams({
+      store,
+      cursors,
+      inbound,
+      sendPath,
+      io,
+      peerChannels: spectrum,
+      log: () => {}
+    }),
+    // No Spectrum project is connected here, and the fake server speaks the Beta API only.
+    spectrum,
+    spectrumSecrets
   })
-  return { runtime, store, threads, outbox, inbox }
+  return { runtime, store, threads, outbox, inbox, spectrum, spectrumSecrets }
 }
 
 const service = () => serviceWith(io)
@@ -171,17 +201,21 @@ describe('the channel', () => {
   })
 
   it('adds and releases one person, and the handles are the allowlist', async () => {
-    const { runtime } = service()
+    const { runtime, store } = service()
     await runtime.connect({ organizationId: 'org_1', accountKey: 'pho_ask_1', storesKey: true })
     await runtime.createBot({ botId: 'b1', botName: 'Scout', handle: '+15551230000' })
 
     const added = await runtime.addMember({ botId: 'b1', handle: '+15559990000' })
     expect(added.phoneNumber).toBeTruthy()
-    expect((await runtime.people('b1')).get('+15559990000')).toMatchObject({ role: 'member' })
-    expect((await runtime.people('b1')).get('+15551230000')).toMatchObject({ role: 'owner' })
+    expect((await photonBotPeople(store, 'b1')).get('+15559990000')).toMatchObject({
+      role: 'member'
+    })
+    expect((await photonBotPeople(store, 'b1')).get('+15551230000')).toMatchObject({
+      role: 'owner'
+    })
 
     await runtime.releaseMember({ botId: 'b1', handle: '+15559990000' })
-    expect((await runtime.people('b1')).has('+15559990000')).toBe(false)
+    expect((await photonBotPeople(store, 'b1')).has('+15559990000')).toBe(false)
     expect(server.state.assignments.size).toBe(1)
   })
 
@@ -190,7 +224,7 @@ describe('the channel', () => {
     // before that await, the second write erases the first assignment from this computer's mirror — and
     // from then on that member's texts are dropped as an unknown sender, which no reconcile recovers
     // because the mirror is the thing that was wrong.
-    const { runtime } = service()
+    const { runtime, store } = service()
     await runtime.connect({ organizationId: 'org_1', accountKey: 'pho_ask_1', storesKey: true })
     await runtime.createBot({ botId: 'b1', botName: 'Scout', handle: '+15551230000' })
 
@@ -199,7 +233,7 @@ describe('the channel', () => {
       runtime.addMember({ botId: 'b1', handle: '+15558880000' })
     ])
 
-    const people = await runtime.people('b1')
+    const people = await photonBotPeople(store, 'b1')
     expect([...people.keys()].sort()).toEqual(['+15551230000', '+15558880000', '+15559990000'])
     expect(server.state.assignments.size).toBe(3)
   })
@@ -410,6 +444,92 @@ describe('the health tick', () => {
 
     // A fresh socket was opened, so the deaf stream was replaced rather than merely reported.
     expect(sockets).toHaveLength(2)
+  })
+})
+
+describe('a bot answering on its own Spectrum project', () => {
+  it('refuses the account path’s member, repair and project-deletion calls', async () => {
+    const { runtime, store } = service()
+    await store.putBot({
+      mode: 'spectrum',
+      botId: 'b1',
+      projectId: 'pho_prj_1',
+      slug: 'my-project',
+      createdAt: 1
+    })
+
+    // Each of these is work only a project Orca provisioned has: an assignment list, a minted key, a
+    // deletion that burns a slug. On the owner's own project all three belong in Spectrum's dashboard.
+    for (const call of [
+      () => runtime.addMember({ botId: 'b1', handle: '+15559990000' }),
+      () => runtime.deleteProject({ botId: 'b1', confirmSlug: 'my-project' }),
+      () => runtime.reconcile('b1')
+    ]) {
+      await expect(call()).rejects.toThrow(/your own Spectrum project/)
+    }
+  })
+
+  it('reports the channel as not signed in once a session-only secret is gone after a restart', async () => {
+    const { runtime, store, spectrumSecrets } = service()
+    await store.putBot({
+      mode: 'spectrum',
+      botId: 'b1',
+      projectId: 'pho_prj_1',
+      slug: 'my-project',
+      createdAt: 1
+    })
+
+    // Held for this session, so nothing was written: what the next run reads is nothing at all.
+    expect(await runtime.statusFor('b1')).toMatchObject({ mode: 'spectrum', secretMissing: true })
+    expect(
+      botConnectorServices(botForRow, { gh: 'signed-in', linear: false }, undefined, {
+        mode: 'spectrum',
+        phoneNumber: null,
+        handles: [],
+        secretMissing: true
+      }).find((entry) => entry.source === 'photon')
+    ).toMatchObject({ signedIn: false })
+
+    spectrumSecrets.holdForSession('b1', { projectId: 'pho_prj_1', secret: 'pho_sk_1' })
+    expect(await runtime.statusFor('b1')).toMatchObject({ secretMissing: false })
+  })
+
+  it('restarts a Spectrum channel that stopped, from the same tick that restarts a stream', async () => {
+    // A client whose stream is already over: the state a restart has to come from, and the reason this
+    // tick has to reach this registry at all — `PhotonService.healthTick` had no production caller and the
+    // stream loop skipped every Spectrum bot, so nothing did.
+    const opened: number[] = []
+    const streaming = serviceWith(io, async () => {
+      opened.push(opened.length)
+      return {
+        messages: {
+          [Symbol.asyncIterator]: () => ({
+            next: () => Promise.resolve({ done: true, value: undefined })
+          })
+        },
+        send: async () => undefined,
+        stop: async () => undefined
+      }
+    })
+    await streaming.store.putBot({
+      mode: 'spectrum',
+      botId: 'b1',
+      projectId: 'pho_prj_1',
+      createdAt: 1
+    })
+    await streaming.spectrumSecrets.put('b1', {
+      projectId: 'pho_prj_1',
+      secret: 'pho_sk_project_secret'
+    })
+    await streaming.runtime.startStreams()
+    await vi.waitFor(() => expect(opened).toHaveLength(1))
+    await vi.waitFor(() => expect(streaming.runtime.spectrumRunning('b1')).toBe(false))
+
+    await streaming.runtime.healthTick()
+
+    // The peer tick is not awaited by the stream tick — one hung SDK start must not hold the clock — so the
+    // restart it drives lands a turn later rather than before the tick answers.
+    await vi.waitFor(() => expect(opened).toHaveLength(2))
   })
 })
 

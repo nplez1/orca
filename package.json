@@ -255,6 +255,7 @@
     "serve-sim": "0.1.47",
     "smol-toml": "1.9.1",
     "socket.io-client": "4.8.4",
+    "spectrum-ts": "12.16.0",
     "ssh2": "^1.17.0",
     "stream-chain": "4.2.6",
     "stream-json": "3.7.0",

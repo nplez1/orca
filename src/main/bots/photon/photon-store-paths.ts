@@ -7,6 +7,10 @@ export const PHOTON_DIR = 'local-photon'
 export const RECORD_FILE = 'photon.json'
 export const SECRET_FILE = 'photon-secrets.json'
 
+/** An existing Spectrum project's secret, per bot: its own file, because it is neither the account key nor
+ *  a project key Orca minted. */
+export const SPECTRUM_SECRET_FILE = 'photon-spectrum-secrets.json'
+
 /**
  * One path segment built from a provider id.
  *
@@ -35,6 +39,9 @@ const inDir = (userDataPath: string, ...parts: string[]): string =>
 export const photonRecordPath = (userDataPath: string): string => inDir(userDataPath, RECORD_FILE)
 
 export const photonSecretsPath = (userDataPath: string): string => inDir(userDataPath, SECRET_FILE)
+
+export const photonSpectrumSecretsPath = (userDataPath: string): string =>
+  inDir(userDataPath, SPECTRUM_SECRET_FILE)
 
 /** Per project, and per consumer purpose, so an independent integration cannot overwrite this one. */
 export const photonCursorPath = (

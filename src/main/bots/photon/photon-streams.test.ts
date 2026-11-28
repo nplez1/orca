@@ -5,7 +5,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PhotonCursorStore } from './photon-cursor'
 import { PhotonStore } from './photon-store'
 import type { PhotonIoFactory, PhotonSocket } from './photon-stream'
@@ -26,7 +26,10 @@ type FakeSocket = PhotonSocket & {
 }
 
 /** A socket the test drives; every one it makes is kept so a leaked reconnect is countable. */
-function harness(handler: () => Promise<void>) {
+function harness(
+  handler: () => Promise<void>,
+  options: { peerChannels?: { tick(): Promise<void> } } = {}
+) {
   const sockets: FakeSocket[] = []
   // A cancelled timer must not run, which is what `clearTimeout` buys in production: modelling it is
   // what makes "the resume was cancelled" observable as "no socket opened".
@@ -64,6 +67,7 @@ function harness(handler: () => Promise<void>) {
     sendPath: { retryPending: async () => [] },
     io,
     log: () => {},
+    ...(options.peerChannels ? { peerChannels: options.peerChannels } : {}),
     setTimer: (callback) => {
       const timer = { callback, cancelled: false }
       timers.push(timer)
@@ -201,5 +205,62 @@ describe('the health tick', () => {
     await test.streams.tick()
 
     expect(test.sockets).toHaveLength(1)
+  })
+
+  it('keeps the clock free when a Spectrum start hangs, and does not stack a second peer tick on it', async () => {
+    // A peer tick awaits the SDK's `createApp`. Awaiting it here put the next tick behind one bot's hung
+    // start-up, so every account-mode stream stopped being health-checked — deaf streams never restarted
+    // and queued sends never retried — while the tick that schedules itself never ran again.
+    // Why a gate the test releases rather than a deadline it races: the peer start stays in flight until
+    // this suite says otherwise, so "the tick finished" is the whole observation. An awaited peer leaves
+    // that tick pending for ever and `vi.waitFor` reports the condition that never became true.
+    let peerTicks = 0
+    let released = false
+    let releasePeer = (): void => {}
+    const peerGate = new Promise<void>((resolve) => {
+      releasePeer = () => {
+        released = true
+        resolve()
+      }
+    })
+    const test = harness(async () => {}, {
+      peerChannels: {
+        tick: () => {
+          peerTicks += 1
+          return peerGate
+        }
+      }
+    })
+    await test.store.putBot({
+      botId: 'b1',
+      projectId: 'pho_prj_1',
+      slug: 'orca-bot-scout-7dc96f77',
+      organizationId: 'org_1'
+    })
+    await test.store.putProjectKey('b1', { keyId: 'k1', secret: 'pho_sk_1' })
+    await test.streams.start('b1')
+    // Connected and never subscribed: the tick's own job is to restart it.
+    test.sockets[0]?.fire('connect')
+
+    let ticked = false
+    void test.streams.tick().then(() => {
+      ticked = true
+    })
+    await vi.waitFor(() => expect(ticked).toBe(true))
+
+    // Still in flight, so the restart below happened on a tick that did not wait for it.
+    expect(released).toBe(false)
+    expect(test.sockets).toHaveLength(2)
+
+    // A tick on top of a pending peer start issues no second one.
+    await test.streams.tick()
+    expect(peerTicks).toBe(1)
+
+    // Releasing it lets the next tick through: the guard is a concurrency limit, not a latch.
+    releasePeer()
+    await vi.waitFor(async () => {
+      await test.streams.tick()
+      expect(peerTicks).toBe(2)
+    })
   })
 })

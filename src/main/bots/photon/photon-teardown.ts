@@ -7,6 +7,7 @@
 import type { PhotonApi, PhotonCredential } from './photon-api'
 import { PhotonApiError } from './photon-api'
 import { photonClosureIsTerminal, type PhotonClosure } from './photon-contract'
+import { requirePhotonProvisionedRecord } from './photon-credentials'
 import type { PhotonStore } from './photon-store'
 
 export type PhotonTeardownDeps = {
@@ -132,10 +133,9 @@ export class PhotonTeardown {
     idempotencyKey?: string
   }): Promise<PhotonProjectDeletionOutcome> {
     const { api, store } = this.deps
-    const record = await store.bot(input.botId)
-    if (!record) {
-      throw new Error(`No Photon project is recorded for bot ${input.botId}.`)
-    }
+    // The record a deletion names, not the live one: a bot that has since moved to its own Spectrum project
+    // still has the provisioned project this deletion burns, kept beside the live record.
+    const record = await requirePhotonProvisionedRecord(store, input.botId, 'project')
     if (input.confirmSlug !== record.slug) {
       throw new Error(
         `Refusing to delete project ${record.projectId}: the confirmation names "${input.confirmSlug}" but its slug is "${record.slug}", and the slug can never be reused.`
@@ -148,7 +148,13 @@ export class PhotonTeardown {
     )
     const closure = await this.awaitClosure(input.account, record.projectId)
     if (closure.state === 'closed') {
-      await store.forgetBot(input.botId)
+      // Not `forgetBot` for a bot that answers on its own Spectrum project: forgetting that record would
+      // leave a live channel nothing references, so only the provisioned identity this call just closed
+      // goes.
+      const live = await store.bot(input.botId)
+      await (live?.mode === 'spectrum'
+        ? store.updateBot(input.botId, (current) => ({ ...current, priorProvision: undefined }))
+        : store.forgetBot(input.botId))
     }
     return {
       botId: input.botId,

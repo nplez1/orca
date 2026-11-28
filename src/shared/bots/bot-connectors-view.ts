@@ -139,6 +139,8 @@ const SLACK_NOT_INSTALLED =
 export type BotPhotonConnector = {
   phoneNumber: string | null
   handles: string[]
+  mode?: 'account' | 'spectrum'
+  secretMissing?: boolean
 }
 
 /** What Orca Cloud says a bot can act through; Slack is listed once its app is installed. */
@@ -204,6 +206,29 @@ export function botConnectorServices(
 }
 
 function photonService(photon: BotPhotonConnector): BotConnectorService {
+  if (photon.mode === 'spectrum') {
+    const detail =
+      'Answers on your own Spectrum project. Its lines, and who may reach them, stay in Spectrum.'
+    if (photon.secretMissing) {
+      return {
+        source: 'photon',
+        tool: 'iMessage',
+        actsAs: 'bot',
+        signedIn: false,
+        gap: 'Its Spectrum project secret is not on this computer any more. Ask your owner to connect the project again in Orca.',
+        detail,
+        wakes: false
+      }
+    }
+    return {
+      source: 'photon',
+      tool: 'iMessage',
+      actsAs: 'bot',
+      signedIn: true,
+      detail,
+      wakes: false
+    }
+  }
   const number = photon.phoneNumber
     ? `Answers on ${photon.phoneNumber}.`
     : 'No number assigned yet; add someone to give it one.'

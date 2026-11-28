@@ -8,6 +8,7 @@ import {
   BOT_PHOTON_DELETE_PROJECT_METHOD,
   BOT_PHOTON_RECONCILE_METHOD,
   BOT_PHOTON_RELEASE_MEMBER_METHOD,
+  BOT_PHOTON_SPECTRUM_CONNECT_METHOD,
   BOT_PHOTON_STATUS_METHOD
 } from './bots-photon'
 
@@ -26,12 +27,25 @@ type Callable = {
   handler: (params: never, context: RpcContext) => Promise<unknown>
 }
 
-/** Every method that changes who may text a bot, what a bot is, or whether a project still exists. */
+/** Every method that changes who may text a bot, what a bot is, or whether a project still exists.
+ *  `bots.photon.spectrum.connect` is on the list because it decides *whose* project a bot answers: without
+ *  the gate a prompt-injected agent could point it at a project it controls, where every sender is someone
+ *  the bot then answers. */
 const CHANGING: { method: Callable; name: string; params: unknown }[] = [
   {
     method: BOT_PHOTON_CONNECT_METHOD,
     name: 'bots.photon.connect',
     params: { organizationId: 'org_1', accountKey: 'pho_ask_1', storesKey: false }
+  },
+  {
+    method: BOT_PHOTON_SPECTRUM_CONNECT_METHOD,
+    name: 'bots.photon.spectrum.connect',
+    params: {
+      botId: 'b1',
+      projectId: 'pho_prj_1',
+      projectSecret: 'pho_sk_project_secret',
+      storesSecret: false
+    }
   },
   {
     method: BOT_PHOTON_CREATE_METHOD,
@@ -100,5 +114,16 @@ describe('which caller may change a bot’s iMessage channel', () => {
     expect(messageOf(await outcomeOf(BOT_PHOTON_STATUS_METHOD, {}, agent))).not.toMatch(
       /Only the owner/
     )
+  })
+
+  it('refuses an agent pointing a bot at a Spectrum project, the way it refuses the account key', async () => {
+    // The exact sentence, not just "something starting with Only": this is the gate standing between a
+    // prompt injection and a project it controls, so the test names it rather than matching a prefix.
+    const error = await outcomeOf(
+      BOT_PHOTON_SPECTRUM_CONNECT_METHOD,
+      { botId: 'b1', projectId: 'pho_prj_1', projectSecret: 'pho_sk_project_secret' },
+      agent
+    )
+    expect(messageOf(error)).toBe('Only the owner can connect a bot to a Spectrum project.')
   })
 })

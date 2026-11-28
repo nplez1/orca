@@ -16,13 +16,43 @@ export type PhotonAssignmentRecord = z.infer<typeof PhotonAssignmentRecord>
 export const PHOTON_SAGA_STEPS = ['project', 'key', 'assignment'] as const
 export type PhotonSagaStep = (typeof PHOTON_SAGA_STEPS)[number]
 
+/**
+ * Which credential the bot's channel runs on, and therefore which half of the field set applies:
+ *
+ * - `account`: Orca provisioned the project with the account service key, so the record carries the
+ *   organization it was created in, the slug it was created under, and the assignments that are also
+ *   the allowlist.
+ * - `spectrum`: the owner's own Spectrum project, so the record carries only its id and slug. There is
+ *   no organization, no minted key and no assignment list — Spectrum's own dashboard decides who
+ *   reaches the project's lines, and the project secret lives sealed beside this file.
+ *
+ * `account` is the default a record written before this field existed parses as, which is why it is
+ * spelled as a default rather than a required field.
+ */
+export const PHOTON_BOT_MODES = ['account', 'spectrum'] as const
+export type PhotonBotMode = (typeof PHOTON_BOT_MODES)[number]
+
+/** The project an Orca-provisioned bot left behind when it was pointed at the owner's own Spectrum project. */
+const PriorProvision = lazyZodSchema(() =>
+  z.object({
+    projectId: z.string().min(1),
+    /** Present only when the provisioned record had one, which its own creation always gave it. */
+    slug: z.string().min(1).optional()
+  })
+)
+
 const PhotonBotRecord = lazyZodSchema(() =>
   z.object({
+    mode: z.enum(PHOTON_BOT_MODES).default('account'),
     botId: z.string().min(1),
     projectId: z.string().min(1),
-    /** The slug the project was created under. Stored, never re-derived: it is immutable upstream. */
-    slug: z.string().min(1),
-    organizationId: z.string().min(1),
+    /** The slug the project was created under, or the one the owner's project already has. Stored, never
+     *  re-derived: it is immutable upstream. Absent only for a Spectrum project that answered without
+     *  one, which is why it is optional rather than defaulted to a guess. */
+    slug: z.string().min(1).optional(),
+    /** The organization an account-provisioned project was created in. Absent in spectrum mode, where
+     *  Orca never saw an organization at all. */
+    organizationId: z.string().min(1).optional(),
     /** The last step that finished; absent while the first is still running. */
     completedThrough: z.enum(PHOTON_SAGA_STEPS).optional(),
     /** The key's id, so it can be revoked; the secret is sealed, never here. */
@@ -41,6 +71,10 @@ const PhotonBotRecord = lazyZodSchema(() =>
      *  it, and the slug is the confirmation. */
     released: z.boolean().default(false),
     releasedAt: z.number().optional(),
+    /** The Orca-provisioned project this bot ran on before it was pointed at the owner's own Spectrum
+     *  project. Kept because `project.delete` needs that record's id and slug: replacing it outright
+     *  would strand a project, and its slug, that nobody could then delete. Only a deletion reads it. */
+    priorProvision: PriorProvision.optional(),
     /** Messages from a handle that is not assigned here. Non-zero means Orca's mirror of the provider's
      *  allowlist is stale, which is a thing to repair rather than a sender to ignore silently. */
     unknownSenderCount: z.number().int().nonnegative().default(0),
@@ -71,6 +105,9 @@ export const StoredRecord = lazyZodSchema(() =>
   z.object({
     account: PhotonAccount.optional(),
     bots: z.array(PhotonBotRecord).default([])
+    /** Released account records whose bot was then pointed at the owner's own Spectrum project, kept
+     *  whole because the record is what a project deletion names: without it the slug and the capacity
+     *  are stranded. One per bot, read only by a deletion, so it never describes the bot's channel. */
   })
 )
 export type StoredRecord = z.infer<typeof StoredRecord>
@@ -94,6 +131,12 @@ export const emptyRecord = (): StoredRecord => ({ bots: [] })
 export const emptySecrets = (): StoredSecrets => ({ projectKeys: {} })
 
 export type PhotonAccountSettings = z.infer<typeof PhotonAccount>
+
+/** A record as it is written: parsed through the schema, so every default — the mode an existing record
+ *  gains when it is rewritten included — has one source rather than a copy beside it. */
+export function withPhotonBotDefaults(input: PhotonBotRecordInput): PhotonBotRecord {
+  return PhotonBotRecord.parse({ ...input, createdAt: input.createdAt ?? Date.now() })
+}
 
 /** What a caller may hand back after provisioning: the record fields, minus the ones only the store
  *  sets. Taken from the schema's *input* type, so a caller need not repeat the defaults. */
