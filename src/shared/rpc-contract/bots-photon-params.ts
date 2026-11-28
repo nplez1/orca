@@ -122,6 +122,10 @@ export type PhotonChannelStatus = {
     completedThrough: 'project' | 'key' | 'assignment' | null
     /** The channel was let go: its numbers and key are gone and its project is all that is left. */
     released: boolean
+    /** A bot on the owner's own project whose secret was session-only and is gone after a restart: it reads
+     *  nothing until the project is connected again. Always false for an account-provisioned bot, whose
+     *  project key is what it reads with. */
+    secretMissing: boolean
     /** Messages from handles this bot has no assignment for. Non-zero means the assignment list here
      *  has drifted from the provider's, and `bots.photon.reconcile` is the repair. */
     unknownSenderCount: number

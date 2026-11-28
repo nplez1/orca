@@ -31,6 +31,12 @@ export type PhotonStreamsDeps = {
   io: PhotonIoFactory
   streamUrl?: string
   log?: (message: string, ...rest: unknown[]) => void
+  /**
+   * The other credential mode's channels, ticked by the clock below. One owner for restart and retry: a
+   * bot on an owner's own Spectrum project has no project key, so this loop used to skip it entirely and
+   * its channel was left to a `healthTick()` nothing in production called.
+   */
+  peerChannels?: { tick(): Promise<void> }
   /** How often the health tick runs. Absent means no tick, which is what a test wants. */
   healthIntervalMs?: number
   /** Handed to every stream as well as used by the tick, so one clock drives the whole channel. */
@@ -73,7 +79,9 @@ export class PhotonStreams {
     this.streams.delete(botId)
     const record = await this.deps.store.bot(botId)
     const credential = await this.deps.store.projectCredential(botId)
-    if (!record || record.released || !credential) {
+    // The mode is read rather than inferred from the missing key: a bot on an owner's own Spectrum project
+    // has no project key by design, and that is a channel this loop does not own.
+    if (!record || record.mode !== 'account' || record.released || !credential) {
       return null
     }
     const stream = new PhotonStream({
@@ -125,9 +133,10 @@ export class PhotonStreams {
   }
 
   /**
-   * The tick that makes two promises true rather than aspirational: a stream that is connected but never
-   * subscribed (`deaf`) is restarted instead of merely reported, and a send that failed is retried
-   * instead of sitting in the outbox until the process dies.
+   * The tick that makes two promises true rather than aspirational — for both credential modes: a stream
+   * that is connected but never subscribed (`deaf`) is restarted instead of merely reported, a send that
+   * failed is retried instead of sitting in the outbox until the process dies, and a Spectrum channel that
+   * ended is replaced by the registry this one ticks.
    */
   async tick(): Promise<void> {
     // Snapshot: a restart replaces the entry, and iterating a Map while adding to it would visit the
@@ -170,13 +179,25 @@ export class PhotonStreams {
       }
     }
     for (const record of await this.deps.store.bots()) {
+      if (record.mode !== 'account' || record.released) {
+        continue
+      }
       const credential = await this.deps.store.projectCredential(record.botId)
-      if (record.released || !credential) {
+      if (!credential) {
         continue
       }
       void this.deps.sendPath
         .retryPending(record.botId, credential)
         .catch((error: unknown) => this.log('[photon] could not retry queued sends', error))
+    }
+    // The other credential mode, on the same clock: a Spectrum channel that stopped is restarted and its
+    // queued answers retried, which is the promise this tick makes for this mode too.
+    if (this.deps.peerChannels) {
+      try {
+        await this.deps.peerChannels.tick()
+      } catch (error) {
+        this.log('[photon] the Spectrum tick failed', error)
+      }
     }
   }
 

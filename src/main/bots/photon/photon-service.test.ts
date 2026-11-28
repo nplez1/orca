@@ -14,7 +14,7 @@ import { PhotonProvisioner } from './photon-provisioning'
 import { PhotonSendPath } from './photon-send'
 import { photonChannelStatus } from './photon-runtime'
 import { PhotonService } from './photon-service'
-import { PhotonSpectrumChannels } from './photon-spectrum-channels'
+import { PhotonSpectrumChannels, type PhotonSpectrumChannelsDeps } from './photon-spectrum-channels'
 import { PhotonSpectrumSecrets } from './photon-spectrum-secrets'
 import { PhotonStreams } from './photon-streams'
 import { PhotonStore } from './photon-store'
@@ -57,8 +57,12 @@ const io: PhotonIoFactory = () => {
   throw new Error('the service tests do not open a stream')
 }
 
-/** The service over this test's stores: the transport is the only thing a caller varies. */
-function serviceWith(io: PhotonIoFactory) {
+/** The service over this test's stores: the socket transport and the SDK client are what a caller varies. */
+function serviceWith(
+  io: PhotonIoFactory,
+  createSpectrumApp: PhotonSpectrumChannelsDeps['createApp'] = () =>
+    Promise.reject(new Error('the service tests open no Spectrum stream'))
+) {
   const store = new PhotonStore(userDataPath)
   const api = new PhotonApi({ baseUrl: server.baseUrl })
   const threads = new PhotonThreadMap(store)
@@ -76,6 +80,17 @@ function serviceWith(io: PhotonIoFactory) {
     sendToChat: async () => {},
     log: () => {}
   })
+  // Wired the way `photonChannel` wires it: the stream loop owns the clock and ticks this registry too.
+  const spectrum = new PhotonSpectrumChannels({
+    store,
+    cursors,
+    secrets: spectrumSecrets,
+    inbound,
+    inbox,
+    sendPath,
+    createApp: createSpectrumApp,
+    log: () => {}
+  })
   const runtime = new PhotonService({
     store,
     api,
@@ -87,20 +102,20 @@ function serviceWith(io: PhotonIoFactory) {
     teardown: new PhotonTeardown({ api, store, log: () => {}, sleep: async () => {} }),
     inbound,
     sendPath,
-    streams: new PhotonStreams({ store, cursors, inbound, sendPath, io, log: () => {} }),
-    // No Spectrum project is connected here, and the fake server speaks the Beta API only.
-    spectrum: new PhotonSpectrumChannels({
+    streams: new PhotonStreams({
       store,
       cursors,
-      secrets: spectrumSecrets,
       inbound,
       sendPath,
-      createApp: () => Promise.reject(new Error('the service tests open no Spectrum stream')),
+      io,
+      peerChannels: spectrum,
       log: () => {}
     }),
+    // No Spectrum project is connected here, and the fake server speaks the Beta API only.
+    spectrum,
     spectrumSecrets
   })
-  return { runtime, store, threads, outbox, inbox }
+  return { runtime, store, threads, outbox, inbox, spectrum, spectrumSecrets }
 }
 
 const service = () => serviceWith(io)
@@ -429,6 +444,90 @@ describe('the health tick', () => {
 
     // A fresh socket was opened, so the deaf stream was replaced rather than merely reported.
     expect(sockets).toHaveLength(2)
+  })
+})
+
+describe('a bot answering on its own Spectrum project', () => {
+  it('refuses the account path’s member, repair and project-deletion calls', async () => {
+    const { runtime, store } = service()
+    await store.putBot({
+      mode: 'spectrum',
+      botId: 'b1',
+      projectId: 'pho_prj_1',
+      slug: 'my-project',
+      createdAt: 1
+    })
+
+    // Each of these is work only a project Orca provisioned has: an assignment list, a minted key, a
+    // deletion that burns a slug. On the owner's own project all three belong in Spectrum's dashboard.
+    for (const call of [
+      () => runtime.addMember({ botId: 'b1', handle: '+15559990000' }),
+      () => runtime.deleteProject({ botId: 'b1', confirmSlug: 'my-project' }),
+      () => runtime.reconcile('b1')
+    ]) {
+      await expect(call()).rejects.toThrow(/your own Spectrum project/)
+    }
+  })
+
+  it('reports the channel as not signed in once a session-only secret is gone after a restart', async () => {
+    const { runtime, store, spectrumSecrets } = service()
+    await store.putBot({
+      mode: 'spectrum',
+      botId: 'b1',
+      projectId: 'pho_prj_1',
+      slug: 'my-project',
+      createdAt: 1
+    })
+
+    // Held for this session, so nothing was written: what the next run reads is nothing at all.
+    expect(await runtime.statusFor('b1')).toMatchObject({ mode: 'spectrum', secretMissing: true })
+    expect(
+      botConnectorServices(botForRow, { gh: 'signed-in', linear: false }, undefined, {
+        mode: 'spectrum',
+        phoneNumber: null,
+        handles: [],
+        secretMissing: true
+      }).find((entry) => entry.source === 'photon')
+    ).toMatchObject({ signedIn: false })
+
+    spectrumSecrets.holdForSession('b1', { projectId: 'pho_prj_1', secret: 'pho_sk_1' })
+    expect(await runtime.statusFor('b1')).toMatchObject({ secretMissing: false })
+  })
+
+  it('restarts a Spectrum channel that stopped, from the same tick that restarts a stream', async () => {
+    // A client whose stream is already over: the state a restart has to come from, and the reason this
+    // tick has to reach this registry at all — `PhotonService.healthTick` had no production caller and the
+    // stream loop skipped every Spectrum bot, so nothing did.
+    const opened: number[] = []
+    const streaming = serviceWith(io, async () => {
+      opened.push(opened.length)
+      return {
+        messages: {
+          [Symbol.asyncIterator]: () => ({
+            next: () => Promise.resolve({ done: true, value: undefined })
+          })
+        },
+        send: async () => undefined,
+        stop: async () => undefined
+      }
+    })
+    await streaming.store.putBot({
+      mode: 'spectrum',
+      botId: 'b1',
+      projectId: 'pho_prj_1',
+      createdAt: 1
+    })
+    await streaming.spectrumSecrets.put('b1', {
+      projectId: 'pho_prj_1',
+      secret: 'pho_sk_project_secret'
+    })
+    await streaming.runtime.startStreams()
+    await vi.waitFor(() => expect(opened).toHaveLength(1))
+    await vi.waitFor(() => expect(streaming.runtime.spectrumRunning('b1')).toBe(false))
+
+    await streaming.runtime.healthTick()
+
+    expect(opened).toHaveLength(2)
   })
 })
 

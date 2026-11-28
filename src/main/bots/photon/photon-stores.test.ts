@@ -192,6 +192,54 @@ describe('the account key and a bot’s project key', () => {
     expect(await store.projectKey('b2')).toEqual({ keyId: 'k2', secret: 'pho_sk_two' })
     expect(await store.bot('b1')).toBeNull()
   })
+
+  it('writes an account-mode record back unchanged, every field it was handed included', async () => {
+    const store = new PhotonStore(userDataPath)
+    const written = await store.putBot({
+      mode: 'account',
+      botId: 'b1',
+      projectId: 'p1',
+      slug: 'orca-bot-one',
+      organizationId: 'org_1',
+      completedThrough: 'assignment',
+      keyId: 'k1',
+      phoneNumber: '+15551230000',
+      ownerHandle: '+15551230000',
+      assignments: [{ assignmentId: 'a1', handle: '+15551230000', phoneNumber: '+15551230000' }],
+      keyGeneration: 2,
+      unknownSenderCount: 1,
+      parkedMessageCount: 2,
+      lastParkedReason: 'This chat is closed.',
+      undeliveredAnswerCount: 1,
+      lastUndeliveredReason: 'Photon answered 503.',
+      createdAt: 1_700_000_000_000
+    })
+
+    // `putBot` parses what it is given, so this pins that the parse is lossless for the mode that has every
+    // field, rather than silently dropping one a caller set.
+    expect(await new PhotonStore(userDataPath).bot('b1')).toEqual(written)
+    expect(written).toMatchObject({
+      mode: 'account',
+      keyGeneration: 2,
+      assignments: [{ assignmentId: 'a1', handle: '+15551230000', phoneNumber: '+15551230000' }],
+      lastUndeliveredReason: 'Photon answered 503.'
+    })
+  })
+
+  it('refuses a record the schema would not read back, instead of writing one that goes unreadable', async () => {
+    const store = new PhotonStore(userDataPath)
+    await store.putBot({ botId: 'b1', projectId: 'p1', organizationId: 'org_1' })
+
+    await expect(
+      store.putBot({ botId: 'b2', projectId: '', organizationId: 'org_1' })
+    ).rejects.toThrow()
+
+    // Nothing was written, so the file the previous state named is still readable and still its own.
+    const restarted = new PhotonStore(userDataPath)
+    expect(await restarted.bot('b2')).toBeNull()
+    expect(restarted.unreadable.record).toBe(false)
+    expect((await restarted.bots()).map((entry) => entry.botId)).toEqual(['b1'])
+  })
 })
 
 describe('the inbox, which is both the crash guard and the dedupe index', () => {

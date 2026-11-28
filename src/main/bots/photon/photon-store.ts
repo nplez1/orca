@@ -209,7 +209,8 @@ export class PhotonStore {
   }
 
   /** Saves a bot's record. The reconciler calls this with the state it read back, which is how a
-   *  half-finished saga finishes instead of rolling back. */
+   *  half-finished saga finishes instead of rolling back. Parsed on the way in, so every default has one
+   *  source: an input the schema refuses throws here rather than being written and read back as damaged. */
   async putBot(input: PhotonBotRecordInput): Promise<PhotonBotRecord> {
     const saved = withPhotonBotDefaults(input)
     await this.change((draft) => {
@@ -217,6 +218,17 @@ export class PhotonStore {
       draft.record = { ...(draft.record ?? emptyRecord()), bots: [...bots, saved] }
     })
     return saved
+  }
+
+  /** Runs one change over the whole record inside the queue, for a caller whose check and write have to be
+   *  one step but whose rule is not this file's to own. Null leaves the record alone. */
+  changeRecord(mutate: (record: StoredRecord) => StoredRecord | null): Promise<void> {
+    return this.change((draft) => {
+      const next = mutate(structuredClone(draft.record ?? emptyRecord()))
+      if (next) {
+        draft.record = next
+      }
+    })
   }
 
   /**

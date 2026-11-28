@@ -155,3 +155,53 @@ describe('a Spectrum channel', () => {
     await expect(channel.send('space_9', 'hello')).rejects.toThrow(/no live Spectrum space/)
   })
 })
+
+describe('a reply to a conversation this run never received', () => {
+  /** The SDK's lookup by id, as spectrum-ts 12.16.0 offers it through the provider namespace. */
+  function appWithLookup(lookup: (id: string) => Promise<SpectrumSpace>) {
+    const sent: { conversationId: string; text: string }[] = []
+    const app: SpectrumApp = {
+      messages: fakeApp([]).app.messages,
+      async send(space, content) {
+        sent.push({ conversationId: space.id, text: content })
+      },
+      space: lookup,
+      async stop() {}
+    }
+    return { app, sent }
+  }
+
+  it('resolves the space from the SDK instead of refusing, which is what a replay after a restart needs', async () => {
+    // The inbox replayed an answer for a message from the previous run, so no space has been streamed
+    // here: the id in the thread map is all there is.
+    const { app, sent } = appWithLookup(async (id) => ({ id }))
+    const channel = new PhotonSpectrumChannel({
+      botId: 'b1',
+      projectId: 'pho_prj_1',
+      app,
+      startSeq: 0,
+      onMessage: async () => {},
+      log: () => {}
+    })
+
+    await channel.send('space_replayed', 'the build is green')
+
+    expect(sent).toEqual([{ conversationId: 'space_replayed', text: 'the build is green' }])
+  })
+
+  it('keeps the honest refusal when the SDK cannot resolve the id', async () => {
+    const { app } = appWithLookup(async () => {
+      throw new Error('no such space')
+    })
+    const channel = new PhotonSpectrumChannel({
+      botId: 'b1',
+      projectId: 'pho_prj_1',
+      app,
+      startSeq: 0,
+      onMessage: async () => {},
+      log: () => {}
+    })
+
+    await expect(channel.send('space_gone', 'hello')).rejects.toThrow(/no live Spectrum space/)
+  })
+})

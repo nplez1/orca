@@ -26,6 +26,12 @@ export type SpectrumMessage = {
 export type SpectrumApp = {
   readonly messages: AsyncIterable<[SpectrumSpace, SpectrumMessage]>
   send(space: SpectrumSpace, content: string): Promise<unknown>
+  /**
+   * The provider's own lookup by id — `provider.space.get(id)` in spectrum-ts 12.16.0. It exists, so a
+   * reply to a message replayed from the inbox after a restart resolves its space instead of being
+   * refused; absent only in a test that does not model it, which keeps the refusal coverable.
+   */
+  space?(id: string): Promise<SpectrumSpace>
   stop(): Promise<void>
 }
 
@@ -43,12 +49,17 @@ export type SpectrumAppFactory = (credentials: {
 export const photonSpectrumApp: SpectrumAppFactory = async ({ projectId, projectSecret }) => {
   const { Spectrum } = await import('spectrum-ts')
   const { imessage } = await import('spectrum-ts/providers/imessage')
-  return Spectrum({
+  const spectrum = await Spectrum({
     projectId,
     projectSecret,
     providers: [imessage.config()],
     telemetry: false
   })
+  // The provider instance is where a space can be built from a persisted id: `space` is a provider
+  // namespace on the instance, not on the Spectrum object itself, which is why the line is resolved here.
+  // The object it answers is the same one `send` takes, so the instance keeps its own send.
+  const line = imessage(spectrum)
+  return Object.assign(spectrum, { space: (id: string) => line.space.get(id) })
 }
 
 /**
@@ -98,8 +109,9 @@ export type PhotonSpectrumChannelDeps = {
 
 export class PhotonSpectrumChannel {
   private readonly log: (message: string, ...rest: unknown[]) => void
-  /** The space each conversation arrived in. The SDK sends to the space object it streamed and offers no
-   *  lookup by id, so a reply is addressed through this map rather than re-derived. */
+  /** The space each conversation arrived in. The SDK sends to the space object it streamed, so a reply to
+   *  a conversation this run has seen is addressed through this map; one it has not is resolved from the
+   *  SDK by id, which the provider namespace offers (`space.get`). */
   private readonly spaces = new Map<string, SpectrumSpace>()
   private seq: number
   private state: 'starting' | 'live' | 'stopped' = 'stopped'
@@ -113,8 +125,8 @@ export class PhotonSpectrumChannel {
     return this.state === 'live'
   }
 
-  /** Starts reading, once. The loop owns its own failures: a stream that ends leaves the channel stopped
-   *  and the health tick is what starts a new one. */
+  /** Starts reading, once. The loop owns its own failures: a stream that ends leaves the channel stopped,
+   *  and the health tick the stream loop owns — which ticks this registry too — is what starts a new one. */
   start(): void {
     if (this.state !== 'stopped') {
       return
@@ -124,18 +136,35 @@ export class PhotonSpectrumChannel {
   }
 
   /**
-   * Sends one message to a conversation this run has already received. It refuses rather than guessing:
-   * a reply to a conversation with no space here would need a space object built from an id alone, and
-   * that is not a handle the SDK can send through.
+   * Sends one message to one of this channel's conversations. It replies through the space the conversation
+   * arrived in, and — for a message replayed from the inbox after a restart, whose space this run never
+   * streamed — through the provider's lookup by id. A lookup that fails is refused rather than guessed at,
+   * so the answer waits in the outbox instead of being sent to nothing.
    */
   async send(conversationId: string, text: string): Promise<void> {
-    const space = this.spaces.get(conversationId)
+    const space = this.spaces.get(conversationId) ?? (await this.spaceFor(conversationId))
     if (!space) {
       throw new Error(
-        `Orca has no live Spectrum space for conversation ${conversationId}, so this answer waits: a reply goes to the space the conversation arrived in, and this run has not received one.`
+        `Orca has no live Spectrum space for conversation ${conversationId}, so this answer waits: a reply goes to the space the conversation arrived in, and this run could not resolve one for its id.`
       )
     }
     await this.deps.app.send(space, text)
+  }
+
+  /** A space built from a persisted conversation id, remembered so the next reply needs no lookup. */
+  private async spaceFor(conversationId: string): Promise<SpectrumSpace | null> {
+    const lookup = this.deps.app.space
+    if (!lookup) {
+      return null
+    }
+    try {
+      const space = await lookup(conversationId)
+      this.spaces.set(conversationId, space)
+      return space
+    } catch (error) {
+      this.log('[photon] could not resolve a Spectrum space by id', error)
+      return null
+    }
   }
 
   /** Stops reading and closes the stream. The SDK's own `stop` is what ends the iteration. */

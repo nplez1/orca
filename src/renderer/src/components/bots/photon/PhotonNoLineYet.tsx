@@ -1,5 +1,6 @@
 // The two steps a bot takes before it has a line: elect to connect it, then say whose number goes on its
-// list. Nothing exists in Photon until the second step, because the owner asked for it.
+// list. Nothing exists in Photon until the second step, because the owner asked for it. The other way in is
+// a Spectrum project the owner already runs, which creates nothing at all — hence the second choice here.
 import React, { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,16 +9,20 @@ import { useTranslate } from '@/i18n/use-translate'
 import { photonCalls, photonErrorMessage } from '@/lib/photon-channel-client'
 import type { Bot } from '../../../../../shared/bot-types'
 import { isPhotonHandle } from '../../../../../shared/rpc-contract/bots-photon-params'
+import { PhotonSpectrumConnectForm } from './PhotonSpectrumConnectForm'
 
 /** A bot with nothing in Photon yet. Connecting is the owner's call, so this asks before anything is
  *  created: the second step is where the project, the key and the first person on its list are made. */
 export function PhotonNoLineYet({
   bot,
   hostId,
+  canSeal,
   onChanged
 }: {
   bot: Bot
   hostId: Bot['hostId']
+  /** False when this host has no keyring, which decides whether a secret can be kept at all. */
+  canSeal: boolean
   onChanged: () => void
 }): React.JSX.Element {
   const t = useTranslate()
@@ -25,7 +30,18 @@ export function PhotonNoLineYet({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [electing, setElecting] = useState(false)
+  const [existingProject, setExistingProject] = useState(false)
   const ready = isPhotonHandle(handle) && !busy
+  if (existingProject) {
+    return (
+      <PhotonSpectrumConnectForm
+        bot={bot}
+        canSeal={canSeal}
+        onConnected={onChanged}
+        onCancel={() => setExistingProject(false)}
+      />
+    )
+  }
   if (!electing) {
     return (
       <div className="space-y-2">
@@ -36,9 +52,14 @@ export function PhotonNoLineYet({
             { bot: bot.name }
           )}
         </p>
-        <Button type="button" size="xs" variant="outline" onClick={() => setElecting(true)}>
-          {t('bots.photon.connectBot', 'Connect {{bot}} to Photon', { bot: bot.name })}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" size="xs" variant="outline" onClick={() => setElecting(true)}>
+            {t('bots.photon.connectBot', 'Connect {{bot}} to Photon', { bot: bot.name })}
+          </Button>
+          <Button type="button" size="xs" variant="ghost" onClick={() => setExistingProject(true)}>
+            {t('bots.photon.spectrumUseExisting', 'Use an existing Spectrum project')}
+          </Button>
+        </div>
       </div>
     )
   }

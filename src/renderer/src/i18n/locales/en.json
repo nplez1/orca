@@ -30977,6 +30977,28 @@
         "expired": "The sign-in expired. Try again.",
         "couldNotSignIn": "Couldn’t sign in. Try again."
       }
+    },
+    "photon": {
+      "spectrumUseExisting": "Use an existing Spectrum project",
+      "spectrumNoAccount": "A Spectrum project you already run needs no Photon account here: the project’s own id and secret are enough for this bot.",
+      "spectrumLead": "Point {{bot}} at a Spectrum project you already run. Nothing is created and no number is assigned here: its lines, and who may reach them, stay in Spectrum.",
+      "spectrumProjectId": "Spectrum project ID",
+      "spectrumProjectIdPlaceholder": "pho_prj_…",
+      "spectrumProjectIdHint": "From the project’s Settings page in Spectrum: the project’s own id, not the organization’s.",
+      "spectrumProjectSecret": "Project secret",
+      "spectrumStoresSecret": "Keep the secret on this computer, sealed by its keyring. Otherwise it lasts this session.",
+      "spectrumCannotStoreSecret": "This computer has no keyring to seal a secret with, so it is not written: the secret lasts this session.",
+      "spectrumConnect": "Connect this project",
+      "spectrumConnectFailed": "Spectrum refused that project. Check the project id and its secret, then try again.",
+      "spectrumPasteSecret": "Save the secret",
+      "spectrumReplaceSecret": "Replace the project secret",
+      "spectrumRelease": "Stop reading this project",
+      "spectrumReleaseTitle": "Stop reading {{bot}}’s project?",
+      "spectrumReleaseBody": "Orca stops reading the project and forgets the secret it kept. The project itself, its lines and everyone who can reach them are untouched: nothing of yours is released or deleted.",
+      "spectrumAnswersOn": "Answers on your own Spectrum project “{{slug}}”. Its lines, and who may reach them, stay in Spectrum.",
+      "spectrumAnswersOnId": "Answers on your own Spectrum project {{projectId}}. Its lines, and who may reach them, stay in Spectrum.",
+      "spectrumSecretMissing": "Its project secret is not on this computer any more, because it was kept for one session only. Nothing reaches this bot until you paste it again.",
+      "spectrumRow": "Answers on your own Spectrum project."
     }
   },
   "plugins": {

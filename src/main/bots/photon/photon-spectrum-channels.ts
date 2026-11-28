@@ -19,6 +19,17 @@ import {
 import type { PhotonSpectrumSecrets } from './photon-spectrum-secrets'
 import type { PhotonStore } from './photon-store'
 
+/** A client opened for a channel that is not going to be kept: closed, and a failure to close it logged
+ *  rather than thrown, because the caller is already reporting a channel it did not publish. */
+async function stopQuietly(
+  app: SpectrumApp,
+  log: (message: string, ...rest: unknown[]) => void
+): Promise<void> {
+  await app.stop().catch((error: unknown) => {
+    log('[photon] could not close an unclaimed Spectrum stream', error)
+  })
+}
+
 /** The one thing this registry asks of the send path: retry what is queued for a bot. A Spectrum bot has
  *  no project key to pass, so the credential is deliberately absent from this slice. */
 type PhotonSpectrumSendRetry = {
@@ -31,11 +42,19 @@ type PhotonSpectrumInbound = {
   handle(input: Parameters<PhotonInbound['handle']>[0]): Promise<unknown>
 }
 
+/** The one thing it asks of the inbox: the highest position this project already holds, so numbering can
+ *  continue after a restart instead of repeating. */
+type PhotonSpectrumSeqSource = {
+  highestSeq(projectId: string): Promise<number>
+}
+
 export type PhotonSpectrumChannelsDeps = {
   store: PhotonStore
   cursors: PhotonCursorStore
   secrets: PhotonSpectrumSecrets
   inbound: PhotonSpectrumInbound
+  /** Where the positions its own numbering hands out are already written. */
+  inbox: PhotonSpectrumSeqSource
   sendPath: PhotonSpectrumSendRetry
   /** Opens the SDK for one bot. Production is `photonSpectrumApp`; a test supplies a fake. */
   createApp: SpectrumAppFactory
@@ -91,13 +110,36 @@ export class PhotonSpectrumChannels {
       this.log('[photon] could not open a Spectrum stream for bot', botId, error)
       return null
     }
+    // The SDK opened while this was awaiting, and either a release ran or a reconnect re-pointed the bot.
+    // Either way this client is not the one to keep: it was opened with credentials the record no longer
+    // names, and it is closed instead of being published, because a channel nothing references is a socket
+    // nothing can stop — not the tick, not a release, not quit.
+    const settled = await this.deps.store.bot(botId)
+    if (
+      !settled ||
+      settled.mode !== 'spectrum' ||
+      settled.released ||
+      settled.projectId !== record.projectId
+    ) {
+      await stopQuietly(app, this.log)
+      return null
+    }
+    const raced = this.channels.get(botId)
+    if (raced?.live) {
+      await stopQuietly(app, this.log)
+      return raced
+    }
     const channel = new PhotonSpectrumChannel({
       botId,
       projectId: record.projectId,
       app,
-      // Spectrum numbers nothing, so the position is this computer's: the last one it checkpointed, and
-      // the inbound handler advances the same cursor an account-provisioned bot's frames move.
-      startSeq: await this.deps.cursors.read(record.projectId).catch(() => 0),
+      // Spectrum numbers nothing, so the position is this computer's: after both the last one it
+      // checkpointed and the highest its inbox already holds, because a restart that reused one would
+      // give two entries the same position and replay them out of order.
+      startSeq: Math.max(
+        await this.deps.cursors.read(record.projectId).catch(() => 0),
+        await this.deps.inbox.highestSeq(record.projectId).catch(() => 0)
+      ),
       onMessage: async (message, seq) => {
         await this.deps.inbound.handle({ botId, projectId: record.projectId, seq, message })
       },
@@ -119,10 +161,11 @@ export class PhotonSpectrumChannels {
   }
 
   /** Where a reply for this bot goes, or null when no channel is live — which the send path reports as a
-   *  send that has not landed, keeping the answer queued rather than losing it. */
+   *  send that has not landed, keeping the answer queued rather than losing it. A channel whose stream
+   *  ended holds a closed client, so handing it back would turn a queued answer into a failure. */
   transportFor(botId: string): PhotonSendTransport | null {
     const channel = this.channels.get(botId)
-    if (!channel) {
+    if (!channel?.live) {
       return null
     }
     return { send: (conversationId, text) => channel.send(conversationId, text) }
@@ -130,7 +173,7 @@ export class PhotonSpectrumChannels {
 
   /** Replaces a channel whose stream ended, and retries what its bot could not send. The same promise
    *  the stream tick makes for an account-provisioned bot: a live channel is left alone, a dead one is
-   *  restarted rather than reported. */
+   *  restarted rather than reported. Called by the one health tick, which the stream loop owns. */
   async tick(): Promise<void> {
     for (const record of await this.deps.store.bots()) {
       if (record.mode !== 'spectrum' || record.released) {

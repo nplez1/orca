@@ -5,7 +5,8 @@
 // who may text a bot, and the permission strings do not enforce it: an unstamped local CLI call reads as
 // `owner`, so `'workspace'` and `'accounts-admin'` pass for any agent on the box. Without this gate a
 // prompt injection could admit an outside number (`member.add`), burn a slug for good
-// (`project.delete`), re-point the account (`connect`) or tear the channel down (`bot.release`).
+// (`project.delete`), re-point the account (`connect`) or the bot itself
+// (`spectrum.connect`), or tear the channel down (`bot.release`).
 import {
   PhotonAddMemberParams,
   PhotonConnectParams,
@@ -67,19 +68,21 @@ export const BOT_PHOTON_CONNECT_METHOD = defineMethod({
 })
 
 /**
- * Connects a bot to a Spectrum project the owner already had, which is the one method that changes
- * something without an owner gate.
+ * Connects a bot to a Spectrum project the owner already had. Owner-only, exactly like
+ * `bots.photon.connect` and for the same reason: without the gate a prompt-injected agent could point any
+ * bot at a project it controls, and every sender there would then be someone the bot answers.
  *
- * That is deliberate and narrow: this credential is one project's own pair, it creates nothing upstream,
- * assigns nobody and can only ever reach the bot it names — so the blast radius an agent holding it has
- * is this bot's own conversation, not the account that pays for every project. The account key
- * (`bots.photon.connect`) is the opposite and stays owner-only.
+ * The permission string does not enforce it — an unstamped local CLI call reads as `owner` — so the gate
+ * below is the check that matters. Re-pointing a bot that is already reading a project is refused by the
+ * service, and the app offers this as a plain choice in the bot's own settings, which is what makes an
+ * owner-only method reachable at all.
  */
 export const BOT_PHOTON_SPECTRUM_CONNECT_METHOD = defineMethod({
   name: 'bots.photon.spectrum.connect',
   permission: 'workspace',
   params: PhotonSpectrumConnectParams,
   handler: async ({ botId, projectId, projectSecret, storesSecret }, context) => {
+    ownerOnly(context, 'Only the owner can connect a bot to a Spectrum project.')
     await requireChannel({ botId }, context, { releasedOk: false })
     return photonChannel(context.runtime).connectSpectrum({
       botId,

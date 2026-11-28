@@ -278,7 +278,7 @@ importers:
         specifier: 4.8.4
         version: 4.8.4(supports-color@7.2.0)
       spectrum-ts:
-        specifier: ^12.16.0
+        specifier: 12.16.0
         version: 12.16.0(supports-color@7.2.0)(typescript@7.0.2)
       ssh2:
         specifier: ^1.17.0

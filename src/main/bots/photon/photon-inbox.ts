@@ -240,6 +240,19 @@ export class PhotonInbox {
     return entries.sort((left, right) => (left.seq ?? 0) - (right.seq ?? 0))
   }
 
+  /** The highest stream position any entry here holds, handled or not. A channel that numbers its own
+   *  messages reads this so a restart cannot hand out a position an entry already has. */
+  async highestSeq(projectId: string): Promise<number> {
+    let highest = 0
+    for (const messageId of await this.idsOf(projectId)) {
+      const entry = await this.read(projectId, messageId)
+      if (entry?.seq !== undefined && entry.seq > highest) {
+        highest = entry.seq
+      }
+    }
+    return highest
+  }
+
   /** The oldest entry at or below `seq` that Orca never dealt with, ignoring `except`. The cursor may
    *  not move past one of these: Photon only replays after the highest cursor it was given, so a cursor
    *  that stepped over an unhandled message would make it unreachable. */

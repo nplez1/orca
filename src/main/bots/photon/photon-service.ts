@@ -27,7 +27,6 @@ import type { PhotonStreams } from './photon-streams'
 import {
   assertPhotonBotHasNoSpectrumChannel,
   connectPhotonSpectrum,
-  photonHealthTick,
   photonSendCredential,
   releasePhotonSpectrumChannel,
   startPhotonChannels,
@@ -276,10 +275,23 @@ export class PhotonService {
     return this.deps.store
   }
 
+  /** Whether this bot's Spectrum project secret is on this computer. False for an account-mode bot, which
+   *  has a project key instead, and false for a secret the owner kept for the session only once Orca has
+   *  restarted — a bot that answers nothing until it is pasted again. */
+  async spectrumSecretPresent(botId: string): Promise<boolean> {
+    return (await this.deps.spectrumSecrets.secret(botId)) !== null
+  }
+
   /** The bot's record as `orca bot connectors` needs it: a bot with no number is not connected, unless it
-   *  answers on a Spectrum project, where nobody texts a number Orca assigned because Orca assigned none. */
+   *  answers on a Spectrum project, where nobody texts a number Orca assigned because Orca assigned none.
+   *  A Spectrum bot whose secret was session-only and is gone after a restart is not connected either, and
+   *  saying it is would be a button that answers nothing. */
   async statusFor(botId: string): Promise<PhotonBotConnectorRow | null> {
-    return photonConnectorRow(this.deps.store, botId)
+    const row = await photonConnectorRow(this.deps.store, botId)
+    if (row?.mode !== 'spectrum') {
+      return row
+    }
+    return { ...row, secretMissing: !(await this.spectrumSecretPresent(botId)) }
   }
 
   /** Whether this bot has a channel at all, which is what a bot delete checks before releasing one. */
@@ -314,8 +326,11 @@ export class PhotonService {
     return this.deps.spectrum.running(botId)
   }
 
+  /** The tick that keeps every channel honest: the streams own the clock, and they tick the Spectrum
+   *  registry too, so both credential modes have one owner for restart and retry rather than a
+   *  `healthTick()` nothing in production calls. */
   healthTick(): Promise<void> {
-    return photonHealthTick(this.deps)
+    return this.deps.streams.tick()
   }
 
   /** One send per finished turn, to the conversation that asked. The credential is what the HTTP client

@@ -22,6 +22,8 @@ import { BotConnectorCaption } from '../bot-connector-people'
 import type { BotConnectorTitle } from '../bot-connector-titles'
 import { PhotonConnectForm } from './PhotonConnectForm'
 import { PhotonNoLineYet } from './PhotonNoLineYet'
+import { PhotonSpectrumConnectForm } from './PhotonSpectrumConnectForm'
+import { PhotonSpectrumLine } from './PhotonSpectrumLine'
 
 type PhotonBot = PhotonChannelStatus['bots'][number]
 
@@ -254,6 +256,10 @@ export function BotPhotonCard({
 }): React.JSX.Element | null {
   const t = useTranslate()
   const { view, reload } = usePhotonChannel(bot.hostId)
+  // Which way in the owner is taking when the account is not connected: Photon's own numbers, or a project
+  // they already run. A Spectrum bot needs no account at all, so the second choice cannot be behind the
+  // first — that was the dead end this replaces.
+  const [ownProjectFirst, setOwnProjectFirst] = useState(false)
   if (view.status === 'loading' || view.status === 'unavailable') {
     return null
   }
@@ -279,57 +285,98 @@ export function BotPhotonCard({
     )
   }
   // `assignment` is the only finished step: before it the record has a project but no number, so the
-  // card must not say Connected and must send the owner to Repair.
-  const unfinished = line !== undefined && !line.released && line.completedThrough !== 'assignment'
+  // card must not say Connected and must send the owner to Repair. A bot on the owner's own Spectrum
+  // project has no steps at all, because Orca did none of them.
+  const ownProject = line?.mode === 'spectrum'
+  // Either way in counts as connected: a bot on the owner's own Spectrum project answers with no Photon
+  // account on this computer at all, so the account's own state cannot be the whole answer.
+  const connected = channel?.connected === true || (line !== undefined && !line.released)
+  const unfinished =
+    line !== undefined && !line.released && !ownProject && line.completedThrough !== 'assignment'
   const notReceiving = line?.stream === 'deaf' || line?.stream === 'stopped'
-  const description = !channel?.connected
+  const description = !connected
     ? t('bots.photon.notConnected', 'Not set up yet: Photon provides the number.')
     : line === undefined
       ? t('bots.photon.noLine', 'Not connected to Photon.')
       : line.released
         ? t('bots.photon.released', 'Released')
-        : unfinished
-          ? t(
-              'bots.photon.unfinished',
-              'Set up only as far as {{step}}, so it has no number yet. Repair finishes it.',
-              { step: line.completedThrough ?? 'project' }
-            )
-          : t('bots.photon.answersOn', 'Answers on {{number}}.', {
-              number:
-                line.phoneNumber ?? t('bots.photon.numberPending', 'a number Photon is assigning')
-            })
+        : ownProject
+          ? t('bots.photon.spectrumRow', 'Answers on your own Spectrum project.')
+          : unfinished
+            ? t(
+                'bots.photon.unfinished',
+                'Set up only as far as {{step}}, so it has no number yet. Repair finishes it.',
+                { step: line.completedThrough ?? 'project' }
+              )
+            : t('bots.photon.answersOn', 'Answers on {{number}}.', {
+                number:
+                  line.phoneNumber ?? t('bots.photon.numberPending', 'a number Photon is assigning')
+              })
   return (
     <BotConnectorRowFrame
       icon={<MessageCircle className="size-4" />}
       name={name}
       description={description}
       status={
-        channel?.connected && line && !line.released
+        connected && line && !line.released
           ? unfinished
             ? { label: t('bots.photon.needsYou', 'Needs you'), tone: 'attention' }
-            : notReceiving
-              ? { label: t('bots.photon.notReceiving', 'Not receiving'), tone: 'attention' }
-              : { label: t('bots.photon.connected', 'Connected'), tone: 'connected' }
+            : ownProject && line.secretMissing
+              ? { label: t('bots.photon.needsYou', 'Needs you'), tone: 'attention' }
+              : notReceiving
+                ? { label: t('bots.photon.notReceiving', 'Not receiving'), tone: 'attention' }
+                : { label: t('bots.photon.connected', 'Connected'), tone: 'connected' }
           : null
       }
       actions={{}}
     >
-      {!channel?.connected ? (
+      {!connected ? (
         <div className="space-y-3">
           <p className="text-xs leading-5 text-muted-foreground">
-            {t(
-              'bots.photon.setupNote',
-              'Texting a bot needs an iMessage number, and Photon assigns it. Connect your own Photon account once on this computer; no Orca account is involved.'
-            )}
+            {ownProjectFirst
+              ? t(
+                  'bots.photon.spectrumNoAccount',
+                  'A Spectrum project you already run needs no Photon account here: the project’s own id and secret are enough for this bot.'
+                )
+              : t(
+                  'bots.photon.setupNote',
+                  'Texting a bot needs an iMessage number, and Photon assigns it. Connect your own Photon account once on this computer; no Orca account is involved.'
+                )}
           </p>
-          <PhotonConnectForm
-            hostId={bot.hostId}
-            canSeal={channel?.accountKeySealed ?? false}
-            onConnected={reload}
-          />
+          {ownProjectFirst ? (
+            <PhotonSpectrumConnectForm
+              bot={bot}
+              canSeal={channel?.accountKeySealed ?? false}
+              onConnected={reload}
+              onCancel={() => setOwnProjectFirst(false)}
+            />
+          ) : (
+            <>
+              <PhotonConnectForm
+                hostId={bot.hostId}
+                canSeal={channel?.accountKeySealed ?? false}
+                onConnected={reload}
+              />
+              <Button size="xs" variant="ghost" onClick={() => setOwnProjectFirst(true)}>
+                {t('bots.photon.spectrumUseExisting', 'Use an existing Spectrum project')}
+              </Button>
+            </>
+          )}
         </div>
       ) : line === undefined ? (
-        <PhotonNoLineYet bot={bot} hostId={bot.hostId} onChanged={reload} />
+        <PhotonNoLineYet
+          bot={bot}
+          hostId={bot.hostId}
+          canSeal={channel?.accountKeySealed ?? false}
+          onChanged={reload}
+        />
+      ) : line.mode === 'spectrum' ? (
+        <PhotonSpectrumLine
+          bot={bot}
+          line={line}
+          canSeal={channel?.accountKeySealed ?? false}
+          onChanged={reload}
+        />
       ) : (
         <PhotonLine bot={bot} hostId={bot.hostId} line={line} onChanged={reload} />
       )}

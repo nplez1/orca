@@ -10,7 +10,8 @@ import type {
   PhotonCreateBotInput,
   PhotonDeleteProjectInput,
   PhotonReleaseBotInput,
-  PhotonReleaseMemberInput
+  PhotonReleaseMemberInput,
+  PhotonSpectrumConnectInput
 } from '../../../shared/rpc-contract/bots-photon-params'
 import type { ExecutionHostId } from '../../../shared/execution-host/execution-host'
 import { botHostTarget } from './bot-hosts'
@@ -23,6 +24,10 @@ export function photonCalls(hostId: ExecutionHostId) {
       callRuntimeRpc(target, 'bots.photon.connect', params),
     createBot: (params: PhotonCreateBotInput): Promise<unknown> =>
       callRuntimeRpc(target, 'bots.photon.create', params),
+    /** Points this bot at a Spectrum project the owner already runs. Creates nothing upstream, so there is
+     *  no project and no number to wait for: the call proves the pair and starts reading. */
+    connectSpectrum: (params: PhotonSpectrumConnectInput): Promise<unknown> =>
+      callRuntimeRpc(target, 'bots.photon.spectrum.connect', params),
     addMember: (params: PhotonAddMemberInput): Promise<unknown> =>
       callRuntimeRpc(target, 'bots.photon.member.add', params),
     releaseMember: (params: PhotonReleaseMemberInput): Promise<unknown> =>

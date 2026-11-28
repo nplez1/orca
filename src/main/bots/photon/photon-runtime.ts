@@ -123,6 +123,7 @@ export function photonChannel(runtime: OrcaRuntimeService): PhotonService {
     cursors,
     secrets: spectrumSecrets,
     inbound,
+    inbox,
     createApp: photonSpectrumApp,
     // Called only once the send path below exists, which is why this is a closure rather than the value.
     sendPath: { retryPending: (botId, credential) => sendPath.retryPending(botId, credential) }
@@ -142,6 +143,9 @@ export function photonChannel(runtime: OrcaRuntimeService): PhotonService {
     inbound,
     sendPath,
     io: socketFactory,
+    // One clock for the whole channel: the streams own it, and they tick the Spectrum registry too, so a
+    // bot on the owner's own project is restarted and retried like any other rather than never.
+    peerChannels: spectrum,
     setTimer: (callback, ms) => {
       const handle = setTimeout(callback, ms)
       return { cancel: () => clearTimeout(handle) }
@@ -172,6 +176,9 @@ export type PhotonBotConnectorRow = {
   mode: PhotonBotMode
   phoneNumber: string | null
   handles: string[]
+  /** A bot on the owner's own project whose secret is not on this computer: session-only, and gone after
+   *  a restart. It answers nothing until it is pasted again, so a listing must not say it is connected. */
+  secretMissing?: boolean
 }
 
 /** What `orca bot connectors` says about one bot's channel, or null when the channel has no complete
@@ -212,25 +219,33 @@ export async function photonChannelStatus(
     organizationId: account?.organizationId ?? null,
     accountKeyStored: account?.storesKey === true,
     accountKeySealed: photonCanSealSecrets(),
-    bots: (await store.bots()).map((record) => {
-      const status = botIds.includes(record.botId) ? service.streamStatus(record.botId) : null
-      return {
-        botId: record.botId,
-        mode: record.mode,
-        slug: record.slug ?? null,
-        projectId: record.projectId,
-        phoneNumber: record.phoneNumber ?? null,
-        handles: record.assignments.map((entry) => entry.handle),
-        stream: channelWord(service, record, status),
-        completedThrough: record.completedThrough ?? null,
-        released: record.released,
-        unknownSenderCount: record.unknownSenderCount,
-        parkedMessageCount: record.parkedMessageCount,
-        lastParkedReason: record.lastParkedReason ?? null,
-        undeliveredAnswerCount: record.undeliveredAnswerCount,
-        lastUndeliveredReason: record.lastUndeliveredReason ?? null
-      }
-    })
+    bots: await Promise.all(
+      (await store.bots()).map(async (record) => {
+        const status = botIds.includes(record.botId) ? service.streamStatus(record.botId) : null
+        return {
+          botId: record.botId,
+          mode: record.mode,
+          slug: record.slug ?? null,
+          projectId: record.projectId,
+          phoneNumber: record.phoneNumber ?? null,
+          handles: record.assignments.map((entry) => entry.handle),
+          stream: channelWord(service, record, status),
+          completedThrough: record.completedThrough ?? null,
+          released: record.released,
+          // A session-only secret is gone after a restart, and the card says so rather than offering a
+          // channel that reads nothing.
+          secretMissing:
+            record.mode === 'spectrum'
+              ? !(await service.spectrumSecretPresent(record.botId))
+              : false,
+          unknownSenderCount: record.unknownSenderCount,
+          parkedMessageCount: record.parkedMessageCount,
+          lastParkedReason: record.lastParkedReason ?? null,
+          undeliveredAnswerCount: record.undeliveredAnswerCount,
+          lastUndeliveredReason: record.lastUndeliveredReason ?? null
+        }
+      })
+    )
   }
 }
 
