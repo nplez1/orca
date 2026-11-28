@@ -424,6 +424,33 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
   a delta round is the owner's call. `LOCAL-PATCHES.md` § `local(lint)`: the mesh row's upstream surface carries the
   reasoning.
 
+### nplez1/issue-481 — a pi pane holds armed work before its first turn (fork issue #481)
+
+- **Why:** #481 reported a pane with an armed `/loop` that showed `done` and never the scheduled-work
+  badge, and named the missing `loop:state` subscription as the cause. That subscription had already
+  landed (`53551610c98`, PR #449); the report reproduces at HEAD through a seam no channel reaches — the
+  lane could only hold a row that already existed. A pane with no turn has only the `session_start`
+  placeholder, which is an identity-only record while its transcript exists and a `sessionBoundary` row
+  otherwise, and both refused the fold. So arming a loop at a fresh idle prompt, or restoring one with a
+  resumed session, published `scheduled_work` and moved the row not at all.
+- **Shape:** a restatement that states armed work may open a row over the placeholder and drops the
+  inherited boundary flag; the listener records that the hold opened on a placeholder
+  (`piHoldOpenedOnPlaceholderPaneKeys`) and restores the flag when the last job stops, so an idle pane
+  does not settle as a completed turn; the normalizer records and folds before the boundary stamp, so an
+  armed `session_start` publishes the hold itself; and the re-check now also runs a 5-minute discovery
+  cadence while a home answers but nothing is held, which finds an older `/loop` that answers the list
+  and emits nothing. A build serving neither channel still arms no timer. The reader moved to
+  `agent-status-scheduled-work-roster-source.ts` to stay inside the emitter's `max-lines` budget.
+- **Base:** `main` at `ba78b1e9ad7`, one commit rebased onto it (no file overlap with the commits it
+  crossed: #500's pane-ownership lane, #497's empty-tabs work, the host device-row retirement).
+- **Verified:** 25 tests in `src/main/pi/agent-status-scheduled-work.test.ts` (the real generated
+  extension driven into the real listener), 401 across the pi and listener suites; `pnpm tc` clean;
+  `check:code-quality:changed main` clean; `local/gate-lint.mjs --fast` 16/16 (the fork-comment ratchet
+  back at exactly its 4843-line baseline); unit gate PASS on the head (`src/shared/**` is a global
+  input). Reviewed by `claude/opus`, high: R1 (3 SHOULD-FIX, 1 MINOR, 2 NIT), delta on R2 (2 SHOULD-FIX
+  — the placeholder memory on the `session_start` path, and a real turn not clearing it), delta on R3
+  clean; the remaining MINOR and NITs are recorded in the PR body.
+
 ### nplez1/New-Loop-Job-Support — a pi pane reads its own scheduled work (pi revamp follow-up, PR #449)
 
 - **Why:** pi-config's `/loop` and pi-subagents were revamped into one `manage_schedules` roster over two

@@ -30,9 +30,12 @@ import {
 } from '../opencode-session-registry'
 import {
   applyPiScheduledWorkHold,
+  forgetPiHoldOpenedOnPlaceholder,
   hookPayloadArmsScheduledWork,
-  recordPiScheduledWork
+  recordPiScheduledWork,
+  rememberPiHoldOpenedOnPlaceholder
 } from '../providers/pi-pane-hold-evidence'
+import { PI_RESTATEMENT_EVENTS } from '../providers/pi-family/pi-family-events'
 import { claudeRowHasUnlistedLiveWork } from '../providers/claude/lifecycle/claude-pane-hold-evidence'
 import { readString } from '../tool-input-preview'
 import { readClaudeBatchSettledRequests } from '../claude-settled-permission-requests'
@@ -303,29 +306,42 @@ export function normalizeHookPayload(
     sessionPlaceholder !== null
       ? gatePaneStateOnDescendants(state, paneKey, sessionPlaceholder)
       : null
-  // Why a session boundary, and only on a still-idle row: this reports a session start, not a turn
-  // that ended — without the flag a relaunch over a crashed `working` row reads as a finished turn,
-  // and an automation's "turn done since dispatchedAt" check can pass before the turn has started.
-  // A row the gate turned live IS a turn, and clients without the session-boundary capability drop
-  // a flagged tab's whole status, so the flag must not ride on it.
-  const gatedPlaceholder =
-    heldPlaceholder?.state === 'done'
-      ? { ...heldPlaceholder, sessionBoundary: true }
-      : heldPlaceholder
-  const transportPayload = dispatched.payload ?? gatedPlaceholder
-  // Why here, once, after the gate and the placeholder: the gate records the lead's own verdict before
-  // any fold consumes it, and every republish path — a finished turn, a descendant draining, a resumed
-  // session's placeholder — passes through this line with the inventory this post carries.
+  // Why a session boundary, and only on a still-idle row: this reports a session start, not a turn that
+  // ended — without the flag a relaunch over a crashed `working` row reads as a finished turn, and an
+  // automation's "turn done since dispatchedAt" check can pass before the turn started. It must not ride
+  // on a live row: a flagged tab's whole status is dropped by clients without the capability.
+  // Why here, once, after the gate and before the boundary stamp: the gate records the lead's own verdict
+  // before any fold consumes it, every republish path (a finished turn, a descendant draining, a resumed
+  // session's placeholder) passes through with this post's inventory, and a placeholder the fold turns
+  // live is not an idle session start for the stamp below to describe.
+  const transportPayload = dispatched.payload ?? heldPlaceholder
   if (source === 'pi') {
     recordPiScheduledWork(state, paneKey, hookPayloadRecord)
   }
-  const piHeldPayload =
+  const heldTransport =
     source === 'pi' ? applyPiScheduledWorkHold(state, paneKey, transportPayload) : transportPayload
+  if (source === 'pi') {
+    if (heldPlaceholder !== null) {
+      if (heldPlaceholder.state === 'done' && heldTransport?.workingMode === 'monitoring') {
+        rememberPiHoldOpenedOnPlaceholder(state, paneKey)
+      } else {
+        forgetPiHoldOpenedOnPlaceholder(state, paneKey)
+      }
+    } else if (!PI_RESTATEMENT_EVENTS.has(eventName)) {
+      forgetPiHoldOpenedOnPlaceholder(state, paneKey)
+    }
+  }
+  const piHeldPayload =
+    heldPlaceholder !== null && heldTransport?.state === 'done'
+      ? { ...heldTransport, sessionBoundary: true }
+      : heldTransport
   // Why: an identity-only record is what discards a status row, so it is only right while there is
-  // no state to publish. A resume whose children are still live does have one, and publishing it is
-  // how the pane gets its hold back instead of waiting for the next child event to describe one.
+  // no state to publish. A resume whose children are still live — or whose loops are still armed —
+  // does have one, and publishing it is how the pane gets its hold back instead of waiting.
   const providerSessionOnlyRecord =
-    providerSessionOnly && (piHeldPayload?.subagents?.length ?? 0) === 0
+    providerSessionOnly &&
+    piHeldPayload?.workingMode !== 'monitoring' &&
+    (piHeldPayload?.subagents?.length ?? 0) === 0
   const restoredUnconfirmed =
     source === 'claude' && state.claudeUnconfirmedRestoredStatusPaneKeys.delete(paneKey)
   if (!piHeldPayload) {

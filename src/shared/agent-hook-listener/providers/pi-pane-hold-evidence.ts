@@ -60,6 +60,26 @@ export function recordPiScheduledWork(
   state.piScheduledWorkByPaneKey.set(paneKey, { jobs, receivedAt: now })
 }
 
+/** Whether the row a scheduled-work hold opened was a session placeholder, which its release must undo.
+ *
+ *  The hold turns a `done` placeholder into `working`, and a live row may not carry the boundary flag
+ *  (clients without that capability drop a flagged tab's whole status), so the flag is cleared while the
+ *  hold lasts — but a pane that never ran a turn must settle back to a boundary row when the last job
+ *  stops. Without this memory the released row reads as a completed turn: a completion clock on an idle
+ *  session, and a push announcing a turn that never ran. One hold, one restore, one entry in this set. */
+export function piHoldOpenedOnPlaceholder(state: HookListenerState, paneKey: string): boolean {
+  return state.piHoldOpenedOnPlaceholderPaneKeys.has(paneKey)
+}
+
+export function rememberPiHoldOpenedOnPlaceholder(state: HookListenerState, paneKey: string): void {
+  state.piHoldOpenedOnPlaceholderPaneKeys.add(paneKey)
+}
+
+/** Forget it: the release restored the flag, or a fresh session placeholder replaced the row. */
+export function forgetPiHoldOpenedOnPlaceholder(state: HookListenerState, paneKey: string): void {
+  state.piHoldOpenedOnPlaceholderPaneKeys.delete(paneKey)
+}
+
 /** Whether a pi post reports armed work, which claims the pane on its own: a loop that re-enters the
  *  session or a cold job the scheduler will fire.
  *
@@ -119,14 +139,12 @@ export function applyPiScheduledWorkHold(
     ...payload,
     state: resolution.stateName,
     workingMode: resolution.workingMode,
-    // Why the previous row: a re-hold of the same finished turn keeps its clock, so the turn-news
-    // listener cannot read a fresh stamp as a turn that has just ended.
+    // Why the previous row: a re-hold of the same finished turn keeps its clock — `continueMainAgentStatus`
+    // does that itself — while a turn that never finished (a crashed `working` row a relaunch folded over)
+    // must not hand the hold its start as the lead's verdict, or the pane announces an end that never came.
     mainAgent: continueMainAgentStatus(
       previousMainAgent,
-      {
-        state: 'done',
-        stateStartedAt: payload.turnCompletedAt ?? previousMainAgent?.stateStartedAt
-      },
+      { state: 'done', stateStartedAt: payload.turnCompletedAt },
       now
     )
   }
