@@ -116,6 +116,7 @@ function createHarness(
   })
   return {
     ...harness,
+    state,
     accepted,
     posted,
     inventory,
@@ -577,6 +578,135 @@ describe('pi scheduled work holds the pane as monitoring', () => {
     expect(harness.accepted.at(-1)?.state).toBe('done')
     expect(harness.accepted.at(-1)?.workingMode).toBeUndefined()
     expect(harness.posted.at(-1)?.scheduled_work).toBeUndefined()
+  })
+
+  it('finds an armed loop in an idle session that announces nothing', async () => {
+    const inventory: Inventory = { live: [], cold: [] }
+    const harness = createHarness({ inventory })
+    await drive(harness, 'session_start', { reason: 'startup' })
+    const postedWhileIdle = harness.posted.length
+
+    // Why silent: an older `/loop` answers its list channel and emits no `loop:state` at all, so nothing
+    // in the pane announces this arm — only asking again on the discovery cadence can find it.
+    inventory.live.push(liveLoop())
+    await vi.advanceTimersByTimeAsync(300_000)
+    await flush()
+
+    expect(harness.accepted.at(-1)?.state).toBe('working')
+    expect(harness.accepted.at(-1)?.workingMode).toBe('monitoring')
+    // Why the slice: the post that carries it must be the discovery's, not the idle start's.
+    expect(harness.posted.slice(postedWhileIdle).at(-1)?.scheduled_work).toEqual({
+      jobs: [expect.objectContaining({ id: 'loop-1', kind: 'live' })]
+    })
+  })
+
+  it('asks again without posting while a served session holds nothing', async () => {
+    const inventory: Inventory = { live: [], cold: [] }
+    const harness = createHarness({ inventory })
+    await drive(harness, 'session_start', { reason: 'startup' })
+    const postedWhileIdle = harness.posted.length
+
+    await vi.advanceTimersByTimeAsync(600_000)
+    await flush()
+
+    // Why: discovery exists to find work, not to restate an empty inventory — a tick that found nothing
+    // must cost one ask and no delivery, or every idle pane posts every five minutes forever.
+    expect(harness.posted.length).toBe(postedWhileIdle)
+    expect(harness.accepted.at(-1)?.state).toBe('done')
+  })
+
+  it('holds a loop restored with the resumed session, before any turn', async () => {
+    const inventory: Inventory = { live: [liveLoop()], cold: [] }
+    const harness = createHarness({ inventory })
+    harness.fsMock.existsSync.mockReturnValue(true)
+
+    await drive(harness, 'session_start', { reason: 'resume' })
+    // Why past the retry: the start's own post is in flight when the refresh's answer lands, so the
+    // restatement that carries it is re-armed rather than delivered on the first tick.
+    await vi.advanceTimersByTimeAsync(1_000)
+    await flush()
+
+    expect(harness.accepted.at(-1)?.state).toBe('working')
+    expect(harness.accepted.at(-1)?.workingMode).toBe('monitoring')
+
+    // Why the release: the hold opened on the start's own post here, with no restatement to record it, so
+    // the release must still find the placeholder it has to return to.
+    inventory.live.length = 0
+    harness.emitPiEvent(LOOP_STATE, { jobs: [] })
+    await flush()
+
+    expect(harness.accepted.at(-1)?.state).toBe('done')
+    expect(harness.accepted.at(-1)?.sessionBoundary).toBe(true)
+  })
+
+  it('releases a turn that ran inside an armed session as a real completion', async () => {
+    const inventory: Inventory = { live: [], cold: [] }
+    const harness = createHarness({ inventory })
+    harness.fsMock.existsSync.mockReturnValue(true)
+    await drive(harness, 'session_start', { reason: 'startup' })
+    inventory.live.push(liveLoop())
+    harness.emitPiEvent(LOOP_STATE, { jobs: [{ id: 'loop-1', nextAt: Date.now() + 300_000 }] })
+    await flush()
+    expect(harness.accepted.at(-1)?.workingMode).toBe('monitoring')
+
+    // Why: a loop firing (or the user typing) starts a real turn under the same hold, and that turn's
+    // completion is the one completion this pane has — it must not be mistaken for the idle boundary.
+    await drive(harness, 'before_agent_start', { prompt: 'sweep the queue' })
+    await drive(harness, 'agent_start')
+    await drive(harness, 'agent_end', {})
+    expect(harness.accepted.at(-1)?.workingMode).toBe('monitoring')
+
+    inventory.live.length = 0
+    harness.emitPiEvent(LOOP_STATE, { jobs: [] })
+    await flush()
+
+    expect(harness.accepted.at(-1)?.state).toBe('done')
+    expect(harness.accepted.at(-1)?.workingMode).toBeUndefined()
+    expect(harness.accepted.at(-1)?.sessionBoundary).toBeUndefined()
+  })
+
+  it('holds a loop armed before the session’s first turn', async () => {
+    const inventory: Inventory = { live: [], cold: [] }
+    const harness = createHarness({ inventory })
+    // Why the persisted session: a real pi post carries `session_id` once its transcript exists, which is
+    // what makes a session_start row an identity-only placeholder.
+    harness.fsMock.existsSync.mockReturnValue(true)
+    // Why a bare session_start: a resumed pane holding restored loops has no turn to ride, and its row
+    // is the placeholder this post opened.
+    await drive(harness, 'session_start', { reason: 'resume' })
+    expect(harness.accepted.at(-1)?.state).toBe('done')
+
+    inventory.live.push(liveLoop())
+    harness.emitPiEvent(LOOP_STATE, { jobs: [{ id: 'loop-1', nextAt: Date.now() + 300_000 }] })
+    await flush()
+
+    expect(harness.accepted.at(-1)?.state).toBe('working')
+    expect(harness.accepted.at(-1)?.workingMode).toBe('monitoring')
+    // Why: the placeholder states no turn, so the hold must not publish a boundary flag beside `working`
+    // — a client without session-boundary support drops a flagged tab's whole status.
+    expect(harness.accepted.at(-1)?.sessionBoundary).toBeUndefined()
+
+    // Why the release: a stopped loop on a pane that never ran a turn must settle back to the boundary
+    // row it came from. Without the flag the row is a completed turn — a push nobody earned, and a
+    // completion clock on an idle session.
+    inventory.live.length = 0
+    harness.emitPiEvent(LOOP_STATE, { jobs: [] })
+    await flush()
+
+    expect(harness.accepted.at(-1)?.state).toBe('done')
+    expect(harness.accepted.at(-1)?.workingMode).toBeUndefined()
+    expect(harness.accepted.at(-1)?.sessionBoundary).toBe(true)
+  })
+
+  it('leaves a session-switch prompt identity-only until work claims the pane', async () => {
+    // Why: a pi session_start carrying a live UI prompt opens a `waiting` row, which is not a turn and not
+    // a hold — it must not become a visible row just because the pane has a transcript.
+    const harness = createHarness({ inventory: { live: [], cold: [] } })
+    harness.fsMock.existsSync.mockReturnValue(true)
+
+    await drive(harness, 'session_start', { reason: 'startup', ui_prompt_active: true })
+
+    expect(harness.state.lastStatusByPaneKey.get(PANE_KEY)?.providerSessionOnly).toBe(true)
   })
 
   it('keeps a live child as plain working, then settles to monitoring when it ends', async () => {

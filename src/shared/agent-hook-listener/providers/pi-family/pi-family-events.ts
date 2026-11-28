@@ -9,6 +9,12 @@ import { extractToolFields, isNewTurnEvent } from '../../provider-event-routing'
 import { readString } from '../../tool-input-preview'
 import { parseOmpPlanReviewPrompt } from '../../../native-chat/input/questions/omp-plan-review-prompt'
 import { mainAgentState } from '../../../agent-status/lifecycle/main-agent-status'
+import {
+  hookPayloadArmsScheduledWork,
+  forgetPiHoldOpenedOnPlaceholder,
+  piHoldOpenedOnPlaceholder,
+  rememberPiHoldOpenedOnPlaceholder
+} from '../pi-pane-hold-evidence'
 
 /** Events that restate an existing row between turns instead of opening one of their own. */
 export const PI_RESTATEMENT_EVENTS: ReadonlySet<unknown> = new Set([
@@ -44,19 +50,34 @@ export function normalizePiCompatibleEvent(
   if (PI_RESTATEMENT_EVENTS.has(eventName)) {
     // Restate inter-turn model/child/scheduled changes on an existing visible row; hidden resume placeholders carry no state.
     const previous = state.lastStatusByPaneKey.get(paneKey)
+    const armsScheduledWork = hookPayloadArmsScheduledWork(hookPayload)
     if (
       !previous ||
-      previous.providerSessionOnly === true ||
+      (previous.providerSessionOnly === true && !armsScheduledWork) ||
       previous.payload.agentType !== agentType ||
       (eventName === 'model_select' && !model)
     ) {
       return null
     }
+    const restated = restatedLeadFields(state, paneKey, previous.payload)
+    const placeholderOpened = piHoldOpenedOnPlaceholder(state, paneKey)
+    if (armsScheduledWork) {
+      if (previous.payload.sessionBoundary === true) {
+        rememberPiHoldOpenedOnPlaceholder(state, paneKey)
+      }
+    } else if (placeholderOpened && restated.state === 'done') {
+      forgetPiHoldOpenedOnPlaceholder(state, paneKey)
+    }
     return normalizeAgentStatusPayload({
       ...previous.payload,
       // Why for every restatement: the row it restates may be held `working` by a finished turn, and a
       // restatement that republishes that `working` as the lead's verdict pins the badge for good.
-      ...restatedLeadFields(state, paneKey, previous.payload),
+      ...restated,
+      ...(armsScheduledWork
+        ? { sessionBoundary: undefined }
+        : placeholderOpened && restated.state === 'done'
+          ? { sessionBoundary: true }
+          : {}),
       ...(eventName === 'model_select' ? { model, modelSwitchCommand } : {}),
       subagents
     })

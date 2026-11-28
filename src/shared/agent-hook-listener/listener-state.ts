@@ -134,6 +134,7 @@ export type HookListenerState = {
   /** Armed scheduled work a pi pane's own extension last reported — loop, pending wakeup or cold job —
    *  with when that post arrived: its fire times are relative to it, and the hold must age. */
   piScheduledWorkByPaneKey: Map<string, PiScheduledWorkInventory>
+  piHoldOpenedOnPlaceholderPaneKeys: Set<string>
   /** Hermes turn per pane, so tool hooks from its post-turn background review can be ignored. */
   hermesTurnByPaneKey: Map<string, HermesPaneTurn>
   /**
@@ -210,6 +211,7 @@ export function createHookListenerState(
     retiredPiClaudeChildrenByPaneKey: new Map(),
     descendantLeadStateByPaneKey: new Map(),
     piScheduledWorkByPaneKey: new Map(),
+    piHoldOpenedOnPlaceholderPaneKeys: new Set(),
     hermesTurnByPaneKey: new Map(),
     childSessionIdsByPaneKey: new Map()
   }
@@ -304,6 +306,7 @@ export function clearPaneProcessCacheState(state: HookListenerState, paneKey: st
   state.retiredPiClaudeChildrenByPaneKey.delete(paneKey)
   state.descendantLeadStateByPaneKey.delete(paneKey)
   state.piScheduledWorkByPaneKey.delete(paneKey)
+  state.piHoldOpenedOnPlaceholderPaneKeys.delete(paneKey)
   state.hermesTurnByPaneKey.delete(paneKey)
   state.childSessionIdsByPaneKey.delete(paneKey)
   // Unfinished evidence and exit intent belong to the ended process.
@@ -367,6 +370,7 @@ export function movePaneCacheState(
   movePaneScopedMapEntries(state.retiredPiClaudeChildrenByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.descendantLeadStateByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.piScheduledWorkByPaneKey, fromPaneKey, toPaneKey)
+  movePaneScopedSetEntries(state.piHoldOpenedOnPlaceholderPaneKeys, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.hermesTurnByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.childSessionIdsByPaneKey, fromPaneKey, toPaneKey)
 }
@@ -421,6 +425,7 @@ export function clearAllListenerCaches(state: HookListenerState): void {
   state.retiredPiClaudeChildrenByPaneKey.clear()
   state.descendantLeadStateByPaneKey.clear()
   state.piScheduledWorkByPaneKey.clear()
+  state.piHoldOpenedOnPlaceholderPaneKeys.clear()
   state.hermesTurnByPaneKey.clear()
   state.childSessionIdsByPaneKey.clear()
   state.hookRootAttempts.clear()

@@ -27,7 +27,9 @@ const PI_SCHEDULED_WORK_LATE_MS = 2 * 60 * 1000
 /** How long a cached inventory is believed at all. The extension restates a held row every 10 minutes
  *  and re-checks every minute (`agent-status-scheduled-work-source.ts`), and its key excludes the
  *  countdown, so a fire that merely moves posts nothing — the restatement is the only freshness
- *  signal there is, and an inventory this old came from an extension that stopped posting. */
+ *  signal there is, and an inventory this old came from an extension that stopped posting. Here and
+ *  not in that cadence: its slower discovery ask (5 minutes, only while nothing is held) renews the
+ *  receipt of an armed job the pane has not been told about yet, so it never races this bound. */
 const PI_SCHEDULED_WORK_MAX_AGE_MS = 10 * 60 * 1000 + 60 * 1000 + PI_SCHEDULED_WORK_LATE_MS
 
 function isRecord(value: unknown): value is Record<string, unknown> {

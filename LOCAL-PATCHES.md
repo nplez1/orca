@@ -1080,15 +1080,71 @@ that changed what the two channels answer. Two shapes the lane read wrongly:
   bound only pi-subagents' two events, so a loop armed, paused or re-armed between turns
   had no post to ride: `/loop` typed at an idle prompt, or a `manage_schedules` call that lands after
   the turn ended, left the pane `done` with the loop armed until the first fire. It is now a third
-  subscribed channel, and it also covers the session-start order case — a restored loop's emit is
-  caught when Orca's extension loads first, and Orca's own `session_start` ask catches it when the
-  `loop` extension loads first. The set holds only jobs with an armed fire, so a dynamic loop between
-  wakeups is invisible to it — pausing or ending one of those moves nothing, which over-holds rather
-  than releasing early, and the ≤60s re-check is the bound.
+  subscribed channel, and it also covers the emit-ordering half of the session-start case — a restored
+  loop's emit is caught when Orca's extension loads first, and Orca's own `session_start` ask catches it
+  when the `loop` extension loads first. The set holds only jobs with an armed fire, so a dynamic loop
+  between wakeups is invisible to it — pausing or ending one of those moves nothing, which over-holds
+  rather than releasing early, and the ≤60s re-check is the bound. What that left open, and what #481
+  reported, is the addendum below.
 
 The events list carries a third entry rather than replacing one: the two pi-subagents channels still
 announce cold work, and `/loop`'s create/remove request channels are still deliberately not bound
 (binding them reads the inventory before the change lands).
+
+**Follow-up, 2026-11-28 — the row the hold could not open (#481).** #481 reported a pane with an armed
+loop that never showed the badge, and named the channel as the cause. The channel had landed in the
+follow-up above; the report reproduces anyway, from a seam no channel reaches, because the lane could
+only hold a row that already existed:
+
+- **A pane with no turn has no row to hold.** pi posts `session_start` and nothing else until a turn
+  starts, and that post opens a placeholder — an _identity-only_ record while its transcript exists
+  (`providerSessionOnly`, so receivers discard the row), otherwise a row stamped `sessionBoundary`, which
+  says "session start, not a finished turn". Two guards then refused the hold: the identity-only record
+  rejected every restatement before it reached the fold, and `applyPiScheduledWorkHold` skipped any
+  boundary payload. So arming a loop at a fresh idle prompt — the issue's own repro — published
+  `scheduled_work` and moved the row not at all; a resumed pane holding restored loops never held
+  either, because `session_start` already carried the inventory and the extension's delivery key then
+  marked it posted.
+- **The fix is at three seams, and each is needed.** `pi-family-events.ts` lets a restatement that
+  states armed work open a row over the identity-only placeholder (the claim a loop makes is the same
+  one that already lets a live child republish one), and drops the inherited boundary flag for that
+  post — a restatement that reports armed work is not the idle boundary it is restating, and a flagged
+  _live_ row is what clients without the capability discard whole.
+  `normalization/normalize-hook-payload.ts` records and folds **before** the boundary stamp, so a
+  session that starts armed publishes the hold itself rather than a placeholder, and the identity-only
+  record now also yields to a `monitoring` hold — a row with something to say is published. What the
+  flag removal costs is paid back at the release: `piHoldOpenedOnPlaceholderPaneKeys` remembers that the
+  hold opened this row over a placeholder, and the restatement that ends the hold stamps
+  `sessionBoundary` back. Without it the idle pane settles `done` with no flag, no `turnCompletedAt` and
+  an empty prompt, which `hookRowTransition` reads as a finished turn — a push for a turn that never
+  ran (found by the adversarial review, not by the issue).
+- **A discovery cadence closes the rest.** `agent-status-scheduled-work-source.ts`'s re-check used to
+  arm only while the pane claimed a hold, so a pane that had never held work could only be told about
+  an arm by an extension that publishes. It now runs while holding nothing too, at
+  `PI_SCHEDULED_WORK_DISCOVERY_MS` (5 min), and only once a home has answered a list at all (its
+  `served` predicate): an older `/loop` that answers `loop:rpc:schedules:list` and emits no
+  `loop:state` is found within that window, while a build that serves neither channel still arms no
+  timer and posts nothing — the fail-safe property is the gate, not an accident. A tick that finds the
+  inventory unchanged costs one ask and no delivery, and a channel retired by two unanswered asks drops
+  out of the predicate, so the timer stops when nothing serves it.
+- **Product call: live agent work still outranks the monitor, and #481's third point is declined.** A
+  row carries one `workingMode`, so "working + monitoring" is not representable; and monitoring is not
+  only a badge — `isAgentTimeAccruing` stops accruing working time on it and
+  `heldTurnCountsAsFinished` reads a monitoring hold as a finished turn unless self-started, which under
+  a live child is exactly the pair of regressions #283 and #197 fixed. An orchestrator parking long-lived
+  children therefore reads plain `working` while they run and `working` + `monitoring` once only scheduled
+  work remains. Pinned by `providers/pi-pane-hold-evidence.test.ts` › "ranks live agent work above the
+  monitor".
+- **The row a hold opens is a real row while it holds.** On a turn-less pane it carries an empty prompt
+  and the lead's synthetic `done`, so the released row is a `done` boundary row rather than the
+  identity-only placeholder it replaced — receivers keep it as "a session with no turn", which is what
+  it is.
+
+Tests: `agent-status-scheduled-work.test.ts` gains the cases this rests on — a loop armed at an idle
+prompt with the real identity-only placeholder (transcript present) and its release back to a boundary
+row, the same arm found by the discovery cadence with nothing announcing it, a restored loop held on the
+`session_start` post itself, an idle discovery tick that posts nothing, and a `session_start` carrying a
+live UI prompt staying identity-only.
 
 **Known uncovered, on purpose.** `plugins/pi-codex-goal` schedules its own re-entry —
 `provider-limit-auto-resume` five minutes after a provider limit, `continuation-scheduler`

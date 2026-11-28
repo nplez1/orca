@@ -7,6 +7,7 @@ import { getPiAgentStatusAsyncSubagentSessionModuleLines } from '../../agent-sta
 import { getPiAgentStatusWslCurlSourceLines } from './agent-status-wsl-curl-source'
 import { getPiSubagentSnapshotSourceLines } from './agent-status-subagent-roster-source'
 import { getPiAgentStatusScheduledWorkModuleLines } from '../../agent-status-scheduled-work-source'
+import { getPiAgentStatusScheduledWorkRosterLines } from '../../agent-status-scheduled-work-roster-source'
 
 export const ORCA_PI_AGENT_STATUS_EXTENSION_FILE = 'orca-agent-status.ts'
 
@@ -125,6 +126,7 @@ export function getPiAgentStatusExtensionSource(kind: PiAgentKind = 'pi'): strin
     '',
     ...getPiSubagentSnapshotSourceLines(),
     ...getPiAgentStatusScheduledWorkModuleLines(kind),
+    ...getPiAgentStatusScheduledWorkRosterLines(kind),
     ...sessionMetadataSourceLines,
     '',
     '// Stat/mtime caching avoids reparsing endpoint files during streaming events.',
