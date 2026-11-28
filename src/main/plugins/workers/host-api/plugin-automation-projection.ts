@@ -82,19 +82,21 @@ export function projectPluginAutomations(
   pluginId: string,
   workspaceIds: ReadonlyMap<string, string>
 ): PluginHostResult<'automation.list'> {
+  // Command automations have no agent to run, so they are not listed, and the cap and the
+  // truncated flag count listed rows rather than every stored one.
+  const listed = automations.filter((automation) => Boolean(automation.agentId))
   return {
-    automations: automations
-      .flatMap((automation) => {
-        const agent = automation.agentId
-        if (!agent) {
-          return []
-        }
-        const raw = automation.workspaceMode === 'existing' ? automation.workspaceId : null
-        const workspaceId = raw ? (workspaceIds.get(raw) ?? fittingId(raw)) : null
-        return {
-          id: automation.id,
-          name: automation.name.slice(0, 512),
-          agent: agent.slice(0, 64),
+    automations: listed.slice(0, PLUGIN_AUTOMATION_LIST_LIMIT).flatMap((automation) => {
+      const agent = automation.agentId
+      if (!agent) {
+        return []
+      }
+      const raw = automation.workspaceMode === 'existing' ? automation.workspaceId : null
+      const workspaceId = raw ? (workspaceIds.get(raw) ?? fittingId(raw)) : null
+      return {
+        id: automation.id,
+        name: automation.name.slice(0, 512),
+        agent: agent.slice(0, 64),
         prompt: automation.prompt.slice(0, PLUGIN_HOST_TEXT_MAX_LENGTH),
         promptTruncated: automation.prompt.length > PLUGIN_HOST_TEXT_MAX_LENGTH,
         projectId: fittingId(automation.runContext?.repoId ?? automation.projectId),
@@ -114,6 +116,6 @@ export function projectPluginAutomations(
         createdByThisPlugin: pluginOwnsAutomation(automation, pluginId)
       }
     }),
-    truncated: automations.length > PLUGIN_AUTOMATION_LIST_LIMIT
+    truncated: listed.length > PLUGIN_AUTOMATION_LIST_LIMIT
   }
 }
