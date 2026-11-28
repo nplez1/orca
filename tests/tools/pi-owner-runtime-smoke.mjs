@@ -63,27 +63,45 @@ try {
     await runner.emit({ type: 'agent_start' })
     await new Promise(resolve => setTimeout(resolve, 250))
     assert.deepEqual(errors, [])
-    console.log(JSON.stringify({pid: process.pid, owner: process.env[process.argv[3]], handlers: loaded.extensions[0].handlers.size}))
+    console.log(JSON.stringify({pid: process.pid, owner: process.env[process.argv[3]], pane: process.env[process.argv[3] + '_PANE'], handlers: loaded.extensions[0].handlers.size}))
   `
   )
+  const ownerKeyOf = (kind) =>
+    kind === 'prime-agent' ? 'ORCA_PRIME_AGENT_STATUS_OWNED' : 'ORCA_PI_STATUS_OWNED'
+  const BASELINE_MUTATIONS = {
+    'baseline-dead': {
+      from: '  return isStatusOwnerAlive(ownerPid)',
+      to: '  return Boolean(ownerPid)'
+    },
+    'baseline-other-pane': {
+      from: '  if (ownerPane && paneKey && ownerPane !== paneKey) return false',
+      to: '  if (false) return false'
+    }
+  }
+  const SCENARIOS = [
+    { name: 'baseline-dead', ownerLive: false, ownerPane: 'owner-proof', reports: false },
+    { name: 'fixed-dead', ownerLive: false, ownerPane: 'owner-proof', reports: true },
+    { name: 'fixed-live', ownerLive: true, ownerPane: 'owner-proof', reports: false },
+    { name: 'fixed-live-other-pane', ownerLive: true, ownerPane: 'other-pane', reports: true },
+    { name: 'baseline-other-pane', ownerLive: true, ownerPane: 'other-pane', reports: false }
+  ]
   const results = []
   for (const kind of ['pi', 'omp', 'prime-agent']) {
-    const ownerKey =
-      kind === 'prime-agent' ? 'ORCA_PRIME_AGENT_STATUS_OWNED' : 'ORCA_PI_STATUS_OWNED'
-    for (const scenario of ['baseline-dead', 'fixed-dead', 'fixed-live']) {
+    const ownerKey = ownerKeyOf(kind)
+    for (const scenario of SCENARIOS) {
       let source = getPiAgentStatusExtensionSource(kind)
-      if (scenario === 'baseline-dead') {
-        const guard = 'if (ownerPid && ownerPid !== selfPid && isStatusOwnerAlive(ownerPid)) return'
+      const mutation = BASELINE_MUTATIONS[scenario.name]
+      if (mutation) {
         assert.ok(
-          source.includes(guard),
-          'Baseline mutation must replace the actual ownership guard'
+          source.includes(mutation.from),
+          `${scenario.name} must mutate the code it claims to baseline: ${mutation.from}`
         )
-        source = source.replace(guard, 'if (ownerPid && ownerPid !== selfPid) return')
+        source = source.replace(mutation.from, mutation.to)
       }
-      const extension = join(scratch, `${kind}-${scenario}.ts`)
+      const extension = join(scratch, `${kind}-${scenario.name}.ts`)
       await writeFile(extension, source)
       const before = received.length
-      const owner = scenario === 'fixed-live' ? process.pid : deadPid
+      const owner = scenario.ownerLive ? process.pid : deadPid
       const child = await runProcess({
         program: process.execPath,
         args: [worker, extension, ownerKey],
@@ -97,26 +115,35 @@ try {
           ORCA_AGENT_HOOK_ENV: 'proof',
           ORCA_AGENT_HOOK_ENDPOINT: '',
           ORCA_PI_STATUS_OWNED: '',
+          ORCA_PI_STATUS_OWNED_PANE: '',
           ORCA_PRIME_AGENT_STATUS_OWNED: '',
+          ORCA_PRIME_AGENT_STATUS_OWNED_PANE: '',
           PRIME_AGENT_INTERNAL_DAEMON_WORKER: kind === 'prime-agent' ? '1' : '',
-          [ownerKey]: String(owner)
+          [ownerKey]: String(owner),
+          [`${ownerKey}_PANE`]: scenario.ownerPane
         },
         timeoutMs: 15000
       })
       assert.equal(child.code, 0, child.stderr)
       const observation = JSON.parse(child.stdout.trim().split('\n').at(-1))
-      const shouldReport = scenario === 'fixed-dead'
+      const shouldReport = scenario.reports
       assert.equal(
         received.length - before,
         shouldReport ? 1 : 0,
-        `${kind}/${scenario}: HTTP delivery`
+        `${kind}/${scenario.name}: HTTP delivery`
       )
       assert.equal(observation.owner, String(shouldReport ? observation.pid : owner))
+      assert.equal(observation.pane, shouldReport ? 'owner-proof' : scenario.ownerPane)
       assert.equal(observation.handlers > 0, shouldReport)
       if (shouldReport) {
         assert.equal(received.at(-1).payload.hook_event_name, 'agent_start')
       }
-      results.push({ kind, scenario, posts: received.length - before, ...observation })
+      results.push({
+        kind,
+        scenario: scenario.name,
+        posts: received.length - before,
+        ...observation
+      })
     }
   }
   console.log(JSON.stringify({ platform: process.platform, results }, null, 2))
