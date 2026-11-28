@@ -527,7 +527,9 @@ describe('a bot answering on its own Spectrum project', () => {
 
     await streaming.runtime.healthTick()
 
-    expect(opened).toHaveLength(2)
+    // The peer tick is not awaited by the stream tick — one hung SDK start must not hold the clock — so the
+    // restart it drives lands a turn later rather than before the tick answers.
+    await vi.waitFor(() => expect(opened).toHaveLength(2))
   })
 })
 

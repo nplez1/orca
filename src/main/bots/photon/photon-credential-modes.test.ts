@@ -10,11 +10,13 @@ import {
   startPhotonChannels,
   type PhotonCredentialModesDeps
 } from './photon-credential-modes'
+import { PhotonApi } from './photon-api'
 import { PhotonOutbox } from './photon-outbox'
 import { PhotonSpectrumChannels } from './photon-spectrum-channels'
 import type { SpectrumApp, SpectrumMessage, SpectrumSpace } from './photon-spectrum-channel'
 import { PhotonSpectrumSecrets } from './photon-spectrum-secrets'
 import { PhotonStore } from './photon-store'
+import { PhotonTeardown } from './photon-teardown'
 import { PhotonCursorStore } from './photon-cursor'
 import { PhotonInbox } from './photon-inbox'
 import { PhotonInbound } from './photon-inbound'
@@ -41,8 +43,13 @@ const sdkMessage = (over: Partial<SpectrumMessage> = {}): SpectrumMessage => ({
 /** One SDK client per channel, with the two facts these tests need: was it closed, and what did it send. */
 type FakeClient = { stopped: boolean; projectId: string; sent: string[] }
 
-function fakeClients() {
+/**
+ * `deferOpen` holds every `createApp` answer until the test calls `openNext`, which is the only way to land
+ * something in the window between the SDK opening and the channel being published.
+ */
+function fakeClients(options: { deferOpen?: boolean } = {}) {
   const clients: FakeClient[] = []
+  const waiting: (() => void)[] = []
   const createApp = (credentials: {
     projectId: string
     projectSecret: string
@@ -53,7 +60,7 @@ function fakeClients() {
     const finished = new Promise<void>((resolve) => {
       finish = resolve
     })
-    return Promise.resolve({
+    const app: SpectrumApp = {
       messages: {
         async *[Symbol.asyncIterator](): AsyncIterableIterator<[SpectrumSpace, SpectrumMessage]> {
           await finished
@@ -67,9 +74,18 @@ function fakeClients() {
         record.stopped = true
         finish()
       }
+    }
+    if (!options.deferOpen) {
+      return Promise.resolve(app)
+    }
+    return new Promise<SpectrumApp>((resolve) => {
+      waiting.push(() => resolve(app))
     })
   }
-  return { clients, createApp }
+  const openNext = (): void => {
+    waiting.shift()?.()
+  }
+  return { clients, createApp, openNext }
 }
 
 /** The stores the connect path writes to, over one temporary profile. */
@@ -170,6 +186,119 @@ describe('connecting a bot to an owner’s own Spectrum project', () => {
       // The record's own age is carried over, so a bot does not look newly created for being re-pointed.
       createdAt: 1
     })
+  })
+
+  it('refuses a released record whose teardown never finished, naming what is still on it', async () => {
+    const { deps, store } = depsWith({})
+    await store.putBot({
+      mode: 'account',
+      botId: 'b1',
+      projectId: 'prj_orca',
+      slug: 'orca-bot-scout',
+      organizationId: 'org_1',
+      completedThrough: 'assignment',
+      keyId: 'k1',
+      assignments: [{ assignmentId: 'as_1', handle: '+15551230000', phoneNumber: '+15557654321' }],
+      released: true,
+      releasedAt: 2,
+      createdAt: 1
+    })
+
+    expect(await rejectionOf(connect(deps))).toMatch(
+      /teardown never finished: 1 number still assigned and an unrevoked project key/
+    )
+
+    // Nothing was written over it: the number and the key are still named, so a retried release can
+    // finish the job this record exists for.
+    expect(await store.bot('b1')).toMatchObject({
+      mode: 'account',
+      projectId: 'prj_orca',
+      keyId: 'k1',
+      released: true
+    })
+    expect((await store.bot('b1'))?.assignments).toHaveLength(1)
+  })
+
+  it('keeps the released account record beside the Spectrum one, so its project can still be deleted', async () => {
+    const { deps, store } = depsWith({})
+    await store.putBot({
+      mode: 'account',
+      botId: 'b1',
+      projectId: 'prj_orca',
+      slug: 'orca-bot-scout',
+      organizationId: 'org_1',
+      completedThrough: 'assignment',
+      released: true,
+      releasedAt: 2,
+      createdAt: 1
+    })
+
+    await connect(deps)
+
+    expect(await store.bot('b1')).toMatchObject({
+      mode: 'spectrum',
+      projectId: 'pho_prj_1',
+      // The provisioned project survives as the one a deletion can still name.
+      priorProvision: { projectId: 'prj_orca', slug: 'orca-bot-scout' }
+    })
+
+    const calls: string[] = []
+    const api = new PhotonApi({
+      baseUrl: 'http://photon.test',
+      newIdempotencyKey: () => 'idem_1',
+      fetchImpl: async (input, init) => {
+        const path = new URL(input).pathname
+        calls.push(`${init.method ?? 'GET'} ${path}`)
+        return init.method === 'DELETE'
+          ? new Response(null, { status: 202 })
+          : new Response(JSON.stringify({ state: 'closed' }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' }
+            })
+      }
+    })
+    const outcome = await new PhotonTeardown({ api, store, log: () => {} }).deleteProject({
+      botId: 'b1',
+      account: { kind: 'account', key: 'pho_sk_account' },
+      confirmSlug: 'orca-bot-scout'
+    })
+
+    expect(calls).toEqual(['DELETE /projects/prj_orca', 'GET /projects/prj_orca/closure'])
+    expect(outcome.state).toBe('closed')
+    // The provisioned identity is gone with the project it named, and the bot's own channel is not:
+    // forgetting the whole record here would have left a live Spectrum channel nothing can reach.
+    expect((await store.bot('b1'))?.priorProvision).toBeUndefined()
+    expect(await store.bot('b1')).toMatchObject({ mode: 'spectrum', projectId: 'pho_prj_1' })
+  })
+
+  it('refuses a bot whose record changed while the pair was being proven', async () => {
+    let finishProbe: () => void = () => {}
+    const probing = new Promise<void>((resolve) => {
+      finishProbe = resolve
+    })
+    const { deps, store } = depsWith({
+      probe: async ({ projectId }) => {
+        await probing
+        return { projectId, name: 'My project', slug: 'my-project' }
+      }
+    })
+
+    const connecting = connect(deps)
+    // A `bots.photon.create` on the same bot lands while the pair is in flight. The refusal has to read the
+    // record the write is about to replace, not the one read before the network call, or this claim would
+    // write a Spectrum record over a live provision.
+    await store.putBot({
+      mode: 'account',
+      botId: 'b1',
+      projectId: 'prj_orca',
+      slug: 'orca-bot-scout',
+      organizationId: 'org_1',
+      createdAt: 1
+    })
+    finishProbe()
+
+    expect(await rejectionOf(connecting)).toMatch(/already answers on an Orca-provisioned/)
+    expect(await store.bot('b1')).toMatchObject({ mode: 'account', projectId: 'prj_orca' })
   })
 
   it('refuses to re-point a bot that is reading another project right now', async () => {
@@ -336,5 +465,37 @@ describe('releasing a channel on the owner’s own project', () => {
 
     expect(await releasePhotonSpectrumChannel(deps, 'b1')).toBeNull()
     expect(await store.bot('b1')).not.toBeNull()
+  })
+
+  it('stops a client that finished opening during the release, so no channel outlives its record', async () => {
+    const clients = fakeClients({ deferOpen: true })
+    const { deps, store, spectrum } = depsWith({ clients })
+    await connect(deps, { storesSecret: true })
+    // The start is fire-and-forget, so the SDK is reached a turn or two after the connect answers.
+    await vi.waitFor(() => expect(clients.clients).toHaveLength(1))
+
+    // The release is held on its forget of the outbox, which is a step it reaches after forgetting the
+    // record. The SDK answers inside that window, and a client published here would be a channel nothing
+    // can stop: the tick only walks store records, and this record is about to go.
+    let finishOutbox: () => void = () => {}
+    const outboxHeld = new Promise<void>((resolve) => {
+      finishOutbox = resolve
+    })
+    const releasing = releasePhotonSpectrumChannel(
+      { ...deps, outbox: { forget: () => outboxHeld } },
+      'b1'
+    )
+    clients.openNext()
+    // Wait for the start to have decided: either it closed the client (right) or it published a channel
+    // (the leak this pins). Letting the release finish first would hide which one happened.
+    await vi.waitFor(() =>
+      expect(clients.clients[0]?.stopped === true || spectrum.running('b1')).toBe(true)
+    )
+    finishOutbox()
+    await releasing
+
+    expect(clients.clients[0]?.stopped).toBe(true)
+    expect(spectrum.running('b1')).toBe(false)
+    expect(await store.bot('b1')).toBeNull()
   })
 })

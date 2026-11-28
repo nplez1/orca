@@ -86,46 +86,171 @@ export type PhotonCredentialModesDeps = {
   log?: (message: string, ...rest: unknown[]) => void
 }
 
-/** A project id claimed for one bot, or the bot that already reads it. */
+/** A project id claimed for one bot, or why the bot cannot be pointed at it. */
 export type PhotonSpectrumClaim =
-  | { claimed: true; record: PhotonBotRecord }
-  | { claimed: false; holderBotId: string }
+  | {
+      claimed: true
+      record: PhotonBotRecord
+      /** The project this bot was reading before, when it is a different one. */
+      repointedFrom: string | null
+    }
+  | { claimed: false; refusal: PhotonSpectrumRefusal }
+
+/** Why a bot cannot be pointed at a Spectrum project. Each carries what the message needs to say what to
+ *  do about it. */
+export type PhotonSpectrumRefusal =
+  | { reason: 'account'; projectId: string }
+  | {
+      reason: 'unsettled'
+      projectId: string
+      slug: string | null
+      assignments: number
+      keyUnrevoked: boolean
+    }
+  | { reason: 'repointing'; projectId: string; wanted: string }
+  | { reason: 'held'; projectId: string; holderBotId: string }
 
 /**
- * Writes a Spectrum bot's record, but only when no other bot already reads that project.
+ * Why this bot cannot be claimed for a Spectrum project, read from the record the write is about to
+ * replace. A released account record is kept as the prior provision on the new one — it is what
+ * `project.delete` names — but only once nothing of that channel is left on it: a number still assigned
+ * or a key nobody revoked is a half-finished teardown, and overwriting the record would lose both.
+ */
+function spectrumRefusal(input: {
+  current: PhotonBotRecord | null
+  bots: readonly PhotonBotRecord[]
+  projectId: string
+  botId: string
+  reading: boolean
+}): PhotonSpectrumRefusal | null {
+  const { current } = input
+  if (current?.mode === 'account') {
+    if (!current.released) {
+      return { reason: 'account', projectId: current.projectId }
+    }
+    if (current.assignments.length > 0 || current.keyId !== undefined) {
+      return {
+        reason: 'unsettled',
+        projectId: current.projectId,
+        slug: current.slug ?? null,
+        assignments: current.assignments.length,
+        keyUnrevoked: current.keyId !== undefined
+      }
+    }
+  }
+  if (current?.mode === 'spectrum' && current.projectId !== input.projectId && input.reading) {
+    return { reason: 'repointing', projectId: current.projectId, wanted: input.projectId }
+  }
+  const held = input.bots.find(
+    (entry) =>
+      entry.mode === 'spectrum' &&
+      entry.projectId === input.projectId &&
+      entry.botId !== input.botId
+  )
+  return held ? { reason: 'held', projectId: input.projectId, holderBotId: held.botId } : null
+}
+
+/** The refusal as the owner reads it: what is in the way, and the call that clears it. */
+function spectrumRefusalMessage(refusal: PhotonSpectrumRefusal): string {
+  switch (refusal.reason) {
+    case 'account':
+      return `This bot already answers on an Orca-provisioned Photon project (${refusal.projectId}). Release that channel first, then connect this project.`
+    case 'unsettled': {
+      const left = [
+        refusal.assignments > 0
+          ? `${refusal.assignments} number${refusal.assignments === 1 ? '' : 's'} still assigned`
+          : null,
+        refusal.keyUnrevoked ? 'an unrevoked project key' : null
+      ]
+        .filter((part) => part !== null)
+        .join(' and ')
+      return `This bot's Photon project ${refusal.slug ?? refusal.projectId} was released, but its teardown never finished: ${left}. Run bots.photon.bot.release again to finish it, or delete the project with bots.photon.project.delete, then connect this project — the record being replaced here is what names that project, so overwriting it would strand it.`
+    }
+    case 'repointing':
+      return `This bot is reading Spectrum project ${refusal.projectId} right now, so it cannot be pointed at ${refusal.wanted} without releasing this channel first. Release it with bots.photon.bot.release, then connect the other project.`
+    case 'held':
+      return `Spectrum project ${refusal.projectId} is already connected to bot ${refusal.holderBotId}. One project has one inbox, so two bots on it would answer each other's messages; connect this bot to a different project.`
+  }
+}
+
+/**
+ * Writes a Spectrum bot's record, unless the bot cannot be pointed there or no other bot already reads
+ * that project.
  *
- * The check and the write are one entry in the store's queue, so two connects racing the same project
- * cannot both find it free and then both write: that would leave two sockets on one inbox, and each bot
- * answering the other's messages. `store.changeRecord` is the queue; the rule lives here.
+ * The rules and the write are one entry in the store's queue, so two connects racing the same project
+ * cannot both find it free and then both write — two sockets on one inbox, each bot answering the
+ * other's messages — and a check made before the network probe cannot be overwritten by a concurrent
+ * `bots.photon.create` on the same bot. `store.changeRecord` is the queue; the rules live here.
  */
 export function claimPhotonSpectrumProject(
   store: PhotonStore,
-  input: PhotonBotRecordInput
+  input: PhotonBotRecordInput,
+  options: { reading: boolean }
 ): Promise<PhotonSpectrumClaim> {
-  const saved = withPhotonBotDefaults({ ...input, mode: 'spectrum' })
-  const outcome: { holderBotId: string | null } = { holderBotId: null }
+  const outcome: {
+    refusal: PhotonSpectrumRefusal | null
+    record: PhotonBotRecord | null
+    repointedFrom: string | null
+  } = { refusal: null, record: null, repointedFrom: null }
   return store
     .changeRecord((record) => {
-      const held = record.bots.find(
-        (entry) =>
-          entry.mode === 'spectrum' &&
-          entry.projectId === saved.projectId &&
-          entry.botId !== saved.botId
-      )
-      if (held) {
-        outcome.holderBotId = held.botId
+      const current = record.bots.find((entry) => entry.botId === input.botId) ?? null
+      const priorProvision = priorProvisionOf(current)
+      const saved = withPhotonBotDefaults({
+        ...input,
+        mode: 'spectrum',
+        // The record's own age is carried over, so a bot does not look newly created for being re-pointed.
+        ...(current ? { createdAt: current.createdAt } : {}),
+        ...(priorProvision ? { priorProvision } : {})
+      })
+      const refusal = spectrumRefusal({
+        current,
+        bots: record.bots,
+        projectId: saved.projectId,
+        botId: saved.botId,
+        reading: options.reading
+      })
+      if (refusal) {
+        outcome.refusal = refusal
         return null
       }
+      outcome.record = saved
+      outcome.repointedFrom =
+        current?.mode === 'spectrum' && current.projectId !== saved.projectId
+          ? current.projectId
+          : null
       return {
         ...record,
         bots: [...record.bots.filter((entry) => entry.botId !== saved.botId), saved]
       }
     })
-    .then(() =>
-      outcome.holderBotId
-        ? { claimed: false, holderBotId: outcome.holderBotId }
-        : { claimed: true, record: saved }
-    )
+    .then((): PhotonSpectrumClaim => {
+      if (outcome.refusal) {
+        return { claimed: false, refusal: outcome.refusal }
+      }
+      if (!outcome.record) {
+        // The queue ran the rule and it left the record alone without a refusal to report: nothing was
+        // written, so this is not a claim.
+        throw new Error('The Spectrum project was not claimed and nothing says why.')
+      }
+      return {
+        claimed: true,
+        record: outcome.record,
+        repointedFrom: outcome.repointedFrom
+      }
+    })
+}
+
+/** The provisioned project to keep on the new record: this bot's own released one, or whatever an earlier
+ *  switch already kept — a second connect must not forget the project the first one made reachable. */
+function priorProvisionOf(current: PhotonBotRecord | null): PhotonBotRecord['priorProvision'] {
+  if (current?.mode === 'account') {
+    return {
+      projectId: current.projectId,
+      ...(current.slug ? { slug: current.slug } : {})
+    }
+  }
+  return current?.priorProvision
 }
 
 /**
@@ -135,9 +260,9 @@ export function claimPhotonSpectrumProject(
  *
  * Refusals before anything is written, because each would otherwise leave a channel that fails later on
  * its own: a secret asked to be kept where it could only be written base64, a bot whose Orca-provisioned
- * project is still live, a project another bot already reads, and a bot whose channel is *reading* one
- * project being pointed at another. A secret the owner chose not to keep still works for this session,
- * which is what makes "off" a choice rather than broken.
+ * project is still live (or whose teardown never finished), a project another bot already reads, and a bot
+ * whose channel is *reading* one project being pointed at another. A secret the owner chose not to keep
+ * still works for this session, which is what makes "off" a choice rather than broken.
  *
  * Re-connecting the same project is how a rotated secret is applied, so it is allowed and it takes
  * effect: the channel reading the old secret is closed before the new one opens.
@@ -148,14 +273,6 @@ export async function connectPhotonSpectrum(
 ): Promise<PhotonSpectrumConnectResult> {
   const log = deps.log ?? ((message: string, ...rest: unknown[]) => console.warn(message, ...rest))
   assertPhotonKeyCanBeStored(input.storesSecret)
-  const existing = await deps.store.bot(input.botId)
-  // A released account record keeps the project id its deletion has to burn, and nothing of it is live:
-  // pointing this bot at a spectrum project is then exactly what a bot with no channel does.
-  if (existing && existing.mode === 'account' && !existing.released) {
-    throw new Error(
-      `This bot already answers on an Orca-provisioned Photon project (${existing.projectId}). Release that channel first, then connect this project.`
-    )
-  }
   // The probe runs before anything is written: a pair that does not work leaves no record and no secret
   // behind, so a typo is a refusal rather than a channel that fails later.
   const probe = deps.probeSpectrum ?? probePhotonSpectrumProject
@@ -163,33 +280,28 @@ export async function connectPhotonSpectrum(
     projectId: input.projectId,
     projectSecret: input.projectSecret
   })
-  const repointing =
-    existing?.mode === 'spectrum' && existing.projectId !== project.projectId ? existing : null
-  if (repointing && deps.spectrum.running(input.botId)) {
-    throw new Error(
-      `This bot is reading Spectrum project ${repointing.projectId} right now, so it cannot be pointed at ${project.projectId} without releasing this channel first. Release it with bots.photon.bot.release, then connect the other project.`
-    )
-  }
-  // The holder check and the write are one store queue entry: two connects racing the same project cannot
-  // both find it free and then both open a socket on the one inbox.
-  const claimed = await claimPhotonSpectrumProject(deps.store, {
-    mode: 'spectrum',
-    botId: input.botId,
-    projectId: project.projectId,
-    ...(project.slug ? { slug: project.slug } : {}),
-    ...(existing ? { createdAt: existing.createdAt } : {})
-  })
+  // Every other refusal reads the record *inside* the store's queue, with the write: the pair is proven
+  // over the network, and a `bots.photon.create` racing that window would otherwise be overwritten by
+  // this claim — or a record already replaced by it would be checked as it was before the probe.
+  const claimed = await claimPhotonSpectrumProject(
+    deps.store,
+    {
+      mode: 'spectrum',
+      botId: input.botId,
+      projectId: project.projectId,
+      ...(project.slug ? { slug: project.slug } : {})
+    },
+    { reading: deps.spectrum.running(input.botId) }
+  )
   if (!claimed.claimed) {
-    throw new Error(
-      `Spectrum project ${project.projectId} is already connected to bot ${claimed.holderBotId}. One project has one inbox, so two bots on it would answer each other's messages; connect this bot to a different project.`
-    )
+    throw new Error(spectrumRefusalMessage(claimed.refusal))
   }
   // Before the new channel opens, the old one closes: a rotated secret or a changed project would
   // otherwise leave the bot reading with the credential it just replaced. Answers queued for a *different*
   // project can never be delivered on this one, so they are settled rather than retried until the horizon
   // passes; a rotated secret keeps them, because they are still addressable.
   deps.spectrum.stop(input.botId)
-  if (repointing) {
+  if (claimed.repointedFrom) {
     await deps.outbox.forget(input.botId)
   }
   const secret = { projectId: project.projectId, secret: input.projectSecret }
@@ -216,13 +328,23 @@ export async function connectPhotonSpectrum(
 }
 
 /**
+/** What letting go of a Spectrum channel needs. The outbox is a slice rather than the class: a release
+ *  only ever asks it to forget. */
+export type PhotonSpectrumReleaseDeps = {
+  store: PhotonStore
+  spectrum: PhotonSpectrumChannels
+  spectrumSecrets: PhotonSpectrumSecrets
+  outbox: { forget(botId: string): Promise<void> }
+}
+
+/**
  * Lets go of a bot's channel on the owner's own project: nothing of theirs is released, because Orca
  * created nothing and minted nothing. The channel stops reading and the sealed secret is forgotten, which
  * is all Orca holds. Null when this bot answers on an Orca-provisioned project, whose release is the
  * account path's own.
  */
 export async function releasePhotonSpectrumChannel(
-  deps: Pick<PhotonCredentialModesDeps, 'store' | 'spectrum' | 'spectrumSecrets' | 'outbox'>,
+  deps: PhotonSpectrumReleaseDeps,
   botId: string
 ): Promise<PhotonReleaseOutcome | null> {
   const held = await deps.store.bot(botId)
@@ -230,9 +352,12 @@ export async function releasePhotonSpectrumChannel(
     return null
   }
   deps.spectrum.stop(botId)
+  // The record goes first: a start whose `createApp` resolves after this point re-reads the record, finds
+  // it gone and closes its client, where forgetting it last let that start publish a channel for a bot
+  // about to be deleted — and the tick only walks records, so nothing would ever stop it.
+  await deps.store.forgetBot(botId)
   await deps.outbox.forget(botId)
   await deps.spectrumSecrets.forget(botId)
-  await deps.store.forgetBot(botId)
   return { botId, released: [], revokedKey: false, projectKept: true, problems: [] }
 }
 

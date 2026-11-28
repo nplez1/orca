@@ -32,6 +32,15 @@ export type PhotonSagaStep = (typeof PHOTON_SAGA_STEPS)[number]
 export const PHOTON_BOT_MODES = ['account', 'spectrum'] as const
 export type PhotonBotMode = (typeof PHOTON_BOT_MODES)[number]
 
+/** The project an Orca-provisioned bot left behind when it was pointed at the owner's own Spectrum project. */
+const PriorProvision = lazyZodSchema(() =>
+  z.object({
+    projectId: z.string().min(1),
+    /** Present only when the provisioned record had one, which its own creation always gave it. */
+    slug: z.string().min(1).optional()
+  })
+)
+
 const PhotonBotRecord = lazyZodSchema(() =>
   z.object({
     mode: z.enum(PHOTON_BOT_MODES).default('account'),
@@ -62,6 +71,10 @@ const PhotonBotRecord = lazyZodSchema(() =>
      *  it, and the slug is the confirmation. */
     released: z.boolean().default(false),
     releasedAt: z.number().optional(),
+    /** The Orca-provisioned project this bot ran on before it was pointed at the owner's own Spectrum
+     *  project. Kept because `project.delete` needs that record's id and slug: replacing it outright
+     *  would strand a project, and its slug, that nobody could then delete. Only a deletion reads it. */
+    priorProvision: PriorProvision.optional(),
     /** Messages from a handle that is not assigned here. Non-zero means Orca's mirror of the provider's
      *  allowlist is stale, which is a thing to repair rather than a sender to ignore silently. */
     unknownSenderCount: z.number().int().nonnegative().default(0),
@@ -92,6 +105,9 @@ export const StoredRecord = lazyZodSchema(() =>
   z.object({
     account: PhotonAccount.optional(),
     bots: z.array(PhotonBotRecord).default([])
+    /** Released account records whose bot was then pointed at the owner's own Spectrum project, kept
+     *  whole because the record is what a project deletion names: without it the slug and the capacity
+     *  are stranded. One per bot, read only by a deletion, so it never describes the bot's channel. */
   })
 )
 export type StoredRecord = z.infer<typeof StoredRecord>

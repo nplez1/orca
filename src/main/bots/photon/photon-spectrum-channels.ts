@@ -63,6 +63,9 @@ export type PhotonSpectrumChannelsDeps = {
 
 export class PhotonSpectrumChannels {
   private readonly channels = new Map<string, PhotonSpectrumChannel>()
+  /** Bots something asked to stop while their start was still opening. The record forget that follows a
+   *  release takes longer than a client does to open, so the record alone cannot say "do not publish". */
+  private readonly stopped = new Set<string>()
   private readonly log: (message: string, ...rest: unknown[]) => void
 
   constructor(private readonly deps: PhotonSpectrumChannelsDeps) {
@@ -83,6 +86,9 @@ export class PhotonSpectrumChannels {
    *  secret cannot be opened here, or the SDK refused to start — all of which are reports, not throws:
    *  the record and the secret are real either way, and a connect that saved them did not fail. */
   async start(botId: string): Promise<PhotonSpectrumChannel | null> {
+    // A start is an explicit request to read this bot's project, so it takes the bot off the stopped list;
+    // a stop that arrives from here on is recorded again by `stop`, and checked before publishing.
+    this.stopped.delete(botId)
     const running = this.channels.get(botId)
     if (running?.live) {
       return running
@@ -113,9 +119,12 @@ export class PhotonSpectrumChannels {
     // The SDK opened while this was awaiting, and either a release ran or a reconnect re-pointed the bot.
     // Either way this client is not the one to keep: it was opened with credentials the record no longer
     // names, and it is closed instead of being published, because a channel nothing references is a socket
-    // nothing can stop — not the tick, not a release, not quit.
+    // nothing can stop — not the tick, not a release, not quit. The stop is checked as well as the record:
+    // forgetting a record is a write, so a release in progress has already stopped this bot by the time a
+    // record it is still deleting reads as present.
     const settled = await this.deps.store.bot(botId)
     if (
+      this.stopped.has(botId) ||
       !settled ||
       settled.mode !== 'spectrum' ||
       settled.released ||
@@ -129,6 +138,9 @@ export class PhotonSpectrumChannels {
       await stopQuietly(app, this.log)
       return raced
     }
+    // A raced channel whose stream already ended still owns an SDK client, and publishing over it would
+    // leave that client unreachable: closed here, for the same reason the entry at the top is.
+    raced?.stop()
     const channel = new PhotonSpectrumChannel({
       botId,
       projectId: record.projectId,
@@ -151,6 +163,9 @@ export class PhotonSpectrumChannels {
   }
 
   stop(botId: string): void {
+    // Recorded as well as acted on: a client that finishes opening after this point belongs to a channel
+    // the caller will never hear from again, so `start` closes it rather than publishing it.
+    this.stopped.add(botId)
     this.channels.get(botId)?.stop()
     this.channels.delete(botId)
   }

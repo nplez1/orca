@@ -26,7 +26,10 @@ type FakeSocket = PhotonSocket & {
 }
 
 /** A socket the test drives; every one it makes is kept so a leaked reconnect is countable. */
-function harness(handler: () => Promise<void>) {
+function harness(
+  handler: () => Promise<void>,
+  options: { peerChannels?: { tick(): Promise<void> } } = {}
+) {
   const sockets: FakeSocket[] = []
   // A cancelled timer must not run, which is what `clearTimeout` buys in production: modelling it is
   // what makes "the resume was cancelled" observable as "no socket opened".
@@ -64,6 +67,7 @@ function harness(handler: () => Promise<void>) {
     sendPath: { retryPending: async () => [] },
     io,
     log: () => {},
+    ...(options.peerChannels ? { peerChannels: options.peerChannels } : {}),
     setTimer: (callback) => {
       const timer = { callback, cancelled: false }
       timers.push(timer)
@@ -201,5 +205,43 @@ describe('the health tick', () => {
     await test.streams.tick()
 
     expect(test.sockets).toHaveLength(1)
+  })
+
+  it('keeps the clock free when a Spectrum start hangs, and does not stack a second peer tick on it', async () => {
+    // A peer tick awaits the SDK's `createApp`. Awaiting it here put the next tick behind one bot's hung
+    // start-up, so every account-mode stream stopped being health-checked — deaf streams never restarted
+    // and queued sends never retried — while the tick that schedules itself never ran again.
+    let peerTicks = 0
+    const hung = new Promise<void>(() => {})
+    const test = harness(async () => {}, {
+      peerChannels: {
+        tick: () => {
+          peerTicks += 1
+          return hung
+        }
+      }
+    })
+    await test.store.putBot({
+      botId: 'b1',
+      projectId: 'pho_prj_1',
+      slug: 'orca-bot-scout-7dc96f77',
+      organizationId: 'org_1'
+    })
+    await test.store.putProjectKey('b1', { keyId: 'k1', secret: 'pho_sk_1' })
+    await test.streams.start('b1')
+    // Connected and never subscribed: the tick's own job is to restart it.
+    test.sockets[0]?.fire('connect')
+
+    const outcome = await Promise.race([
+      test.streams.tick().then(() => 'ticked'),
+      new Promise<string>((resolve) => setTimeout(() => resolve('held'), 1_500))
+    ])
+
+    expect(outcome).toBe('ticked')
+    expect(test.sockets).toHaveLength(2)
+
+    // The hung tick is still in flight, and the next one does not pile another on top of it.
+    await test.streams.tick()
+    expect(peerTicks).toBe(1)
   })
 })

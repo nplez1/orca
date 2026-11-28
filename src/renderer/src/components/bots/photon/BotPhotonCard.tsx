@@ -96,7 +96,7 @@ function PhotonLine({
       <p className="text-xs text-muted-foreground">
         {t(
           'bots.photon.releasedWhatLeft',
-          'Its number and key are gone, and only the Photon project is left. Deleting that project in Photon does not clear the record here: giving this bot a number again needs `bots.photon.project.delete`, which Settings does not offer because it burns the slug for good.'
+          'Its number and key are gone. The record stays so its Photon project can still be deleted, and it can answer again on a Spectrum project you already run: connect that project’s id and secret. Giving it a Photon number again means deleting this project with `bots.photon.project.delete`, which burns the slug for good.'
         )}
       </p>
     )
@@ -220,7 +220,7 @@ function PhotonLine({
             <DialogDescription>
               {t(
                 'bots.photon.releaseConfirmBody',
-                'Its numbers are released and its key is revoked. Settings has no way back: giving it a number again means deleting its Photon project with `bots.photon.project.delete`, which burns the slug for good, so the record stays with only a project left.'
+                'Its numbers are released and its key is revoked. Giving it a Photon number again means deleting its project with `bots.photon.project.delete`, which burns the slug for good, so the record stays with only a project left; to keep it answering, point it at a Spectrum project you already run.'
               )}
             </DialogDescription>
           </DialogHeader>

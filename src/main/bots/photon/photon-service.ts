@@ -239,7 +239,7 @@ export class PhotonService {
   }): Promise<PhotonProjectDeletionOutcome> {
     // Validated before the stream is touched: a typo in the slug or a missing account key must not
     // leave the bot deaf until the next restart.
-    const record = await requirePhotonProvisionedRecord(this.deps.store, input.botId)
+    const record = await requirePhotonProvisionedRecord(this.deps.store, input.botId, 'project')
     if (input.confirmSlug !== record.slug) {
       throw new Error(
         `Refusing to delete project ${record.projectId}: the confirmation names "${input.confirmSlug}" but its slug is "${record.slug}", and the slug can never be reused.`
@@ -259,7 +259,7 @@ export class PhotonService {
   /** Reads a half-finished saga back and finishes the record, which is what a crash leaves behind. Also
    *  the repair for a bot whose mirror of the provider's allowlist went stale. */
   async reconcile(botId: string): Promise<{ repaired: boolean; notes: string[] }> {
-    await requirePhotonProvisionedRecord(this.deps.store, botId)
+    await requirePhotonProvisionedRecord(this.deps.store, botId, 'channel')
     const account = await requirePhotonAccount(this.deps.store)
     const ownerHandle = (await this.deps.store.bot(botId))?.ownerHandle
     const outcome = await this.deps.provisioner.reconcile({

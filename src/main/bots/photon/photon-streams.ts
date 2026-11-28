@@ -49,6 +49,8 @@ const DEFAULT_HEALTH_MS = 60_000
 export class PhotonStreams {
   private readonly streams = new Map<string, PhotonStream>()
   private health: PhotonTimer | null = null
+  /** Whether the peer registry's tick is still running, so a slow one is not stacked on. */
+  private peerTickRunning = false
 
   private readonly log: (message: string, ...rest: unknown[]) => void
 
@@ -191,14 +193,25 @@ export class PhotonStreams {
         .catch((error: unknown) => this.log('[photon] could not retry queued sends', error))
     }
     // The other credential mode, on the same clock: a Spectrum channel that stopped is restarted and its
-    // queued answers retried, which is the promise this tick makes for this mode too.
-    if (this.deps.peerChannels) {
-      try {
-        await this.deps.peerChannels.tick()
-      } catch (error) {
-        this.log('[photon] the Spectrum tick failed', error)
-      }
+    // queued answers retried, which is the promise this tick makes for this mode too. Not awaited: a peer
+    // tick awaits the SDK's `createApp`, and the next tick is scheduled from this call's `finally`, so one
+    // hung start would stop the clock for every account-mode stream as well. The guard is what keeps the
+    // un-awaited tick from piling up on top of a slow one.
+    this.tickPeerChannels()
+  }
+
+  private tickPeerChannels(): void {
+    const peers = this.deps.peerChannels
+    if (!peers || this.peerTickRunning) {
+      return
     }
+    this.peerTickRunning = true
+    void peers
+      .tick()
+      .catch((error: unknown) => this.log('[photon] the Spectrum tick failed', error))
+      .finally(() => {
+        this.peerTickRunning = false
+      })
   }
 
   private startHealth(): void {

@@ -207,4 +207,39 @@ describe('the Spectrum channel registry', () => {
 
     expect(opened).toEqual([])
   })
+
+  it('closes a channel whose stream ended while this start was still opening its own', async () => {
+    let opened = 0
+    let openFirst: (app: SpectrumApp) => void = () => {}
+    const racedStops: string[] = []
+    const test = harness(() => {
+      opened += 1
+      if (opened === 1) {
+        return new Promise<SpectrumApp>((resolve) => {
+          openFirst = resolve
+        })
+      }
+      return Promise.resolve({
+        messages: ended(),
+        send: async () => undefined,
+        stop: async () => {
+          racedStops.push('raced')
+        }
+      })
+    })
+    await botOnProject(test)
+
+    const first = test.channels.start('b1')
+    // A second start publishes a channel whose stream ends at once, so the entry the first one finds on
+    // its way back is one nothing is reading — and replacing it without closing it loses its client.
+    await test.channels.start('b1')
+    await vi.waitFor(() => expect(test.channels.running('b1')).toBe(false))
+
+    openFirst(holdingApp([]))
+    expect(await first).not.toBeNull()
+
+    expect(racedStops).toEqual(['raced'])
+    expect(test.channels.running('b1')).toBe(true)
+    test.channels.stop('b1')
+  })
 })

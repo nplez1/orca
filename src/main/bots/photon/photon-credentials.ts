@@ -83,13 +83,30 @@ export async function requirePhotonSpectrumSecret(
   return stored
 }
 
-/** A bot's record on an Orca-provisioned project: what a project deletion and a reconcile need, since
- *  neither is Orca's to do on the owner's own project. */
+/**
+ * A bot's record on an Orca-provisioned project, for the caller that needs it: `'channel'` is the live one
+ * a reconcile and an assignment change repair, and refuses a bot that answers on the owner's own Spectrum
+ * project. `'project'` is the one a *deletion* names, which for a bot that moved to its own Spectrum
+ * project is the provisioned project kept beside it — replacing that outright is what would strand a
+ * project, and print a slug, nobody could then delete.
+ */
 export async function requirePhotonProvisionedRecord(
   store: PhotonStore,
-  botId: string
+  botId: string,
+  need: 'channel' | 'project'
 ): Promise<PhotonBotRecord> {
   const record = await requirePhotonRecord(store, botId)
+  const prior = record.mode === 'spectrum' && need === 'project' ? record.priorProvision : undefined
+  if (prior) {
+    // The provisioned identity as a deletion needs it: a project and the slug its confirmation names.
+    return {
+      ...record,
+      mode: 'account',
+      projectId: prior.projectId,
+      ...(prior.slug ? { slug: prior.slug } : {}),
+      released: true
+    }
+  }
   assertPhotonProvisionedProject(record)
   return record
 }
