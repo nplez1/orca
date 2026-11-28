@@ -22,6 +22,48 @@ type SetupRunnerObservation = {
   stop: () => void
 }
 
+type SetupRunnerEndPorts = {
+  subscribeToTerminalData: (ptyId: string, listener: (data: string) => void) => () => void
+  readRecentOutput: (ptyId: string) => string | undefined
+  onEnd: () => void
+}
+
+/**
+ * Watches a setup runner's own end signals: the marker its wrapper prints, then
+ * OSC 133;D for a runner interrupted back to its prompt.
+ *
+ * Why not `waitForSetupTerminalCompletion`: that wait consumes the shared
+ * completion token, and a structured launch waiting on the same setup would then
+ * never see it end. This reads the token and never clears it.
+ */
+export function observeSetupRunnerEnd(
+  ptyId: string,
+  completionToken: string,
+  ports: SetupRunnerEndPorts
+): () => void {
+  let ended = false
+  const end = (): void => {
+    if (ended) {
+      return
+    }
+    ended = true
+    ports.onEnd()
+  }
+  const scanCompletion = createSetupCompletionScanner(completionToken, end).scan
+  const scanCommandFinished = createOsc133CommandFinishedScanner(end).scan
+  const scanOutput = (data: string): void => {
+    scanCommandFinished(data)
+    scanCompletion(data)
+  }
+  const unsubscribe = ports.subscribeToTerminalData(ptyId, scanOutput)
+  // Why replay: a fast setup prints its marker before the observer is attached.
+  const replay = ports.readRecentOutput(ptyId)
+  if (replay) {
+    scanOutput(replay)
+  }
+  return unsubscribe
+}
+
 /**
  * Which worktrees are setting up, and which PTYs said so.
  *
@@ -129,16 +171,6 @@ export abstract class OrcaRuntimeWithSetupRunnerState extends OrcaRuntimeWithSta
     // Why the runtime records it: a caller that waits for structured setup later
     // reads the token from here, and arming must not be the only owner of it.
     this.setupCompletionTokenByPtyId.set(ptyId, completionToken)
-    const scanCompletion = createSetupCompletionScanner(completionToken, () =>
-      this.endWorktreeSetupRunner(ptyId)
-    ).scan
-    const scanCommandFinished = createOsc133CommandFinishedScanner(() =>
-      this.endWorktreeSetupRunner(ptyId)
-    ).scan
-    const scanOutput = (data: string): void => {
-      scanCommandFinished(data)
-      scanCompletion(data)
-    }
     const watchdog = setTimeout(() => {
       console.warn(
         `[runtime] setup runner for ${worktreeId} never reported an end; clearing its setting-up state`
@@ -148,20 +180,17 @@ export abstract class OrcaRuntimeWithSetupRunnerState extends OrcaRuntimeWithSta
     // Why: a pending hour-long timer must not hold the process open.
     watchdog.unref?.()
     let unsubscribe: () => void = () => {}
-    // Why announce before subscribing: the replayed output below can end the
-    // runner synchronously, and an end before the start would announce nothing.
+    // Why announce before observing: replayed output below can end the runner
+    // synchronously, and an end before the start would announce nothing.
     this.setupRunnerAnnouncements.start(ptyId, worktreeId, () => {
       unsubscribe()
       clearTimeout(watchdog)
     })
-    // Why its own scanner rather than `waitForSetupTerminalCompletion`: that wait
-    // consumes the shared token, and the structured launch wait needs it too.
-    unsubscribe = this.subscribeToTerminalData(ptyId, scanOutput)
-    // Why replay: setup can print its marker before the observer is registered.
-    const replay = this.recentPtyOutputById.get(ptyId)?.read()
-    if (replay) {
-      scanOutput(replay)
-    }
+    unsubscribe = observeSetupRunnerEnd(ptyId, completionToken, {
+      subscribeToTerminalData: (id, listener) => this.subscribeToTerminalData(id, listener),
+      readRecentOutput: (id) => this.recentPtyOutputById.get(id)?.read(),
+      onEnd: () => this.endWorktreeSetupRunner(ptyId)
+    })
   }
 
   notifyWorktreeSetupRunnerState(worktreeId: string, running: boolean): void {

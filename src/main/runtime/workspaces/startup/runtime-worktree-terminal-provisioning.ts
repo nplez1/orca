@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import type { CreateWorktreeResult } from '../../../../shared/worktree/create-types'
 import { shouldSeedWorktreePrimaryTerminal } from '../../../../shared/worktree/creation/worktree-first-surface'
-import { buildObservedSetupCommand } from '../../orchestration/workers/launch/setup-completion-signal'
 import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../shared/workspace-layout/layout-owner-switch'
 import type { DefaultTerminalTab } from '../../../../shared/workspace-layout/workspace-layout-command-types'
 import type { TerminalCreateOptions } from '../../terminal/launch/terminal-create-options'
+import { resolveObservedSetupLaunch } from './host-setup-runner-launch'
 
 type TerminalResult = { handle: string }
 type TerminalSurfacing = Pick<
@@ -42,9 +42,6 @@ export type WorktreeTerminalProvisioningHost = {
   ) => Promise<readonly { tabId: string }[] | null>
   getPtyId: (handle: string) => string | undefined
   recordSetupCompletionToken: (ptyId: string, token: string) => void
-  /** Announces the worktree as setting up until its runner ends. Required, not
-   *  optional: a host that spawns a runner and drops the announcement is exactly
-   *  the gap this feature exists to close. */
   armWorktreeSetupRunner: (handle: string, worktreeId: string, completionToken: string) => void
 }
 
@@ -63,42 +60,7 @@ export type WorktreeTerminalProvisioningArgs = TerminalSurfacing & {
   startupNeedsTerminal?: boolean
   setupCommandPlatform: 'windows' | 'posix'
   // Why: setup and startup must use the same wrapper when startup waits for setup.
-  // The token is required: a pre-wrapped command nobody can watch would leave the
-  // sidebar without the setting-up state it already paid for.
   wrappedSetup?: { command: string; completionToken: string }
-}
-
-export type ObservedSetupLaunch = {
-  command: string
-  env?: Record<string, string>
-  /** The token `command` prints when it ends; the host watches it. */
-  completionToken: string
-}
-
-/**
- * The setup command plus the completion token it ends with.
- *
- * One rule for every host that spawns a repo setup runner: the command always
- * carries a token, so the runner can always be announced as setting up. A caller
- * that already wrapped setup around the agent's startup passes that wrapper's
- * token instead, so both halves print the same line.
- */
-export function resolveObservedSetupLaunch(
-  setup: NonNullable<CreateWorktreeResult['setup']>,
-  platform: 'windows' | 'posix',
-  wrappedSetup?: { command: string; completionToken: string }
-): ObservedSetupLaunch {
-  if (wrappedSetup) {
-    return { command: wrappedSetup.command, completionToken: wrappedSetup.completionToken }
-  }
-  const completionToken = randomUUID()
-  const observed = buildObservedSetupCommand(
-    setup.runnerScriptPath,
-    platform,
-    completionToken,
-    setup.shell
-  )
-  return { command: observed.command, env: observed.env, completionToken }
 }
 
 export async function createWorktreeDefaultTabTerminals(

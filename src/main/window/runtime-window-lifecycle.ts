@@ -1,9 +1,7 @@
-/* eslint-disable max-lines -- Why: upstream-owned and at its 300-line budget; the fork's setting-up relay rides inside it, and splitting costs a permanent sync hunk. */
 import {
   registerSleepingMailAvailability,
   resumeSleepingAgentsInWindow
 } from './renderer-relays/sleeping-mail-window-relay'
-import { attachSetupRunnerStateToWindow } from './setup-runner-window-forwarding'
 import { randomUUID } from 'node:crypto'
 
 import { ipcMain, type BrowserWindow } from 'electron'
@@ -22,7 +20,7 @@ import { requestSessionTabCloseFromRenderer } from './renderer-relays/session-ta
 import { requestTerminalPaneMoveFromRenderer } from './renderer-relays/terminal-pane-move-request-relay'
 import { revealTerminalPaneInWindow } from './renderer-relays/terminal-pane-reveal-relay'
 import { requestTerminalTabCloseFromRenderer } from './renderer-relays/terminal-tab-close-request-relay'
-import { ORCA_SIDEBAR_INPUTS_IS_MAIN } from '../../shared/sidebar-list/feed/sidebar-inputs-switch'
+import { relayClientEventNoticesToWindow } from './renderer-relays/client-event-notice-relay'
 import type { AgentListVerdictUpdate } from '../../shared/agent-status/presentation/agent-list-status'
 import { addFanoutListener } from '../runtime/events/event-listener-fanout'
 
@@ -256,17 +254,7 @@ export function registerRuntimeWindowLifecycle(
       send('runtime:clientHostedBrowserRowsChanged', event),
     claudeAccountSelected: (change) => send('claudeAccounts:selectedElsewhere', change)
   })
-  const detachClientNotices = runtime.onClientEvent(
-    (event) => {
-      if (event.type === 'linearLinkedIssueUpdated') {
-        send('linear:linkedIssueUpdated', event)
-      } else if (ORCA_SIDEBAR_INPUTS_IS_MAIN && event.type === 'sidebarInputsChanged') {
-        send('runtime:sidebarInputsChanged', event)
-      }
-    },
-    { consumesTerminalSideEffects: false }
-  )
-  attachSetupRunnerStateToWindow(mainWindow, runtime)
+  relayClientEventNoticesToWindow(mainWindow, runtime)
   // Only this window's live document speaks for the Agents list; a gone one leaves no verdicts behind.
   const releaseAgentListVerdicts = addFanoutListener(
     ipcMain,
@@ -300,7 +288,6 @@ export function registerRuntimeWindowLifecycle(
     runtime.setAgentListPublication(null)
   })
   mainWindow.on('closed', () => {
-    detachClientNotices()
     releaseAgentListVerdicts()
     releaseSleepingMailAvailability()
     runtime.setAgentListPublication(null)

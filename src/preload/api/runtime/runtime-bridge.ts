@@ -12,6 +12,7 @@ import type {
   RuntimeTerminalDriverState
 } from '../../../shared/remote-runtime/session-graph/runtime-session-contracts'
 import type { RuntimeRpcResponse } from '../../../shared/remote-runtime/rpc/runtime-rpc-envelope'
+import type { RuntimeClientEvent } from '../../../shared/remote-runtime/session-graph/runtime-client-events'
 import type { RuntimeEnvironmentSubscriptionHandle } from '../../runtime/runtime-environment-subscriptions'
 import type { PreloadApi } from '../../api-types'
 
@@ -107,6 +108,8 @@ export const runtimeApi = {
     ipcRenderer.on('runtime:terminalDriverChanged', listener)
     return () => ipcRenderer.removeListener('runtime:terminalDriverChanged', listener)
   },
+  getSetupRunnerState: (): Promise<RuntimeClientEvent[]> =>
+    ipcRenderer.invoke('runtime:getSetupRunnerState'),
   onWorktreeSetupRunnerStateChanged: (
     callback: (event: { worktreeId: string; running: boolean }) => void
   ): (() => void) => {

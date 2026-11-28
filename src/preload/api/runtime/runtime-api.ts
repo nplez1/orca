@@ -18,6 +18,7 @@ import type {
   RuntimeTerminalDriverState
 } from '../../../shared/remote-runtime/session-graph/runtime-session-contracts'
 import type { RuntimeRpcResponse } from '../../../shared/remote-runtime/rpc/runtime-rpc-envelope'
+import type { RuntimeClientEvent } from '../../../shared/remote-runtime/session-graph/runtime-client-events'
 import type { ClientHostedBrowserRowsEvent } from '../../../shared/browser/client-hosting/client-hosted-browser-rows'
 import type { SidebarInputsChangedEvent } from '../../../shared/sidebar-list/feed/sidebar-inputs-feed-contract'
 import type {
@@ -84,6 +85,7 @@ export type RuntimeApi = {
     onTerminalDriverChanged: (
       callback: (event: { ptyId: string; driver: RuntimeTerminalDriverState }) => void
     ) => () => void
+    getSetupRunnerState: () => Promise<RuntimeClientEvent[]>
     onWorktreeSetupRunnerStateChanged: (
       callback: (event: { worktreeId: string; running: boolean }) => void
     ) => () => void

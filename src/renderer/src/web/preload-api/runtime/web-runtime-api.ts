@@ -37,7 +37,7 @@ export function createWebRuntimeApi(): NonNullable<Partial<PreloadApi>['runtime'
     reclaimBrowserForDesktop: () => Promise.resolve({ reclaimed: false }),
     onTerminalFitOverrideChanged: () => noopUnsubscribe,
     onTerminalDriverChanged: () => noopUnsubscribe,
-    // Why: the web client is never the host that spawns a local setup runner.
+    getSetupRunnerState: () => Promise.resolve([]),
     onWorktreeSetupRunnerStateChanged: () => noopUnsubscribe,
     onNativeChatLaunchDraftResolved: () => noopUnsubscribe,
     onBrowserDriverChanged: () => noopUnsubscribe,

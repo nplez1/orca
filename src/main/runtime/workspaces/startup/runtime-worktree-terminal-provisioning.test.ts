@@ -33,7 +33,6 @@ function recordingHost(host: RecordedSetupHost): WorktreeTerminalProvisioningHos
   }
 }
 
-/** The exit code an observed command reports through its own completion marker. */
 function printedSetupStatus(
   command: string,
   env: Record<string, string> | undefined,
@@ -81,7 +80,6 @@ it.skipIf(process.platform === 'win32')(
         wrappedSetup: { command: sequenced.setupCommand, completionToken: 'token-wrapped' }
       })
       expect(host.recorded.get('pty_term_setup')).toBe('token-wrapped')
-      // The wrapper's token is also what the sidebar's setting-up state watches.
       expect(host.armed).toEqual(['token-wrapped'])
       const setup = host.created.find((options) => options.command === sequenced.setupCommand)!
       expect(printedSetupStatus(setup.command!, setup.env, 'token-wrapped')).toBe(3)
@@ -91,8 +89,6 @@ it.skipIf(process.platform === 'win32')(
   }
 )
 
-// An unwrapped setup has no caller waiting on it, and the sidebar must still read "Setting up…"
-// until it ends: the host wraps it and watches the token its own wrapper prints.
 it.skipIf(process.platform === 'win32')(
   'an unwrapped setup is observed and announced, and the token it was armed with is the one it prints',
   async () => {

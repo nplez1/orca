@@ -92,8 +92,6 @@ export async function startRuntimeLocalWorktreeTerminals(args: {
   let wrappedSetup: WorktreeTerminalProvisioningArgs['wrappedSetup']
   if (startup && setup?.waitForAgentStartup === true) {
     const platform = setupPlatform(setup, process.platform === 'win32' ? 'windows' : 'posix')
-    // Why always: the setup runner must be announced as setting up whichever
-    // caller asked for it, so the wrapper and its token are not optional.
     const completionToken = randomUUID()
     const sequenced = createSequencedSetupAgentCommands({
       runnerScriptPath: setup.runnerScriptPath,

@@ -153,7 +153,7 @@ import { normalizeSparseDirectories } from '../repos/sparse-checkout-directories
 import { attributedSparsePresetId } from '../repos/sparse-preset-attribution'
 import { getSetupRunnerCommandPlatformForPath } from '../../../shared/agent-launch/startup/setup-runner-command'
 import { createSequencedSetupAgentCommands } from '../../../shared/agent-launch/startup/setup-agent-sequencing'
-import { resolveObservedSetupLaunch } from '../../runtime/workspaces/startup/runtime-worktree-terminal-provisioning'
+import { resolveObservedSetupLaunch } from '../../runtime/workspaces/startup/host-setup-runner-launch'
 import {
   createWorktreeCreateTimingRecorder,
   localWorktreeCreateExecutionHost,
@@ -447,8 +447,6 @@ async function spawnLocalStartupAndSetupTerminals(args: {
       setup,
       process.platform === 'win32' ? 'windows' : 'posix'
     )
-    // Why a token here: setup sequenced around the agent's startup still has to
-    // be announced as setting up, so the wrapper prints a completion marker.
     const completionToken = randomUUID()
     const sequenced = createSequencedSetupAgentCommands({
       runnerScriptPath: setup.runnerScriptPath,
