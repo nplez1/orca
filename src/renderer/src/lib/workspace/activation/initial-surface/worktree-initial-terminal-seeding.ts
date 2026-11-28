@@ -5,7 +5,7 @@ import type {
 import type { ExecutionHostId } from '../../../../../../shared/execution-host/execution-host'
 import { shouldAutoCreateInitialTerminal } from '@/lib/workspace/activation/initial-surface/initial-terminal'
 import { hasSplitLandingGroup } from '@/store/slices/tabs/split-landing-groups'
-import { isTerminalWorkspaceEmptiedOnPurpose } from '../../../../../../shared/workspace-layout/terminal-surfaces/closed-terminal-tab-tombstones'
+import { isWorkspaceEmptiedForSeeding } from '@/lib/workspace-emptied-on-purpose'
 import { shouldSeedWorktreePrimaryTerminal } from '../../../../../../shared/worktree/creation/worktree-first-surface'
 import { createSequencedSetupAgentCommands } from '../../../../../../shared/agent-launch/startup/setup-agent-sequencing'
 import { getSetupRunnerCommandPlatformForPath } from '../../../../../../shared/agent-launch/startup/setup-runner-command'
@@ -195,7 +195,7 @@ export function ensureWorktreeHasInitialTerminal(
   // survivor keeps renderableTabCount non-zero, so no terminal is added; and closeTabPreservingPty
   // (use-terminal-pane-lifecycle.ts) skips both close hooks for pane moves and retirement, where
   // re-seeding is the wanted outcome.
-  const shouldHonourClosedTerminalTombstone = isTerminalWorkspaceEmptiedOnPurpose(store, worktreeId)
+  const shouldHonourClosedTerminalTombstone = isWorkspaceEmptiedForSeeding(store, worktreeId)
   // Why: an execution host that has not answered is not a host with no terminals; seeding into that
   // gap is what adds a tab per launch (STA-4658). Explicit launch work below is a request to create
   // a terminal now, so it stays ungated.

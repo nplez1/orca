@@ -1,6 +1,7 @@
 import { closedEditorFileSnapshot } from './closed-editor-file-snapshot'
 import { closedEditorTabOrder } from './recently-closed-editor-tabs'
 import { findAdjacentOpenFileId } from '../tabs/editor-tab-close-target'
+import { recordEmptiedWorkspaceWith } from '@/lib/workspace/tabs/close/workspace-emptied-record'
 import {
   editorContentIsReferenced,
   editorPlacementIndex,
@@ -297,6 +298,11 @@ export function createCloseFileAction(
       // Why: route editor/diff closes through the unified close path (MRU + visual-neighbor fallback) so they match terminal/browser tab-close behavior.
       for (const unifiedTabId of unifiedTabIdsToClose) {
         get().closeUnifiedTab(unifiedTabId, { editorRetirementHandled: true })
+      }
+      if (opts?.captureRecentlyClosed !== false) {
+        recordEmptiedWorkspaceWith(get(), placementId ?? preClose?.worktreeId, (patch) =>
+          set(patch)
+        )
       }
     }
   }

@@ -1,4 +1,8 @@
-import { CLOSED_TERMINAL_TAB_TOMBSTONE_TTL_MS } from '../../../shared/workspace-layout/terminal-surfaces/closed-terminal-tab-tombstones'
+import {
+  CLOSED_TERMINAL_TAB_TOMBSTONE_TTL_MS,
+  hasWorkspaceEmptiedRecord,
+  isTerminalWorkspaceEmptiedOnPurpose
+} from '../../../shared/workspace-layout/terminal-surfaces/closed-terminal-tab-tombstones'
 import type { ClosedTerminalTabTombstonesByTabId } from '../../../shared/workspace-layout/terminal-surfaces/closed-terminal-tab-tombstones'
 
 type TabRow = readonly { id: string }[]
@@ -54,7 +58,28 @@ export function isWorkspaceEmptiedOnPurpose(
 ): boolean {
   return (
     hasNoRenderableWorkspaceContent(state, worktreeId) &&
-    hasFreshClosedTabRecord(state.closedTerminalTabTombstonesByTabId, worktreeId, now)
+    (hasFreshClosedTabRecord(state.closedTerminalTabTombstonesByTabId, worktreeId, now) ||
+      hasWorkspaceEmptiedRecord(state.closedTerminalTabTombstonesByTabId, worktreeId, now))
+  )
+}
+
+/**
+ * The same call, for the paths that would otherwise seed a first surface (`shouldAutoCreateInitialTerminal`
+ * and the startup-resume gate). A terminal close record needs a terminal row to speak for this build;
+ * a workspace record is the only evidence a chat, browser or editor close leaves behind, and it
+ * needs no row.
+ */
+export function isWorkspaceEmptiedForSeeding(
+  state: WorkspaceContentState & {
+    tabsByWorktree: Readonly<Record<string, readonly unknown[] | undefined>>
+  },
+  worktreeId: string,
+  now = Date.now()
+): boolean {
+  return (
+    isTerminalWorkspaceEmptiedOnPurpose(state, worktreeId, now) ||
+    (hasNoRenderableWorkspaceContent(state, worktreeId) &&
+      hasWorkspaceEmptiedRecord(state.closedTerminalTabTombstonesByTabId, worktreeId, now))
   )
 }
 

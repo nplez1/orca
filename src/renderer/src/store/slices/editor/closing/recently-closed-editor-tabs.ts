@@ -1,6 +1,7 @@
 import { closedEditorFileSnapshot } from './closed-editor-file-snapshot'
 import { workspaceEditorFiles } from '../tabs/workspace-editor-files'
 import type { EditorGet, EditorSet } from '../types/editor-set-get'
+import { recordEmptiedWorkspaceWith } from '@/lib/workspace/tabs/close/workspace-emptied-record'
 import type { EditorSlice } from '../types/editor-slice'
 import {
   createRecentlyClosedTabPositionIndex,
@@ -257,6 +258,7 @@ export function createRecentlyClosedEditorTabs(
       for (const itemId of closingItemIds) {
         get().closeUnifiedTab?.(itemId, { editorRetirementHandled: true })
       }
+      recordEmptiedWorkspaceWith(get(), activeWorktreeId, (patch) => set(patch))
     }
   }
 }

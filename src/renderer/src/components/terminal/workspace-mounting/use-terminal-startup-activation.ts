@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useAppStore } from '@/store'
 import { shouldSeedDefaultSurface } from '@/lib/workspace/activation/initial-surface/automatic-default-surface'
 import { findPendingWorktreeCreationId } from '@/lib/workspace/creation/pending-worktree-creation'
-import { isTerminalWorkspaceEmptiedOnPurpose } from '../../../../../shared/workspace-layout/terminal-surfaces/closed-terminal-tab-tombstones'
+import { isWorkspaceEmptiedForSeeding } from '@/lib/workspace-emptied-on-purpose'
 import { gateWorktreeAgentActivation } from '@/lib/workspace/activation/worktree-agent-activation-gate'
 import { createWorkspaceTerminalHostAuthoritySelector } from '@/lib/workspace/ownership/workspace-terminal-host-authority'
 import { hasStructuredAgentLaunchInWorktree } from '@/lib/agent-session/launch/structured-agent-session-launch-status'
@@ -84,7 +84,7 @@ export function useTerminalStartupActivation(controller: TerminalStartupControll
       // Why: the activation gate reconciles durable/live agent state first; only an actually empty, never-visited workspace receives a default shell.
       const { renderableTabCount } = reconcileWorktreeTabModel(activeWorktreeId)
       // Only recorded closes preserve emptiness; reread at decision time because rows can change while waiting.
-      const emptiedOnPurpose = isTerminalWorkspaceEmptiedOnPurpose(
+      const emptiedOnPurpose = isWorkspaceEmptiedForSeeding(
         useAppStore.getState(),
         activeWorktreeId
       )
