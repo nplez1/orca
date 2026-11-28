@@ -166,7 +166,6 @@ export async function createWorkerWorktree(args: {
     runHooks: false,
     setupDecision,
     awaitTerminalProvisioning: true,
-    observeSetupCompletion: true,
     createdWithAgent: args.agent,
     ...(args.promisedAgentChat ? { promisedAgentChat: true } : {}),
     ...(args.onWorkspaceCreated ? { onWorkspaceCreated: args.onWorkspaceCreated } : {}),

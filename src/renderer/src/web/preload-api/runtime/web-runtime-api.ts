@@ -37,6 +37,8 @@ export function createWebRuntimeApi(): NonNullable<Partial<PreloadApi>['runtime'
     reclaimBrowserForDesktop: () => Promise.resolve({ reclaimed: false }),
     onTerminalFitOverrideChanged: () => noopUnsubscribe,
     onTerminalDriverChanged: () => noopUnsubscribe,
+    getSetupRunnerState: () => Promise.resolve([]),
+    onWorktreeSetupRunnerStateChanged: () => noopUnsubscribe,
     onNativeChatLaunchDraftResolved: () => noopUnsubscribe,
     onBrowserDriverChanged: () => noopUnsubscribe,
     onBrowserRemoteViewersChanged: () => noopUnsubscribe,

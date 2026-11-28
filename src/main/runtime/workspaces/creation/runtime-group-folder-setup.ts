@@ -113,7 +113,6 @@ export async function prepareGroupFolderCreation(args: {
       : {}),
     startupLaunchSource: input.launchSource,
     awaitTerminalProvisioning: true,
-    observeSetupCompletion: input.agentLaunchMode === 'structured',
     setupOnly: input.agentLaunchMode === 'structured'
   }
   const built = await resolveManagedWorktreeCreateStartup(

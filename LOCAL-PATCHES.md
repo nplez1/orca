@@ -78,6 +78,21 @@ conflict adjacency, and because each is a trap a well-meaning future edit can fa
 
 ## Patches
 
+### `local(setup)`: the setting-up indicator reaches the local window
+
+Anchor: `src/main/window/renderer-relays/client-event-notice-relay.ts`, the fork relays in
+`src/main/window/runtime-window-lifecycle.ts`, and the `runtime:getSetupRunnerState` /
+`runtime:worktreeSetupRunnerStateChanged` pair in `src/main/ipc/runtime.ts` and
+`src/preload/api/runtime/runtime-bridge.ts`.
+
+Upstream's `worktreeSetupRunnerState` client event reaches paired environments and mobile clients,
+but a local window is not a runtime environment: the renderer's client-event bridge never subscribes
+for it, and the window's own fan-out forwards only the two event types it has IPC for. Issue #87 is
+that gap — the sidebar of the machine running a repo's setup script never showed "Setting up…",
+whichever create flow started it. The relay is fork-owned so a sync keeps it; it also owns the two
+notices upstream forwards in that file, so a sync that restores upstream's block would deliver those
+twice. If upstream ports the state to a local channel of its own, both can go.
+
 ### `local(updater)`: point the update feed at this fork
 
 Upstream hardcodes `stablyai/orca` as the update feed in several places. Left alone, a build of this

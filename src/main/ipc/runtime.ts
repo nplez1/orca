@@ -33,6 +33,7 @@ export function registerRuntimeHandlers(runtime: OrcaRuntimeService): void {
   const desktopSenders = new DesktopRuntimeSenderLifecycle(runtime)
   ipcMain.removeHandler('runtime:syncWindowGraph')
   ipcMain.removeHandler('runtime:getStatus')
+  ipcMain.removeHandler('runtime:getSetupRunnerState')
   ipcMain.removeHandler('runtime:call')
   ipcMain.removeHandler('runtime:subscribe')
   ipcMain.removeAllListeners('runtime:unsubscribe')
@@ -96,6 +97,8 @@ export function registerRuntimeHandlers(runtime: OrcaRuntimeService): void {
     await runtime.machineNameReady()
     return runtime.getStatus()
   })
+
+  ipcMain.handle('runtime:getSetupRunnerState', () => runtime.getSetupRunnerClientEventSnapshot())
 
   // Registry build walks every method; do it once, not per IPC call.
   const dispatcher = new RpcDispatcher({ runtime, methods: ALL_RPC_METHODS })

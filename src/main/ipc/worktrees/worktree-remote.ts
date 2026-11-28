@@ -151,12 +151,9 @@ import { resolveWorktreeIncludePaths } from '../../git/worktrees/content-paths/w
 import { resolveWorktreeSharedDirectories } from '../../git/worktrees/content-paths/worktree-shared-directories'
 import { normalizeSparseDirectories } from '../repos/sparse-checkout-directories'
 import { attributedSparsePresetId } from '../repos/sparse-preset-attribution'
-import {
-  buildSetupRunnerCommand,
-  getSetupRunnerCommandPlatformForPath
-} from '../../../shared/agent-launch/startup/setup-runner-command'
+import { getSetupRunnerCommandPlatformForPath } from '../../../shared/agent-launch/startup/setup-runner-command'
 import { createSequencedSetupAgentCommands } from '../../../shared/agent-launch/startup/setup-agent-sequencing'
-import { buildObservedSetupCommand } from '../../runtime/orchestration/workers/launch/setup-completion-signal'
+import { resolveObservedSetupLaunch } from '../../runtime/workspaces/startup/host-setup-runner-launch'
 import {
   createWorktreeCreateTimingRecorder,
   localWorktreeCreateExecutionHost,
@@ -444,24 +441,26 @@ async function spawnLocalStartupAndSetupTerminals(args: {
   let startupTerminal: CreateWorktreeResult['startupTerminal']
 
   let sequencedStartup = startup
-  let wrappedSetupCommandStr: string | undefined
+  let wrappedSetup: Parameters<typeof resolveObservedSetupLaunch>[2]
   if (startup && setup?.waitForAgentStartup === true) {
     const platform = getSetupRunnerCommandPlatformForLaunch(
       setup,
       process.platform === 'win32' ? 'windows' : 'posix'
     )
+    const completionToken = randomUUID()
     const sequenced = createSequencedSetupAgentCommands({
       runnerScriptPath: setup.runnerScriptPath,
       startupCommand: startup.command,
       platform,
-      shell: setup.shell
+      shell: setup.shell,
+      completionToken
     })
     sequencedStartup = {
       ...startup,
       command: sequenced.startupCommand,
       ...(sequenced.startupEnv ? { env: { ...startup.env, ...sequenced.startupEnv } } : {})
     }
-    wrappedSetupCommandStr = sequenced.setupCommand
+    wrappedSetup = { command: sequenced.setupCommand, completionToken }
     setup = { ...setup, envVars: { ...setup.envVars, ...sequenced.setupEnv } }
   }
 
@@ -514,40 +513,23 @@ async function spawnLocalStartupAndSetupTerminals(args: {
   if (setup) {
     try {
       // Why: the desktop create spawns Setup itself, so this is the only place
-      // that can tell the sidebar a script (not an agent) is working here. The
-      // sequenced variant already wraps the runner and is left unobserved.
-      const completionToken = wrappedSetupCommandStr ? null : randomUUID()
-      const observed = completionToken
-        ? buildObservedSetupCommand(
-            setup.runnerScriptPath,
-            getSetupRunnerCommandPlatformForLaunch(
-              setup,
-              process.platform === 'win32' ? 'windows' : 'posix'
-            ),
-            completionToken,
-            setup.shell
-          )
-        : null
-      const setupCommand =
-        wrappedSetupCommandStr ??
-        observed?.command ??
-        buildSetupRunnerCommand(
-          setup.runnerScriptPath,
-          getSetupRunnerCommandPlatformForLaunch(
-            setup,
-            process.platform === 'win32' ? 'windows' : 'posix'
-          ),
-          setup.shell
-        )
-      const setupEnv = { ...setup.envVars, ...observed?.env }
+      // that can tell the sidebar a script (not an agent) is working here.
+      const launch = resolveObservedSetupLaunch(
+        setup,
+        getSetupRunnerCommandPlatformForLaunch(
+          setup,
+          process.platform === 'win32' ? 'windows' : 'posix'
+        ),
+        wrappedSetup
+      )
       let setupTerminalHandle: string | undefined
       setupTerminalHandle = (
         await runtime.createTerminal(
           `id:${worktree.id}`,
           {
             title: runtime.getSetupTerminalTitle(),
-            command: setupCommand,
-            env: setupEnv,
+            command: launch.command,
+            env: { ...setup.envVars, ...launch.env },
             activate: false,
             surfaceOwner: false,
             ...userAct
@@ -558,8 +540,8 @@ async function spawnLocalStartupAndSetupTerminals(args: {
       // Why before arming: an observation failure must not make a spawned runner
       // look like a failed spawn and send the renderer off to re-queue setup.
       didSpawnSetup = true
-      if (completionToken && setupTerminalHandle) {
-        runtime.armWorktreeSetupRunner(setupTerminalHandle, worktree.id, completionToken)
+      if (setupTerminalHandle) {
+        runtime.armWorktreeSetupRunner(setupTerminalHandle, worktree.id, launch.completionToken)
       }
     } catch (error) {
       const message = readableWslDistroHoldText(
@@ -576,9 +558,7 @@ async function spawnLocalStartupAndSetupTerminals(args: {
       ? {
           activationSetup: {
             ...setup,
-            ...(startupTerminalHandle && wrappedSetupCommandStr
-              ? { command: wrappedSetupCommandStr }
-              : {})
+            ...(startupTerminalHandle && wrappedSetup ? { command: wrappedSetup.command } : {})
           }
         }
       : {}),

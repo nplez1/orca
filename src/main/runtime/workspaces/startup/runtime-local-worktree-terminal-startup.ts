@@ -92,13 +92,13 @@ export async function startRuntimeLocalWorktreeTerminals(args: {
   let wrappedSetup: WorktreeTerminalProvisioningArgs['wrappedSetup']
   if (startup && setup?.waitForAgentStartup === true) {
     const platform = setupPlatform(setup, process.platform === 'win32' ? 'windows' : 'posix')
-    const completionToken = request.observeSetupCompletion ? randomUUID() : undefined
+    const completionToken = randomUUID()
     const sequenced = createSequencedSetupAgentCommands({
       runnerScriptPath: setup.runnerScriptPath,
       startupCommand: startup.command,
       platform,
       shell: setup.shell,
-      ...(completionToken ? { completionToken } : {})
+      completionToken
     })
     sequencedStartup = {
       ...startup,
@@ -107,7 +107,7 @@ export async function startRuntimeLocalWorktreeTerminals(args: {
     }
     wrappedSetup = {
       command: sequenced.setupCommand,
-      ...(completionToken ? { completionToken } : {})
+      completionToken
     }
     setup = { ...setup, envVars: { ...setup.envVars, ...sequenced.setupEnv } }
   }
@@ -276,7 +276,6 @@ function provisionArgs(
     callerProvidesSurface: callerProvidesInitialSurface(args),
     startupNeedsTerminal: args.startup !== undefined,
     setupCommandPlatform: setupPlatform(args.setup, 'posix'),
-    observeSetupCompletion: args.request.observeSetupCompletion,
     ...(wrappedSetup ? { wrappedSetup } : {})
   }
 }

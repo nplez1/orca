@@ -3,7 +3,7 @@
   "base": "27a700fd8d659a298769e5453bb340d4debbf76a",
   "perFileThreshold": 5,
   "accepted": "script automations: the new fields and functions on upstream-owned files document themselves where the code cannot say it; feature documentation, not fork rationale",
-  "total": 4845,
+  "total": 4843,
   "files": {
     ".github/workflows/e2e.yml": 11,
     ".github/workflows/pr.yml": 7,
@@ -99,7 +99,7 @@
     "src/main/ipc/worktrees/floating-workspace-directory.ts": 28,
     "src/main/ipc/worktrees/listing/watched-worktree-catalog-notification.ts": 8,
     "src/main/ipc/worktrees/paths/worktree-logic.ts": 14,
-    "src/main/ipc/worktrees/worktree-remote.ts": 37,
+    "src/main/ipc/worktrees/worktree-remote.ts": 36,
     "src/main/jira/attachments/discovery.ts": 10,
     "src/main/jira/attachments/images.ts": 5,
     "src/main/jira/client.ts": 12,
