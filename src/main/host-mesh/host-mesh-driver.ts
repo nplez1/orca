@@ -371,7 +371,7 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
     recipientHostKey: string
   }): Promise<{ offerUrl: string; deviceId: string; endpointCandidates: string[] }> {
     const minted = await deps.mintRuntimeOffer(args)
-    store.recordPeer(args.recipientHostKey, { deviceRowId: minted.deviceId })
+    store.recordPeer(args.recipientHostKey, { deviceRowId: minted.deviceId, minted: true })
     return minted
   }
 

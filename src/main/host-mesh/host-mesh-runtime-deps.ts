@@ -242,12 +242,21 @@ function depsFromApp(server: HostMeshRuntimeServer): HostMeshDriverDeps {
       void invalidateRuntimeEnvironmentTransport(environmentId).catch(() => undefined)
     },
     adoptReachableEndpoint: (args) => adoptReachableEndpoint(userDataPath, args),
-    // Why the ids stay grouped by peer: whether a row is current is a question about the other rows minted
-    // for the same machine, so a flat set could not answer it.
+    // Why the ids stay grouped by peer, and why minted is separate: whether a row was replaced is a question about
+    // the other rows minted for the same machine, and only rows this host minted are the mesh's to retire.
     pruneStaleRows: () => {
       try {
         const peers = new Map(
-          [...store.readPeerIndex()].map(([hostKey, entry]) => [hostKey, entry.deviceRowIds])
+          [...store.readPeerIndex()].map(([hostKey, entry]) => [
+            hostKey,
+            {
+              all: entry.deviceRowIds,
+              // Migration: an entry written before the distinction existed recorded the caller's own row and its
+              // own mints alike, so the only reading available is that every id it holds was minted here. Refusing
+              // that reading would leave a release's worth of spent credentials live and listed forever.
+              minted: entry.mintedRowIds ?? entry.deviceRowIds
+            }
+          ])
         )
         return pruneMeshDeviceRows(server, peers)
       } catch {

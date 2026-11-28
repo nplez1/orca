@@ -93,6 +93,10 @@ export const stateSchema = lazyZodSchema(() =>
 export const peerEntrySchema = lazyZodSchema(() =>
   z.looseObject({
     deviceRowIds: z.array(z.string().min(1)),
+    // Rows this host minted as reverse offers. A row a peer authenticated with is adopted into `deviceRowIds` too,
+    // and only these are the mesh's to retire: an owner's pairing link must never be swept or hidden.
+    // Absent on entries written before the distinction existed, which is a migration the sweep reads.
+    mintedRowIds: z.array(z.string().min(1)).optional(),
     environmentId: z.string().min(1).nullable(),
     // The name a redemption wrote into this host's pairing row, so a later pass can tell an invented word from one
     // the owner typed.
@@ -118,6 +122,8 @@ export type HostMeshMigrationRecord = {
 
 export type HostMeshPeerIndexEntry = {
   deviceRowIds: readonly string[]
+  /** The subset this host minted itself; see `mintedRowIds` in the schema. */
+  mintedRowIds?: readonly string[]
   environmentId: string | null
   /** Set when this host named the pairing itself; absent when the owner did. */
   redeemedLabel?: string | null

@@ -128,6 +128,8 @@ export type HostMeshStore = {
     hostKey: string,
     entry: {
       deviceRowId?: string
+      /** True when this host minted the row as a reverse offer, rather than adopting the caller's own row. */
+      minted?: boolean
       environmentId?: string
       redeemedLabel?: string
     }
@@ -213,17 +215,28 @@ export function createHostMeshStore({ userDataPath }: { userDataPath: string }):
         const held = isRecord(raw) ? raw : {}
         const known = peerEntrySchema.safeParse(raw)
         const deviceRowIds = known.success ? known.data.deviceRowIds : []
+        const mintedRowIds = known.success ? (known.data.mintedRowIds ?? []) : []
         const environmentId = known.success ? known.data.environmentId : null
         const redeemedLabel =
           entry.redeemedLabel ?? (known.success ? known.data.redeemedLabel : null)
+        const addedRowId =
+          entry.deviceRowId !== undefined && !deviceRowIds.includes(entry.deviceRowId)
+            ? entry.deviceRowId
+            : undefined
+        const nextDeviceRowIds =
+          addedRowId === undefined ? deviceRowIds : [...deviceRowIds, addedRowId]
+        const nextMintedRowIds =
+          addedRowId !== undefined && entry.minted === true
+            ? [...mintedRowIds, addedRowId]
+            : mintedRowIds
         return {
           ...peerIndex,
           [hostKey]: {
             ...held,
-            deviceRowIds:
-              entry.deviceRowId === undefined || deviceRowIds.includes(entry.deviceRowId)
-                ? deviceRowIds
-                : [...deviceRowIds, entry.deviceRowId],
+            deviceRowIds: nextDeviceRowIds,
+            // Why always written, even empty: absence has to mean "this file predates the distinction", which is
+            // the only thing that lets the sweep tell an adopted owner link from a row it minted itself.
+            mintedRowIds: nextMintedRowIds,
             environmentId: entry.environmentId ?? environmentId,
             // Why omitted when this host named nothing: an entry written before names existed keeps its own shape.
             ...(redeemedLabel === null || redeemedLabel === undefined ? {} : { redeemedLabel })
@@ -253,9 +266,17 @@ export function createHostMeshStore({ userDataPath }: { userDataPath: string }):
           const held = isRecord(raw) ? raw : {}
           const ids = Array.isArray(held.deviceRowIds) ? held.deviceRowIds : []
           const remaining = ids.filter((id) => typeof id !== 'string' || !deviceRowIds.has(id))
-          if (remaining.length !== ids.length) {
+          const minted = Array.isArray(held.mintedRowIds) ? held.mintedRowIds : []
+          const mintedRemaining = minted.filter(
+            (id) => typeof id !== 'string' || !deviceRowIds.has(id)
+          )
+          if (remaining.length !== ids.length || mintedRemaining.length !== minted.length) {
             changed = true
-            kept[hostKey] = { ...held, deviceRowIds: remaining }
+            kept[hostKey] = {
+              ...held,
+              deviceRowIds: remaining,
+              mintedRowIds: mintedRemaining
+            }
           } else {
             kept[hostKey] = raw
           }

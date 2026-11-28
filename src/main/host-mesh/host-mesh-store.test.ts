@@ -159,6 +159,7 @@ describe('the group on disk', () => {
 
     expect(store().readPeerIndex().get('key-a')).toEqual({
       deviceRowIds: ['row-1'],
+      mintedRowIds: [],
       environmentId: 'env-1'
     })
 
@@ -175,6 +176,8 @@ describe('the group on disk', () => {
 
     expect(store().readPeerIndex().get('key-a')).toEqual({
       deviceRowIds: ['row-1', 'row-2'],
+      // Present and empty: neither of these was minted here, they were adopted from the caller.
+      mintedRowIds: [],
       environmentId: 'env-1'
     })
   })
@@ -183,16 +186,21 @@ describe('the group on disk', () => {
     // Why this matters: an entry keeps everything ever minted for that machine so removal can revoke the set, and
     // the mesh minted one row per failed offer. Without this the index grew by one entry per retry forever.
     store().recordPeer('key-a', { deviceRowId: 'row-1', environmentId: 'env-1' })
-    store().recordPeer('key-a', { deviceRowId: 'row-2' })
+    store().recordPeer('key-a', { deviceRowId: 'row-2', minted: true })
     store().recordPeer('key-b', { deviceRowId: 'row-3' })
 
     store().forgetPeerDeviceRows(new Set(['row-2', 'row-3']))
 
     expect(store().readPeerIndex().get('key-a')).toEqual({
       deviceRowIds: ['row-1'],
+      mintedRowIds: [],
       environmentId: 'env-1'
     })
-    expect(store().readPeerIndex().get('key-b')).toEqual({ deviceRowIds: [], environmentId: null })
+    expect(store().readPeerIndex().get('key-b')).toEqual({
+      deviceRowIds: [],
+      mintedRowIds: [],
+      environmentId: null
+    })
   })
 
   it('treats a file past the byte cap as unreadable rather than loading it', () => {

@@ -124,7 +124,7 @@ export function createHostMeshRpcService(deps: HostMeshDriverDeps): HostMeshRpcS
       environmentId: deps.environmentIdForHostKey(recipientHostKey) ?? '',
       recipientHostKey
     })
-    store.recordPeer(recipientHostKey, { deviceRowId: minted.deviceId })
+    store.recordPeer(recipientHostKey, { deviceRowId: minted.deviceId, minted: true })
     return minted.offerUrl
   }
 
