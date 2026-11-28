@@ -174,14 +174,14 @@ export type HostMeshDriverDeps = {
    */
   invalidateTransport?: (environmentId: string) => void
   /**
-   * Revokes this host's own expired, never-redeemed runtime offers and returns the device ids it dropped.
+   * Revokes the device rows the mesh minted here that are no longer a credential: expired offers nobody
+   * redeemed, and rows a later one superseded. Returns the ids it dropped.
    *
-   * Why the pass does this: every reverse offer mints one runtime device row, so a member that never takes the
-   * offer leaves one behind per retry. They expire on their own TTL and cannot pair anything, but Settings lists
-   * them as active links until something removes them — an owner reading hundreds of them cannot tell a broken
-   * mesh from a fleet that size.
+   * Why the pass does this: every reverse offer mints one runtime device row, and a member that re-joins leaves
+   * the previous row behind — seen, so never expired, so listed as an active link for good. The fleet's own rule
+   * is one row per peer, which is what the peer index already assumes when removal revokes a whole set.
    */
-  pruneExpiredOffers?: () => readonly string[]
+  pruneStaleRows?: () => readonly string[]
   /**
    * Asks this host to run a pass of its own, after a peer has just joined it.
    *

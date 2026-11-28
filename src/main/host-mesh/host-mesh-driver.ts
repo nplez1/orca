@@ -138,18 +138,18 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
   const reverseOffers = new Map<string, ReverseOffer>()
 
   /**
-   * Drops the offers nobody redeemed and the peer index kept an id for.
+   * Drops the rows the mesh minted here that are no longer a credential for their peer.
    *
-   * Why the pass does this: every retry mints a device row, and an owner cannot tell thirty spent offers from
-   * thirty pairings — Settings lists them as active links because that is what they are until they expire.
-   * The rows are dead once their own TTL has passed, so the pass that made them is the pass that clears them.
+   * Why the pass does this: every retry mints a device row, and a row the peer already replaced stays counted as an
+   * active link because it was seen once. The peer index knows which rows belong to which machine, so the sweep keeps
+   * the newest and drops the rest — the same rule removal uses when it revokes a whole set.
    */
-  function pruneStaleOffers(): void {
-    if (deps.pruneExpiredOffers === undefined) {
+  function pruneStaleRows(): void {
+    if (deps.pruneStaleRows === undefined) {
       return
     }
     try {
-      const pruned = deps.pruneExpiredOffers()
+      const pruned = deps.pruneStaleRows()
       if (pruned.length > 0) {
         store.forgetPeerDeviceRows(new Set(pruned))
       }
@@ -1142,7 +1142,7 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
     // Why before the pull: this is the pass that tells the members what this host calls them, so seeding after it
     // would postpone every repair by one cycle.
     state = namesForPass(state)
-    pruneStaleOffers()
+    pruneStaleRows()
     const membersBefore = new Set(state.members.map((member) => member.hostKey))
     state = await pullMemberViews(state)
     // Why a tombstone learned from a member tears down: this is the only path a member that was asleep ever

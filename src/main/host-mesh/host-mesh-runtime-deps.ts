@@ -35,7 +35,7 @@ import {
   hostMeshPlaceholderName
 } from '../../shared/host-mesh/host-mesh-contract'
 import type { HostMeshDriverDeps } from './host-mesh-driver-contract'
-import { pruneExpiredMeshOffers } from './host-mesh-offer-pruning'
+import { pruneMeshDeviceRows } from './host-mesh-device-row-pruning'
 import { createHostMeshWriteLock } from './host-mesh-write-lock'
 import { createHostMeshDriver } from './host-mesh-driver'
 import { createHostMeshRpcService } from './host-mesh-rpc-service'
@@ -241,12 +241,14 @@ function depsFromApp(server: HostMeshRuntimeServer): HostMeshDriverDeps {
       void invalidateRuntimeEnvironmentTransport(environmentId).catch(() => undefined)
     },
     adoptReachableEndpoint: (args) => adoptReachableEndpoint(userDataPath, args),
-    pruneExpiredOffers: () => {
+    // Why the ids stay grouped by peer: whether a row is current is a question about the other rows minted
+    // for the same machine, so a flat set could not answer it.
+    pruneStaleRows: () => {
       try {
-        const minted = new Set(
-          [...store.readPeerIndex().values()].flatMap((entry) => entry.deviceRowIds)
+        const peers = new Map(
+          [...store.readPeerIndex()].map(([hostKey, entry]) => [hostKey, entry.deviceRowIds])
         )
-        return pruneExpiredMeshOffers(server, minted)
+        return pruneMeshDeviceRows(server, peers)
       } catch {
         return []
       }
