@@ -554,6 +554,7 @@
 10 src/main/hermes/hermes-home-filesystem.ts
 2 src/main/hermes/hermes-transcript-import.ts
 27 src/main/hermes/hook-service.ts
+1 src/main/host-mesh/host-mesh-owned-device-rows.ts # meshOwnedDeviceRowIds reads host-mesh.json (<=256KB, readFileSync) on an explicit Share-this-computer grant list, to hide the rows the mesh minted; the store has no async or worker-backed read, the file is read only while a group is joined, and a read failure hides nothing
 2 src/main/host/deferred-secret-protection-report.ts
 1 src/main/host/electron-speech-services.ts
 1 src/main/host/secret-protection-report.ts

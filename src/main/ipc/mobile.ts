@@ -181,9 +181,7 @@ export function registerMobileHandlers(
     }
     // Runtime links are bearer credentials immediately, so unconnected grants must remain revocable.
     const all = registry.listDevices({ fresh: true })
-    // Why the mesh's own rows are absent: a pass mints one per reverse offer and retires the ones it replaced, so
-    // nothing in this list is the owner's to manage or to count — a retry storm read as forty-five links on a
-    // two-machine fleet is what that looked like.
+    // fork-comment-ok: what the mesh minted is hidden here; host-mesh-owned-device-rows.ts says why.
     const meshOwned = meshOwnedDeviceRowIds()
     return {
       grants: all
