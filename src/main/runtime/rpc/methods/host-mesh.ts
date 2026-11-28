@@ -17,7 +17,8 @@ import {
   HostMeshPendingParamsSchema,
   HostMeshRelayParamsSchema,
   HostMeshRemoveParamsSchema,
-  HostMeshSettingsPatchParamsSchema
+  HostMeshSettingsPatchParamsSchema,
+  HostMeshSyncParamsSchema
 } from '../../../../shared/rpc-contract/host-mesh-params'
 import type {
   HostMeshCaller,
@@ -104,7 +105,9 @@ export const HOST_MESH_METHODS = [
   defineMethod({
     name: HOST_MESH_SYNC_METHOD,
     permission: 'workspace',
-    params: HostMeshPendingParamsSchema,
+    // Why not `pending`'s schema: a sync publishes where the sender can be dialed, so the narrower strict object
+    // refused the only call a pass needs (#492).
+    params: HostMeshSyncParamsSchema,
     handler: async (params, ctx) => await meshService().sync(params, meshCaller(ctx))
   }),
   defineMethod({

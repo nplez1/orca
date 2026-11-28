@@ -622,7 +622,8 @@ import {
   HostMeshPendingParamsSchema,
   HostMeshRelayParamsSchema,
   HostMeshRemoveParamsSchema,
-  HostMeshSettingsPatchParamsSchema
+  HostMeshSettingsPatchParamsSchema,
+  HostMeshSyncParamsSchema
 } from './host-mesh-params'
 import { ApplyHostSettingsReplicationParams } from './host-settings-params'
 import { JiraFavouriteFilterParams } from './jira/jira-favourite-filter-params'
@@ -1904,7 +1905,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'hostMesh.removeMember': HostMeshLocalRemoveParamsSchema,
   'hostMesh.settings': HostMeshSettingsPatchParamsSchema,
   'hostMesh.snapshot': HostMeshLocalSnapshotParamsSchema,
-  'hostMesh.sync': HostMeshPendingParamsSchema,
+  'hostMesh.sync': HostMeshSyncParamsSchema,
   'hostMesh.syncNow': HostMeshLocalSnapshotParamsSchema,
   'hostSettings.applyReplication': ApplyHostSettingsReplicationParams,
   'hostSettings.replicationState': null,

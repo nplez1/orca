@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { lazyZodSchema } from '../schema/lazy-zod-schema'
 import {
+  HOST_MESH_MAX_ENDPOINT_CANDIDATES,
   HOST_MESH_MAX_LABEL_CHARS,
   HOST_MESH_MAX_MEMBERS,
   HOST_MESH_PAYLOAD_VERSION
@@ -21,6 +22,8 @@ const NONCE_MAX_CHARS = 128
 // A box holds an offer URL plus up to HOST_MESH_MAX_ENDPOINT_CANDIDATES endpoints, so it is the widest field.
 const CIPHERTEXT_MAX_CHARS = 16_384
 const GROUP_ID_MAX_CHARS = 256
+// Matches `isDialableEndpoint`, which is the only reader: a longer string is not an address either side can dial.
+const ENDPOINT_MAX_CHARS = 512
 
 const keyB64 = lazyZodSchema(() => z.string().min(1).max(KEY_B64_MAX_CHARS))
 // Why empty is allowed: the first call a newcomer makes asks which group the member is in, and carries
@@ -88,6 +91,29 @@ export const HostMeshPendingParamsSchema = lazyZodSchema(() =>
       version: z.literal(HOST_MESH_PAYLOAD_VERSION),
       groupId,
       hostKey: keyB64
+    })
+    .strict()
+)
+
+/**
+ * What `hostMesh.sync` is asked, which is `pending`'s question plus where the asker can be dialed.
+ *
+ * Why its own schema: the request gained `endpoints` in #492 and the method kept `pending`'s schema, so every sync —
+ * the one call a pass cannot do without — was refused as an unknown key on a `.strict()` object. Every pair then read
+ * one-way or not-paired on every host, and nothing but a build change could clear it.
+ */
+export const HostMeshSyncParamsSchema = lazyZodSchema(() =>
+  z
+    .object({
+      version: z.literal(HOST_MESH_PAYLOAD_VERSION),
+      groupId,
+      hostKey: keyB64,
+      // Why optional: a peer on a build without route publishing sends none, and an older peer reads its own
+      // `pending` schema, so the sender retries without this list rather than leaving the pair unjoined.
+      endpoints: z
+        .array(z.string().min(1).max(ENDPOINT_MAX_CHARS))
+        .max(HOST_MESH_MAX_ENDPOINT_CANDIDATES)
+        .optional()
     })
     .strict()
 )

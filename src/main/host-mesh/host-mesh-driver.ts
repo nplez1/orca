@@ -170,6 +170,21 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
     return typeof error === 'object' && error !== null && 'peerCode' in error
   }
 
+  /**
+   * A member that answered `invalid_argument`: its schema refused the request, not this host's credential.
+   *
+   * Why its own name: a sync whose `endpoints` a pre-route-publishing build cannot read is a wire-shape mismatch
+   * between two working machines, and the retry without them is the only thing that keeps that pair joined.
+   */
+  function isInvalidParams(error: unknown): boolean {
+    return (
+      typeof error === 'object' &&
+      error !== null &&
+      'peerCode' in error &&
+      error.peerCode === 'invalid_argument'
+    )
+  }
+
   /** Read once per snapshot, and never allowed to fail a snapshot: it only annotates one. */
   function storedMigration(): { appliedAt: number; peerCount: number } | null {
     try {
@@ -1023,14 +1038,29 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
   }): Promise<{ state: HostMeshState; reached: boolean }> {
     const { member, environmentId } = args
     let state = args.state
-    const payload = await deps.send<HostMeshSyncPayload>(environmentId, HOST_MESH_SYNC_METHOD, {
+    const request = {
       version: HOST_MESH_PAYLOAD_VERSION,
       groupId: state.groupId,
       hostKey: selfKey(),
       // Why this host publishes its own addresses on every request: the member that can still be reached learns
       // where to look before the path it is using dies.
       ...(args.endpoints.length === 0 ? {} : { endpoints: [...args.endpoints] })
-    } satisfies HostMeshPendingRequest)
+    } satisfies HostMeshPendingRequest
+    const payload = await deps
+      .send<HostMeshSyncPayload>(environmentId, HOST_MESH_SYNC_METHOD, request)
+      .catch(async (error: unknown) => {
+        // Why the list is retried without: a member on a build whose schema predates route publishing answers
+        // `invalid_argument` for the extra key, and the addresses are an optimisation while the sync is the pair.
+        if (request.endpoints === undefined || !isInvalidParams(error)) {
+          throw error
+        }
+        const { endpoints: _endpoints, ...withoutEndpoints } = request
+        return await deps.send<HostMeshSyncPayload>(
+          environmentId,
+          HOST_MESH_SYNC_METHOD,
+          withoutEndpoints
+        )
+      })
     if (!confirmKey(payload.selfKey, payload.publicKeyB64)) {
       return { state, reached: false }
     }
