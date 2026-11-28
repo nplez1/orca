@@ -175,6 +175,7 @@ type HostMeshDeviceRegistry = {
 type HostMeshDeviceRow = {
   deviceId: string
   scope: string
+  pairedAt: number
   lastSeenAt: number
   offerExpiresAt?: number
 }

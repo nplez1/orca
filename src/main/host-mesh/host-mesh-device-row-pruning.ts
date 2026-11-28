@@ -1,8 +1,5 @@
 import type { HostMeshRuntimeServer } from './host-mesh-runtime-deps'
 
-/** How long a superseded row may keep being counted before the sweep drops it. */
-export const SUPERSEDED_ROW_GRACE_MS = 24 * 60 * 60 * 1000
-
 /**
  * Just the fields the sweep reads, so it never imports the registry.
  *
@@ -12,6 +9,7 @@ export const SUPERSEDED_ROW_GRACE_MS = 24 * 60 * 60 * 1000
 export type MeshDeviceRow = {
   deviceId: string
   scope: string
+  pairedAt: number
   lastSeenAt: number
   offerExpiresAt?: number
 }
@@ -25,30 +23,29 @@ export type MeshDeviceRowServer = Pick<HostMeshRuntimeServer, 'revokeRuntimeAcce
 }
 
 /**
- * Rows one peer has minted here that are no longer its credential: offers it never redeemed, and rows a later
- * one superseded.
+ * Rows one peer has minted here that are no longer a credential: offers it never redeemed, and rows a later
+ * one replaced.
  *
- * Why superseded rows are the bulk of it: a retry mints a new row each time, the peer redeems it and the old
- * row stays — seen, so never "expired", so counted as a live link for good. Left alone, a peer that re-joins
- * once per outage ends up with one bearer credential per retry, and an owner reading forty-five of them cannot
- * tell that from a fleet that size.
+ * Why "replaced" is proven rather than assumed: a retry mints a new row each time, Settings counts every row a
+ * peer was ever seen from as a live link, and nothing retires the old one. A row is spent when a newer row for
+ * the same machine has been sighted — the peer authenticated with it — and this row has produced no sighting
+ * since that successor was minted. That is a fact about use, not an age, so the very next pass drops it: no grace
+ * window, and a row a peer is still using survives however old it is, because using it writes a later sighting.
  *
- * Why the grace: a token in use refreshes `lastSeenAt` on every connect, while a peer that holds two
- * environments against this host refreshes both. Only a row nobody has used in a day is provably not in use,
- * so the newest row is kept and the rest wait out the grace.
+ * Why an unexpired offer stays: it is still a link its recipient can scan, so only its own TTL can clear it.
  */
 export function staleMeshRows(
   rows: readonly MeshDeviceRow[],
   now: number
 ): readonly MeshDeviceRow[] {
-  const live = rows.filter((row) => row.scope === 'runtime')
-  const newestSeenAt = live.reduce((newest, row) => Math.max(newest, row.lastSeenAt), 0)
-  return live.filter((row) =>
-    row.lastSeenAt === 0
-      ? // An unexpired offer is still a link its recipient can scan, so only its own TTL can clear it.
-        row.offerExpiresAt !== undefined && row.offerExpiresAt <= now
-      : row.lastSeenAt < newestSeenAt && now - row.lastSeenAt > SUPERSEDED_ROW_GRACE_MS
-  )
+  const sighted = rows.filter((row) => row.scope === 'runtime' && row.lastSeenAt > 0)
+  return rows
+    .filter((row) => row.scope === 'runtime')
+    .filter((row) =>
+      row.lastSeenAt === 0
+        ? row.offerExpiresAt !== undefined && row.offerExpiresAt <= now
+        : sighted.some((other) => other.pairedAt > row.pairedAt && row.lastSeenAt < other.pairedAt)
+    )
 }
 
 /**
