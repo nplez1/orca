@@ -138,11 +138,12 @@ export function createHostMeshDriver(deps: HostMeshDriverDeps): HostMeshDriver {
   const reverseOffers = new Map<string, ReverseOffer>()
 
   /**
-   * Drops the rows the mesh minted here that are no longer a credential for their peer.
+   * Drops the rows the mesh minted here that are no longer a credential for their peer, and any id whose row the
+   * registry no longer has.
    *
    * Why the pass does this: every retry mints a device row, and a row the peer already replaced stays counted as an
    * active link because it was seen once. The peer index knows which rows belong to which machine, so the sweep keeps
-   * the newest and drops the rest — the same rule removal uses when it revokes a whole set.
+   * the newest the peer actually redeemed and drops the rest — the same rule removal uses when it revokes a set.
    */
   function pruneStaleRows(): void {
     if (deps.pruneStaleRows === undefined) {

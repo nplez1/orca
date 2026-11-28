@@ -174,8 +174,8 @@ export type HostMeshDriverDeps = {
    */
   invalidateTransport?: (environmentId: string) => void
   /**
-   * Revokes the device rows the mesh minted here that are no longer a credential: expired offers nobody
-   * redeemed, and rows a later one superseded. Returns the ids it dropped.
+   * Revokes the device rows the mesh minted here that are no longer a credential, and returns every id the peer
+   * index should drop: the ones it revoked, plus the ones the registry no longer has.
    *
    * Why the pass does this: every reverse offer mints one runtime device row, and a member that re-joins leaves
    * the previous row behind — seen, so never expired, so listed as an active link for good. The fleet's own rule

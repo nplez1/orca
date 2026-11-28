@@ -9,7 +9,6 @@ import type { HostMeshRuntimeServer } from './host-mesh-runtime-deps'
 export type MeshDeviceRow = {
   deviceId: string
   scope: string
-  pairedAt: number
   lastSeenAt: number
   offerExpiresAt?: number
   parentDeviceId?: string
@@ -23,6 +22,13 @@ export type MeshDeviceRowServer = Pick<HostMeshRuntimeServer, 'revokeRuntimeAcce
     listDevices: (options?: { fresh?: boolean }) => readonly MeshDeviceRow[]
     removeDevice: (deviceId: string) => boolean
   } | null
+}
+
+/** One peer's rows: everything the index holds, and the ids this host minted, oldest first. */
+export type MeshPeerRows = {
+  all: readonly string[]
+  /** Mint order is the order the index appended them, which is what makes it a sequence and not a clock. */
+  minted: readonly string[]
 }
 
 /** Rows another row was minted from, so a sweep can leave a parent alone. */
@@ -42,34 +48,33 @@ function parentsOf(rows: readonly MeshDeviceRow[]): ReadonlySet<string> {
  * Rows this host minted for one peer that are no longer its credential: offers nobody redeemed past their TTL,
  * and rows a later one replaced.
  *
- * Why a sighted replacement is proof: `lastSeenAt` is written when a socket authenticates and again when one
- * closes, so it does not order uses — a row can look stale while a connection is still open on it, and a closed
- * one can look newer than the row that replaced it. What cannot be argued with is which row the peer chose: once
- * a minted row has been seen at all, the peer redeemed it, so the newer of the seen rows is the credential and the
- * older ones are spent. That comparison never reads `lastSeenAt`.
+ * Why the peer's choice is proof: `lastSeenAt` is written when a socket authenticates and again when one closes,
+ * so it does not order uses — a row whose connection is still open can look stale, and a row closed after its
+ * replacement was minted can look newer. What cannot be argued with is which row the peer redeemed, so the newest
+ * SIGHTED row in mint order is the credential and the older ones are spent. Mint order rather than `pairedAt`:
+ * both are written by the same clock, but only one of them survives the clock going backwards.
  *
  * Why a parent is left alone: revoking a row also revokes rows minted from it — a phone paired through it, a
  * delegated mobile row. Retiring a spent credential must not spend anything else, so a row with children stays
  * and the owner keeps the only revoke that should cascade.
  *
- * Why `minted` decides membership: a peer's own pairing link is adopted into the index when it joins, and that row
- * is the owner's to keep, list and revoke — never the mesh's to retire.
+ * Why the minted list decides membership: a peer's own pairing link is adopted into the index when it joins, and
+ * that row is the owner's to keep, list and revoke — never the mesh's to retire.
  */
 export function staleMeshRows(
   rows: readonly MeshDeviceRow[],
-  minted: ReadonlySet<string>,
+  peers: MeshPeerRows,
   now: number
 ): readonly MeshDeviceRow[] {
-  const candidates = rows.filter((row) => row.scope === 'runtime' && minted.has(row.deviceId))
+  const byId = new Map(rows.map((row) => [row.deviceId, row]))
+  const candidates = peers.minted
+    .map((id) => byId.get(id))
+    .filter((row): row is MeshDeviceRow => row !== undefined && row.scope === 'runtime')
   if (candidates.length === 0) {
     return []
   }
   const parents = parentsOf(rows)
-  const seen = candidates.filter((row) => row.lastSeenAt > 0)
-  const current = seen.reduce<MeshDeviceRow | null>(
-    (newest, row) => (newest === null || row.pairedAt > newest.pairedAt ? row : newest),
-    null
-  )
+  const current = candidates.findLast((row) => row.lastSeenAt > 0) ?? null
   return candidates.filter((row) => {
     if (row.deviceId === current?.deviceId || parents.has(row.deviceId)) {
       return false
@@ -83,7 +88,11 @@ export function staleMeshRows(
 }
 
 /**
- * Revokes the mesh's own spent device rows and returns the ids it dropped.
+ * Revokes the mesh's own spent device rows, and returns every id the peer index should now drop: the ones it
+ * revoked, plus the ones the registry no longer has.
+ *
+ * Why the second group exists: an id whose row is gone is already revoked, but nothing else ever removed it from
+ * the index, so the entry grew by a dead id per path that bypassed this sweep.
  *
  * Why per peer rather than one flat set: replacement is a relation between the rows minted for the same machine,
  * so the peer index — which is exactly that grouping, and which removal already trusts to revoke a whole set — is
@@ -91,23 +100,34 @@ export function staleMeshRows(
  */
 export function pruneMeshDeviceRows(
   server: MeshDeviceRowServer,
-  peers: ReadonlyMap<string, { minted: readonly string[]; all: readonly string[] }>
+  peers: ReadonlyMap<string, MeshPeerRows>
 ): readonly string[] {
   const registry = server.getDeviceRegistry()
   if (!registry) {
     return []
   }
   const now = Date.now()
-  const byId = new Map(registry.listDevices({ fresh: true }).map((row) => [row.deviceId, row]))
-  const pruned: string[] = []
+  const rows = registry.listDevices({ fresh: true })
+  const present = new Set(rows.map((row) => row.deviceId))
+  const dropped: string[] = []
   for (const peer of peers.values()) {
-    const own = peer.all
-      .map((id) => byId.get(id))
-      .filter((row): row is MeshDeviceRow => row !== undefined)
-    for (const row of staleMeshRows(own, new Set(peer.minted), now)) {
+    for (const id of peer.all) {
+      if (!present.has(id)) {
+        dropped.push(id)
+      }
+    }
+    for (const row of staleMeshRows(rows, peer, now)) {
+      // Why removal is the fallback rather than the end: a full revoke settles queued asks and drops live sockets,
+      // and a registry that refuses it still accepts the row deletion.
+      let revoked = false
       try {
-        if (server.revokeRuntimeAccess(row.deviceId) || registry.removeDevice(row.deviceId)) {
-          pruned.push(row.deviceId)
+        revoked = server.revokeRuntimeAccess(row.deviceId)
+      } catch {
+        revoked = false
+      }
+      try {
+        if (revoked || registry.removeDevice(row.deviceId)) {
+          dropped.push(row.deviceId)
         }
       } catch {
         // Why one row does not end the sweep: the next pass retries it, and a throw here would end the whole
@@ -115,5 +135,5 @@ export function pruneMeshDeviceRows(
       }
     }
   }
-  return pruned
+  return dropped
 }
