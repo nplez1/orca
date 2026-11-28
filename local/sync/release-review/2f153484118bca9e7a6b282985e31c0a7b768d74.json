@@ -1,0 +1,1378 @@
+{
+  "revision": "2f153484118bca9e7a6b282985e31c0a7b768d74",
+  "base": "e8321ad760971f5cc9df7e23908315315a5167c9",
+  "upstream": "27a700fd8d659a298769e5453bb340d4debbf76a",
+  "mergeCommit": "20e7fbc94d441a9047ee5d4b9125ce3767361630",
+  "reviewer": {
+    "provider": "claude",
+    "alias": "opus",
+    "name": "Opus 5.5",
+    "thinking": "high"
+  },
+  "generatedBy": "node local/release-review-packets.mjs --write",
+  "artifact": {
+    "kind": "remerge-diff",
+    "path": "orca-review/sync-20e7fbc94d44/remerge-diff.patch",
+    "bytes": 604001,
+    "files": 144,
+    "reviewedBytes": 584131,
+    "excluded": {
+      "files": 2,
+      "bytes": 19870,
+      "rules": [
+        {
+          "id": "ratchet-baselines",
+          "covers": [
+            "gate-lint:check:max-lines-ratchet",
+            "gate-lint:check-host-mesh-upstream-seams"
+          ],
+          "files": 2,
+          "bytes": 19870,
+          "why": "a list of known offenders; its ratchet fails when the tree grows past it",
+          "residual": "an edit that raises an allowance still passes; the +/- counts show whether a list grew"
+        }
+      ]
+    },
+    "uncovered": [
+      {
+        "path": "config/react-compiler-hazard-baseline.txt",
+        "rule": "ratchet-baselines",
+        "reason": "no covering check found"
+      },
+      {
+        "path": "config/render-path-translate-baseline.txt",
+        "rule": "ratchet-baselines",
+        "reason": "no covering check found"
+      }
+    ]
+  },
+  "note": "2 slice(s) over the remerge diff of 20e7fbc94d4, 584131 of 604001 bytes reviewed (19870 bytes in 2 files left to their verifying checks). Round 1: 2 BLOCKER, 3 SHOULD-FIX, 2 MINOR, 2 NIT. Sweep: 30 fine slice(s) by Opus 5.5, 25 finding(s): 1 BLOCKER, 2 SHOULD-FIX, 14 MINOR, 8 NIT. Adjudication: 3 packet(s) by Opus 5.5, 31 judgment(s) and 0 BLOCKER, 0 SHOULD-FIX, 1 MINOR, 0 NIT the sweep missed. 10 delta round(s) (delta 20e7fbc94d44..b346e041e9c6; delta b346e041e9c6..974bfeb7e92b; delta 974bfeb7e92b..78eeda892e1e; delta 78eeda892e1e..aa0177bd5395; delta aa0177bd5395..d51ec4d3569c; delta d51ec4d3569c..8aa857d12e4f; delta 8aa857d12e4f..04690a5c218c; delta 04690a5c218c..072132da02cd; delta 072132da02cd..737523b580c3; delta 737523b580c3..2f153484118b): 0 BLOCKER, 2 SHOULD-FIX, 8 MINOR, 3 NIT. 15/15 slices reported; $39.77 total.",
+  "slices": [
+    {
+      "id": "A",
+      "round": "R1",
+      "scope": "{BRANCHES.md … local} (5), mobile/src/session/mobile-session-frame-styles.ts, src/main",
+      "files": 69,
+      "bytes": 237219,
+      "verdict": "reported",
+      "blockers": 2,
+      "shouldFix": 2,
+      "minors": 1,
+      "nits": 1,
+      "unresolved": 0,
+      "costUsd": 4.737212400000001,
+      "coverage": "Read all 4264 lines of slice-A.patch and checked the resolved hunks against the merged tree, including upstream's new lazy IPC group files (lazy-ipc-handle-group, lazy-ephemeral-vm-handlers, lazy-jira-handlers, lazy-account-and-diagnostic, lazy-secondary, lazy-linear) and the preload bridges that call them; I did not look at the other slice's src/shared hunks beyond what these hunks reference.",
+      "findings": [
+        {
+          "id": "A-1",
+          "severity": "BLOCKER",
+          "file": "src/main/ipc/ephemeral-vm/ephemeral-vm-runtime-handlers.ts",
+          "summary": "The fork's extendLifetime and runContextMenuItem handlers now register through upstream's lazy registrar, but neither channel is in EPHEMERAL_VM_IPC_CHANNELS (lazy-ephemeral-vm-handlers.ts:13), so ipcMain never answers them.",
+          "status": "resolved (delta-1)"
+        },
+        {
+          "id": "A-2",
+          "severity": "BLOCKER",
+          "file": "src/main/ipc/jira/register-handlers.ts",
+          "summary": "'jira:listEditFields' is missing from JIRA_IPC_CHANNELS, and the fork's registerJiraPageHandlers (direct ipcMain.handle) now runs only inside the lazy loader, so jira:searchIssuesPage and jira:listIssuesPage do not exist until some other Jira channel has been invoked.",
+          "status": "resolved (delta-1)"
+        },
+        {
+          "id": "A-3",
+          "severity": "SHOULD-FIX",
+          "file": "src/main/ipc/ephemeral-vm/ephemeral-vm.ts",
+          "summary": "The fork's reclaim sweep and interrupted-provision flagging were put behind skipStartupReconcile, which the lazy loader sets to true whenever saved VM state already triggered the startup reconcile.",
+          "status": "resolved (delta-2)"
+        },
+        {
+          "id": "A-4",
+          "severity": "SHOULD-FIX",
+          "file": "src/main/ipc/register-core-handlers/register-core-handlers.ts",
+          "summary": "The resolution kept the base/upstream import and call of registerDashboardPopoutHandlers, which the fork had removed before the sync.",
+          "status": "resolved (delta-1)"
+        },
+        {
+          "id": "A-5",
+          "severity": "MINOR",
+          "file": "LOCAL-PATCHES.md",
+          "summary": "The new heading was inserted between sync-log entries, so the 2026-11-24 entry and everything after it now sits under the wrong section.",
+          "status": "resolved (delta-1)"
+        },
+        {
+          "id": "A-6",
+          "severity": "NIT",
+          "file": "LOCAL-PATCHES.md",
+          "summary": "The text says 'the 2026-11-28 sync narrowed it'; this sync is dated 2026-11-27 everywhere else.",
+          "status": "resolved (delta-1)"
+        }
+      ]
+    },
+    {
+      "id": "B",
+      "round": "R1",
+      "scope": "src/{renderer,shared}",
+      "files": 73,
+      "bytes": 346912,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 1,
+      "minors": 1,
+      "nits": 1,
+      "unresolved": 0,
+      "costUsd": 4.4760274,
+      "coverage": "Read all 7376 lines of slice-B.patch (73 files) and checked the hunks against the resolved tree, both parents (e8321ad7609, 27a700fd8d6) and LOCAL-PATCHES.md where context was needed; the AppWorkspaceShell and main-process ingest code was checked only where a slice hunk depends on it.",
+      "findings": [
+        {
+          "id": "B-1",
+          "severity": "SHOULD-FIX",
+          "file": "src/renderer/src/components/skills/SkillsPage.tsx",
+          "summary": "Taking upstream's RailPage chrome dropped the fork's top-band and window-controls reservation (pt-5/md:pt-6, SKILLS_PAGE_TOP_ROW_INSET), but 'skills' is still in VIEWS_OWNING_CONTENT_HEADER, so the shell suppresses the titlebar stripe that RailPage relies on.",
+          "status": "resolved (delta-1)"
+        },
+        {
+          "id": "B-2",
+          "severity": "MINOR",
+          "file": "src/renderer/src/components/skills/catalog/SkillsPageHeader.tsx",
+          "summary": "The Skills close button that fork #366 removed is back via RailPageHeader, and only en.json's tombstones were deleted; the closeSkills/closeTooltip null tombstones remain in 10 fork locale files.",
+          "status": "resolved (delta-1)"
+        },
+        {
+          "id": "B-3",
+          "severity": "NIT",
+          "file": "src/shared/agent-hook-listener/providers/claude/lifecycle/claude-pane-hold-evidence.ts",
+          "summary": "After the narrowing to shell tasks, a running 'workflow' or 'unknown' background task reads as monitoring locally, while the relay path hard-codes hasShellTask: true and reads the same pane as working.",
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "id": "adj-1",
+      "round": "adj-1",
+      "scope": "adjudication 1 of 3",
+      "files": 9,
+      "bytes": 33097,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 1,
+      "nits": 0,
+      "unresolved": 0,
+      "costUsd": 3.3717993999999996,
+      "coverage": "Read all seven resolution hunks and checked each finding against HEAD aa0177bd539, the fork tip e8321ad760, upstream 27a700fd8d6 and the callers (renderer Jira page client, runtime host services, speech lazy owners, max-lines ledger rule, expected-deletions rows); no tests or typecheck were run, and I could not view the full -U0 diff of expected-deletions.json since the pre-sync tip.",
+      "findings": [
+        {
+          "id": "adj-1-1",
+          "severity": "MINOR",
+          "file": "LOCAL-PATCHES.md",
+          "summary": "The local(agents) anchor list still says claude-roster-state.ts has 'No fork hunk in this file, so a conflict there is upstream's to resolve', but this sync's narrowing put the fork's {commands, hasShellTask} write there, and listener-state.ts (which declares the type) is not listed as an anchor.",
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "id": "adj-2",
+      "round": "adj-2",
+      "scope": "adjudication 2 of 3",
+      "files": 11,
+      "bytes": 91099,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 0,
+      "nits": 0,
+      "unresolved": 0,
+      "costUsd": 4.1942824000000005,
+      "coverage": "Read all 1974 lines of adj-2.patch and checked each finding against HEAD aa0177bd5 and the post-merge commits a172ad78d20, b346e041e9c and 2bbb951da0f: AppWorkspaceShell, the Skills headers, RailPageHeader, all locale overlays, the bailout baseline at the fork tip and the merge, every reader and writer of claudeRunningNonAgentTasksByPaneKey, lazy-zod-schema, and the jira/files/client-ui params; I could not run React Compiler, so S-O-1's bailout count is inferred from the fork tip's recorded 3 on byte-equivalent code and the same oxc-transform-react ~0.152.0.",
+      "findings": []
+    },
+    {
+      "id": "adj-3",
+      "round": "adj-3",
+      "scope": "adjudication 3 of 3",
+      "files": 7,
+      "bytes": 21422,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 0,
+      "nits": 0,
+      "unresolved": 0,
+      "costUsd": 2.6210604000000006,
+      "coverage": "Read all four resolution hunks and their files at HEAD, plus the callers, inventory, relay, lazy-zod, seam-register, ratchet-baseline and propose code needed for each finding, and verified the popout upstream blobs at 27a700fd8d6; I did not run tests, typecheck or the seam check itself.",
+      "findings": []
+    },
+    {
+      "id": "delta-1",
+      "round": "delta-1",
+      "scope": "delta 20e7fbc94d44..b346e041e9c6",
+      "files": 44,
+      "bytes": 102401,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 1,
+      "nits": 1,
+      "unresolved": 0,
+      "costUsd": 3.0849968000000003,
+      "coverage": "Read the whole delta patch and the excluded baseline note, and checked the touched lazy registrars, handler registrations, ephemeral-VM startup path, AppWorkspaceShell against upstream, fork and upstream locale files, the LOCAL-PATCHES heading layout and the seam-check header against the tree at b346e041e9c.",
+      "findings": [
+        {
+          "id": "delta-1-1",
+          "severity": "MINOR",
+          "file": "local/checks/host-mesh-upstream-seams.mjs",
+          "summary": "Five upstream files that are not host-mesh surface (jira-params.ts, github-account-binding-params.ts, repo-params.ts, claude-oauth-credentials.ts, session-list-result-validation.ts) are added to the host-mesh seam register with permanent budgets so the mesh check passes on the repair commit.",
+          "status": "open"
+        },
+        {
+          "id": "delta-1-2",
+          "severity": "NIT",
+          "file": "src/shared/rpc-contract/host-mesh-params.ts",
+          "summary": "joinerWithPublicKey and joinerWithOptionalPublicKey call joiner.extend(...) when the module loads, which builds joiner, keyB64 and hostLabel straight away.",
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "id": "delta-2",
+      "round": "delta-2",
+      "scope": "delta b346e041e9c6..974bfeb7e92b",
+      "files": 6,
+      "bytes": 17163,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 1,
+      "nits": 0,
+      "unresolved": 0,
+      "costUsd": 1.7080478000000001,
+      "coverage": "Read the whole delta and excluded patches plus the current text of lazy-ephemeral-vm-handlers.ts, ephemeral-vm.ts, the reclaim and provisioning-recovery modules, the register-core-handlers call site and the helper-ratchet overlay semantics.",
+      "findings": [
+        {
+          "id": "delta-2-1",
+          "severity": "MINOR",
+          "file": "config/main-blocking-helper-baseline.txt",
+          "summary": "The fork's extra blocking-helper reference (flagInterruptedEphemeralVmProvisioning) was signed off by rewriting upstream's own baseline row and comment instead of adding a row to config/main-blocking-helper-baseline.fork.txt.",
+          "status": "resolved (delta-3)"
+        }
+      ]
+    },
+    {
+      "id": "delta-3",
+      "round": "delta-3",
+      "scope": "delta 974bfeb7e92b..78eeda892e1e",
+      "files": 1,
+      "bytes": 1063,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 0,
+      "nits": 1,
+      "unresolved": 0,
+      "costUsd": 1.1969243999999999,
+      "coverage": "Read the full delta and excluded patches, the ratchet script, the ratchet-baseline overlay merge and prune logic, the current overlay file, the base file diffed against upstream 27a700fd8d6, and LOCAL-PATCHES § local(vm).",
+      "findings": [
+        {
+          "id": "delta-3-1",
+          "severity": "NIT",
+          "file": "config/main-blocking-helper-baseline.fork.txt",
+          "summary": "The new overlay row is inserted between src/main/ephemeral-vm-runtime-context-menu.ts and src/main/ephemeral-vm-runtime-extend.ts, out of the path order every other row in the file follows.",
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "id": "delta-5",
+      "round": "delta-5",
+      "scope": "delta 78eeda892e1e..aa0177bd5395",
+      "files": 4,
+      "bytes": 7313,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 0,
+      "nits": 0,
+      "unresolved": 0,
+      "costUsd": 1.5408700000000004,
+      "coverage": "Read the whole delta (LOCAL-PATCHES.md, convergence-ledger.md, expected-deletions.json, the new shell-hold test) and checked the hook's provenance across the merge parents, the manifest parser, the narrowed hold rule and the S-O-1 and B-3 sites in the current tree.",
+      "findings": []
+    },
+    {
+      "id": "delta-6",
+      "round": "delta-6",
+      "scope": "delta aa0177bd5395..d51ec4d3569c",
+      "files": 96,
+      "bytes": 242540,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 1,
+      "minors": 2,
+      "nits": 0,
+      "unresolved": 0,
+      "costUsd": 3.4277439999999997,
+      "coverage": "Checked every finding id against HEAD, and read the touched dispatch, command-runner, persistence, RPC, CLI, plugin-projection and renderer-save files against the code they call.",
+      "findings": [
+        {
+          "id": "delta-6-1",
+          "severity": "SHOULD-FIX",
+          "file": "src/main/plugins/workers/host-api/plugin-automation-projection.ts",
+          "summary": "The rewrite from slice(0, PLUGIN_AUTOMATION_LIST_LIMIT).map to flatMap dropped the 200-row cap, so the plugin automation.list answer is unbounded.",
+          "status": "resolved (delta-7)"
+        },
+        {
+          "id": "delta-6-2",
+          "severity": "MINOR",
+          "file": "src/cli/automations/automation-enabled-handlers.ts",
+          "summary": "When the automation is already on or off, enable/disable print a plain sentence through writeStdoutLine even with --json.",
+          "status": "open"
+        },
+        {
+          "id": "delta-6-3",
+          "severity": "MINOR",
+          "file": "src/main/persistence/scheduling-automations/automation-definition-update.ts",
+          "summary": "Clearing a command with an empty --script keeps the stored empty prompt, so the automation becomes an agent automation with no prompt.",
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "id": "delta-7",
+      "round": "delta-7",
+      "scope": "delta d51ec4d3569c..8aa857d12e4f",
+      "files": 1,
+      "bytes": 2073,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 0,
+      "nits": 1,
+      "unresolved": 0,
+      "costUsd": 1.1152188,
+      "coverage": "Read the full current text of plugin-automation-projection.ts against the delta and #495's original change, checked the PLUGIN_AUTOMATION_LIST_LIMIT schema bound and callers, searched for projection tests, and confirmed the untouched S-O-1 file still has two finalizers.",
+      "findings": [
+        {
+          "id": "delta-7-1",
+          "severity": "NIT",
+          "file": "src/main/plugins/workers/host-api/plugin-automation-projection.ts",
+          "summary": "No test covers projectPluginAutomations, so the restored 200-row cap and the agent-only truncated count are unpinned.",
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "id": "delta-8",
+      "round": "delta-8",
+      "scope": "delta 8aa857d12e4f..04690a5c218c",
+      "files": 4,
+      "bytes": 8953,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 1,
+      "nits": 0,
+      "unresolved": 0,
+      "costUsd": 1.4800744000000001,
+      "coverage": "Read the full current text of host-mesh-params.ts and methods/host-mesh.ts and the changed regions of host-mesh-driver.ts, plus the error path from the dispatcher's schema refusal through runtime-deps send, the driver tests and the generated catalog entry.",
+      "findings": [
+        {
+          "id": "delta-8-1",
+          "severity": "MINOR",
+          "file": "src/main/host-mesh/host-mesh-driver.ts",
+          "summary": "No test covers the new retry that resends hostMesh.sync without endpoints after an invalid_argument refusal.",
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "id": "delta-9",
+      "round": "delta-9",
+      "scope": "delta 04690a5c218c..072132da02cd",
+      "files": 6,
+      "bytes": 15437,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 0,
+      "nits": 0,
+      "unresolved": 0,
+      "costUsd": 1.5769606000000003,
+      "coverage": "Read the full delta and every touched file, plus the peer-index writers (host-mesh-store recordPeer/forgetPeerDeviceRows, rpc-service offerBack:516), the redeem upsert path, and the device-registry sighting code that sets lastSeenAt; also searched the fork's docs for a record of the change.",
+      "findings": []
+    },
+    {
+      "id": "delta-10",
+      "round": "delta-10",
+      "scope": "delta 072132da02cd..737523b580c3",
+      "files": 102,
+      "bytes": 323893,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 1,
+      "minors": 2,
+      "nits": 0,
+      "unresolved": 0,
+      "costUsd": 4.020445200000001,
+      "coverage": "Read every touched host-mesh, setup-runner, pi hold/ownership, Jira board-set, workspace-emptied and release-notes file, plus the callers and readers they rely on; the earlier findings were checked against the tree.",
+      "findings": [
+        {
+          "id": "delta-10-1",
+          "severity": "SHOULD-FIX",
+          "file": "src/main/host-mesh/host-mesh-store.ts",
+          "summary": "recordPeer writes mintedRowIds: [] on an older peer entry whenever it adds no minted row (settleLinks on every saveState, the RPC service's commit() on every inbound call, the caller-row adoption), and forgetPeerDeviceRows does the same, which defeats the absent-means-older-entry migration the sweep and Share this computer read.",
+          "status": "resolved (delta-11)"
+        },
+        {
+          "id": "delta-10-2",
+          "severity": "MINOR",
+          "file": ".github/scripts/fork-release-notes.mjs",
+          "summary": "Merge commits are counted as product changes (a Merge subject classifies as 'other') while the buckets skip them and the lead already names merges in its merge clause.",
+          "status": "resolved (delta-11)"
+        },
+        {
+          "id": "delta-10-3",
+          "severity": "MINOR",
+          "file": "src/renderer/src/store/slices/editor/closing/close-file-action.ts",
+          "summary": "Every closeFile with the default captureRecentlyClosed writes a workspace-emptied record, including automated closes such as plugin-view-editor-shot-cleanup.",
+          "status": "resolved (delta-11)"
+        }
+      ]
+    },
+    {
+      "id": "delta-11",
+      "round": "delta-11",
+      "scope": "delta 737523b580c3..2f153484118b",
+      "files": 5,
+      "bytes": 7621,
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 1,
+      "nits": 0,
+      "unresolved": 0,
+      "costUsd": 1.2182263999999998,
+      "coverage": "Read the full recordPeer and forgetPeerDeviceRows bodies, both mintedRowIds readers, the release-notes commit parser and buildSummary, and the store tests next to the new one; checked that no copy of the removed README claim remains.",
+      "findings": [
+        {
+          "id": "delta-11-1",
+          "severity": "MINOR",
+          "file": "src/main/host-mesh/host-mesh-store.ts",
+          "summary": "The forgetPeerDeviceRows fallback from [] to ids for an older entry without mintedRowIds has no test, so reverting it would break nothing.",
+          "status": "open"
+        }
+      ]
+    }
+  ],
+  "sweep": {
+    "reviewer": {
+      "name": "cheap-tier"
+    },
+    "budgetBytes": 24576,
+    "slices": [
+      {
+        "id": "A",
+        "scope": "{BRANCHES.md,LOCAL-PATCHES.md,config}",
+        "files": 5,
+        "bytes": 22587,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 2,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-A-1",
+            "severity": "MINOR",
+            "file": "LOCAL-PATCHES.md",
+            "summary": "The bullet calls the close-shortcut hook fork-owned, but it is upstream's new file added in this same range and the fork never had it.",
+            "status": "open"
+          },
+          {
+            "id": "S-A-2",
+            "severity": "MINOR",
+            "file": "LOCAL-PATCHES.md",
+            "summary": "The anchor names src/shared/agent-hook-listener/providers/claude-pane-hold-evidence.ts, a path that exists at no revision; the file is providers/claude/lifecycle/claude-pane-hold-evidence.ts.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "B",
+        "scope": "docs, local/sync/{convergence-ledger.md,expected-deletions.json}",
+        "files": 5,
+        "bytes": 24112,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 1,
+        "minors": 1,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-B-1",
+            "severity": "SHOULD-FIX",
+            "file": "local/sync/convergence-ledger.md",
+            "summary": "The ledger calls use-dashboard-popout-close-shortcut.ts fork-owned, but upstream owns that path at the pinned base and expected-deletions.json carries no row for it.",
+            "status": "resolved (delta-6)"
+          },
+          {
+            "id": "S-B-2",
+            "severity": "MINOR",
+            "file": "local/sync/convergence-ledger.md",
+            "summary": "The ledger says expected-deletions.json gained nine USAGE_PROVIDER_MANIFEST.antigravity.* symbols; the hunk adds seven, and two of the nine rows it does add are not manifest symbols at all.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "C",
+        "scope": "local/sync/{identity-sweep-baseline.json,sync-log-archive.md,upstream-deleted-fork-tests-baseline.json}, local/upstream-file-comments-baseline.json, mobile/src/session/mobile-session-frame-styles.ts, src/main/agent-hooks",
+        "files": 8,
+        "bytes": 22221,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 2,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-C-1",
+            "severity": "MINOR",
+            "file": "mobile/src/session/mobile-session-frame-styles.ts",
+            "summary": "The resolution dropped spacing and typography from the theme import although both parents and upstream at 27a700fd8d6 keep them, so this is an undocumented fork delta on an upstream-owned file with a one-line revert.",
+            "status": "open"
+          },
+          {
+            "id": "S-C-2",
+            "severity": "MINOR",
+            "file": "src/main/claude/hooks/claude-hook-plugin.test.ts",
+            "summary": "After the mechanical rewrite every fixture is .orca-np, so no test exercises the .orca alternative of CLAUDE_MANAGED_HOOK_COMMAND_PATTERN even though the pattern deliberately keeps it.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "D",
+        "scope": "src/main/ai-vault, src/main/bots/bot-request-view.ts, src/main/claude/hooks/claude-hook-plugin.test.ts",
+        "files": 5,
+        "bytes": 18855,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 1,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-D-1",
+            "severity": "MINOR",
+            "file": "src/main/claude/hooks/claude-hook-plugin.test.ts",
+            "summary": "After the identity sweep rewrote the five .orca literals to .orca-np, no input in any test exercises CLAUDE_MANAGED_HOOK_COMMAND_PATTERN's LEGACY_HOME_DIRECTORY_NAME (.orca) alternative.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "E",
+        "scope": "src/main/github, src/main/host-sync/usage-provider-credential-census.test.ts, src/main/host/electron-http-client.ts",
+        "files": 4,
+        "bytes": 21468,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": []
+      },
+      {
+        "id": "F",
+        "scope": "src/main/ipc/{accounts,ephemeral-vm}, src/main/ipc/filesystem/watchers/filesystem-watcher-local-events.ts, src/main/ipc/jira",
+        "files": 7,
+        "bytes": 22507,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": []
+      },
+      {
+        "id": "G",
+        "scope": "src/main/ipc/register-core-handlers, src/main/ipc/repos/repo-clone-lifecycle.ts, src/main/ipc/shell/shell-owned-path-target.ts",
+        "files": 4,
+        "bytes": 11832,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": []
+      },
+      {
+        "id": "H",
+        "scope": "src/main/jira",
+        "files": 4,
+        "bytes": 23395,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 1,
+        "nits": 1,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-H-1",
+            "severity": "MINOR",
+            "file": "src/main/jira/jira-issue-page-reads.ts",
+            "summary": "The ported unbounded-JQL retry lands only on the array read, so the fork's primary UI path (searchIssuesPage -> readIssuePageForClient) still surfaces Jira's 400 unbounded-JQL rejection.",
+            "status": "open"
+          },
+          {
+            "id": "S-H-2",
+            "severity": "NIT",
+            "file": "src/main/jira/jira-api-error.ts",
+            "summary": "The resolution drops upstream's exports readJiraError and toJiraApiError from this module, keeping only the class.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "I",
+        "scope": "src/main/network/http-client.ts, src/main/orca-profiles/host-sync-settings-disposition.ts, src/main/pi/managed-extensions/agent-status/agent-status-handler-source.ts, src/main/project-groups/nested-repo-discovery.ts, src/main/rate-limits/{fork … service-usage-provider-enablement.conformance.test.ts} (7), src/main/rate-limits/service/{full-cycle-prepared.ts,rate-limit-service-test-harness.ts}",
+        "files": 15,
+        "bytes": 21849,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": []
+      },
+      {
+        "id": "J",
+        "scope": "src/main/rate-limits/service/{service-cycle-fetch-state.ts … service-types.ts} (6)",
+        "files": 6,
+        "bytes": 23643,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": []
+      },
+      {
+        "id": "K",
+        "scope": "src/main/runtime, src/main/startup/quit/main-process-quit.ts",
+        "files": 5,
+        "bytes": 23015,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 1,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-K-1",
+            "severity": "MINOR",
+            "file": "src/main/runtime/orca-runtime-owned-controllers.ts",
+            "summary": "The slice's speech hunk replaced the class's `mobileSpeech`/`mobileDictation` declarations with upstream's `mobileSpeechOwners`, but the fork's `@ts-nocheck` split initialiser still assigns both fields and eagerly constructs the controllers, so nothing reads them and upstream's lazy load never applies.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "L",
+        "scope": "src/main/window/clipboard/clipboard-ipc-handlers.ts, src/renderer/src/App.tsx, src/renderer/src/components/automations/external/use-external-automation-actions.ts, src/renderer/src/components/cmd-j/palette-live-status.tsx",
+        "files": 4,
+        "bytes": 14850,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 1,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-L-1",
+            "severity": "MINOR",
+            "file": "src/main/window/clipboard/clipboard-ipc-handlers.ts",
+            "summary": "The resolution suppressed the max-lines rule on the clipboard handler — a file that only crossed the 300-line budget because of the merge's own additions — and recorded it as a new entry in a ratchet whose header forbids growth.",
+            "status": "dismissed (adj-1)"
+          }
+        ]
+      },
+      {
+        "id": "M",
+        "scope": "src/renderer/src/components/dashboard-popout, src/renderer/src/components/diff-comments/useDiffCommentDecorator.tsx, src/renderer/src/components/editor/diff/monaco-view/DiffViewer.tsx, src/renderer/src/components/right-sidebar/ai-vault/scanning/ai-vault-session-refresh.ts, src/renderer/src/components/right-sidebar/checks-panel/refresh/use-checks-detail-timer.ts",
+        "files": 7,
+        "bytes": 23162,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 1,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-M-1",
+            "severity": "MINOR",
+            "file": "src/renderer/src/components/dashboard-popout/snapshot/dashboard-agent-status-patch.ts",
+            "summary": "Deleting useDashboardSnapshot.ts in this resolution leaves dashboard-agent-status-patch.ts with no importer at all, so patchDashboardSnapshotFromAgentStatus is dead code in the repo.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "N",
+        "scope": "src/renderer/src/components/right-sidebar/checks-panel/refresh/use-checks-panel-manual-refresh.tsx (part 1 of 2)",
+        "files": 1,
+        "bytes": 24395,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": []
+      },
+      {
+        "id": "O",
+        "scope": "src/renderer/src/components/right-sidebar/checks-panel/refresh/{use-checks-panel-manual-refresh.tsx,use-checks-panel-polling.tsx} (part 2 of 2)",
+        "files": 2,
+        "bytes": 14585,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 1,
+        "minors": 0,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-O-1",
+            "severity": "SHOULD-FIX",
+            "file": "src/renderer/src/components/right-sidebar/checks-panel/refresh/use-checks-panel-polling.tsx",
+            "summary": "The resolution kept the fork's two inline try/finally blocks where upstream had extracted them into runWithFinally, but also kept upstream's zero bailout rows for this file, so the code and the React Compiler baseline now record different facts.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "P",
+        "scope": "src/renderer/src/components/right-sidebar/checks-panel/review-actions/use-checks-panel-check-and-review-actions.tsx, src/renderer/src/components/right-sidebar/source-control",
+        "files": 5,
+        "bytes": 19188,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": []
+      },
+      {
+        "id": "Q",
+        "scope": "src/renderer/src/components/settings",
+        "files": 5,
+        "bytes": 21932,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": []
+      },
+      {
+        "id": "R",
+        "scope": "src/renderer/src/components/sidebar",
+        "files": 4,
+        "bytes": 9310,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": []
+      },
+      {
+        "id": "S",
+        "scope": "src/renderer/src/components/skills",
+        "files": 4,
+        "bytes": 18600,
+        "verdict": "reported",
+        "blockers": 1,
+        "shouldFix": 0,
+        "minors": 1,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-S-1",
+            "severity": "BLOCKER",
+            "file": "src/renderer/src/components/skills/SkillsPage.tsx",
+            "summary": "The page's RailPage conversion removed the fork's top-band reservation (pt-5 md:pt-6 and SKILLS_PAGE_TOP_ROW_INSET) while the shell still excludes 'skills' from the titlebar stripe, so the Skills page has no band in the default stacked-sidebar layout.",
+            "status": "dismissed (adj-2)"
+          },
+          {
+            "id": "S-S-2",
+            "severity": "MINOR",
+            "file": "src/renderer/src/components/skills/catalog/SkillsPageHeader.tsx",
+            "summary": "The resolution re-adds the close X (onClose prop plus RailPageHeader close={...}) that fork #366 deliberately removed from the Skills header.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "T",
+        "scope": "src/renderer/src/components/status-bar, src/renderer/src/components/tab-bar/terminal-tabs/terminal-tab-activity-status.ts, src/renderer/src/components/task-page/jira/Content.tsx",
+        "files": 9,
+        "bytes": 22011,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 2,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-T-1",
+            "severity": "NIT",
+            "file": "src/renderer/src/components/status-bar/usage/owner-usage-rate-limits.ts",
+            "summary": "The resolution adds a dead antigravityAccounts field to adoptRemoteRateLimits and keeps it on the controller, although upstream removed antigravity as a usage provider and the surviving type is the empty tuple [].",
+            "status": "open"
+          },
+          {
+            "id": "S-T-2",
+            "severity": "NIT",
+            "file": "src/renderer/src/components/status-bar/composition/status-bar-provider-visibility.ts",
+            "summary": "The fork's manifest loop keeps the pendingNeedsSetup branch while no manifest entry sets it any more, and the test that pinned that rule was deleted in the same resolution.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "U",
+        "scope": "src/renderer/src/components/terminal-pane, src/renderer/src/i18n/fork/en.json, src/renderer/src/lib/workspace/activity/worktree-status.ts, src/renderer/src/popout.tsx",
+        "files": 5,
+        "bytes": 18490,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 1,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-U-1",
+            "severity": "MINOR",
+            "file": "src/renderer/src/i18n/fork/en.json",
+            "summary": "The English overlay unlocked the restored Skills close button's strings, but the ten other fork locale overlays still tombstone closeSkills and closeTooltip, so the control is English-only in those languages.",
+            "status": "dismissed (adj-2)"
+          }
+        ]
+      },
+      {
+        "id": "V",
+        "scope": "src/shared/agent-hook-listener, src/shared/agent-usage/rate-limits/rate-limit-types.ts",
+        "files": 6,
+        "bytes": 13352,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 2,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-V-1",
+            "severity": "NIT",
+            "file": "src/shared/agent-hook-listener/listener-state.ts",
+            "summary": "The trimmed doc for piScheduledWorkByPaneKey drops the reason the inventory is held in listener state instead of being read off the current event.",
+            "status": "open"
+          },
+          {
+            "id": "S-V-2",
+            "severity": "NIT",
+            "file": "src/shared/agent-hook-listener/providers/claude/lifecycle/claude-pane-hold-evidence.ts",
+            "summary": "The fork's demotion policy is narrowed from any running non-agent task to shells only, and no test covers either the old or the new rule.",
+            "status": "dismissed (adj-2)"
+          }
+        ]
+      },
+      {
+        "id": "W",
+        "scope": "src/shared/ai-vault/search/ai-vault-search-contract.ts, src/shared/plugins/artifacts/plugin-vm-recipe-artifact.ts",
+        "files": 2,
+        "bytes": 14103,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": []
+      },
+      {
+        "id": "X",
+        "scope": "src/shared/remote-runtime, src/shared/rpc-contract/ai-vault/ai-vault-params.ts",
+        "files": 3,
+        "bytes": 20732,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": []
+      },
+      {
+        "id": "Y",
+        "scope": "src/shared/rpc-contract/client-ui/client-ui-params.ts",
+        "files": 1,
+        "bytes": 24413,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 1,
+        "nits": 1,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-Y-1",
+            "severity": "MINOR",
+            "file": "src/shared/rpc-contract/client-ui/client-ui-params.ts",
+            "summary": "The union is bought past the 300-line budget with a new inline max-lines suppression and a new ratchet baseline entry, in a file each future sync keeps unioning into.",
+            "status": "open"
+          },
+          {
+            "id": "S-Y-2",
+            "severity": "NIT",
+            "file": "src/shared/rpc-contract/client-ui/client-ui-params.ts",
+            "summary": "A fork-only bounds key is retained for the dashboard pop-out the fork never opens, because the fork ships the dashboard as a content-area view.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "Z",
+        "scope": "src/shared/rpc-contract/client-ui/{client-ui-status-bar-params.ts,client-ui-workspace-filter-fields-params.ts}, src/shared/rpc-contract/filesystem/files-params.ts, src/shared/rpc-contract/github",
+        "files": 5,
+        "bytes": 15327,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 1,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-Z-1",
+            "severity": "NIT",
+            "file": "src/shared/rpc-contract/filesystem/files-params.ts",
+            "summary": "The resolution authored a composition neither parent had, lazyZodSchema over a union of two lazy proxies, so the union is materialized once but its members stay proxies until first use.",
+            "status": "dismissed (adj-2)"
+          }
+        ]
+      },
+      {
+        "id": "AA",
+        "scope": "src/shared/rpc-contract/jira/jira-params.ts, src/shared/rpc-contract/orchestration/orchestration-params.ts",
+        "files": 2,
+        "bytes": 22770,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 1,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-AA-1",
+            "severity": "MINOR",
+            "file": "src/shared/rpc-contract/jira/jira-params.ts",
+            "summary": "The resolution promoted the fork's `ListIssuesFields` record into a lazy Zod object schema and rewrote both consumers to `.optional()`/`.extend()`, so the same `…Fields` suffix now means a schema here and a plain shape record twenty lines later at `BoardIssuePageFields`.",
+            "status": "open"
+          }
+        ]
+      },
+      {
+        "id": "AB",
+        "scope": "src/shared/rpc-contract/projects/project-runtime-params.ts, src/shared/rpc-contract/rpc-param-primitives.ts, src/shared/rpc-contract/workspaces/worktree-create-params.ts",
+        "files": 3,
+        "bytes": 23212,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": []
+      },
+      {
+        "id": "AC",
+        "scope": "src/shared/rpc-contract/workspaces/worktree-params.ts, src/shared/skills/packages/skill-package-manifest.ts",
+        "files": 2,
+        "bytes": 23385,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": []
+      },
+      {
+        "id": "AD",
+        "scope": "src/shared/{source-control,usage-provider-enablement.ts,usage-providers}",
+        "files": 5,
+        "bytes": 5436,
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 1,
+        "reviewer": "cheap-tier",
+        "costUsd": null,
+        "unresolved": 0,
+        "findings": [
+          {
+            "id": "S-AD-1",
+            "severity": "NIT",
+            "file": "src/shared/usage-providers/usage-provider-manifest.ts",
+            "summary": "Removing the antigravity entry leaves `pendingNeedsSetup` a manifest field no provider sets, so usageProviderPendingNeedsSetup() now always returns false.",
+            "status": "open"
+          }
+        ]
+      }
+    ],
+    "costUsd": 0
+  },
+  "adjudication": {
+    "reviewer": {
+      "provider": "claude",
+      "alias": "opus",
+      "name": "Opus 5.5",
+      "thinking": "high"
+    },
+    "slices": [
+      {
+        "id": "adj-1",
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 1,
+        "nits": 0,
+        "costUsd": 3.3717993999999996,
+        "judged": 12,
+        "missing": 0
+      },
+      {
+        "id": "adj-2",
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "costUsd": 4.1942824000000005,
+        "judged": 12,
+        "missing": 0
+      },
+      {
+        "id": "adj-3",
+        "verdict": "reported",
+        "blockers": 0,
+        "shouldFix": 0,
+        "minors": 0,
+        "nits": 0,
+        "costUsd": 2.6210604000000006,
+        "judged": 7,
+        "missing": 0
+      }
+    ],
+    "judged": [
+      {
+        "id": "S-A-1",
+        "real": true,
+        "severity": "NIT",
+        "why": "True at 20e7fbc: the hook is upstream's (8b1f8c51046, blob dce517bf0cb0). HEAD aa0177bd539 already rewrote the LOCAL-PATCHES bullet to say it is upstream's own file with its own expected-deletion row, so nothing is left to fix.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-A-2",
+        "real": true,
+        "severity": "MINOR",
+        "why": "LOCAL-PATCHES.md:949 still names providers/claude-pane-hold-evidence.ts; the file is providers/claude/lifecycle/. The sibling anchors claude-events.ts, claude-roster-state.ts and grok-events.ts are stale the same way. Fix: correct all four paths in one hunk.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-B-1",
+        "real": true,
+        "severity": "NIT",
+        "why": "Correct at the merge commit (a fair SHOULD-FIX then), but HEAD aa0177bd539 added the expected-deletions.json row at line 210 and corrected the ledger to say the hook is upstream's, so no fix is outstanding.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-B-2",
+        "real": true,
+        "severity": "NIT",
+        "why": "The merge's 'nine manifest symbols' was wrong: there are seven USAGE_PROVIDER_MANIFEST.antigravity rows plus AntigravityIcon and SKILLS_PAGE_TOP_ROW_INSET. HEAD aa0177bd539 already corrected both the ledger and LOCAL-PATCHES.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-C-1",
+        "real": true,
+        "severity": "NIT",
+        "why": "The only delta from upstream is dropping two imports that upstream itself never uses. No behaviour change, and a future conflict would be trivial or none; record only.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-C-2",
+        "real": true,
+        "severity": "MINOR",
+        "why": "At the fork tip the five .orca fixtures were the only positive test of the pattern's LEGACY_HOME_DIRECTORY_NAME branch; after the identity sweep's --fix everything is .orca-np, while claude-shell-function.ts:25 still depends on the legacy branch matching. Fix: add one case built from LEGACY_HOME_DIRECTORY_NAME so the sweep sees no literal.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-D-1",
+        "real": true,
+        "severity": "MINOR",
+        "why": "Same defect as S-C-2: the legacy .orca branch of CLAUDE_MANAGED_HOOK_COMMAND_PATTERN lost its only positive test. Same single-hunk fix.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-H-1",
+        "real": true,
+        "severity": "MINOR",
+        "why": "runIssuePageSearch calls readIssuePageForClient with no unbounded-JQL retry even on the first page, and runtime-jira-page-client.ts:50 only falls back on method_not_found, so the jira-collection-page-read-actions reads never get upstream's recovery. Not a regression (the fork tip had none), but the ledger's 'past the first page' understates the gap. Fix: apply the bounded retry to the cursorless JQL page read, or correct the ledger text.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-H-2",
+        "real": true,
+        "severity": "NIT",
+        "why": "The fork tip already dropped readJiraError/toJiraApiError (jira-api-error.ts was a bare re-export), nothing in src references them, and authenticated-request.ts carries the superset. Record only.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-K-1",
+        "real": true,
+        "severity": "MINOR",
+        "why": "runtime-host-services.ts now declares only mobileSpeechOwners (lazy, dynamic import), and nothing in src reads runtime.mobileSpeech or mobileDictation. The @ts-nocheck file still constructs both eagerly and statically imports their modules: a startup cost, not a behaviour bug, since the command surface uses only the lazy instances. Fix: delete orca-runtime-owned-controllers.ts lines 8-9 and 34-36.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-L-1",
+        "real": false,
+        "severity": "NIT",
+        "why": "This exemption is the fork's sanctioned procedure: the ledger's max-lines section says upstream-owned files are exempted, not split, and forbids splitting them, and local/max-lines-exemption.mjs writes exactly this header plus baseline row. Only the directive's 'at its budget' wording is imprecise.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-M-1",
+        "real": true,
+        "severity": "NIT",
+        "why": "The file has no importer, but the ledger records keeping it as upstream's bytes on purpose; deleting it would need an expected-deletion row and create modify/delete churn every sync. No fix.",
+        "by": "adj-1"
+      },
+      {
+        "id": "S-O-1",
+        "real": true,
+        "severity": "MINOR",
+        "why": "HEAD's use-checks-panel-polling.tsx differs from the fork tip only in two comments and keeps both finalizers; the fork tip recorded 3 bailouts on the same compiler, but the merge took upstream's baseline with no row, so the ratchet reds the inner loop. No runtime effect, and the release gate does not run this ratchet (exclusions.mjs:36). Fix: restore the '3 …/use-checks-panel-polling.tsx' row.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-S-1",
+        "real": false,
+        "severity": "NIT",
+        "why": "Real at the merge, but b346e041e9c removed 'skills' from VIEWS_OWNING_CONTENT_HEADER (AppWorkspaceShell.tsx:69-73), so the stripe now reserves the band exactly as for Automations and Artifacts; nothing is left to fix at HEAD.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-S-2",
+        "real": true,
+        "severity": "MINOR",
+        "why": "SkillsPageHeader.tsx:57-61 passes close={…} again, which RailPageHeader shows whenever the rail is hidden, undoing #366 (f3086f3283c) with no LOCAL-PATCHES entry; no other rail page passes close. Fix: drop the close prop and onClose plumbing and re-add the tombstones, or record the decision in LOCAL-PATCHES.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-T-1",
+        "real": true,
+        "severity": "NIT",
+        "why": "rate-limit-types.ts:244 types the field as `?: []`; the only renderer consumer is use-status-bar-controller.ts:255, which passes it into a controller field nothing reads. Dead but harmless; remove at the next sync.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-T-2",
+        "real": true,
+        "severity": "NIT",
+        "why": "No manifest entry sets pendingNeedsSetup any more, so the branch at status-bar-provider-visibility.ts:173 is unreachable; usage-provider-manifest.conformance.test.ts:145 still exercises the accessor, so it is a dormant manifest capability, not a broken rule.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-U-1",
+        "real": false,
+        "severity": "NIT",
+        "why": "Fixed in b346e041e9c, which deleted the closeSkills/closeTooltip tombstones from all ten fork overlays; grep finds no tombstone left, and every upstream locale carries both strings.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-V-1",
+        "real": true,
+        "severity": "NIT",
+        "why": "The trimmed doc at listener-state.ts:134-135 drops the reason the inventory lives in state (a republish can arrive with no inventory); comment-only, no behaviour change.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-V-2",
+        "real": false,
+        "severity": "NIT",
+        "why": "2bbb951da0f added claude-background-task-shell-hold.test.ts, which asserts that a local_bash hold reads plain working and a monitor reads monitoring, so the narrowed rule is pinned; the writers (roster-state, ingest-remote) all set hasShellTask.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-Y-1",
+        "real": true,
+        "severity": "NIT",
+        "why": "The file is 337 lines with an inline max-lines disable and baseline row 116, as disclosed in the merge message; splitting an upstream-owned schema file in the fork would cost more at every sync than the exemption does.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-Y-2",
+        "real": true,
+        "severity": "NIT",
+        "why": "dashboardPopoutBounds (client-ui-params.ts:280) is still read by persisted-ui-state-types.ts:263, wsl-move-ui-dispositions.ts:179 and the held-dead dashboard-popout-window.ts; retire them together, not inside this conflict.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-Z-1",
+        "real": false,
+        "severity": "NIT",
+        "why": "Not a defect: lazyZodSchema's proxy forwards _zod (and has/ownKeys/prototype) to the materialized schema, and upstream already nests lazy schemas inside lazy factories (WorktreeSelector.extend); the union's member order and modes are the fork's existing logic.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-AA-1",
+        "real": true,
+        "severity": "NIT",
+        "why": "The schema-valued ListIssuesFields (jira-params.ts:60) came from a172ad78d20, not the merge; ListIssues and ListIssuesPage produce the same shapes as before, so it is only a naming mismatch with the record BoardIssuePageFields at :231.",
+        "by": "adj-2"
+      },
+      {
+        "id": "S-AD-1",
+        "real": true,
+        "severity": "NIT",
+        "why": "No manifest entry sets pendingNeedsSetup, so usageProviderPendingNeedsSetup is constant false and that clause in isUsageEmptyState never applies. It is harmless and the conformance test records it; no fix needed, though the optional field could be deleted.",
+        "by": "adj-3"
+      },
+      {
+        "id": "B-3",
+        "real": true,
+        "severity": "NIT",
+        "why": "Locally a running workflow/unknown/malformed task now reads monitoring, while the WSL-only relay hard-codes hasShellTask: true and reads working. It is a badge-only divergence the ledger already records, and turn completion is unaffected. Fix: reword the server-ingest-remote.ts:300-302 comment to say the local lane now gives non-shell kinds upstream's monitoring.",
+        "by": "adj-3"
+      },
+      {
+        "id": "delta-1-1",
+        "real": true,
+        "severity": "MINOR",
+        "why": "The wording parts are already fixed at HEAD, but measureSurface measures each diff from its base, so the five non-mesh rows give every later hosts diff a fresh 32/21/18/12/2-line allowance that nothing limits to the repair. Fix: delete those rows (one hunk) now that the repair is on main.",
+        "by": "adj-3"
+      },
+      {
+        "id": "delta-1-2",
+        "real": true,
+        "severity": "NIT",
+        "why": "joiner.extend(...) and keyB64.optional() at host-mesh-params.ts:32-33 materialize the lazy proxies at module load, so the wrapping defers nothing there; behaviour is correct. Fix: wrap joinerWithPublicKey/joinerWithOptionalPublicKey in lazyZodSchema too.",
+        "by": "adj-3"
+      },
+      {
+        "id": "delta-3-1",
+        "real": true,
+        "severity": "NIT",
+        "why": "Line 68 of the fork overlay is out of path order; readCountBaseline ignores order, but formatCountBaseline sorts on --prune. Fix: move it next to src/main/ipc/ephemeral-vm/ephemeral-vm-runtime-handlers.ts (line 94).",
+        "by": "adj-3"
+      },
+      {
+        "id": "delta-4-1",
+        "real": true,
+        "severity": "NIT",
+        "why": "expected-deletions.json:211 has commit \"2026-11-27\", and conflict-propose.mjs:93 prints that field as provenance; the blob itself is correct. Fix: use 20e7fbc94d4 or drop the field.",
+        "by": "adj-3"
+      },
+      {
+        "id": "delta-4-2",
+        "real": true,
+        "severity": "NIT",
+        "why": "convergence-ledger.md:154 says both constants died with the Antigravity retirement, but the SKILLS_PAGE_TOP_ROW_INSET row credits upstream's #50484 rail rewrite. Fix: say one died with the retirement and one with upstream's rail rewrite.",
+        "by": "adj-3"
+      }
+    ]
+  },
+  "waiver": null
+}
