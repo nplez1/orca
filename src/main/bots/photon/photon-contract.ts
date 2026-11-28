@@ -38,13 +38,25 @@ export const PHOTON_SLUG_MAX = 63
 
 const NonEmpty = lazyZodSchema(() => z.string().min(1))
 
+/** Photon answers with `projectId`; the docs' `id` is read too, so either naming parses. */
 export const PhotonProjectSchema = lazyZodSchema(() =>
-  z.object({
-    id: NonEmpty,
-    slug: NonEmpty,
-    name: z.string(),
-    organizationId: NonEmpty
-  })
+  z
+    .object({
+      id: NonEmpty.optional(),
+      projectId: NonEmpty.optional(),
+      slug: NonEmpty,
+      name: z.string(),
+      organizationId: NonEmpty
+    })
+    .transform((project, ctx) => {
+      // Photon's own answer, preferred over the docs' name when both arrive.
+      const id = project.projectId ?? project.id
+      if (!id) {
+        ctx.addIssue({ code: 'custom', path: ['id'], message: 'Neither id nor projectId' })
+        return z.NEVER
+      }
+      return { id, slug: project.slug, name: project.name, organizationId: project.organizationId }
+    })
 )
 export type PhotonProject = z.infer<typeof PhotonProjectSchema>
 
