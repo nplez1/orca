@@ -142,7 +142,7 @@ describe('isWorkspaceEmptiedForSeeding', () => {
   })
 })
 
-describe('isWorkspaceEmptiedOnPurpose', () => {
+describe('isWorkspaceEmptiedOnPurpose — workspace-scope close record', () => {
   it('reads an empty workspace whose last chat, browser or editor tab was closed as emptied', () => {
     expect(
       isWorkspaceEmptiedOnPurpose(
